@@ -1,0 +1,123 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+
+class InventoryController extends Controller
+{
+    public function index(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $rows = DB::table('stock_items as si')
+            ->join('warehouses as w', 'w.id', '=', 'si.warehouse_id')
+            ->join('product_variants as pv', 'pv.id', '=', 'si.product_variant_id')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->where('si.tenant_id', $tenantId)
+            ->select([
+                'si.id',
+                'si.warehouse_id',
+                'w.name as warehouse_name',
+                'si.product_variant_id',
+                'p.sku',
+                'p.name as product_name',
+                'pv.flavor',
+                'pv.sale_price',
+                'si.on_hand',
+                'si.reserved',
+                DB::raw('(si.on_hand - si.reserved) as available'),
+            ])
+            ->orderBy('p.name')
+            ->get();
+
+        return response()->json(['data' => $rows]);
+    }
+
+    public function adjust(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'warehouse_id' => ['required', 'integer'],
+            'product_variant_id' => ['required', 'integer'],
+            'qty' => ['required', 'integer', 'not_in:0'],
+            'movement_type' => ['required', 'string', 'max:40'],
+            'unit_cost' => ['nullable', 'numeric', 'min:0'],
+            'reference_type' => ['nullable', 'string', 'max:100'],
+            'reference_id' => ['nullable', 'integer'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $warehouseExists = DB::table('warehouses')
+            ->where('id', $request->integer('warehouse_id'))
+            ->where('tenant_id', $tenantId)
+            ->exists();
+
+        $variantExists = DB::table('product_variants')
+            ->where('id', $request->integer('product_variant_id'))
+            ->where('tenant_id', $tenantId)
+            ->exists();
+
+        if (! $warehouseExists || ! $variantExists) {
+            return response()->json(['message' => 'Magazzino o variante non validi per il tenant.'], 404);
+        }
+
+        $now = now();
+
+        DB::transaction(function () use ($request, $tenantId, $now): void {
+            $stockExists = DB::table('stock_items')
+                ->where('tenant_id', $tenantId)
+                ->where('warehouse_id', $request->integer('warehouse_id'))
+                ->where('product_variant_id', $request->integer('product_variant_id'))
+                ->exists();
+
+            if (! $stockExists) {
+                DB::table('stock_items')->insert([
+                    'tenant_id' => $tenantId,
+                    'warehouse_id' => $request->integer('warehouse_id'),
+                    'product_variant_id' => $request->integer('product_variant_id'),
+                    'on_hand' => 0,
+                    'reserved' => 0,
+                    'reorder_point' => 0,
+                    'safety_stock' => 0,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            DB::table('stock_items')
+                ->where('tenant_id', $tenantId)
+                ->where('warehouse_id', $request->integer('warehouse_id'))
+                ->where('product_variant_id', $request->integer('product_variant_id'))
+                ->update([
+                    'on_hand' => DB::raw('on_hand + '.(int) $request->integer('qty')),
+                    'updated_at' => $now,
+                ]);
+
+            DB::table('stock_movements')->insert([
+                'tenant_id' => $tenantId,
+                'warehouse_id' => $request->integer('warehouse_id'),
+                'product_variant_id' => $request->integer('product_variant_id'),
+                'movement_type' => (string) $request->input('movement_type'),
+                'qty' => (int) $request->integer('qty'),
+                'unit_cost' => $request->input('unit_cost'),
+                'reference_type' => $request->input('reference_type'),
+                'reference_id' => $request->input('reference_id'),
+                'employee_id' => $request->user()->id,
+                'occurred_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        });
+
+        return response()->json(['message' => 'Movimento registrato.']);
+    }
+}

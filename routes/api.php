@@ -1,0 +1,54 @@
+<?php
+
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CatalogController;
+use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\LoyaltyController;
+use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\ShippingController;
+use App\Http\Controllers\Api\SmartInventoryController;
+use Illuminate\Support\Facades\Route;
+
+Route::post('/login', [AuthController::class, 'login']);
+
+Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
+    Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+
+    Route::middleware('role:superadmin,admin_cliente')->group(function () {
+        Route::get('/catalog/products', [CatalogController::class, 'index']);
+        Route::post('/catalog/products', [CatalogController::class, 'store']);
+
+        Route::get('/customers', [CustomerController::class, 'index']);
+        Route::post('/customers', [CustomerController::class, 'store']);
+        Route::put('/customers/{customerId}', [CustomerController::class, 'update']);
+
+        Route::get('/employees', [EmployeeController::class, 'index']);
+        Route::post('/employees', [EmployeeController::class, 'store']);
+        Route::put('/employees/{employeeId}', [EmployeeController::class, 'update']);
+
+        Route::get('/shipping/carriers', [ShippingController::class, 'carriers']);
+        Route::post('/shipping/carriers', [ShippingController::class, 'storeCarrier']);
+        Route::get('/shipping/shipments', [ShippingController::class, 'shipments']);
+        Route::post('/shipping/shipments', [ShippingController::class, 'createShipment']);
+        Route::put('/shipping/shipments/{shipmentId}', [ShippingController::class, 'updateShipmentStatus']);
+
+        Route::get('/inventory/smart-reorder/preview', [SmartInventoryController::class, 'preview']);
+        Route::post('/inventory/smart-reorder/run', [SmartInventoryController::class, 'run']);
+    });
+
+    Route::middleware('role:superadmin,admin_cliente,dipendente')->group(function () {
+        Route::get('/inventory/stock', [InventoryController::class, 'index']);
+        Route::post('/inventory/adjust', [InventoryController::class, 'adjust']);
+
+        Route::post('/orders/quote', [OrderController::class, 'quote']);
+        Route::post('/orders/place', [OrderController::class, 'place']);
+    });
+
+    Route::middleware('role:superadmin,admin_cliente,dipendente,cliente_finale')->group(function () {
+        Route::get('/loyalty/customers/{customerId}/wallet', [LoyaltyController::class, 'showWallet']);
+        Route::post('/loyalty/customers/{customerId}/redeem-preview', [LoyaltyController::class, 'redeemPreview']);
+    });
+});
