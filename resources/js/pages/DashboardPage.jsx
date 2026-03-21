@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { orders, inventory, customers, employees, loyalty } from '../api.jsx';
-import { TrendingUp, AlertCircle, ShoppingCart, Package, Users, Briefcase, Zap } from 'lucide-react';
-import StatCard from '../components/StatCard.jsx';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
-import ErrorAlert from '../components/ErrorAlert.jsx';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { orders, inventory, customers, employees } from '../api.jsx';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { setLowStockCount } = useOutletContext();
+
   const [data, setData] = useState({
     totalOrders: 0,
     totalRevenue: 0,
@@ -16,169 +14,221 @@ export default function DashboardPage() {
     activeEmployees: 0,
     recentOrders: [],
   });
-  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  useEffect(() => { fetchDashboardData(); }, []);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError('');
 
-      // Fetch all data in parallel
-      const [ordersRes, inventoryRes, customersRes, employeesRes, smartResRes] = await Promise.all([
+      const [ordersRes, inventoryRes, customersRes, employeesRes] = await Promise.all([
         orders.getOrders().catch(() => ({})),
         inventory.getStock().catch(() => ({})),
         customers.getCustomers().catch(() => ({})),
         employees.getEmployees().catch(() => ({})),
-        inventory.getSmartReorderPreview().catch(() => ({})),
       ]);
 
-      // Calculate totals
-      const ordersList = ordersRes.data?.data || [];
-      const stockList = inventoryRes.data?.data || [];
+      const ordersList    = ordersRes.data?.data    || [];
+      const stockList     = inventoryRes.data?.data || [];
       const customersList = customersRes.data?.data || [];
       const employeesList = employeesRes.data?.data || [];
-      const smartAlerts = smartResRes.data?.alerts || [];
 
-      const totalRevenue = ordersList.reduce((sum, order) => sum + (order.grand_total || 0), 0);
-      const lowStockItems = stockList.filter(item => item.on_hand < item.reorder_point).length;
+      const totalRevenue  = ordersList.reduce((sum, o) => sum + (o.grand_total || 0), 0);
+      const lowStockItems = stockList.filter(i => i.on_hand < i.reorder_point).length;
 
       setData({
-        totalOrders: ordersList.length,
-        totalRevenue: totalRevenue,
-        lowStockItems: lowStockItems,
+        totalOrders:     ordersList.length,
+        totalRevenue,
+        lowStockItems,
         activeCustomers: customersList.length,
         activeEmployees: employeesList.length,
-        recentOrders: ordersList.slice(0, 5),
+        recentOrders:    ordersList.slice(0, 10),
       });
 
-      setAlerts(smartAlerts || []);
+      setLowStockCount(lowStockItems);
     } catch (err) {
       setError(err.message || 'Errore nel caricamento dei dati');
-      console.error('Dashboard error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) return <LoadingSpinner />;
+  const filteredOrders = data.recentOrders.filter(order => {
+    const matchSearch =
+      !search ||
+      String(order.id).includes(search) ||
+      `${order.customer?.first_name} ${order.customer?.last_name}`.toLowerCase().includes(search.toLowerCase());
+    const matchStatus =
+      statusFilter === 'all' || order.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  const statusBadge = (status) => {
+    if (status === 'paid')    return <span className="badge high"><span className="badge-dot"></span>Pagato</span>;
+    if (status === 'draft')   return <span className="badge mid"><span className="badge-dot"></span>Bozza</span>;
+    return                           <span className="badge low"><span className="badge-dot"></span>Pendente</span>;
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 300 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: 40, height: 40, border: '3px solid var(--border2)',
+            borderTopColor: 'var(--gold)', borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite', margin: '0 auto',
+          }}></div>
+          <p style={{ marginTop: 14, color: 'var(--muted)', fontSize: 13 }}>Caricamento…</p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 mt-1">Benvenuto nel gestionale SvaPro</p>
+    <>
+      {/* ── KPI GRID ── */}
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-label">Ricavi Totali</div>
+          <div className="kpi-value gold">
+            €{data.totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <span className="kpi-delta up">↑ live</span>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-label">Ordini</div>
+          <div className="kpi-value">{data.totalOrders}</div>
+          <span className="kpi-delta up">Totale</span>
+        </div>
+
+        <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/inventory')}>
+          <div className="kpi-label">Stock Basso</div>
+          <div className={`kpi-value${data.lowStockItems > 0 ? ' red' : ''}`}>{data.lowStockItems}</div>
+          {data.lowStockItems > 0
+            ? <span className="kpi-delta warn">⚠ da riordinare</span>
+            : <span className="kpi-delta up">✓ ok</span>}
+        </div>
+
+        <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/customers')}>
+          <div className="kpi-label">Clienti</div>
+          <div className="kpi-value">{data.activeCustomers}</div>
+          <span className="kpi-delta up">Registrati</span>
+        </div>
       </div>
 
-      {/* Alerts */}
-      {alerts.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
-            <div>
-              <h3 className="font-semibold text-amber-900">Stock Bassi</h3>
-              <p className="text-sm text-amber-800 mt-1">
-                {alerts.length} prodotto/i hanno stock inferiore alla soglia di riordino
-              </p>
-              <button
-                onClick={() => navigate('/inventory/smart-reorder')}
-                className="mt-2 text-sm font-medium text-amber-600 hover:text-amber-700"
-              >
-                Visualizza Smart Reorder →
-              </button>
-            </div>
-          </div>
+      {/* ── ALERT BANNER ── */}
+      {data.lowStockItems > 0 && (
+        <div className="alert-banner">
+          <span className="icon">⚠</span>
+          <span>
+            <strong>{data.lowStockItems} {data.lowStockItems === 1 ? 'prodotto' : 'prodotti'}</strong>
+            con stock sotto la soglia di riordino
+          </span>
+          <button className="banner-link" onClick={() => navigate('/inventory/smart-reorder')}>
+            Vai a Smart Reorder →
+          </button>
         </div>
       )}
 
-      {error && <ErrorAlert message={error} onRetry={fetchDashboardData} />}
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard
-          title="Ordini Totali"
-          value={data.totalOrders}
-          icon={ShoppingCart}
-          color="blue"
-        />
-        <StatCard
-          title="Ricavi"
-          value={`€${data.totalRevenue.toFixed(2)}`}
-          icon={TrendingUp}
-          color="green"
-        />
-        <StatCard
-          title="Stock Basso"
-          value={data.lowStockItems}
-          icon={Zap}
-          color="red"
-          onClick={() => navigate('/inventory')}
-        />
-        <StatCard
-          title="Clienti"
-          value={data.activeCustomers}
-          icon={Users}
-          color="purple"
-          onClick={() => navigate('/customers')}
-        />
-        <StatCard
-          title="Dipendenti"
-          value={data.activeEmployees}
-          icon={Briefcase}
-          color="indigo"
-          onClick={() => navigate('/employees')}
-        />
-      </div>
-
-      {/* Recent Orders */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Ordini Recenti</h2>
+      {/* ── ERROR ── */}
+      {error && (
+        <div className="alert-banner" style={{ borderColor: 'rgba(230,76,60,.4)' }}>
+          <span className="icon">✕</span>
+          <span><strong>Errore:</strong> {error}</span>
+          <button className="banner-link" onClick={fetchDashboardData}>Riprova →</button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
+      )}
+
+      {/* ── RECENT ORDERS ── */}
+      <div>
+        <div className="section-header">
+          <div className="section-title">
+            Ordini Recenti
+            <span className="section-subtitle"> — ultimi {data.recentOrders.length}</span>
+          </div>
+          <button className="btn btn-ghost" onClick={() => navigate('/orders')}>Vedi tutti</button>
+          <button className="btn btn-gold" onClick={() => navigate('/orders')}>
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd"/></svg>
+            Nuovo Ordine
+          </button>
+        </div>
+
+        <div className="table-card">
+          <div className="table-toolbar">
+            <div className="search-box">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style={{ color: 'var(--muted)', flexShrink: 0 }}>
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+              </svg>
+              <input
+                placeholder="Cerca per ID o cliente…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            <button
+              className={`filter-chip${statusFilter === 'all' ? ' active' : ''}`}
+              onClick={() => setStatusFilter('all')}
+            >Tutti</button>
+            <button
+              className={`filter-chip${statusFilter === 'paid' ? ' active' : ''}`}
+              onClick={() => setStatusFilter('paid')}
+            >Pagati</button>
+            <button
+              className={`filter-chip${statusFilter === 'draft' ? ' active' : ''}`}
+              onClick={() => setStatusFilter('draft')}
+            >Bozze</button>
+            <button
+              className={`filter-chip${statusFilter === 'pending' ? ' active' : ''}`}
+              onClick={() => setStatusFilter('pending')}
+            >Pendenti</button>
+          </div>
+
+          <table>
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left font-medium text-gray-700">ID</th>
-                <th className="px-6 py-3 text-left font-medium text-gray-700">Cliente</th>
-                <th className="px-6 py-3 text-left font-medium text-gray-700">Totale</th>
-                <th className="px-6 py-3 text-left font-medium text-gray-700">Stato</th>
+                <th>ID</th>
+                <th>Cliente</th>
+                <th>Totale</th>
+                <th>Stato</th>
+                <th></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {data.recentOrders.length > 0 ? (
-                data.recentOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-3 font-medium text-gray-900">#{order.id}</td>
-                    <td className="px-6 py-3 text-gray-600">
-                      {order.customer?.first_name} {order.customer?.last_name}
-                    </td>
-                    <td className="px-6 py-3 font-medium text-gray-900">
-                      €{order.grand_total?.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                        order.status === 'paid'
-                          ? 'bg-green-100 text-green-800'
-                          : order.status === 'draft'
-                          ? 'bg-gray-100 text-gray-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {order.status === 'paid' ? 'Pagato' : order.status === 'draft' ? 'Bozza' : 'Pendente'}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
+            <tbody>
+              {filteredOrders.length > 0 ? filteredOrders.map(order => (
+                <tr key={order.id}>
+                  <td><span className="mono">#{String(order.id).padStart(4, '0')}</span></td>
+                  <td style={{ color: 'var(--text)', fontWeight: 500 }}>
+                    {order.customer
+                      ? `${order.customer.first_name} ${order.customer.last_name}`
+                      : <span style={{ color: 'var(--muted)' }}>—</span>}
+                  </td>
+                  <td>
+                    <span className="mono positive">
+                      €{(order.grand_total || 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </td>
+                  <td>{statusBadge(order.status)}</td>
+                  <td>
+                    <button
+                      className="btn btn-ghost"
+                      style={{ padding: '5px 10px', fontSize: 12 }}
+                      onClick={() => navigate('/orders')}
+                    >
+                      Apri
+                    </button>
+                  </td>
+                </tr>
+              )) : (
                 <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
-                    Nessun ordine trovato
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--muted)' }}>
+                    {search || statusFilter !== 'all' ? 'Nessun risultato per i filtri applicati' : 'Nessun ordine trovato'}
                   </td>
                 </tr>
               )}
@@ -187,23 +237,94 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button
-          onClick={() => navigate('/orders')}
-          className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition text-left"
-        >
-          <h3 className="font-semibold text-indigo-900">Crea Nuovo Ordine</h3>
-          <p className="text-sm text-indigo-700 mt-1">Aggiungi un nuovo ordine di vendita</p>
-        </button>
-        <button
-          onClick={() => navigate('/inventory/smart-reorder')}
-          className="p-4 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition text-left"
-        >
-          <h3 className="font-semibold text-purple-900">Smart Reorder</h3>
-          <p className="text-sm text-purple-700 mt-1">Gestisci ordini automatici di magazzino</p>
-        </button>
+      {/* ── BOTTOM GRID ── */}
+      <div className="bottom-grid">
+
+        {/* Quick Actions */}
+        <div className="mini-card">
+          <div className="mini-card-title">Azioni Rapide</div>
+
+          <a className="quick-action" href="/orders" onClick={e => { e.preventDefault(); navigate('/orders'); }}>
+            <div className="quick-action-icon" style={{ background: 'var(--blue-bg)' }}>
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="var(--blue)"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3z"/></svg>
+            </div>
+            <div>
+              <div className="quick-action-label">Nuovo Ordine</div>
+              <div className="quick-action-sub">Aggiungi un ordine di vendita</div>
+            </div>
+          </a>
+
+          <a className="quick-action" href="/inventory/smart-reorder" onClick={e => { e.preventDefault(); navigate('/inventory/smart-reorder'); }}>
+            <div className="quick-action-icon" style={{ background: 'var(--amber-bg)' }}>
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="var(--amber)"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+            </div>
+            <div>
+              <div className="quick-action-label">Smart Reorder</div>
+              <div className="quick-action-sub">Riordino automatico AI</div>
+            </div>
+          </a>
+
+          <a className="quick-action" href="/catalog" onClick={e => { e.preventDefault(); navigate('/catalog'); }}>
+            <div className="quick-action-icon" style={{ background: 'var(--gold-glow)' }}>
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="var(--gold)"><path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4z" clipRule="evenodd"/></svg>
+            </div>
+            <div>
+              <div className="quick-action-label">Aggiungi Prodotto</div>
+              <div className="quick-action-sub">Gestisci il catalogo</div>
+            </div>
+          </a>
+
+          <a className="quick-action" href="/customers" onClick={e => { e.preventDefault(); navigate('/customers'); }}>
+            <div className="quick-action-icon" style={{ background: 'var(--green-bg)' }}>
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="var(--green)"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+            </div>
+            <div>
+              <div className="quick-action-label">Nuovo Cliente</div>
+              <div className="quick-action-sub">Registra un cliente</div>
+            </div>
+          </a>
+        </div>
+
+        {/* Riepilogo */}
+        <div className="mini-card">
+          <div className="mini-card-title">Riepilogo <span>aggiornato ora</span></div>
+
+          <div className="activity-item">
+            <div className="activity-dot" style={{ background: 'var(--gold)' }}></div>
+            <div className="activity-text">Ricavi totali</div>
+            <span className="mono positive">
+              €{data.totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+
+          <div className="activity-item">
+            <div className="activity-dot" style={{ background: 'var(--blue)' }}></div>
+            <div className="activity-text">Ordini registrati</div>
+            <span className="mono" style={{ color: 'var(--text)' }}>{data.totalOrders}</span>
+          </div>
+
+          <div className="activity-item">
+            <div className="activity-dot" style={{ background: 'var(--green)' }}></div>
+            <div className="activity-text">Clienti attivi</div>
+            <span className="mono" style={{ color: 'var(--text)' }}>{data.activeCustomers}</span>
+          </div>
+
+          <div className="activity-item">
+            <div className="activity-dot" style={{ background: 'var(--muted2)' }}></div>
+            <div className="activity-text">Dipendenti</div>
+            <span className="mono" style={{ color: 'var(--text)' }}>{data.activeEmployees}</span>
+          </div>
+
+          <div className="activity-item">
+            <div className="activity-dot" style={{ background: data.lowStockItems > 0 ? 'var(--red)' : 'var(--green)' }}></div>
+            <div className="activity-text">Prodotti sotto soglia</div>
+            <span className={`mono${data.lowStockItems > 0 ? ' negative' : ' positive'}`}>
+              {data.lowStockItems}
+            </span>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
+
