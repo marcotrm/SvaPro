@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { customers } from '../api.jsx';
-import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import CustomerModal from '../components/CustomerModal.jsx';
@@ -13,111 +12,100 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
+  useEffect(() => { fetchCustomers(); }, []);
 
   const fetchCustomers = async () => {
     try {
-      setLoading(true);
-      setError('');
+      setLoading(true); setError('');
       const response = await customers.getCustomers();
       setCustomersList(response.data.data || []);
     } catch (err) {
       setError(err.message || 'Errore nel caricamento dei clienti');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const handleOpenModal = (customer = null) => {
-    setSelectedCustomer(customer);
-    setShowModal(true);
-  };
+  const handleOpenModal = (customer = null) => { setSelectedCustomer(customer); setShowModal(true); };
+  const handleCloseModal = () => { setShowModal(false); setSelectedCustomer(null); };
+  const handleSaveCustomer = async () => { await fetchCustomers(); handleCloseModal(); };
 
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setSelectedCustomer(null);
-  };
-
-  const handleSaveCustomer = async () => {
-    await fetchCustomers();
-    handleCloseModal();
-  };
-
-  const filteredCustomers = customersList.filter(c =>
+  const filtered = customersList.filter(c =>
     c.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const initials = c => `${c.first_name?.[0] || ''}${c.last_name?.[0] || ''}`.toUpperCase();
+
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Clienti</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
-        >
-          <Plus size={20} />
+    <>
+      {/* Page header */}
+      <div className="page-head">
+        <div>
+          <div className="page-head-title">Clienti</div>
+          <div className="page-head-sub">{customersList.length} clienti registrati</div>
+        </div>
+        <button className="btn btn-gold" onClick={() => handleOpenModal()}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Nuovo Cliente
         </button>
       </div>
 
       {error && <ErrorAlert message={error} onRetry={fetchCustomers} />}
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-        <input
-          type="text"
-          placeholder="Cerca per nome, email o codice..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-      </div>
-
-      {/* Customers Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+      {/* Table */}
+      <div className="table-card">
+        <div className="table-toolbar">
+          <div className="search-box">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color:'var(--muted)',flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input
+              placeholder="Cerca per nome, email o codice..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>{filtered.length} risultati</span>
+        </div>
+        <table>
+          <thead>
             <tr>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Codice</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Nome</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Email</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Telefono</th>
-              <th className="px-6 py-3 text-center font-medium text-gray-700">Azioni</th>
+              <th>Codice</th>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Telefono</th>
+              <th style={{textAlign:'right'}}>Azioni</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredCustomers.length > 0 ? (
-              filteredCustomers.map((customer) => (
-                <tr key={customer.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 font-medium text-gray-900">{customer.code}</td>
-                  <td className="px-6 py-3 text-gray-600">{customer.first_name} {customer.last_name}</td>
-                  <td className="px-6 py-3 text-gray-600">{customer.email}</td>
-                  <td className="px-6 py-3 text-gray-600">{customer.phone || '-'}</td>
-                  <td className="px-6 py-3 text-center flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => handleOpenModal(customer)}
-                      className="text-indigo-600 hover:text-indigo-700"
-                    >
-                      <Edit2 size={18} />
+          <tbody>
+            {filtered.length > 0 ? filtered.map(customer => (
+              <tr key={customer.id}>
+                <td><span className="mono" style={{color:'var(--gold)'}}>{customer.code}</span></td>
+                <td>
+                  <div className="avatar-cell">
+                    <div className="avatar-sm">{initials(customer)}</div>
+                    <div>
+                      <div className="avatar-name">{customer.first_name} {customer.last_name}</div>
+                    </div>
+                  </div>
+                </td>
+                <td style={{color:'var(--muted2)'}}>{customer.email}</td>
+                <td style={{color:'var(--muted2)'}}>{customer.phone || 'â€”'}</td>
+                <td>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}}>
+                    <button className="icon-action edit" onClick={() => handleOpenModal(customer)} title="Modifica">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
-                    <button className="text-red-600 hover:text-red-700">
-                      <Trash2 size={18} />
+                    <button className="icon-action danger" title="Elimina">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                     </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
+                  </div>
+                </td>
+              </tr>
+            )) : (
               <tr>
-                <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                <td colSpan="5" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
                   Nessun cliente trovato
                 </td>
               </tr>
@@ -126,14 +114,10 @@ export default function CustomersPage() {
         </table>
       </div>
 
-      {/* Modal */}
       {showModal && (
-        <CustomerModal
-          customer={selectedCustomer}
-          onClose={handleCloseModal}
-          onSave={handleSaveCustomer}
-        />
+        <CustomerModal customer={selectedCustomer} onClose={handleCloseModal} onSave={handleSaveCustomer} />
       )}
-    </div>
+    </>
   );
 }
+

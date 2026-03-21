@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { catalog } from '../api.jsx';
-import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
@@ -13,39 +12,23 @@ export default function CatalogPage() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+  useEffect(() => { fetchProducts(); }, []);
 
   const fetchProducts = async () => {
     try {
-      setLoading(true);
-      setError('');
+      setLoading(true); setError('');
       const response = await catalog.getProducts();
       setProducts(response.data.data || []);
     } catch (err) {
       setError(err.message || 'Errore nel caricamento dei prodotti');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const handleOpenModal = (product = null) => {
-    setSelectedProduct(product);
-    setShowModal(true);
-  };
+  const handleOpenModal = (product = null) => { setSelectedProduct(product); setShowModal(true); };
+  const handleCloseModal = () => { setShowModal(false); setSelectedProduct(null); };
+  const handleSaveProduct = async () => { await fetchProducts(); handleCloseModal(); };
 
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setSelectedProduct(null);
-  };
-
-  const handleSaveProduct = async () => {
-    await fetchProducts();
-    handleCloseModal();
-  };
-
-  const filteredProducts = products.filter(p =>
+  const filtered = products.filter(p =>
     p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -53,71 +36,69 @@ export default function CatalogPage() {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Catalogo</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
-        >
-          <Plus size={20} />
+    <>
+      {/* Page header */}
+      <div className="page-head">
+        <div>
+          <div className="page-head-title">Catalogo Prodotti</div>
+          <div className="page-head-sub">{products.length} prodotti nel database</div>
+        </div>
+        <button className="btn btn-gold" onClick={() => handleOpenModal()}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Nuovo Prodotto
         </button>
       </div>
 
       {error && <ErrorAlert message={error} onRetry={fetchProducts} />}
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-        <input
-          type="text"
-          placeholder="Cerca per nome o SKU..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-      </div>
-
-      {/* Products Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+      {/* Table */}
+      <div className="table-card">
+        <div className="table-toolbar">
+          <div className="search-box">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color:'var(--muted)',flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input
+              placeholder="Cerca per nome o SKU..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>
+            {filtered.length} risultati
+          </span>
+        </div>
+        <table>
+          <thead>
             <tr>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Nome</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">SKU</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Brand</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Categoria</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Prezzo</th>
-              <th className="px-6 py-3 text-center font-medium text-gray-700">Azioni</th>
+              <th>Nome</th>
+              <th>SKU</th>
+              <th>Brand</th>
+              <th>Categoria</th>
+              <th>Prezzo</th>
+              <th style={{textAlign:'right'}}>Azioni</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredProducts.length > 0 ? (
-              filteredProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 font-medium text-gray-900">{product.name}</td>
-                  <td className="px-6 py-3 text-gray-600">{product.sku}</td>
-                  <td className="px-6 py-3 text-gray-600">{product.brand?.name || '-'}</td>
-                  <td className="px-6 py-3 text-gray-600">{product.category?.name || '-'}</td>
-                  <td className="px-6 py-3 font-medium text-gray-900">€{product.price?.toFixed(2)}</td>
-                  <td className="px-6 py-3 text-center flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => handleOpenModal(product)}
-                      className="text-indigo-600 hover:text-indigo-700"
-                    >
-                      <Edit2 size={18} />
+          <tbody>
+            {filtered.length > 0 ? filtered.map(product => (
+              <tr key={product.id}>
+                <td style={{fontWeight:600,color:'var(--text)'}}>{product.name}</td>
+                <td><span className="mono" style={{color:'var(--muted2)'}}>{product.sku}</span></td>
+                <td style={{color:'var(--muted2)'}}>{product.brand?.name || '—'}</td>
+                <td style={{color:'var(--muted2)'}}>{product.category?.name || '—'}</td>
+                <td><span className="mono positive">€{product.price?.toFixed(2)}</span></td>
+                <td>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}}>
+                    <button className="icon-action edit" onClick={() => handleOpenModal(product)} title="Modifica">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
-                    <button className="text-red-600 hover:text-red-700">
-                      <Trash2 size={18} />
+                    <button className="icon-action danger" title="Elimina">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                     </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
+                  </div>
+                </td>
+              </tr>
+            )) : (
               <tr>
-                <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                <td colSpan="6" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
                   Nessun prodotto trovato
                 </td>
               </tr>
@@ -126,14 +107,9 @@ export default function CatalogPage() {
         </table>
       </div>
 
-      {/* Modal */}
       {showModal && (
-        <CatalogModal
-          product={selectedProduct}
-          onClose={handleCloseModal}
-          onSave={handleSaveProduct}
-        />
+        <CatalogModal product={selectedProduct} onClose={handleCloseModal} onSave={handleSaveProduct} />
       )}
-    </div>
+    </>
   );
 }

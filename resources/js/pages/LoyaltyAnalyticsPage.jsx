@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { loyalty, customers } from '../api.jsx';
-import { TrendingUp, Gift } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 export default function LoyaltyAnalyticsPage() {
   const [customersList, setCustomersList] = useState([]);
@@ -12,21 +11,16 @@ export default function LoyaltyAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
+  useEffect(() => { fetchCustomers(); }, []);
 
   const fetchCustomers = async () => {
     try {
-      setLoading(true);
-      setError('');
+      setLoading(true); setError('');
       const response = await customers.getCustomers();
       setCustomersList(response.data.data || []);
     } catch (err) {
       setError(err.message || 'Errore nel caricamento dei clienti');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleSelectCustomer = async (customer) => {
@@ -35,132 +29,191 @@ export default function LoyaltyAnalyticsPage() {
       const response = await loyalty.getWallet(customer.id);
       setWallet(response.data.wallet);
     } catch (err) {
-      console.error('Error fetching wallet:', err);
       setWallet(null);
     }
   };
 
-  const COLORS = ['#4f46e5', '#06b6d4', '#ec4899', '#f59e0b'];
+  const initials = c => `${c.first_name?.[0] || ''}${c.last_name?.[0] || ''}`.toUpperCase();
+
+  // Build chart data from ledger
+  const chartData = wallet?.ledger?.slice(0, 8).map(e => ({
+    date: new Date(e.created_at).toLocaleDateString('it-IT', {day:'2-digit',month:'short'}),
+    punti: e.type === 'earn' ? e.points : 0,
+    utilizzo: e.type === 'redeem' ? e.points : 0,
+  })) || [];
+
+  const pieData = wallet ? [
+    { name: 'Guadagnati', value: wallet.ledger?.filter(e => e.type === 'earn').reduce((s,e) => s + e.points, 0) || 0 },
+    { name: 'Utilizzati',  value: wallet.ledger?.filter(e => e.type === 'redeem').reduce((s,e) => s + e.points, 0) || 0 },
+  ] : [];
+  const PIE_COLORS = ['#c9a227', '#3d8ef0'];
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div style={{background:'var(--surface)',border:'1px solid var(--border2)',borderRadius:8,padding:'10px 14px',fontSize:12}}>
+        <div style={{color:'var(--muted)',marginBottom:4}}>{label}</div>
+        {payload.map((p, i) => (
+          <div key={i} style={{color: p.color, fontWeight:700}}>{p.name}: {p.value}</div>
+        ))}
+      </div>
+    );
+  };
 
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Loyalty Analytics</h1>
-        <p className="text-gray-500 mt-1">Gestione programma fedeltà e punti clienti</p>
+    <>
+      {/* Page header */}
+      <div className="page-head">
+        <div>
+          <div className="page-head-title">Loyalty Analytics</div>
+          <div className="page-head-sub">Gestione programma fedeltÃ  e punti clienti</div>
+        </div>
       </div>
 
       {error && <ErrorAlert message={error} onRetry={fetchCustomers} />}
 
-      {/* Customer Selection */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Seleziona Cliente</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {customersList.map((customer) => (
+      {/* Customer selector */}
+      <div className="table-card" style={{padding:20}}>
+        <div style={{fontSize:12,fontWeight:700,letterSpacing:'1px',textTransform:'uppercase',color:'var(--muted)',marginBottom:12}}>
+          Seleziona Cliente
+        </div>
+        <div className="loyalty-customers">
+          {customersList.map(customer => (
             <button
               key={customer.id}
+              className={`customer-card${selectedCustomer?.id === customer.id ? ' selected' : ''}`}
               onClick={() => handleSelectCustomer(customer)}
-              className={`p-3 rounded-lg border-2 transition text-left ${
-                selectedCustomer?.id === customer.id
-                  ? 'border-indigo-600 bg-indigo-50'
-                  : 'border-gray-200 bg-white hover:border-indigo-300'
-              }`}
             >
-              <p className="font-medium text-gray-900">{customer.first_name} {customer.last_name}</p>
-              <p className="text-xs text-gray-500">{customer.code}</p>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                <div className="avatar-sm" style={{width:26,height:26,fontSize:10}}>{initials(customer)}</div>
+                <div className="customer-card-name">{customer.first_name} {customer.last_name}</div>
+              </div>
+              <div className="customer-card-code">{customer.code}</div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Wallet Info */}
+      {/* Wallet KPIs */}
       {selectedCustomer && wallet && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Total Points */}
-          <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg shadow-sm border border-indigo-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-indigo-700">Punti Totali</p>
-                <p className="text-3xl font-bold text-indigo-600 mt-2">{wallet.current_points || 0}</p>
-              </div>
-              <Gift className="text-indigo-300" size={40} />
-            </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16}}>
+          {/* Punti */}
+          <div className="kpi-card">
+            <div className="kpi-label">Punti Totali</div>
+            <div className="kpi-value gold" style={{fontSize:32,marginTop:8}}>{wallet.current_points || 0}</div>
+            <div style={{fontSize:12,color:'var(--muted)',marginTop:4}}>Saldo attuale</div>
           </div>
-
-          {/* Monetary Value */}
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg shadow-sm border border-green-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-700">Valore Monetario</p>
-                <p className="text-3xl font-bold text-green-600 mt-2">€{((wallet.current_points || 0) * 0.05).toFixed(2)}</p>
-              </div>
-              <TrendingUp className="text-green-300" size={40} />
-            </div>
+          {/* Valore */}
+          <div className="kpi-card">
+            <div className="kpi-label">Valore Monetario</div>
+            <div className="kpi-value positive" style={{fontSize:32,marginTop:8}}>â‚¬{((wallet.current_points || 0) * 0.05).toFixed(2)}</div>
+            <div style={{fontSize:12,color:'var(--muted)',marginTop:4}}>0.05â‚¬ per punto</div>
           </div>
-
-          {/* Status */}
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg shadow-sm border border-purple-200 p-6">
-            <p className="text-sm font-medium text-purple-700">Stato Carta</p>
-            <p className="text-lg font-bold text-purple-600 mt-2 capitalize">
-              {wallet.card_status || 'Attiva'}
-            </p>
-            <p className="text-xs text-purple-600 mt-2">
-              {wallet.card_number ? `•••• ${wallet.card_number.slice(-4)}` : 'Validazione richiesta'}
-            </p>
+          {/* Stato carta */}
+          <div className="kpi-card">
+            <div className="kpi-label">Stato Carta</div>
+            <div style={{marginTop:8}}>
+              <span className={`badge ${wallet.card_status === 'active' ? 'high' : 'mid'}`} style={{fontSize:14,padding:'4px 12px'}}>
+                <span className="badge-dot" />
+                {wallet.card_status || 'Attiva'}
+              </span>
+            </div>
+            <div style={{fontSize:11,color:'var(--muted)',marginTop:8,fontFamily:'IBM Plex Mono, monospace'}}>
+              {wallet.card_number ? `â€¢â€¢â€¢â€¢ ${wallet.card_number.slice(-4)}` : 'Nessuna carta'}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Ledger */}
-      {selectedCustomer && wallet && wallet.ledger && wallet.ledger.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Cronologia Punti</h2>
+      {/* Charts */}
+      {selectedCustomer && wallet && chartData.length > 0 && (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+          {/* Bar chart */}
+          <div className="table-card" style={{padding:20}}>
+            <div style={{fontSize:13,fontWeight:700,color:'var(--text)',marginBottom:16}}>Storico Punti</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={chartData} barGap={2}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="date" tick={{fontSize:11,fill:'var(--muted)'}} axisLine={false} tickLine={false} />
+                <YAxis tick={{fontSize:11,fill:'var(--muted)'}} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="punti" name="Guadagnati" fill="#c9a227" radius={[3,3,0,0]} />
+                <Bar dataKey="utilizzo" name="Utilizzati" fill="#3d8ef0" radius={[3,3,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left font-medium text-gray-700">Data</th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-700">Tipo</th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-700">Punti</th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-700">Note</th>
+          {/* Pie chart */}
+          <div className="table-card" style={{padding:20}}>
+            <div style={{fontSize:13,fontWeight:700,color:'var(--text)',marginBottom:16}}>Distribuzione</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                  {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
+                </Pie>
+                <Legend formatter={(v) => <span style={{color:'var(--muted2)',fontSize:12}}>{v}</span>} />
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Ledger table */}
+      {selectedCustomer && wallet?.ledger?.length > 0 && (
+        <div className="table-card">
+          <div className="table-toolbar">
+            <span style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>Cronologia Punti</span>
+            <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>{wallet.ledger.length} movimenti</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Punti</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {wallet.ledger.map((entry, idx) => (
+                <tr key={idx}>
+                  <td style={{color:'var(--muted2)'}}>
+                    {new Date(entry.created_at).toLocaleDateString('it-IT')}
+                  </td>
+                  <td>
+                    <span className={`badge ${entry.type === 'earn' ? 'high' : 'low'}`}>
+                      <span className="badge-dot" />
+                      {entry.type === 'earn' ? 'Guadagnato' : 'Utilizzato'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`mono ${entry.type === 'earn' ? 'positive' : 'negative'}`}>
+                      {entry.type === 'earn' ? '+' : '-'}{entry.points}
+                    </span>
+                  </td>
+                  <td style={{color:'var(--muted)'}}>{entry.description || 'â€”'}</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {wallet.ledger.map((entry, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <td className="px-6 py-3 text-gray-600">
-                      {new Date(entry.created_at).toLocaleDateString('it-IT')}
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                        entry.type === 'earn'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {entry.type === 'earn' ? 'Guadagna' : 'Utilizzo'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 font-medium text-gray-900">{entry.points}</td>
-                    <td className="px-6 py-3 text-gray-600">{entry.description || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* No Selection Message */}
+      {/* Empty state */}
       {!selectedCustomer && (
-        <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-          <Gift className="mx-auto text-gray-400 mb-4" size={48} />
-          <p className="text-gray-600 font-medium">Seleziona un cliente per vedere i dettagli del programma fedeltà</p>
+        <div style={{
+          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+          padding:'64px 0', color:'var(--muted)', gap:12,
+          border:'1px dashed var(--border)', borderRadius:'var(--radius)',
+        }}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{opacity:.4}}><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+          <div style={{fontSize:14,fontWeight:600}}>Seleziona un cliente</div>
+          <div style={{fontSize:13}}>Visualizza i dettagli del programma fedeltÃ </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
+

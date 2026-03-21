@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { orders, customers, inventory } from '../api.jsx';
-import { Plus } from 'lucide-react';
+﻿import React, { useState, useEffect } from 'react';
+import { orders } from '../api.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import OrderModal from '../components/OrderModal.jsx';
@@ -11,97 +10,97 @@ export default function OrdersPage() {
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  useEffect(() => { fetchOrders(); }, []);
 
   const fetchOrders = async () => {
     try {
-      setLoading(true);
-      setError('');
+      setLoading(true); setError('');
       const response = await orders.getOrders();
       setOrdersList(response.data.data || []);
     } catch (err) {
       setError(err.message || 'Errore nel caricamento degli ordini');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const handleOpenModal = () => {
-    setSelectedOrder(null);
-    setShowModal(true);
-  };
+  const handleOpenModal = () => { setSelectedOrder(null); setShowModal(true); };
+  const handleCloseModal = () => { setShowModal(false); setSelectedOrder(null); };
+  const handleSaveOrder = async () => { await fetchOrders(); handleCloseModal(); };
 
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setSelectedOrder(null);
-  };
+  const statusLabel = { paid: 'Pagato', draft: 'Bozza', pending: 'Pendente' };
+  const statusBadge = { paid: 'high', draft: 'mid', pending: 'low' };
 
-  const handleSaveOrder = async () => {
-    await fetchOrders();
-    handleCloseModal();
-  };
+  const filtered = statusFilter === 'all' ? ordersList
+    : ordersList.filter(o => o.status === statusFilter);
 
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Ordini</h1>
-        <button
-          onClick={handleOpenModal}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
-        >
-          <Plus size={20} />
+    <>
+      {/* Page header */}
+      <div className="page-head">
+        <div>
+          <div className="page-head-title">Ordini</div>
+          <div className="page-head-sub">{ordersList.length} ordini totali</div>
+        </div>
+        <button className="btn btn-gold" onClick={handleOpenModal}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Nuovo Ordine
         </button>
       </div>
 
       {error && <ErrorAlert message={error} onRetry={fetchOrders} />}
 
-      {/* Orders Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+      {/* Table */}
+      <div className="table-card">
+        <div className="table-toolbar">
+          {['all','paid','draft','pending'].map(s => (
+            <button
+              key={s}
+              className={`filter-chip${statusFilter === s ? ' active' : ''}`}
+              onClick={() => setStatusFilter(s)}
+            >
+              {s === 'all' ? 'Tutti' : statusLabel[s]}
+            </button>
+          ))}
+          <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>
+            {filtered.length} risultati
+          </span>
+        </div>
+        <table>
+          <thead>
             <tr>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">ID</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Cliente</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Magazzino</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Totale</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Punti Loyalty</th>
-              <th className="px-6 py-3 text-left font-medium text-gray-700">Stato</th>
+              <th>ID</th>
+              <th>Cliente</th>
+              <th>Magazzino</th>
+              <th>Totale</th>
+              <th>Loyalty</th>
+              <th>Stato</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-            {ordersList.length > 0 ? (
-              ordersList.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 font-medium text-gray-900">#{order.id}</td>
-                  <td className="px-6 py-3 text-gray-600">
-                    {order.customer?.first_name} {order.customer?.last_name}
-                  </td>
-                  <td className="px-6 py-3 text-gray-600">{order.warehouse?.name || '-'}</td>
-                  <td className="px-6 py-3 font-medium text-gray-900">€{order.grand_total?.toFixed(2)}</td>
-                  <td className="px-6 py-3">{order.loyalty_points_awarded || 0}</td>
-                  <td className="px-6 py-3">
-                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                      order.status === 'paid'
-                        ? 'bg-green-100 text-green-800'
-                        : order.status === 'draft'
-                        ? 'bg-gray-100 text-gray-800'
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {order.status === 'paid' ? 'Pagato' : order.status === 'draft' ? 'Bozza' : 'Pendente'}
-                    </span>
-                  </td>
-                </tr>
-              ))
-            ) : (
+          <tbody>
+            {filtered.length > 0 ? filtered.map(order => (
+              <tr key={order.id}>
+                <td><span className="mono" style={{color:'var(--muted2)'}}>#{order.id}</span></td>
+                <td style={{fontWeight:600,color:'var(--text)'}}>
+                  {order.customer?.first_name} {order.customer?.last_name}
+                </td>
+                <td style={{color:'var(--muted2)'}}>{order.warehouse?.name || 'â€”'}</td>
+                <td><span className="mono positive">â‚¬{order.grand_total?.toFixed(2)}</span></td>
+                <td style={{color:'var(--amber)',fontFamily:'IBM Plex Mono, monospace',fontSize:13}}>
+                  +{order.loyalty_points_awarded || 0} pt
+                </td>
+                <td>
+                  <span className={`badge ${statusBadge[order.status] || 'mid'}`}>
+                    <span className="badge-dot" />
+                    {statusLabel[order.status] || order.status}
+                  </span>
+                </td>
+              </tr>
+            )) : (
               <tr>
-                <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                <td colSpan="6" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
                   Nessun ordine trovato
                 </td>
               </tr>
@@ -110,14 +109,10 @@ export default function OrdersPage() {
         </table>
       </div>
 
-      {/* Modal */}
       {showModal && (
-        <OrderModal
-          order={selectedOrder}
-          onClose={handleCloseModal}
-          onSave={handleSaveOrder}
-        />
+        <OrderModal order={selectedOrder} onClose={handleCloseModal} onSave={handleSaveOrder} />
       )}
-    </div>
+    </>
   );
 }
+
