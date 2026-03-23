@@ -95,9 +95,11 @@ class CustomerController extends Controller
             'overview' => [
                 'total_customers' => count($customers),
                 'loyalty_card_customers' => collect($customers)->whereNotNull('card_code')->count(),
+                'app_ready_customers' => collect($customers)->filter(fn (array $customer) => ($customer['loyalty_devices_count'] ?? 0) > 0)->count(),
                 'returning_customers' => $returningCustomers->count(),
                 'avg_return_days' => $avgReturnDays,
                 'inactive_customers_30d' => $inactiveCustomers,
+                'push_sent_7d' => collect($customers)->sum('push_notifications_last_7d'),
             ],
             'city_breakdown' => $cityBreakdown,
             'top_returners' => $topReturners,
@@ -169,6 +171,17 @@ class CustomerController extends Controller
             ->groupBy('customer_id')
             ->selectRaw('customer_id, COUNT(*) as paid_orders_count, MAX(paid_at) as last_purchase_at, MIN(paid_at) as first_purchase_at');
 
+        $deviceStats = DB::table('loyalty_device_tokens')
+            ->where('tenant_id', $tenantId)
+            ->where('notifications_enabled', true)
+            ->groupBy('customer_id')
+            ->selectRaw('customer_id, COUNT(*) as loyalty_devices_count, MAX(last_seen_at) as loyalty_last_seen_at');
+
+        $pushStats = DB::table('loyalty_push_notifications')
+            ->where('tenant_id', $tenantId)
+            ->groupBy('customer_id')
+            ->selectRaw("customer_id, MAX(sent_at) as last_push_sent_at, SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as push_notifications_last_7d", [now()->subDays(7)]);
+
         return DB::table('customers as c')
             ->leftJoin('customer_addresses as ca', function ($join) {
                 $join->on('ca.customer_id', '=', 'c.id')
@@ -176,6 +189,12 @@ class CustomerController extends Controller
             })
             ->leftJoinSub($orderStats, 'order_stats', function ($join) {
                 $join->on('order_stats.customer_id', '=', 'c.id');
+            })
+            ->leftJoinSub($deviceStats, 'device_stats', function ($join) {
+                $join->on('device_stats.customer_id', '=', 'c.id');
+            })
+            ->leftJoinSub($pushStats, 'push_stats', function ($join) {
+                $join->on('push_stats.customer_id', '=', 'c.id');
             })
             ->leftJoin('loyalty_cards as lc', function ($join) use ($tenantId) {
                 $join->on('lc.customer_id', '=', 'c.id')
@@ -190,6 +209,10 @@ class CustomerController extends Controller
                 'order_stats.first_purchase_at',
                 'lc.card_code',
                 'lc.status as loyalty_status',
+                'device_stats.loyalty_devices_count',
+                'device_stats.loyalty_last_seen_at',
+                'push_stats.last_push_sent_at',
+                'push_stats.push_notifications_last_7d',
             ]);
     }
 
@@ -219,6 +242,10 @@ class CustomerController extends Controller
                     'city' => $customer->city,
                     'card_code' => $customer->card_code,
                     'loyalty_status' => $customer->loyalty_status,
+                    'loyalty_devices_count' => (int) ($customer->loyalty_devices_count ?? 0),
+                    'loyalty_last_seen_at' => $customer->loyalty_last_seen_at,
+                    'last_push_sent_at' => $customer->last_push_sent_at,
+                    'push_notifications_last_7d' => (int) ($customer->push_notifications_last_7d ?? 0),
                     'paid_orders_count' => $paidOrdersCount,
                     'last_purchase_at' => $lastPurchaseAt?->toDateTimeString(),
                     'return_frequency_days' => $returnFrequencyDays,

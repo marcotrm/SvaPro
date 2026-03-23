@@ -57,6 +57,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
 
     Route::middleware('role:superadmin,admin_cliente,dipendente,cliente_finale')->group(function () {
         Route::get('/loyalty/customers/{customerId}/wallet', [LoyaltyController::class, 'showWallet']);
+        Route::post('/loyalty/customers/{customerId}/devices', [LoyaltyController::class, 'registerDevice']);
+        Route::get('/loyalty/customers/{customerId}/notifications', [LoyaltyController::class, 'notifications']);
+        Route::post('/loyalty/customers/{customerId}/notifications/{notificationId}/read', [LoyaltyController::class, 'markNotificationRead']);
         Route::post('/loyalty/customers/{customerId}/redeem-preview', [LoyaltyController::class, 'redeemPreview']);
     });
 });

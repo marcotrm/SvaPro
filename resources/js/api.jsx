@@ -110,6 +110,9 @@ export const employees = {
 // Loyalty APIs
 export const loyalty = {
   getWallet: (customerId) => api.get(`/loyalty/customers/${customerId}/wallet`),
+  registerDevice: (customerId, data) => api.post(`/loyalty/customers/${customerId}/devices`, data),
+  getNotifications: (customerId, params = {}) => api.get(`/loyalty/customers/${customerId}/notifications`, { params }),
+  markNotificationRead: (customerId, notificationId) => api.post(`/loyalty/customers/${customerId}/notifications/${notificationId}/read`),
   getRedemptionPreview: (customerId, pointsToRedeem) => 
     api.post(`/loyalty/customers/${customerId}/redeem-preview`, { points_to_redeem: pointsToRedeem }),
 };

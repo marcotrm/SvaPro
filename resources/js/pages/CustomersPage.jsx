@@ -51,6 +51,13 @@ export default function CustomersPage() {
 
   const formatDate = value => value ? new Date(value).toLocaleDateString('it-IT') : '-';
   const formatReturnDays = value => value ? `${value} gg` : 'Nuovo';
+  const getAppBadge = customer => {
+    if ((customer.loyalty_devices_count || 0) > 0) {
+      return `${customer.loyalty_devices_count} device`;
+    }
+
+    return 'App non collegata';
+  };
 
   if (loading) return <LoadingSpinner />;
 
@@ -84,6 +91,11 @@ export default function CustomersPage() {
             <div className="kpi-label">Clienti di Ritorno</div>
             <div className="kpi-value">{analytics.overview?.returning_customers ?? 0}</div>
             <div className="kpi-delta warn">Riattivabili: {analytics.overview?.inactive_customers_30d ?? 0}</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-label">App Loyalty Pronte</div>
+            <div className="kpi-value gold">{analytics.overview?.app_ready_customers ?? 0}</div>
+            <div className="kpi-delta up">Push 7gg: {analytics.overview?.push_sent_7d ?? 0}</div>
           </div>
           <div className="kpi-card">
             <div className="kpi-label">Ritorno Medio</div>
@@ -123,6 +135,7 @@ export default function CustomersPage() {
               <th>Ultimo Acquisto</th>
               <th>Ritorno Medio</th>
               <th>Fidelity</th>
+              <th>App Loyalty</th>
               <th style={{textAlign:'right'}}>Azioni</th>
             </tr>
           </thead>
@@ -149,6 +162,17 @@ export default function CustomersPage() {
                   </span>
                 </td>
                 <td>
+                  <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                    <span className={`badge ${(customer.loyalty_devices_count || 0) > 0 ? 'high' : 'mid'}`}>
+                      <span className="badge-dot" />
+                      {getAppBadge(customer)}
+                    </span>
+                    <span style={{fontSize:12,color:'var(--muted2)'}}>
+                      Ultimo push: {formatDate(customer.last_push_sent_at)}
+                    </span>
+                  </div>
+                </td>
+                <td>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}}>
                     <button className="icon-action edit" onClick={() => handleOpenModal(customer)} title="Modifica">
                       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -161,7 +185,7 @@ export default function CustomersPage() {
               </tr>
             )) : (
               <tr>
-                <td colSpan="7" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
+                <td colSpan="8" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
                   Nessun cliente trovato
                 </td>
               </tr>

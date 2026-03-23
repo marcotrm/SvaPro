@@ -42,10 +42,114 @@ class LoyaltyController extends Controller
             ->limit(20)
             ->get();
 
+        $devices = DB::table('loyalty_device_tokens')
+            ->where('tenant_id', $tenantId)
+            ->where('customer_id', $customerId)
+            ->orderByDesc('last_seen_at')
+            ->get(['id', 'platform', 'device_name', 'app_version', 'notifications_enabled', 'last_seen_at']);
+
+        $notifications = DB::table('loyalty_push_notifications')
+            ->where('tenant_id', $tenantId)
+            ->where('customer_id', $customerId)
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get();
+
         return response()->json([
             'wallet' => $wallet,
             'ledger' => $ledger,
+            'devices' => $devices,
+            'notifications' => $notifications,
         ]);
+    }
+
+    public function registerDevice(Request $request, int $customerId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'platform' => ['required', 'in:ios,android,web'],
+            'device_token' => ['required', 'string', 'max:255'],
+            'device_name' => ['nullable', 'string', 'max:100'],
+            'app_version' => ['nullable', 'string', 'max:30'],
+            'notifications_enabled' => ['nullable', 'boolean'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $customerExists = DB::table('customers')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $customerId)
+            ->exists();
+
+        if (! $customerExists) {
+            return response()->json(['message' => 'Cliente non trovato per il tenant.'], 404);
+        }
+
+        $now = now();
+
+        DB::table('loyalty_device_tokens')->updateOrInsert(
+            ['device_token' => (string) $request->input('device_token')],
+            [
+                'tenant_id' => $tenantId,
+                'customer_id' => $customerId,
+                'platform' => (string) $request->input('platform'),
+                'device_name' => $request->input('device_name'),
+                'app_version' => $request->input('app_version'),
+                'notifications_enabled' => (bool) $request->boolean('notifications_enabled', true),
+                'last_seen_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]
+        );
+
+        return response()->json(['message' => 'Device loyalty registrato.']);
+    }
+
+    public function notifications(Request $request, int $customerId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $notifications = DB::table('loyalty_push_notifications')
+            ->where('tenant_id', $tenantId)
+            ->where('customer_id', $customerId)
+            ->orderByDesc('id')
+            ->limit((int) $request->input('limit', 20))
+            ->get();
+
+        return response()->json([
+            'data' => $notifications,
+            'meta' => [
+                'unread' => DB::table('loyalty_push_notifications')
+                    ->where('tenant_id', $tenantId)
+                    ->where('customer_id', $customerId)
+                    ->whereNull('read_at')
+                    ->count(),
+            ],
+        ]);
+    }
+
+    public function markNotificationRead(Request $request, int $customerId, int $notificationId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $updated = DB::table('loyalty_push_notifications')
+            ->where('tenant_id', $tenantId)
+            ->where('customer_id', $customerId)
+            ->where('id', $notificationId)
+            ->update([
+                'read_at' => now(),
+                'status' => 'read',
+                'updated_at' => now(),
+            ]);
+
+        if (! $updated) {
+            return response()->json(['message' => 'Notifica loyalty non trovata.'], 404);
+        }
+
+        return response()->json(['message' => 'Notifica segnata come letta.']);
     }
 
     public function redeemPreview(Request $request, int $customerId): JsonResponse

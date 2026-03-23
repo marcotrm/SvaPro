@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Services\LoyaltyPushService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,10 @@ use Illuminate\Support\Facades\Validator;
 
 class OrderController extends Controller
 {
+    public function __construct(private readonly LoyaltyPushService $loyaltyPushService)
+    {
+    }
+
     public function quote(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
@@ -200,7 +205,7 @@ class OrderController extends Controller
                             'updated_at' => $now,
                         ]);
 
-                    DB::table('loyalty_ledger')->insert([
+                    $loyaltyLedgerId = DB::table('loyalty_ledger')->insertGetId([
                         'tenant_id' => $tenantId,
                         'customer_id' => $customerId,
                         'order_id' => $orderId,
@@ -210,6 +215,14 @@ class OrderController extends Controller
                         'created_at' => $now,
                         'updated_at' => $now,
                     ]);
+
+                    $this->loyaltyPushService->queuePointsEarnedNotification(
+                        $tenantId,
+                        $customerId,
+                        $orderId,
+                        (int) $quote['loyalty']['earned_points'],
+                        $loyaltyLedgerId,
+                    );
                 }
 
                 if ($request->filled('employee_id')) {

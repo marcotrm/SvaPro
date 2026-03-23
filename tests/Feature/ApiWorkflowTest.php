@@ -99,6 +99,13 @@ class ApiWorkflowTest extends TestCase
             'X-Tenant-Code' => 'DEMO',
         ];
 
+        $this->withHeaders($headers)->postJson('/api/loyalty/customers/1/devices', [
+            'platform' => 'android',
+            'device_token' => 'device-token-loyalty-1',
+            'device_name' => 'Pixel Demo',
+            'app_version' => '1.0.0',
+        ])->assertOk();
+
         $beforeCount = DB::table('sales_orders')->count();
 
         $this->withHeaders($headers)->postJson('/api/orders/place', [
@@ -129,11 +136,35 @@ class ApiWorkflowTest extends TestCase
             'source_type' => 'sale',
         ]);
 
+        $this->assertDatabaseHas('loyalty_push_notifications', [
+            'customer_id' => 1,
+            'notification_type' => 'points_earned',
+            'status' => 'queued',
+        ]);
+
+        $this->assertDatabaseHas('outbox_events', [
+            'tenant_id' => 1,
+            'event_name' => 'loyalty.push.notification.created',
+        ]);
+
         $walletResponse = $this->withHeaders($headers)->getJson('/api/loyalty/customers/1/wallet');
 
         $walletResponse->assertOk()
             ->assertJsonPath('wallet.points_balance', 1)
-            ->assertJsonPath('wallet.card_code', 'CARD-0001');
+            ->assertJsonPath('wallet.card_code', 'CARD-0001')
+            ->assertJsonPath('devices.0.platform', 'android')
+            ->assertJsonPath('notifications.0.notification_type', 'points_earned');
+
+        $notificationsResponse = $this->withHeaders($headers)->getJson('/api/loyalty/customers/1/notifications');
+        $notificationsResponse->assertOk()
+            ->assertJsonPath('meta.unread', 1)
+            ->assertJsonPath('data.0.status', 'queued');
+
+        $notificationId = (int) $notificationsResponse->json('data.0.id');
+
+        $this->withHeaders($headers)->postJson('/api/loyalty/customers/1/notifications/'.$notificationId.'/read')
+            ->assertOk()
+            ->assertJsonPath('message', 'Notifica segnata come letta.');
 
         $this->withHeaders($headers)->postJson('/api/loyalty/customers/1/redeem-preview', [
             'points' => 1,
@@ -357,6 +388,7 @@ class ApiWorkflowTest extends TestCase
             ->assertJsonPath('overview.total_customers', 1)
             ->assertJsonPath('overview.returning_customers', 1)
             ->assertJsonPath('overview.loyalty_card_customers', 1)
+            ->assertJsonPath('overview.app_ready_customers', 0)
             ->assertJsonPath('city_breakdown.0.city', 'Afragola')
             ->assertJsonPath('top_returners.0.customer_id', 1);
     }
