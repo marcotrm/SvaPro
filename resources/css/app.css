@@ -749,6 +749,20 @@ input.form-input, textarea.form-textarea, select.form-select { color: var(--text
 .login-demo-cred-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
 .login-demo-cred-value { font-size: 12px; font-weight: 600; color: var(--text); font-family: 'IBM Plex Mono', monospace; margin-top: 1px; }
 
+/* ══════════════════════════════════════════════════
+   SKELETON LOADERS
+   ══════════════════════════════════════════════════ */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.sk-bar {
+  background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s ease infinite;
+}
+.sk-fade { animation: fadeUp .4s ease both; }
+
 .login-input-wrap { position: relative; margin-bottom: 14px; }
 .login-label { font-size: 12px; font-weight: 600; color: var(--muted2); margin-bottom: 6px; display: block; }
 .login-input {

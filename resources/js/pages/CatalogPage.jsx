@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { catalog } from '../api.jsx';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import { CatalogSkeleton } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
 
@@ -55,7 +55,7 @@ export default function CatalogPage() {
     return parts.length ? parts.join(' • ') : 'Regime standard';
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) return <CatalogSkeleton />;
 
   return (
     <>

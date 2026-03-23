@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { employees } from '../api.jsx';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import { EmployeesSkeleton } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import EmployeeModal from '../components/EmployeeModal.jsx';
 
@@ -46,7 +46,7 @@ export default function EmployeesPage() {
   const formatDate = value => value ? new Date(value).toLocaleDateString('it-IT') : '-';
   const formatCurrency = value => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(Number(value || 0));
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) return <EmployeesSkeleton />;
 
   return (
     <>

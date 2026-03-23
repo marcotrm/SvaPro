@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { loyalty } from '../api.jsx';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import { SkeletonKpi, SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import {
   Area,
@@ -103,7 +103,7 @@ export default function LoyaltyPushMonitoringPage() {
   };
 
   if (loading) {
-    return <LoadingSpinner />;
+    return <><SkeletonKpi count={4} /><SkeletonTable cols={5} rows={5} /></>;
   }
 
   return (

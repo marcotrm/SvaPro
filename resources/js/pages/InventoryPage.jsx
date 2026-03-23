@@ -1,7 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { inventory } from '../api.jsx';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import { InventorySkeleton } from '../components/Skeleton.jsx';
+import VirtualTable from '../components/VirtualTable.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import InventoryMovementModal from '../components/InventoryMovementModal.jsx';
 
@@ -72,7 +73,7 @@ export default function InventoryPage() {
     setShowMovementModal(false);
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) return <InventorySkeleton />;
 
   return (
     <>
@@ -167,38 +168,42 @@ export default function InventoryPage() {
         </table>
       </div>
 
-      <div className="table-card" style={{marginTop: 20}}>
-        <div className="table-toolbar" style={{gap: 10, flexWrap: 'wrap'}}>
-          <div className="search-box" style={{minWidth: 240}}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color:'var(--muted)',flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input
-              placeholder="Cerca per prodotto, SKU o causale..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
+      <VirtualTable
+        items={movements}
+        maxVisible={10}
+        rowHeight={48}
+        toolbar={
+          <div className="table-toolbar" style={{gap: 10, flexWrap: 'wrap'}}>
+            <div className="search-box" style={{minWidth: 240}}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color:'var(--muted)',flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input
+                placeholder="Cerca per prodotto, SKU o causale..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <select className="form-select" style={{maxWidth: 200}} value={movementTypeFilter} onChange={e => setMovementTypeFilter(e.target.value)}>
+              <option value="">Tutte le causali</option>
+              {movementTypes.map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+
+            <select className="form-select" style={{maxWidth: 220}} value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)}>
+              <option value="">Tutti i magazzini</option>
+              {warehouses.map(warehouse => (
+                <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>
+              ))}
+            </select>
+
+            <input className="form-select" type="date" value={dateFromFilter} onChange={e => setDateFromFilter(e.target.value)} style={{maxWidth: 170}} />
+            <input className="form-select" type="date" value={dateToFilter} onChange={e => setDateToFilter(e.target.value)} style={{maxWidth: 170}} />
+
+            <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>{movements.length} movimenti</span>
           </div>
-
-          <select className="form-select" style={{maxWidth: 200}} value={movementTypeFilter} onChange={e => setMovementTypeFilter(e.target.value)}>
-            <option value="">Tutte le causali</option>
-            {movementTypes.map(type => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
-
-          <select className="form-select" style={{maxWidth: 220}} value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)}>
-            <option value="">Tutti i magazzini</option>
-            {warehouses.map(warehouse => (
-              <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>
-            ))}
-          </select>
-
-          <input className="form-select" type="date" value={dateFromFilter} onChange={e => setDateFromFilter(e.target.value)} style={{maxWidth: 170}} />
-          <input className="form-select" type="date" value={dateToFilter} onChange={e => setDateToFilter(e.target.value)} style={{maxWidth: 170}} />
-
-          <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>{movements.length} movimenti</span>
-        </div>
-
-        <table>
+        }
+        headers={
           <thead>
             <tr>
               <th>Data</th>
@@ -210,30 +215,29 @@ export default function InventoryPage() {
               <th>Riferimento</th>
             </tr>
           </thead>
-          <tbody>
-            {movements.length > 0 ? movements.map(item => (
-              <tr key={item.id}>
-                <td style={{color:'var(--muted2)'}}>{formatDateTime(item.occurred_at)}</td>
-                <td style={{fontWeight:600,color:'var(--text)'}}>
-                  {item.product_name}
-                  {item.flavor ? <span style={{color:'var(--muted2)',fontWeight:400}}> - {item.flavor}</span> : null}
-                </td>
-                <td style={{color:'var(--muted2)'}}>{item.warehouse_name}</td>
-                <td><span className="badge mid"><span className="badge-dot" />{item.movement_type}</span></td>
-                <td><span className={`mono ${item.qty < 0 ? 'negative' : 'positive'}`}>{item.qty > 0 ? `+${item.qty}` : item.qty}</span></td>
-                <td style={{color:'var(--muted2)'}}>{item.actor_name || 'Sistema'}</td>
-                <td className="mono" style={{color:'var(--muted2)'}}>{item.reference_type ? `${item.reference_type}:${item.reference_id || '-'}` : '-'}</td>
-              </tr>
-            )) : (
-              <tr>
-                <td colSpan="7" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
-                  Nessun movimento trovato con i filtri selezionati
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+        }
+        renderRow={(item) => (
+          <tr key={item.id}>
+            <td style={{color:'var(--muted2)'}}>{formatDateTime(item.occurred_at)}</td>
+            <td style={{fontWeight:600,color:'var(--text)'}}>
+              {item.product_name}
+              {item.flavor ? <span style={{color:'var(--muted2)',fontWeight:400}}> - {item.flavor}</span> : null}
+            </td>
+            <td style={{color:'var(--muted2)'}}>{item.warehouse_name}</td>
+            <td><span className="badge mid"><span className="badge-dot" />{item.movement_type}</span></td>
+            <td><span className={`mono ${item.qty < 0 ? 'negative' : 'positive'}`}>{item.qty > 0 ? `+${item.qty}` : item.qty}</span></td>
+            <td style={{color:'var(--muted2)'}}>{item.actor_name || 'Sistema'}</td>
+            <td className="mono" style={{color:'var(--muted2)'}}>{item.reference_type ? `${item.reference_type}:${item.reference_id || '-'}` : '-'}</td>
+          </tr>
+        )}
+        emptyNode={
+          <tr>
+            <td colSpan="7" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
+              Nessun movimento trovato con i filtri selezionati
+            </td>
+          </tr>
+        }
+      />
 
       {showMovementModal && (
         <InventoryMovementModal

@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { loyalty, customers } from '../api.jsx';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import { SkeletonKpi, SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
@@ -60,7 +60,7 @@ export default function LoyaltyAnalyticsPage() {
     );
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) return <><SkeletonKpi count={3} /><SkeletonTable cols={4} rows={5} /></>;
 
   return (
     <>

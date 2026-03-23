@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { orders } from '../api.jsx';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import { OrdersSkeleton } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import OrderModal from '../components/OrderModal.jsx';
 
@@ -36,7 +36,7 @@ export default function OrdersPage() {
   const filtered = statusFilter === 'all' ? ordersList
     : ordersList.filter(o => o.status === statusFilter);
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) return <OrdersSkeleton />;
 
   return (
     <>

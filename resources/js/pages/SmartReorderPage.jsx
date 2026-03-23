@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { inventory } from '../api.jsx';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import { SkeletonHead, SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 
 export default function SmartReorderPage() {
@@ -37,7 +37,7 @@ export default function SmartReorderPage() {
 
   const totalCost = suggestedOrders.reduce((s, o) => s + (o.suggested_qty * o.unit_cost), 0);
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) return <><SkeletonHead /><SkeletonTable cols={5} rows={6} /></>;
 
   return (
     <>

@@ -1,7 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { customers } from '../api.jsx';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import { CustomersSkeleton } from '../components/Skeleton.jsx';
+import VirtualTable from '../components/VirtualTable.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import CustomerModal from '../components/CustomerModal.jsx';
 
@@ -61,7 +62,7 @@ export default function CustomersPage() {
     return 'App non collegata';
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) return <CustomersSkeleton />;
 
   return (
     <>
@@ -112,25 +113,30 @@ export default function CustomersPage() {
       {error && <ErrorAlert message={error} onRetry={fetchCustomers} />}
 
       {/* Table */}
-      <div className="table-card">
-        <div className="table-toolbar">
-          <div className="search-box">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color:'var(--muted)',flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input
-              placeholder="Cerca per nome, email o codice..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
+      <VirtualTable
+        items={filtered}
+        maxVisible={12}
+        rowHeight={56}
+        toolbar={
+          <div className="table-toolbar">
+            <div className="search-box">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color:'var(--muted)',flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input
+                placeholder="Cerca per nome, email o codice..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <select className="form-select" style={{maxWidth: 220}} value={cityFilter} onChange={e => setCityFilter(e.target.value)}>
+              <option value="">Tutte le citta</option>
+              {cityOptions.map(item => (
+                <option key={item.city} value={item.city}>{item.city} ({item.customers})</option>
+              ))}
+            </select>
+            <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>{filtered.length} risultati</span>
           </div>
-          <select className="form-select" style={{maxWidth: 220}} value={cityFilter} onChange={e => setCityFilter(e.target.value)}>
-            <option value="">Tutte le citta</option>
-            {cityOptions.map(item => (
-              <option key={item.city} value={item.city}>{item.city} ({item.customers})</option>
-            ))}
-          </select>
-          <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>{filtered.length} risultati</span>
-        </div>
-        <table>
+        }
+        headers={
           <thead>
             <tr>
               <th>Codice</th>
@@ -143,60 +149,59 @@ export default function CustomersPage() {
               <th style={{textAlign:'right'}}>Azioni</th>
             </tr>
           </thead>
-          <tbody>
-            {filtered.length > 0 ? filtered.map(customer => (
-              <tr key={customer.id}>
-                <td><span className="mono" style={{color:'var(--gold)'}}>{customer.code}</span></td>
-                <td>
-                  <div className="avatar-cell">
-                    <div className="avatar-sm">{initials(customer)}</div>
-                    <div>
-                      <div className="avatar-name">{customer.first_name} {customer.last_name}</div>
-                      <div className="avatar-sub">{customer.email || customer.phone || 'Contatto non disponibile'}</div>
-                    </div>
-                  </div>
-                </td>
-                <td style={{color:'var(--muted2)'}}>{customer.city || '-'}</td>
-                <td style={{color:'var(--muted2)'}}>{formatDate(customer.last_purchase_at)}</td>
-                <td style={{color:'var(--muted2)'}}>{formatReturnDays(customer.return_frequency_days)}</td>
-                <td>
-                  <span className={`badge ${customer.card_code ? 'high' : 'mid'}`}>
-                    <span className="badge-dot" />
-                    {customer.card_code ? customer.card_code : 'Da attivare'}
-                  </span>
-                </td>
-                <td>
-                  <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                    <span className={`badge ${(customer.loyalty_devices_count || 0) > 0 ? 'high' : 'mid'}`}>
-                      <span className="badge-dot" />
-                      {getAppBadge(customer)}
-                    </span>
-                    <span style={{fontSize:12,color:'var(--muted2)'}}>
-                      Ultimo push: {formatDate(customer.last_push_sent_at)}
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}}>
-                    <button className="icon-action edit" onClick={() => handleOpenModal(customer)} title="Modifica">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    </button>
-                    <button className="icon-action danger" title="Elimina">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            )) : (
-              <tr>
-                <td colSpan="8" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
-                  Nessun cliente trovato
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+        }
+        renderRow={(customer) => (
+          <tr key={customer.id}>
+            <td><span className="mono" style={{color:'var(--gold)'}}>{customer.code}</span></td>
+            <td>
+              <div className="avatar-cell">
+                <div className="avatar-sm">{initials(customer)}</div>
+                <div>
+                  <div className="avatar-name">{customer.first_name} {customer.last_name}</div>
+                  <div className="avatar-sub">{customer.email || customer.phone || 'Contatto non disponibile'}</div>
+                </div>
+              </div>
+            </td>
+            <td style={{color:'var(--muted2)'}}>{customer.city || '-'}</td>
+            <td style={{color:'var(--muted2)'}}>{formatDate(customer.last_purchase_at)}</td>
+            <td style={{color:'var(--muted2)'}}>{formatReturnDays(customer.return_frequency_days)}</td>
+            <td>
+              <span className={`badge ${customer.card_code ? 'high' : 'mid'}`}>
+                <span className="badge-dot" />
+                {customer.card_code ? customer.card_code : 'Da attivare'}
+              </span>
+            </td>
+            <td>
+              <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                <span className={`badge ${(customer.loyalty_devices_count || 0) > 0 ? 'high' : 'mid'}`}>
+                  <span className="badge-dot" />
+                  {getAppBadge(customer)}
+                </span>
+                <span style={{fontSize:12,color:'var(--muted2)'}}>
+                  Ultimo push: {formatDate(customer.last_push_sent_at)}
+                </span>
+              </div>
+            </td>
+            <td>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}}>
+                <button className="icon-action edit" onClick={() => handleOpenModal(customer)} title="Modifica">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button className="icon-action danger" title="Elimina">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        )}
+        emptyNode={
+          <tr>
+            <td colSpan="8" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
+              Nessun cliente trovato
+            </td>
+          </tr>
+        }
+      />
 
       {analytics?.top_returners?.length > 0 && (
         <div className="table-card">
