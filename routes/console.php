@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('loyalty:dispatch-push --limit=200')->everyMinute();
+Schedule::command('loyalty:process-firebase-deliveries --limit=50')->everyMinute();

@@ -7,23 +7,10 @@ use Illuminate\Support\Facades\DB;
 
 class DispatchLoyaltyPushNotificationsCommand extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'loyalty:dispatch-push {--tenantId= : Tenant ID opzionale} {--limit=100 : Numero massimo di notifiche da processare}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Processa la coda notifiche loyalty e genera eventi outbox di dispatch push';
 
-    /**
-     * Execute the console command.
-     */
     public function handle(): int
     {
         $tenantId = $this->option('tenantId');
@@ -55,25 +42,24 @@ class DispatchLoyaltyPushNotificationsCommand extends Command
             if ($deviceCount <= 0) {
                 DB::table('loyalty_push_notifications')
                     ->where('id', (int) $notification->id)
-                    ->update([
-                        'status' => 'pending_device',
-                        'target_devices_count' => 0,
-                        'updated_at' => $now,
-                    ]);
-
+                    ->update(['status' => 'pending_device', 'target_devices_count' => 0]);
                 $skipped++;
                 continue;
             }
 
+            $eventData = [
+                'notification_id' => (int) $notification->id,
+                'customer_id' => (int) $notification->customer_id,
+                'notification_type' => (string) $notification->notification_type,
+                'target_devices_count' => $deviceCount,
+                'tenant_id' => (int) $notification->tenant_id,
+            ];
+
             DB::table('outbox_events')->insert([
                 'tenant_id' => (int) $notification->tenant_id,
                 'event_name' => 'loyalty.push.notification.dispatch',
-                'payload_json' => json_encode([
-                    'notification_id' => (int) $notification->id,
-                    'customer_id' => (int) $notification->customer_id,
-                    'notification_type' => (string) $notification->notification_type,
-                    'target_devices_count' => $deviceCount,
-                ]),
+                'payload_json' => json_encode($eventData),
+                'event_data' => json_encode($eventData),
                 'published_at' => null,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -81,12 +67,7 @@ class DispatchLoyaltyPushNotificationsCommand extends Command
 
             DB::table('loyalty_push_notifications')
                 ->where('id', (int) $notification->id)
-                ->update([
-                    'status' => 'dispatched',
-                    'target_devices_count' => $deviceCount,
-                    'sent_at' => $now,
-                    'updated_at' => $now,
-                ]);
+                ->update(['status' => 'dispatched', 'target_devices_count' => $deviceCount, 'sent_at' => $now]);
 
             $processed++;
         }

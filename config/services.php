@@ -39,4 +39,8 @@ return [
         'central_supplier_id' => (int) env('SMART_INVENTORY_CENTRAL_SUPPLIER_ID', 1),
     ],
 
+    'firebase' => [
+        'credentials_path' => env('FIREBASE_CREDENTIALS_PATH', storage_path('app/private/firebase-credentials.json')),
+    ],
+
 ];
