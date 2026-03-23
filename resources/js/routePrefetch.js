@@ -1,4 +1,4 @@
-import { catalog, orders, inventory, customers, employees, loyalty, stores } from './api.jsx';
+import { catalog, orders, inventory, customers, employees, loyalty, stores, audit, rolesPermissions } from './api.jsx';
 
 const routeLoaders = {
   '/': () => import('./pages/DashboardPage.jsx'),
@@ -11,6 +11,9 @@ const routeLoaders = {
   '/analytics/loyalty': () => import('./pages/LoyaltyAnalyticsPage.jsx'),
   '/analytics/loyalty/push-monitor': () => import('./pages/LoyaltyPushMonitoringPage.jsx'),
   '/control-tower': () => import('./pages/ControlTowerPage.jsx'),
+  '/audit-log': () => import('./pages/AuditLogPage.jsx'),
+  '/settings': () => import('./pages/SettingsPage.jsx'),
+  '/roles-permissions': () => import('./pages/RolesPermissionsPage.jsx'),
 };
 
 /* Map routes to the API calls they'll make on mount.
@@ -48,6 +51,15 @@ const routeDataLoaders = {
   },
   '/control-tower': () => {
     stores.getTenantHealth();
+  },
+  '/audit-log': () => {
+    audit.getLogs({});
+  },
+  '/settings': () => {
+    stores.getTenantSettings();
+  },
+  '/roles-permissions': () => {
+    rolesPermissions.getMatrix();
   },
 };
 

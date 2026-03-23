@@ -14,6 +14,9 @@ const SmartReorderPage = lazy(() => import('./pages/SmartReorderPage.jsx'));
 const LoyaltyAnalyticsPage = lazy(() => import('./pages/LoyaltyAnalyticsPage.jsx'));
 const LoyaltyPushMonitoringPage = lazy(() => import('./pages/LoyaltyPushMonitoringPage.jsx'));
 const ControlTowerPage = lazy(() => import('./pages/ControlTowerPage.jsx'));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage.jsx'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
+const RolesPermissionsPage = lazy(() => import('./pages/RolesPermissionsPage.jsx'));
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -83,6 +86,9 @@ export default function App() {
               <Route path="/analytics/loyalty" element={<LoyaltyAnalyticsPage />} />
               <Route path="/analytics/loyalty/push-monitor" element={<LoyaltyPushMonitoringPage />} />
               <Route path="/control-tower" element={<ControlTowerPage />} />
+              <Route path="/audit-log" element={<AuditLogPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/roles-permissions" element={<RolesPermissionsPage />} />
             </Route>
           </Route>
 

@@ -183,6 +183,7 @@ export const auth = {
   login: (email, password) => api.post('/login', { email, password }),
   logout: () => api.post('/logout'),
   me: () => api.get('/me'),
+  updateProfile: (data) => api.put('/profile', data),
   switchableUsers: (params = {}) => api.get('/auth/switchable-users', { params }),
   impersonate: (userId) => api.post('/auth/impersonate', { user_id: userId }),
 };
@@ -202,6 +203,8 @@ export const stores = {
   getTenants: () => cachedGet('/tenants', {}, 10000),
   getTenantHealth: () => cachedGet('/tenants/health', {}, 8000),
   getStores: () => cachedGet('/stores', {}, 10000),
+  getTenantSettings: () => cachedGet('/tenant-settings', {}, 8000),
+  updateTenantSettings: (data) => api.put('/tenant-settings', data),
 };
 
 // Order APIs
@@ -258,6 +261,17 @@ export const shipping = {
   getShipments: () => api.get('/shipping/shipments'),
   createShipment: (data) => api.post('/shipping/shipments', data),
   updateShipment: (id, data) => api.put(`/shipping/shipments/${id}`, data),
+};
+
+// Audit APIs
+export const audit = {
+  getLogs: (params = {}) => cachedGet('/audit-logs', params, 4000),
+};
+
+// Roles & Permissions APIs
+export const rolesPermissions = {
+  getMatrix: () => cachedGet('/roles-permissions', {}, 10000),
+  toggle: (roleId, permissionId) => api.post('/roles-permissions/toggle', { role_id: roleId, permission_id: permissionId }),
 };
 
 export default api;

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -158,5 +159,39 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()?->delete();
 
         return response()->json(['message' => 'Logout eseguito.']);
+    }
+
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validator = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'current_password' => ['nullable', 'string'],
+            'new_password' => ['nullable', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($request->filled('new_password')) {
+            if (! $request->filled('current_password') || ! Hash::check((string) $request->input('current_password'), $user->password)) {
+                return response()->json(['message' => 'Password attuale non corretta.'], 422);
+            }
+            $user->password = Hash::make((string) $request->input('new_password'));
+        }
+
+        $user->name = (string) $request->input('name');
+        $user->email = (string) $request->input('email');
+        $user->save();
+
+        AuditLogger::log($request, 'update', 'profile', $user->id, $user->name);
+
+        return response()->json([
+            'message' => 'Profilo aggiornato.',
+            'user' => $this->buildUserPayload($user),
+        ]);
     }
 }

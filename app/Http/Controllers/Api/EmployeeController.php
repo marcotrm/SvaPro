@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -126,12 +127,16 @@ class EmployeeController extends Controller
             'updated_at' => now(),
         ]);
 
+        AuditLogger::log($request, 'create', 'employee', $employeeId, $request->input('first_name') . ' ' . $request->input('last_name'));
+
         return response()->json(['message' => 'Dipendente creato.', 'employee_id' => $employeeId], 201);
     }
 
     public function update(Request $request, int $employeeId): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $old = DB::table('employees')->where('tenant_id', $tenantId)->where('id', $employeeId)->first();
 
         $updated = DB::table('employees')
             ->where('tenant_id', $tenantId)
@@ -147,6 +152,8 @@ class EmployeeController extends Controller
         if (! $updated) {
             return response()->json(['message' => 'Dipendente non trovato.'], 404);
         }
+
+        AuditLogger::log($request, 'update', 'employee', $employeeId, ($old->first_name ?? '') . ' ' . ($old->last_name ?? ''));
 
         return response()->json(['message' => 'Dipendente aggiornato.']);
     }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\CustomerController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\RolesPermissionsController;
 use App\Http\Controllers\Api\ShippingController;
 use App\Http\Controllers\Api\SmartInventoryController;
 use App\Http\Controllers\Api\StoreController;
@@ -17,10 +19,16 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::put('/profile', [AuthController::class, 'updateProfile']);
 
     Route::middleware('role:superadmin,admin_cliente')->group(function () {
         Route::get('/tenants', [StoreController::class, 'tenants']);
         Route::get('/tenants/health', [StoreController::class, 'tenantHealth']);
+        Route::get('/audit-logs', [AuditController::class, 'index']);
+        Route::get('/tenant-settings', [StoreController::class, 'tenantSettings']);
+        Route::put('/tenant-settings', [StoreController::class, 'updateTenantSettings']);
+        Route::get('/roles-permissions', [RolesPermissionsController::class, 'matrix']);
+        Route::post('/roles-permissions/toggle', [RolesPermissionsController::class, 'toggle']);
         Route::get('/auth/switchable-users', [AuthController::class, 'switchableUsers']);
         Route::post('/auth/impersonate', [AuthController::class, 'impersonate']);
         Route::get('/stores', [StoreController::class, 'index']);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -194,6 +195,8 @@ class InventoryController extends Controller
                 'updated_at' => $now,
             ]);
         });
+
+        AuditLogger::log($request, 'adjust', 'inventory', $request->integer('product_variant_id'), 'Mov. ' . $request->input('movement_type') . ' qty:' . $request->integer('qty'));
 
         return response()->json(['message' => 'Movimento registrato.']);
     }

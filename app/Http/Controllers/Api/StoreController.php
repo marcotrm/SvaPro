@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -113,5 +114,51 @@ class StoreController extends Controller
         }
 
         return response()->json(['data' => $result]);
+    }
+
+    public function tenantSettings(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $tenant = DB::table('tenants')->where('id', $tenantId)->first();
+
+        if (! $tenant) {
+            return response()->json(['message' => 'Tenant non trovato.'], 404);
+        }
+
+        return response()->json([
+            'data' => [
+                'id'           => $tenant->id,
+                'name'         => $tenant->name,
+                'code'         => $tenant->code,
+                'vat_number'   => $tenant->vat_number,
+                'timezone'     => $tenant->timezone,
+                'status'       => $tenant->status,
+                'settings_json' => $tenant->settings_json ? json_decode($tenant->settings_json, true) : null,
+            ],
+        ]);
+    }
+
+    public function updateTenantSettings(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $updated = DB::table('tenants')
+            ->where('id', $tenantId)
+            ->update([
+                'name'          => $request->input('name'),
+                'vat_number'    => $request->input('vat_number'),
+                'timezone'      => $request->input('timezone', 'Europe/Rome'),
+                'settings_json' => $request->has('settings_json') ? json_encode($request->input('settings_json')) : DB::raw('settings_json'),
+                'updated_at'    => now(),
+            ]);
+
+        if (! $updated) {
+            return response()->json(['message' => 'Tenant non trovato.'], 404);
+        }
+
+        AuditLogger::log($request, 'update', 'tenant', $tenantId, $request->input('name'));
+
+        return response()->json(['message' => 'Impostazioni tenant aggiornate.']);
     }
 }

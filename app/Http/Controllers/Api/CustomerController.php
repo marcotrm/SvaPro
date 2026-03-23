@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -152,12 +153,16 @@ class CustomerController extends Controller
             'updated_at' => now(),
         ]);
 
+        AuditLogger::log($request, 'create', 'customer', $id, $request->input('first_name') . ' ' . $request->input('last_name'));
+
         return response()->json(['message' => 'Cliente creato.', 'customer_id' => $id], 201);
     }
 
     public function update(Request $request, int $customerId): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $old = DB::table('customers')->where('tenant_id', $tenantId)->where('id', $customerId)->first();
 
         $updated = DB::table('customers')
             ->where('tenant_id', $tenantId)
@@ -174,6 +179,8 @@ class CustomerController extends Controller
         if (! $updated) {
             return response()->json(['message' => 'Cliente non trovato.'], 404);
         }
+
+        AuditLogger::log($request, 'update', 'customer', $customerId, ($old->first_name ?? '') . ' ' . ($old->last_name ?? ''));
 
         return response()->json(['message' => 'Cliente aggiornato.']);
     }

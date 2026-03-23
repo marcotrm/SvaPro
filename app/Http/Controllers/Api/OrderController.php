@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Services\AuditLogger;
 use App\Services\LoyaltyPushService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -267,6 +268,8 @@ class OrderController extends Controller
 
             return $orderId;
         });
+
+        AuditLogger::log($request, 'create', 'order', $orderId, 'Ordine #' . $orderId . ' €' . number_format($quote['totals']['grand_total'], 2));
 
         return response()->json([
             'message' => 'Ordine creato.',

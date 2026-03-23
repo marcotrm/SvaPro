@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -93,6 +94,8 @@ class CatalogController extends Controller
 
         $productId = $this->persistProduct($tenantId, $request);
 
+        AuditLogger::log($request, 'create', 'product', $productId, $request->input('name'));
+
         return response()->json([
             'message' => 'Prodotto creato.',
             'product_id' => $productId,
@@ -124,6 +127,8 @@ class CatalogController extends Controller
         }
 
         $this->persistProduct($tenantId, $request, $productId);
+
+        AuditLogger::log($request, 'update', 'product', $productId, $request->input('name'));
 
         return response()->json([
             'message' => 'Prodotto aggiornato.',
