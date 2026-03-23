@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { auth, stores } from '../api.jsx';
+import { auth, stores, clearApiCache } from '../api.jsx';
 import { prefetchRoute } from '../routePrefetch.js';
 
 const navGroups = [
@@ -72,6 +72,7 @@ const pageTitles = {
   '/employees': 'Dipendenti',
   '/analytics/loyalty': 'Loyalty Analytics',
   '/analytics/loyalty/push-monitor': 'Loyalty Push Monitor',
+  '/control-tower': 'Control Tower',
 };
 
 export default function Layout({ user, setUser }) {
@@ -193,6 +194,7 @@ export default function Layout({ user, setUser }) {
     localStorage.setItem('tenantCode', nextTenantCode);
     localStorage.removeItem('selectedStoreId');
     setSelectedStoreId('');
+    clearApiCache();
     loadSwitchableUsers(nextTenantCode);
     setUserPanelOpen(false);
   };
@@ -205,6 +207,7 @@ export default function Layout({ user, setUser }) {
     setSwitchingUser(true);
     try {
       const response = await auth.impersonate(Number(switchUserId));
+      clearApiCache();
       localStorage.setItem('authToken', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       localStorage.setItem('tenantCode', response.data.user.tenant_code || 'DEMO');
@@ -219,6 +222,7 @@ export default function Layout({ user, setUser }) {
 
   const handleLogout = async () => {
     try { await auth.logout(); } catch {}
+    clearApiCache();
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     localStorage.removeItem('tenantCode');
@@ -274,6 +278,22 @@ export default function Layout({ user, setUser }) {
               })}
             </React.Fragment>
           ))}
+
+          {/* Superadmin-only section */}
+          {isSuperAdmin && (
+            <>
+              <div className="nav-label">Superadmin</div>
+              <a
+                className={`nav-item${location.pathname === '/control-tower' ? ' active' : ''}`}
+                href="/control-tower"
+                onMouseEnter={() => prefetchRoute('/control-tower')}
+                onClick={e => { e.preventDefault(); navigate('/control-tower'); }}
+              >
+                <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"/></svg>
+                Control Tower
+              </a>
+            </>
+          )}
         </nav>
 
         <div className="sidebar-footer">

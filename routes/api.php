@@ -20,6 +20,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
 
     Route::middleware('role:superadmin,admin_cliente')->group(function () {
         Route::get('/tenants', [StoreController::class, 'tenants']);
+        Route::get('/tenants/health', [StoreController::class, 'tenantHealth']);
         Route::get('/auth/switchable-users', [AuthController::class, 'switchableUsers']);
         Route::post('/auth/impersonate', [AuthController::class, 'impersonate']);
         Route::get('/stores', [StoreController::class, 'index']);

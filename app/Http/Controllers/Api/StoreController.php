@@ -44,4 +44,74 @@ class StoreController extends Controller
 
         return response()->json(['data' => $stores]);
     }
+
+    /**
+     * Superadmin Control Tower – per-tenant health metrics.
+     */
+    public function tenantHealth(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $isSuperAdmin = DB::table('user_roles')
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->where('user_roles.user_id', $user->id)
+            ->where('roles.code', 'superadmin')
+            ->exists();
+
+        if (! $isSuperAdmin) {
+            return response()->json(['message' => 'Permessi insufficienti.'], 403);
+        }
+
+        $tenants = DB::table('tenants')->orderBy('name')->get(['id', 'code', 'name', 'status']);
+
+        $result = [];
+
+        foreach ($tenants as $tenant) {
+            $tid = (int) $tenant->id;
+
+            $storeCount = DB::table('stores')->where('tenant_id', $tid)->count();
+
+            $orderStats = DB::table('sales_orders')
+                ->where('tenant_id', $tid)
+                ->selectRaw("COUNT(*) as total_orders, COALESCE(SUM(grand_total),0) as total_revenue, SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END) as paid_orders")
+                ->first();
+
+            $lowStockCount = DB::table('stock_items')
+                ->where('tenant_id', $tid)
+                ->whereColumn('on_hand', '<', 'reorder_point')
+                ->count();
+
+            $customerCount = DB::table('customers')->where('tenant_id', $tid)->count();
+
+            $employeeCount = DB::table('employees')->where('tenant_id', $tid)->count();
+
+            $productCount = DB::table('products')->where('tenant_id', $tid)->count();
+
+            $adminCount = DB::table('users as u')
+                ->join('user_roles as ur', 'ur.user_id', '=', 'u.id')
+                ->join('roles as r', 'r.id', '=', 'ur.role_id')
+                ->where('u.tenant_id', $tid)
+                ->where('r.code', 'admin_cliente')
+                ->where('u.status', 'active')
+                ->count();
+
+            $result[] = [
+                'tenant_id' => $tid,
+                'code' => $tenant->code,
+                'name' => $tenant->name,
+                'status' => $tenant->status,
+                'stores' => $storeCount,
+                'admins' => $adminCount,
+                'products' => $productCount,
+                'customers' => $customerCount,
+                'employees' => $employeeCount,
+                'total_orders' => (int) ($orderStats->total_orders ?? 0),
+                'paid_orders' => (int) ($orderStats->paid_orders ?? 0),
+                'total_revenue' => round((float) ($orderStats->total_revenue ?? 0), 2),
+                'low_stock_items' => $lowStockCount,
+            ];
+        }
+
+        return response()->json(['data' => $result]);
+    }
 }

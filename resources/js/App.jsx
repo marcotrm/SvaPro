@@ -13,6 +13,7 @@ const EmployeesPage = lazy(() => import('./pages/EmployeesPage.jsx'));
 const SmartReorderPage = lazy(() => import('./pages/SmartReorderPage.jsx'));
 const LoyaltyAnalyticsPage = lazy(() => import('./pages/LoyaltyAnalyticsPage.jsx'));
 const LoyaltyPushMonitoringPage = lazy(() => import('./pages/LoyaltyPushMonitoringPage.jsx'));
+const ControlTowerPage = lazy(() => import('./pages/ControlTowerPage.jsx'));
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -81,6 +82,7 @@ export default function App() {
               <Route path="/employees" element={<EmployeesPage />} />
               <Route path="/analytics/loyalty" element={<LoyaltyAnalyticsPage />} />
               <Route path="/analytics/loyalty/push-monitor" element={<LoyaltyPushMonitoringPage />} />
+              <Route path="/control-tower" element={<ControlTowerPage />} />
             </Route>
           </Route>
 

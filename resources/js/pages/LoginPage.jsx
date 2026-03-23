@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../api.jsx';
+import { auth, clearApiCache } from '../api.jsx';
 
 export default function LoginPage({ setUser }) {
   const navigate = useNavigate();
@@ -21,6 +21,7 @@ export default function LoginPage({ setUser }) {
     setLoading(true);
     try {
       const response = await auth.login(email, password);
+      clearApiCache();
       localStorage.setItem('authToken', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       localStorage.setItem('tenantCode', response.data.user.tenant_code || 'DEMO');

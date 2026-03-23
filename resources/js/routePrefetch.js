@@ -1,4 +1,4 @@
-import { catalog, orders, inventory, customers, employees, loyalty } from './api.jsx';
+import { catalog, orders, inventory, customers, employees, loyalty, stores } from './api.jsx';
 
 const routeLoaders = {
   '/': () => import('./pages/DashboardPage.jsx'),
@@ -10,6 +10,7 @@ const routeLoaders = {
   '/employees': () => import('./pages/EmployeesPage.jsx'),
   '/analytics/loyalty': () => import('./pages/LoyaltyAnalyticsPage.jsx'),
   '/analytics/loyalty/push-monitor': () => import('./pages/LoyaltyPushMonitoringPage.jsx'),
+  '/control-tower': () => import('./pages/ControlTowerPage.jsx'),
 };
 
 /* Map routes to the API calls they'll make on mount.
@@ -44,6 +45,9 @@ const routeDataLoaders = {
   },
   '/analytics/loyalty/push-monitor': () => {
     loyalty.getPushMonitoringStats({});
+  },
+  '/control-tower': () => {
+    stores.getTenantHealth();
   },
 };
 

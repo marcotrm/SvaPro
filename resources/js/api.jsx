@@ -138,6 +138,7 @@ api.interceptors.response.use(
 
       localStorage.setItem('tenantCode', fallbackTenantCode);
       localStorage.removeItem('selectedStoreId');
+      clearApiCache();
       if (!originalRequest.__contextRetry) {
         originalRequest.__contextRetry = true;
         originalRequest.headers = {
@@ -154,6 +155,7 @@ api.interceptors.response.use(
 
     if (status === 422 && /Store non valido per il tenant/i.test(message)) {
       localStorage.removeItem('selectedStoreId');
+      clearApiCache();
       if (!originalRequest.__contextRetry) {
         originalRequest.__contextRetry = true;
         if (originalRequest.params?.store_id) {
@@ -198,6 +200,7 @@ export const catalog = {
 
 export const stores = {
   getTenants: () => cachedGet('/tenants', {}, 10000),
+  getTenantHealth: () => cachedGet('/tenants/health', {}, 8000),
   getStores: () => cachedGet('/stores', {}, 10000),
 };
 
