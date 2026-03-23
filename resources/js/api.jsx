@@ -83,6 +83,7 @@ export const orders = {
 // Inventory APIs
 export const inventory = {
   getStock: () => api.get('/inventory/stock'),
+  getMovements: (params = {}) => api.get('/inventory/movements', { params }),
   adjustStock: (data) => api.post('/inventory/adjust', data),
   getSmartReorderPreview: () => api.get('/inventory/smart-reorder/preview'),
   runSmartReorder: () => api.post('/inventory/smart-reorder/run'),

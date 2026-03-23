@@ -257,6 +257,30 @@ class ApiWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_inventory_movements_endpoint_returns_and_filters_records(): void
+    {
+        $headers = $this->authenticateAsSuperAdmin();
+
+        $this->withHeaders($headers)->postJson('/api/inventory/adjust', [
+            'warehouse_id' => 1,
+            'product_variant_id' => 1,
+            'qty' => 7,
+            'movement_type' => 'manual_adjustment',
+            'reference_type' => 'cycle_count',
+            'reference_id' => 101,
+        ])->assertOk()
+            ->assertJsonPath('message', 'Movimento registrato.');
+
+        $allMovements = $this->withHeaders($headers)->getJson('/api/inventory/movements');
+        $allMovements->assertOk()
+            ->assertJsonPath('data.0.warehouse_name', 'Magazzino Centrale');
+
+        $manualAdjustments = $this->withHeaders($headers)->getJson('/api/inventory/movements?movement_type=manual_adjustment&warehouse_id=1');
+        $manualAdjustments->assertOk()
+            ->assertJsonPath('data.0.movement_type', 'manual_adjustment')
+            ->assertJsonPath('data.0.reference_type', 'cycle_count');
+    }
+
     public function test_customer_employee_and_shipping_crud_flow_works(): void
     {
         $headers = $this->authenticateAsSuperAdmin();

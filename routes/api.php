@@ -50,6 +50,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
 
     Route::middleware('role:superadmin,admin_cliente,dipendente')->group(function () {
         Route::get('/inventory/stock', [InventoryController::class, 'index']);
+        Route::get('/inventory/movements', [InventoryController::class, 'movements']);
 
         Route::post('/orders/quote', [OrderController::class, 'quote']);
         Route::post('/orders/place', [OrderController::class, 'place']);
