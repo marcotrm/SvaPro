@@ -47,6 +47,10 @@ class CatalogController extends Controller
             'barcode' => ['nullable', 'string', 'max:100'],
             'brand_id' => ['nullable', 'integer'],
             'category_id' => ['nullable', 'integer'],
+            'default_supplier_id' => ['nullable', 'integer'],
+            'auto_reorder_enabled' => ['nullable', 'boolean'],
+            'reorder_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'min_stock_qty' => ['nullable', 'integer', 'min:0'],
             'nicotine_mg' => ['nullable', 'integer', 'min:0'],
             'volume_ml' => ['nullable', 'integer', 'min:0'],
             'variants' => ['required', 'array', 'min:1'],
@@ -65,6 +69,7 @@ class CatalogController extends Controller
         foreach ([
             'brand_id' => 'brands',
             'category_id' => 'categories',
+            'default_supplier_id' => 'suppliers',
         ] as $field => $table) {
             $value = data_get($request->all(), $field);
             if ($value !== null && ! DB::table($table)
@@ -95,6 +100,10 @@ class CatalogController extends Controller
             'product_type' => (string) $request->input('product_type'),
             'brand_id' => $request->input('brand_id'),
             'category_id' => $request->input('category_id'),
+            'default_supplier_id' => $request->input('default_supplier_id'),
+            'auto_reorder_enabled' => (bool) $request->boolean('auto_reorder_enabled', true),
+            'reorder_days' => (int) $request->input('reorder_days', 30),
+            'min_stock_qty' => (int) $request->input('min_stock_qty', 0),
             'nicotine_mg' => $request->input('nicotine_mg'),
             'volume_ml' => $request->input('volume_ml'),
             'is_active' => true,

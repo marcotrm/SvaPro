@@ -59,24 +59,21 @@ class OrderController extends Controller
         $quote = $this->buildQuote($tenantId, (array) $request->input('lines'));
         $status = (string) ($request->input('status') ?: 'paid');
         $now = now();
+        $stockAlerts = [];
 
         if (($quote['meta']['invalid_lines'] ?? 0) > 0 || count($quote['lines']) === 0) {
             return response()->json(['message' => 'Una o piu righe ordine non sono valide per il tenant.'], 422);
         }
 
         if ($status === 'paid') {
-            $stockError = $this->ensureStockAvailable(
+            $stockAlerts = $this->collectStockAlerts(
                 $tenantId,
                 (int) $request->integer('warehouse_id'),
                 $quote['lines']
             );
-
-            if ($stockError !== null) {
-                return response()->json(['message' => $stockError], 422);
-            }
         }
 
-        $orderId = DB::transaction(function () use ($request, $tenantId, $quote, $status, $now): int {
+        $orderId = DB::transaction(function () use ($request, $tenantId, $quote, $status, $now, $stockAlerts): int {
             $orderId = DB::table('sales_orders')->insertGetId([
                 'tenant_id' => $tenantId,
                 'store_id' => $request->input('store_id'),
@@ -89,10 +86,30 @@ class OrderController extends Controller
                 'tax_total' => $quote['totals']['tax_total'],
                 'excise_total' => $quote['totals']['excise_total'],
                 'grand_total' => $quote['totals']['grand_total'],
+                'has_stock_alert' => ! empty($stockAlerts),
+                'stock_alert_reason' => ! empty($stockAlerts)
+                    ? 'Stock insufficiente su una o piu varianti. Verificare giacenza.'
+                    : null,
                 'paid_at' => $status === 'paid' ? $now : null,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
+
+            if (! empty($stockAlerts)) {
+                $alertRows = [];
+                foreach ($stockAlerts as $alert) {
+                    $alertRows[] = [
+                        'tenant_id' => $tenantId,
+                        'sales_order_id' => $orderId,
+                        'alert_type' => 'insufficient_stock',
+                        'details_json' => json_encode($alert),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+
+                DB::table('sales_order_alerts')->insert($alertRows);
+            }
 
             foreach ($quote['lines'] as $line) {
                 DB::table('sales_order_lines')->insert([
@@ -242,6 +259,8 @@ class OrderController extends Controller
             'message' => 'Ordine creato.',
             'order_id' => $orderId,
             'quote' => $quote,
+            'has_stock_alert' => ! empty($stockAlerts),
+            'stock_alerts' => $stockAlerts,
         ], 201);
     }
 
@@ -402,8 +421,10 @@ class OrderController extends Controller
         return true;
     }
 
-    private function ensureStockAvailable(int $tenantId, int $warehouseId, array $lines): ?string
+    private function collectStockAlerts(int $tenantId, int $warehouseId, array $lines): array
     {
+        $alerts = [];
+
         foreach ($lines as $line) {
             $stock = DB::table('stock_items')
                 ->where('tenant_id', $tenantId)
@@ -415,11 +436,17 @@ class OrderController extends Controller
             $availableQty = (int) (($stock->on_hand ?? 0) - ($stock->reserved ?? 0));
 
             if ($availableQty < (int) $line['qty']) {
-                return 'Stock insufficiente per la variante '.$line['product_variant_id'];
+                $requestedQty = (int) $line['qty'];
+                $alerts[] = [
+                    'product_variant_id' => (int) $line['product_variant_id'],
+                    'requested_qty' => $requestedQty,
+                    'available_qty' => $availableQty,
+                    'shortage_qty' => $requestedQty - $availableQty,
+                ];
             }
         }
 
-        return null;
+        return $alerts;
     }
 
     private function resolveVatRate(int $tenantId, ?int $taxClassId): float

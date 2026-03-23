@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'smart_inventory' => [
+        'central_supplier_id' => (int) env('SMART_INVENTORY_CENTRAL_SUPPLIER_ID', 1),
+    ],
+
 ];

@@ -16,8 +16,6 @@ class SmartReorderService
             ->get();
 
         foreach ($stores as $store) {
-            $topSellers = $this->topSellerQuantities($tenantId, (int) $store->id);
-
             $items = DB::table('stock_items as si')
                 ->join('warehouses as w', 'w.id', '=', 'si.warehouse_id')
                 ->join('product_variants as pv', 'pv.id', '=', 'si.product_variant_id')
@@ -36,15 +34,33 @@ class SmartReorderService
                     'p.id as product_id',
                     'p.name as product_name',
                     'p.default_supplier_id',
+                    'p.auto_reorder_enabled',
+                    'p.reorder_days',
+                    'p.min_stock_qty',
                     'pv.sale_price',
                     'pv.cost_price',
                 ])
                 ->get();
 
             foreach ($items as $item) {
-                $soldQty = (int) ($topSellers[$item->product_variant_id] ?? 0);
+                if (! $item->auto_reorder_enabled) {
+                    continue;
+                }
+
+                $reorderDays = max(1, (int) ($item->reorder_days ?? 30));
+                $soldQty = $this->soldQuantityForVariant(
+                    $tenantId,
+                    (int) $store->id,
+                    (int) $item->product_variant_id,
+                    $reorderDays
+                );
+
                 $available = (int) $item->on_hand - (int) $item->reserved;
-                $threshold = max((int) $store->smart_reorder_threshold, (int) $item->reorder_point);
+                $threshold = max(
+                    (int) $store->smart_reorder_threshold,
+                    (int) $item->reorder_point,
+                    (int) ($item->min_stock_qty ?? 0)
+                );
 
                 if ($soldQty <= 0 || $available > $threshold) {
                     continue;
@@ -71,7 +87,8 @@ class SmartReorderService
                     'product_name' => $item->product_name,
                     'available' => $available,
                     'threshold' => $threshold,
-                    'sold_qty_30d' => $soldQty,
+                    'reorder_days' => $reorderDays,
+                    'sold_qty_window' => $soldQty,
                     'suggested_qty' => $suggestedQty,
                     'supplier_id' => $item->default_supplier_id,
                     'unit_cost' => (float) ($item->cost_price ?? 0),
@@ -85,7 +102,7 @@ class SmartReorderService
         ];
     }
 
-    public function runForTenant(int $tenantId): array
+    public function runForTenant(int $tenantId, bool $forceCentralSupplier = false): array
     {
         $preview = $this->previewForTenant($tenantId);
         $alerts = collect($preview['alerts']);
@@ -98,19 +115,23 @@ class SmartReorderService
             ];
         }
 
-        $createdOrders = DB::transaction(function () use ($tenantId, $alerts): array {
+        $createdOrders = DB::transaction(function () use ($tenantId, $alerts, $forceCentralSupplier): array {
             $orders = [];
+            $centralSupplierId = $this->centralSupplierId();
 
-            $grouped = $alerts->groupBy(function (array $alert) {
+            $grouped = $alerts->groupBy(function (array $alert) use ($forceCentralSupplier) {
                 return implode(':', [
                     $alert['store_id'],
-                    $alert['supplier_id'] ?? 0,
+                    $forceCentralSupplier ? 'central' : ($alert['supplier_id'] ?? 0),
                 ]);
             });
 
             foreach ($grouped as $groupAlerts) {
                 $first = $groupAlerts->first();
-                $supplierId = (int) ($first['supplier_id'] ?? 0);
+                $supplierId = $forceCentralSupplier
+                    ? $centralSupplierId
+                    : (int) ($first['supplier_id'] ?? 0);
+
                 if ($supplierId === 0) {
                     continue;
                 }
@@ -122,8 +143,12 @@ class SmartReorderService
                     'status' => 'draft',
                     'source' => 'auto_reorder',
                     'expected_at' => now()->addDays(2),
+                    'auto_generated_at' => now(),
+                    'auto_generated_by' => 'smart_reorder',
                     'total_net' => 0,
-                    'notes' => 'Ordine generato automaticamente dal magazzino intelligente',
+                    'notes' => $forceCentralSupplier
+                        ? 'Ordine generato automaticamente verso magazzino centrale'
+                        : 'Ordine generato automaticamente dal magazzino intelligente',
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -166,19 +191,27 @@ class SmartReorderService
         ];
     }
 
-    private function topSellerQuantities(int $tenantId, int $storeId): array
+    public function runAutoToCentralForTenant(int $tenantId): array
     {
-        return DB::table('sales_order_lines as sol')
+        return $this->runForTenant($tenantId, true);
+    }
+
+    private function soldQuantityForVariant(int $tenantId, int $storeId, int $variantId, int $days): int
+    {
+        $qty = DB::table('sales_order_lines as sol')
             ->join('sales_orders as so', 'so.id', '=', 'sol.sales_order_id')
             ->where('so.tenant_id', $tenantId)
             ->where('so.store_id', $storeId)
             ->where('so.status', 'paid')
-            ->where('so.paid_at', '>=', now()->subDays(30))
-            ->groupBy('sol.product_variant_id')
-            ->selectRaw('sol.product_variant_id, SUM(sol.qty) as sold_qty')
-            ->orderByDesc('sold_qty')
-            ->pluck('sold_qty', 'product_variant_id')
-            ->map(fn ($value) => (int) $value)
-            ->all();
+            ->where('so.paid_at', '>=', now()->subDays($days))
+            ->where('sol.product_variant_id', $variantId)
+            ->sum('sol.qty');
+
+        return (int) $qty;
+    }
+
+    private function centralSupplierId(): int
+    {
+        return (int) config('services.smart_inventory.central_supplier_id', 0);
     }
 }

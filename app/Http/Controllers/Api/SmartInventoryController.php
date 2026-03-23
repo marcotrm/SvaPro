@@ -26,4 +26,11 @@ class SmartInventoryController extends Controller
 
         return response()->json($this->service->runForTenant($tenantId));
     }
+
+    public function runAutoToCentral(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        return response()->json($this->service->runAutoToCentralForTenant($tenantId));
+    }
 }

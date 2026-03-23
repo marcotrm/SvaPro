@@ -142,7 +142,7 @@ class ApiWorkflowTest extends TestCase
             ->assertJsonPath('monetary_value', 0.05);
     }
 
-    public function test_paid_order_is_rejected_when_stock_is_insufficient(): void
+    public function test_paid_order_is_created_with_alert_when_stock_is_insufficient(): void
     {
         $loginResponse = $this->postJson('/api/login', [
             'email' => 'superadmin@demo.local',
@@ -159,7 +159,7 @@ class ApiWorkflowTest extends TestCase
 
         $beforeCount = DB::table('sales_orders')->count();
 
-        $this->withHeaders($headers)->postJson('/api/orders/place', [
+        $response = $this->withHeaders($headers)->postJson('/api/orders/place', [
             'channel' => 'pos',
             'store_id' => 1,
             'warehouse_id' => 1,
@@ -167,10 +167,63 @@ class ApiWorkflowTest extends TestCase
             'lines' => [
                 ['product_variant_id' => 1, 'qty' => 999],
             ],
-        ])->assertStatus(422)
-            ->assertJsonPath('message', 'Stock insufficiente per la variante 1');
+        ])->assertCreated()
+            ->assertJsonPath('has_stock_alert', true)
+            ->assertJsonPath('stock_alerts.0.product_variant_id', 1);
 
-        $this->assertSame($beforeCount, DB::table('sales_orders')->count());
+        $orderId = (int) $response->json('order_id');
+
+        $this->assertDatabaseHas('sales_orders', [
+            'id' => $orderId,
+            'has_stock_alert' => true,
+        ]);
+
+        $this->assertDatabaseHas('sales_order_alerts', [
+            'sales_order_id' => $orderId,
+            'alert_type' => 'insufficient_stock',
+        ]);
+
+        $afterStock = DB::table('stock_items')
+            ->where('tenant_id', 1)
+            ->where('warehouse_id', 1)
+            ->where('product_variant_id', 1)
+            ->value('on_hand');
+
+        $this->assertLessThan(0, (int) $afterStock);
+
+        $this->assertSame($beforeCount + 1, DB::table('sales_orders')->count());
+    }
+
+    public function test_employee_cannot_adjust_inventory_manually(): void
+    {
+        $loginResponse = $this->postJson('/api/login', [
+            'email' => 'staff@demo.local',
+            'password' => 'ChangeMe123!',
+            'device_name' => 'phpunit-staff',
+        ]);
+
+        $token = $loginResponse->json('token');
+
+        $headers = [
+            'Authorization' => 'Bearer '.$token,
+            'X-Tenant-Code' => 'DEMO',
+        ];
+
+        $this->withHeaders($headers)->postJson('/api/inventory/adjust', [
+            'warehouse_id' => 1,
+            'product_variant_id' => 1,
+            'qty' => 5,
+            'movement_type' => 'manual_adjustment',
+        ])->assertStatus(403)
+            ->assertJsonPath('message', 'Permessi insufficienti.');
+
+        $this->assertDatabaseMissing('stock_movements', [
+            'tenant_id' => 1,
+            'warehouse_id' => 1,
+            'product_variant_id' => 1,
+            'movement_type' => 'manual_adjustment',
+            'qty' => 5,
+        ]);
     }
 
     public function test_customer_employee_and_shipping_crud_flow_works(): void
@@ -249,6 +302,14 @@ class ApiWorkflowTest extends TestCase
     {
         $headers = $this->authenticateAsSuperAdmin();
 
+        DB::table('products')
+            ->where('id', 1)
+            ->update([
+                'auto_reorder_enabled' => true,
+                'reorder_days' => 30,
+                'min_stock_qty' => 10,
+            ]);
+
         $this->withHeaders($headers)->postJson('/api/orders/place', [
             'channel' => 'pos',
             'store_id' => 2,
@@ -262,9 +323,10 @@ class ApiWorkflowTest extends TestCase
         $preview = $this->withHeaders($headers)->getJson('/api/inventory/smart-reorder/preview');
         $preview->assertOk()
             ->assertJsonPath('alerts.0.store_name', 'Negozio Milano')
-            ->assertJsonPath('alerts.0.available', 2);
+            ->assertJsonPath('alerts.0.available', 2)
+            ->assertJsonPath('alerts.0.threshold', 10);
 
-        $run = $this->withHeaders($headers)->postJson('/api/inventory/smart-reorder/run');
+        $run = $this->withHeaders($headers)->postJson('/api/inventory/smart-reorder/run-auto');
         $run->assertOk()
             ->assertJsonPath('created_orders.0.store_id', 2)
             ->assertJsonPath('created_orders.0.supplier_id', 1);
@@ -273,6 +335,7 @@ class ApiWorkflowTest extends TestCase
             'store_id' => 2,
             'supplier_id' => 1,
             'source' => 'auto_reorder',
+            'auto_generated_by' => 'smart_reorder',
         ]);
 
         $this->assertDatabaseHas('purchase_order_lines', [

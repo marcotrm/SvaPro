@@ -35,13 +35,15 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         Route::post('/shipping/shipments', [ShippingController::class, 'createShipment']);
         Route::put('/shipping/shipments/{shipmentId}', [ShippingController::class, 'updateShipmentStatus']);
 
+        Route::post('/inventory/adjust', [InventoryController::class, 'adjust']);
+
         Route::get('/inventory/smart-reorder/preview', [SmartInventoryController::class, 'preview']);
         Route::post('/inventory/smart-reorder/run', [SmartInventoryController::class, 'run']);
+        Route::post('/inventory/smart-reorder/run-auto', [SmartInventoryController::class, 'runAutoToCentral']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente')->group(function () {
         Route::get('/inventory/stock', [InventoryController::class, 'index']);
-        Route::post('/inventory/adjust', [InventoryController::class, 'adjust']);
 
         Route::post('/orders/quote', [OrderController::class, 'quote']);
         Route::post('/orders/place', [OrderController::class, 'place']);
