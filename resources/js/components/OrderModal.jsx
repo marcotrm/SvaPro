@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { X, Loader } from 'lucide-react';
 import { orders } from '../api.jsx';
 
-export default function OrderModal({ order, onClose, onSave }) {
+export default function OrderModal({ order, selectedStoreId = '', onClose, onSave }) {
   const [formData, setFormData] = useState({
     customer_id: order?.customer_id || '',
     warehouse_id: order?.warehouse_id || '',
+    store_id: order?.store_id || selectedStoreId || '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -25,9 +26,10 @@ export default function OrderModal({ order, onClose, onSave }) {
         // Could implement update if needed
       } else {
         // Create new order
-        const quoteResponse = await orders.quote({
+        await orders.quote({
           customer_id: formData.customer_id,
           warehouse_id: formData.warehouse_id,
+          store_id: formData.store_id || selectedStoreId || null,
           items: []
         });
       }

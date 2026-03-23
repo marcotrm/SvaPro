@@ -17,6 +17,16 @@ const getTenantCode = () => {
   return localStorage.getItem('tenantCode') || 'DEMO';
 };
 
+const getSelectedStoreId = () => {
+  const value = localStorage.getItem('selectedStoreId');
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
 // Get current auth token
 const getAuthToken = () => {
   return localStorage.getItem('authToken');
@@ -26,11 +36,20 @@ const getAuthToken = () => {
 api.interceptors.request.use((config) => {
   const token = getAuthToken();
   const tenantCode = getTenantCode();
+  const selectedStoreId = getSelectedStoreId();
   
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   config.headers['X-Tenant-Code'] = tenantCode;
+
+  if (selectedStoreId) {
+    config.headers['X-Store-Id'] = String(selectedStoreId);
+    config.params = {
+      ...(config.params || {}),
+      store_id: config.params?.store_id ?? selectedStoreId,
+    };
+  }
   
   return config;
 });
@@ -74,7 +93,7 @@ export const stores = {
 
 // Order APIs
 export const orders = {
-  getOrders: () => api.get('/orders'),
+  getOrders: (params = {}) => api.get('/orders', { params }),
   getOrder: (id) => api.get(`/orders/${id}`),
   quote: (data) => api.post('/orders/quote', data),
   place: (data) => api.post('/orders/place', data),
@@ -82,12 +101,12 @@ export const orders = {
 
 // Inventory APIs
 export const inventory = {
-  getStock: () => api.get('/inventory/stock'),
+  getStock: (params = {}) => api.get('/inventory/stock', { params }),
   getMovements: (params = {}) => api.get('/inventory/movements', { params }),
   adjustStock: (data) => api.post('/inventory/adjust', data),
-  getSmartReorderPreview: () => api.get('/inventory/smart-reorder/preview'),
-  runSmartReorder: () => api.post('/inventory/smart-reorder/run'),
-  runSmartReorderAuto: () => api.post('/inventory/smart-reorder/run-auto'),
+  getSmartReorderPreview: (params = {}) => api.get('/inventory/smart-reorder/preview', { params }),
+  runSmartReorder: (data = {}) => api.post('/inventory/smart-reorder/run', data),
+  runSmartReorderAuto: (data = {}) => api.post('/inventory/smart-reorder/run-auto', data),
 };
 
 // Customer APIs
@@ -96,16 +115,16 @@ export const customers = {
   getCustomer: (id) => api.get(`/customers/${id}`),
   createCustomer: (data) => api.post('/customers', data),
   updateCustomer: (id, data) => api.put(`/customers/${id}`, data),
-  getReturnAnalytics: () => api.get('/customers/analytics/return-frequency'),
+  getReturnAnalytics: (params = {}) => api.get('/customers/analytics/return-frequency', { params }),
 };
 
 // Employee APIs
 export const employees = {
-  getEmployees: () => api.get('/employees'),
+  getEmployees: (params = {}) => api.get('/employees', { params }),
   getEmployee: (id) => api.get(`/employees/${id}`),
   createEmployee: (data) => api.post('/employees', data),
   updateEmployee: (id, data) => api.put(`/employees/${id}`, data),
-  getTopPerformers: () => api.get('/employees/analytics/top-performers'),
+  getTopPerformers: (params = {}) => api.get('/employees/analytics/top-performers', { params }),
 };
 
 // Loyalty APIs
@@ -114,6 +133,7 @@ export const loyalty = {
   registerDevice: (customerId, data) => api.post(`/loyalty/customers/${customerId}/devices`, data),
   getNotifications: (customerId, params = {}) => api.get(`/loyalty/customers/${customerId}/notifications`, { params }),
   markNotificationRead: (customerId, notificationId) => api.post(`/loyalty/customers/${customerId}/notifications/${notificationId}/read`),
+  getPushMonitoringStats: (params = {}) => api.get('/loyalty/monitoring/push-stats', { params }),
   getRedemptionPreview: (customerId, pointsToRedeem) => 
     api.post(`/loyalty/customers/${customerId}/redeem-preview`, { points_to_redeem: pointsToRedeem }),
 };

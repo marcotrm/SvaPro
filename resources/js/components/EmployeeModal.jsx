@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Loader } from 'lucide-react';
 import { employees } from '../api.jsx';
 
-export default function EmployeeModal({ employee, onClose, onSave }) {
+export default function EmployeeModal({ employee, storesList = [], selectedStoreId = '', onClose, onSave }) {
   const [formData, setFormData] = useState({
-    store_id: employee?.store_id || '',
+    store_id: employee?.store_id || selectedStoreId || '',
     first_name: employee?.first_name || '',
     last_name: employee?.last_name || '',
     hire_date: employee?.hire_date || '',
@@ -12,6 +12,16 @@ export default function EmployeeModal({ employee, onClose, onSave }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setFormData({
+      store_id: employee?.store_id || selectedStoreId || '',
+      first_name: employee?.first_name || '',
+      last_name: employee?.last_name || '',
+      hire_date: employee?.hire_date || '',
+      status: employee?.status || 'active',
+    });
+  }, [employee, selectedStoreId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -65,8 +75,10 @@ export default function EmployeeModal({ employee, onClose, onSave }) {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               required
             >
-              <option value="">Seleziona magazzino</option>
-              {/* Options would be populated from API */}
+              <option value="">Seleziona store</option>
+              {storesList.map((store) => (
+                <option key={store.id} value={store.id}>{store.name}</option>
+              ))}
             </select>
           </div>
 

@@ -6,7 +6,7 @@ import ErrorAlert from '../components/ErrorAlert.jsx';
 import InventoryMovementModal from '../components/InventoryMovementModal.jsx';
 
 export default function InventoryPage() {
-  const { user } = useOutletContext();
+  const { user, selectedStoreId, selectedStore } = useOutletContext();
   const [stock, setStock] = useState([]);
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,15 +19,15 @@ export default function InventoryPage() {
   const [dateToFilter, setDateToFilter] = useState('');
   const [showMovementModal, setShowMovementModal] = useState(false);
 
-  useEffect(() => { fetchStockAndMovements(); }, []);
-  useEffect(() => { fetchMovements(); }, [searchTerm, movementTypeFilter, warehouseFilter, dateFromFilter, dateToFilter]);
+  useEffect(() => { fetchStockAndMovements(); }, [selectedStoreId]);
+  useEffect(() => { fetchMovements(); }, [searchTerm, movementTypeFilter, warehouseFilter, dateFromFilter, dateToFilter, selectedStoreId]);
 
   const fetchStockAndMovements = async () => {
     try {
       setLoading(true); setError('');
       const [stockResponse, movementsResponse] = await Promise.all([
-        inventory.getStock(),
-        inventory.getMovements(),
+        inventory.getStock(selectedStoreId ? { store_id: selectedStoreId } : {}),
+        inventory.getMovements(selectedStoreId ? { store_id: selectedStoreId } : {}),
       ]);
       setStock(stockResponse.data.data || []);
       setMovements(movementsResponse.data.data || []);
@@ -39,6 +39,7 @@ export default function InventoryPage() {
   const fetchMovements = async () => {
     try {
       const response = await inventory.getMovements({
+        store_id: selectedStoreId || undefined,
         q: searchTerm || undefined,
         movement_type: movementTypeFilter || undefined,
         warehouse_id: warehouseFilter || undefined,
@@ -73,7 +74,9 @@ export default function InventoryPage() {
       <div className="page-head">
         <div>
           <div className="page-head-title">Magazzino</div>
-          <div className="page-head-sub">{stock.length} referenze - {lowCount} in stock basso</div>
+          <div className="page-head-sub">
+            {stock.length} referenze - {lowCount} in stock basso{selectedStore ? ` - Store: ${selectedStore.name}` : ''}
+          </div>
         </div>
         <button
           className={`filter-chip${filterLowStock ? ' active' : ''}`}

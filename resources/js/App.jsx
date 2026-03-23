@@ -12,6 +12,7 @@ import CustomersPage from './pages/CustomersPage.jsx';
 import EmployeesPage from './pages/EmployeesPage.jsx';
 import SmartReorderPage from './pages/SmartReorderPage.jsx';
 import LoyaltyAnalyticsPage from './pages/LoyaltyAnalyticsPage.jsx';
+import LoyaltyPushMonitoringPage from './pages/LoyaltyPushMonitoringPage.jsx';
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -68,6 +69,7 @@ export default function App() {
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/analytics/loyalty" element={<LoyaltyAnalyticsPage />} />
+            <Route path="/analytics/loyalty/push-monitor" element={<LoyaltyPushMonitoringPage />} />
           </Route>
         </Route>
 

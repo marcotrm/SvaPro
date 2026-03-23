@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,148 @@ use Illuminate\Support\Facades\Validator;
 
 class LoyaltyController extends Controller
 {
+    public function pushMonitoringStats(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $days = min(max((int) $request->integer('days', 7), 1), 30);
+
+        $from = now()->subDays($days - 1)->startOfDay();
+        $to = now()->endOfDay();
+
+        $statusRows = DB::table('loyalty_push_notifications')
+            ->where('tenant_id', $tenantId)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->get();
+
+        $statusCounts = [];
+        foreach ($statusRows as $row) {
+            $statusCounts[(string) $row->status] = (int) $row->total;
+        }
+
+        $pendingQueue = ($statusCounts['queued'] ?? 0) + ($statusCounts['pending_device'] ?? 0);
+        $inFlight = $statusCounts['dispatched'] ?? 0;
+
+        $outboxSummary = DB::table('outbox_events')
+            ->where('tenant_id', $tenantId)
+            ->where('event_name', 'loyalty.push.notification.dispatch')
+            ->whereNotNull('processed_at')
+            ->whereBetween('processed_at', [$from, $to])
+            ->selectRaw("COUNT(*) as total_processed")
+            ->selectRaw("SUM(CASE WHEN processing_status = 'success' THEN 1 ELSE 0 END) as success_count")
+            ->selectRaw("SUM(CASE WHEN processing_status = 'failed' THEN 1 ELSE 0 END) as failed_count")
+            ->first();
+
+        $processedCount = (int) ($outboxSummary->total_processed ?? 0);
+        $successCount = (int) ($outboxSummary->success_count ?? 0);
+        $failedCount = (int) ($outboxSummary->failed_count ?? 0);
+        $successRate = $processedCount > 0
+            ? round(($successCount / $processedCount) * 100, 2)
+            : 0.0;
+
+        $trendRows = DB::table('outbox_events')
+            ->where('tenant_id', $tenantId)
+            ->where('event_name', 'loyalty.push.notification.dispatch')
+            ->whereNotNull('processed_at')
+            ->whereBetween('processed_at', [$from, $to])
+            ->selectRaw('DATE(processed_at) as day')
+            ->selectRaw("SUM(CASE WHEN processing_status = 'success' THEN 1 ELSE 0 END) as success_count")
+            ->selectRaw("SUM(CASE WHEN processing_status = 'failed' THEN 1 ELSE 0 END) as failed_count")
+            ->groupByRaw('DATE(processed_at)')
+            ->orderBy('day')
+            ->get()
+            ->keyBy('day');
+
+        $deliveryTrend = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $day = now()->subDays($i)->toDateString();
+            $row = $trendRows->get($day);
+            $daySuccess = is_object($row) ? (int) $row->success_count : 0;
+            $dayFailed = is_object($row) ? (int) $row->failed_count : 0;
+            $dayTotal = $daySuccess + $dayFailed;
+
+            $deliveryTrend[] = [
+                'date' => Carbon::parse($day)->format('d/m'),
+                'success_count' => $daySuccess,
+                'failed_count' => $dayFailed,
+                'success_rate' => $dayTotal > 0 ? round(($daySuccess / $dayTotal) * 100, 2) : 0,
+            ];
+        }
+
+        $deviceRows = DB::table('loyalty_device_tokens')
+            ->where('tenant_id', $tenantId)
+            ->whereBetween('created_at', [$from, $to])
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as registered_count')
+            ->groupByRaw('DATE(created_at)')
+            ->orderBy('day')
+            ->get()
+            ->keyBy('day');
+
+        $deviceTrend = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $day = now()->subDays($i)->toDateString();
+            $deviceRow = $deviceRows->get($day);
+            $registered = is_object($deviceRow) ? (int) $deviceRow->registered_count : 0;
+            $deviceTrend[] = [
+                'date' => Carbon::parse($day)->format('d/m'),
+                'registered_count' => $registered,
+            ];
+        }
+
+        $activeDeviceCount = DB::table('loyalty_device_tokens')
+            ->where('tenant_id', $tenantId)
+            ->where('notifications_enabled', true)
+            ->count();
+
+        $totalDeviceCount = DB::table('loyalty_device_tokens')
+            ->where('tenant_id', $tenantId)
+            ->count();
+
+        $recentNotifications = DB::table('loyalty_push_notifications as lpn')
+            ->leftJoin('customers as c', function ($join) use ($tenantId) {
+                $join->on('c.id', '=', 'lpn.customer_id')
+                    ->where('c.tenant_id', '=', $tenantId);
+            })
+            ->where('lpn.tenant_id', $tenantId)
+            ->orderByDesc('lpn.id')
+            ->limit(12)
+            ->get([
+                'lpn.id',
+                'lpn.notification_type',
+                'lpn.title',
+                'lpn.status',
+                'lpn.target_devices_count',
+                'lpn.sent_at',
+                'lpn.delivered_at',
+                'lpn.created_at',
+                'c.first_name',
+                'c.last_name',
+                'c.code as customer_code',
+            ]);
+
+        return response()->json([
+            'summary' => [
+                'pending_queue' => $pendingQueue,
+                'in_flight' => $inFlight,
+                'success_count' => $successCount,
+                'failed_count' => $failedCount,
+                'processed_count' => $processedCount,
+                'success_rate' => $successRate,
+                'active_devices' => (int) $activeDeviceCount,
+                'total_devices' => (int) $totalDeviceCount,
+            ],
+            'status_breakdown' => $statusCounts,
+            'delivery_trend' => $deliveryTrend,
+            'device_registration_trend' => $deviceTrend,
+            'recent_notifications' => $recentNotifications,
+            'meta' => [
+                'days' => $days,
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+            ],
+        ]);
+    }
+
     public function showWallet(Request $request, int $customerId): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');

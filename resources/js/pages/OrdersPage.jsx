@@ -1,10 +1,12 @@
 ﻿import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { orders } from '../api.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import OrderModal from '../components/OrderModal.jsx';
 
 export default function OrdersPage() {
+  const { selectedStoreId, selectedStore } = useOutletContext();
   const [ordersList, setOrdersList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,12 +14,12 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
 
-  useEffect(() => { fetchOrders(); }, []);
+  useEffect(() => { fetchOrders(); }, [selectedStoreId]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true); setError('');
-      const response = await orders.getOrders();
+      const response = await orders.getOrders(selectedStoreId ? { store_id: selectedStoreId } : {});
       setOrdersList(response.data.data || []);
     } catch (err) {
       setError(err.message || 'Errore nel caricamento degli ordini');
@@ -42,7 +44,9 @@ export default function OrdersPage() {
       <div className="page-head">
         <div>
           <div className="page-head-title">Ordini</div>
-          <div className="page-head-sub">{ordersList.length} ordini totali</div>
+          <div className="page-head-sub">
+            {ordersList.length} ordini totali{selectedStore ? ` - Store: ${selectedStore.name}` : ''}
+          </div>
         </div>
         <button className="btn btn-gold" onClick={handleOpenModal}>
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -110,7 +114,12 @@ export default function OrdersPage() {
       </div>
 
       {showModal && (
-        <OrderModal order={selectedOrder} onClose={handleCloseModal} onSave={handleSaveOrder} />
+        <OrderModal
+          order={selectedOrder}
+          selectedStoreId={selectedStoreId}
+          onClose={handleCloseModal}
+          onSave={handleSaveOrder}
+        />
       )}
     </>
   );

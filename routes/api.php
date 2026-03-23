@@ -20,6 +20,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
 
     Route::middleware('role:superadmin,admin_cliente')->group(function () {
         Route::get('/stores', [StoreController::class, 'index']);
+        Route::get('/loyalty/monitoring/push-stats', [LoyaltyController::class, 'pushMonitoringStats']);
 
         Route::get('/catalog/products', [CatalogController::class, 'index']);
         Route::post('/catalog/products', [CatalogController::class, 'store']);

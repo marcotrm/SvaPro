@@ -1,10 +1,12 @@
 ﻿import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { employees } from '../api.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import EmployeeModal from '../components/EmployeeModal.jsx';
 
 export default function EmployeesPage() {
+  const { selectedStoreId, selectedStore, storesList } = useOutletContext();
   const [employeesList, setEmployeesList] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -13,14 +15,14 @@ export default function EmployeesPage() {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => { fetchEmployees(); }, []);
+  useEffect(() => { fetchEmployees(); }, [selectedStoreId]);
 
   const fetchEmployees = async () => {
     try {
       setLoading(true); setError('');
       const [employeesResponse, analyticsResponse] = await Promise.all([
-        employees.getEmployees(),
-        employees.getTopPerformers(),
+        employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId } : {}),
+        employees.getTopPerformers(selectedStoreId ? { store_id: selectedStoreId } : {}),
       ]);
 
       setEmployeesList(employeesResponse.data.data || []);
@@ -52,7 +54,9 @@ export default function EmployeesPage() {
       <div className="page-head">
         <div>
           <div className="page-head-title">Dipendenti</div>
-          <div className="page-head-sub">{employeesList.length} dipendenti nel sistema</div>
+          <div className="page-head-sub">
+            {employeesList.length} dipendenti nel sistema{selectedStore ? ` - Store: ${selectedStore.name}` : ''}
+          </div>
         </div>
         <button className="btn btn-gold" onClick={() => handleOpenModal()}>
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -190,7 +194,13 @@ export default function EmployeesPage() {
       )}
 
       {showModal && (
-        <EmployeeModal employee={selectedEmployee} onClose={handleCloseModal} onSave={handleSaveEmployee} />
+        <EmployeeModal
+          employee={selectedEmployee}
+          storesList={storesList}
+          selectedStoreId={selectedStoreId}
+          onClose={handleCloseModal}
+          onSave={handleSaveEmployee}
+        />
       )}
     </>
   );

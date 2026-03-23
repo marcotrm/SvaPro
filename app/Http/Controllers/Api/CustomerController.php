@@ -14,8 +14,14 @@ class CustomerController extends Controller
     public function index(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
+        $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
 
-        $customers = $this->customerBaseQuery($tenantId)
+        if ($storeId !== null && ! DB::table('stores')->where('tenant_id', $tenantId)->where('id', $storeId)->exists()) {
+            return response()->json(['message' => 'Store non valido per il tenant.'], 422);
+        }
+
+        $customers = $this->customerBaseQuery($tenantId, $storeId)
+            ->when($storeId !== null, fn ($query) => $query->whereNotNull('order_stats.customer_id'))
             ->when($request->filled('q'), function ($query) use ($request) {
                 $term = trim((string) $request->input('q'));
                 $query->where(function ($inner) use ($term) {
@@ -39,7 +45,17 @@ class CustomerController extends Controller
     public function returnFrequencyAnalytics(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
-        $customers = $this->hydrateCustomers($this->customerBaseQuery($tenantId)->get());
+        $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
+
+        if ($storeId !== null && ! DB::table('stores')->where('tenant_id', $tenantId)->where('id', $storeId)->exists()) {
+            return response()->json(['message' => 'Store non valido per il tenant.'], 422);
+        }
+
+        $customers = $this->hydrateCustomers(
+            $this->customerBaseQuery($tenantId, $storeId)
+                ->when($storeId !== null, fn ($query) => $query->whereNotNull('order_stats.customer_id'))
+                ->get()
+        );
 
         $cityBreakdown = collect($customers)
             ->filter(fn (array $customer) => ! empty($customer['city']))
@@ -162,11 +178,12 @@ class CustomerController extends Controller
         return response()->json(['message' => 'Cliente aggiornato.']);
     }
 
-    private function customerBaseQuery(int $tenantId)
+    private function customerBaseQuery(int $tenantId, ?int $storeId = null)
     {
         $orderStats = DB::table('sales_orders')
             ->where('tenant_id', $tenantId)
             ->where('status', 'paid')
+            ->when($storeId !== null, fn ($query) => $query->where('store_id', $storeId))
             ->whereNotNull('customer_id')
             ->groupBy('customer_id')
             ->selectRaw('customer_id, COUNT(*) as paid_orders_count, MAX(paid_at) as last_purchase_at, MIN(paid_at) as first_purchase_at');

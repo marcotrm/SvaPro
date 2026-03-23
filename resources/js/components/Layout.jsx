@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { auth } from '../api.jsx';
+import { auth, stores } from '../api.jsx';
 
 const navGroups = [
   {
@@ -44,6 +44,10 @@ const navGroups = [
         label: 'Loyalty', href: '/analytics/loyalty',
         icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd"/></svg>,
       },
+      {
+        label: 'Push Monitor', href: '/analytics/loyalty/push-monitor',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a4 4 0 00-4 4v1.268A2 2 0 005 9v5l-1 1v1h12v-1l-1-1V9a2 2 0 00-1-1.732V6a4 4 0 00-4-4zm2 5.1V6a2 2 0 10-4 0v1.1A2 2 0 007 9v5h6V9a2 2 0 00-1-1.9z"/></svg>,
+      },
     ],
   },
   {
@@ -66,18 +70,72 @@ const pageTitles = {
   '/customers': 'Clienti',
   '/employees': 'Dipendenti',
   '/analytics/loyalty': 'Loyalty Analytics',
+  '/analytics/loyalty/push-monitor': 'Loyalty Push Monitor',
 };
 
 export default function Layout({ user, setUser }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [lowStockCount, setLowStockCount] = useState(0);
+  const [storesList, setStoresList] = useState([]);
+  const [selectedStoreId, setSelectedStoreId] = useState(localStorage.getItem('selectedStoreId') || '');
+
+  useEffect(() => {
+    const loadStores = async () => {
+      try {
+        const response = await stores.getStores();
+        const list = response.data?.data || [];
+        setStoresList(list);
+
+        if (!list.length) {
+          localStorage.removeItem('selectedStoreId');
+          setSelectedStoreId('');
+          return;
+        }
+
+        const current = localStorage.getItem('selectedStoreId');
+        const isCurrentValid = current ? list.some((store) => String(store.id) === String(current)) : false;
+
+        if (!isCurrentValid) {
+          const mainStore = list.find((store) => store.is_main) || list[0];
+          if (mainStore) {
+            const nextId = String(mainStore.id);
+            localStorage.setItem('selectedStoreId', nextId);
+            setSelectedStoreId(nextId);
+          }
+        }
+      } catch {
+        setStoresList([]);
+        localStorage.removeItem('selectedStoreId');
+        setSelectedStoreId('');
+      }
+    };
+
+    loadStores();
+  }, []);
+
+  const selectedStore = useMemo(
+    () => storesList.find((store) => String(store.id) === String(selectedStoreId)) || null,
+    [storesList, selectedStoreId]
+  );
+
+  const handleStoreChange = (event) => {
+    const nextValue = event.target.value;
+    setSelectedStoreId(nextValue);
+
+    if (nextValue) {
+      localStorage.setItem('selectedStoreId', nextValue);
+    } else {
+      localStorage.removeItem('selectedStoreId');
+    }
+  };
 
   const handleLogout = async () => {
     try { await auth.logout(); } catch {}
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     localStorage.removeItem('tenantCode');
+    localStorage.removeItem('selectedStoreId');
     setUser(null);
     navigate('/login');
   };
@@ -151,10 +209,25 @@ export default function Layout({ user, setUser }) {
 
           <div className="location-select">
             <div className="location-dot"></div>
-            <span>{tenantCode}</span>
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style={{ opacity: .5 }}>
-              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"/>
-            </svg>
+            <select
+              className="form-select"
+              style={{ border: 'none', background: 'transparent', padding: 0, minWidth: 180 }}
+              value={selectedStoreId}
+              onChange={handleStoreChange}
+            >
+              {storesList.length === 0 ? (
+                <option value="">{tenantCode}</option>
+              ) : (
+                <>
+                  <option value="">Tutti gli store</option>
+                  {storesList.map((store) => (
+                    <option key={store.id} value={store.id}>
+                      {store.name}
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
           </div>
 
           <div className="topbar-actions">
@@ -174,7 +247,7 @@ export default function Layout({ user, setUser }) {
 
         {/* PAGE CONTENT */}
         <div className="content">
-          <Outlet context={{ setLowStockCount, user }} />
+          <Outlet context={{ setLowStockCount, user, storesList, selectedStoreId, selectedStore }} />
         </div>
       </div>
     </div>

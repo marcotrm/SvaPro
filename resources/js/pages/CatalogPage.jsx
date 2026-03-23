@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { catalog, stores } from '../api.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
 
 export default function CatalogPage() {
+  const { selectedStoreId, selectedStore } = useOutletContext();
   const [products, setProducts] = useState([]);
   const [storesList, setStoresList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,8 +14,6 @@ export default function CatalogPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStoreId, setSelectedStoreId] = useState('');
-
   useEffect(() => { fetchProducts(); }, [selectedStoreId]);
 
   const fetchProducts = async () => {
@@ -68,7 +68,9 @@ export default function CatalogPage() {
       <div className="page-head">
         <div>
           <div className="page-head-title">Catalogo Prodotti</div>
-          <div className="page-head-sub">{products.length} prodotti nel database</div>
+          <div className="page-head-sub">
+            {products.length} prodotti nel database{selectedStore ? ` - Store: ${selectedStore.name}` : ''}
+          </div>
         </div>
         <button className="btn btn-gold" onClick={() => handleOpenModal()}>
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -89,12 +91,6 @@ export default function CatalogPage() {
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
-          <select className="form-select" style={{maxWidth: 220}} value={selectedStoreId} onChange={e => setSelectedStoreId(e.target.value)}>
-            <option value="">Tutti gli store</option>
-            {storesList.map(store => (
-              <option key={store.id} value={store.id}>{store.name}</option>
-            ))}
-          </select>
           <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>
             {filtered.length} risultati
           </span>
@@ -148,7 +144,13 @@ export default function CatalogPage() {
       </div>
 
       {showModal && (
-        <CatalogModal product={selectedProduct} storesList={storesList} onClose={handleCloseModal} onSave={handleSaveProduct} />
+        <CatalogModal
+          product={selectedProduct}
+          storesList={storesList}
+          selectedStoreId={selectedStoreId}
+          onClose={handleCloseModal}
+          onSave={handleSaveProduct}
+        />
       )}
     </>
   );

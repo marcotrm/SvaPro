@@ -37,10 +37,13 @@ const normalizeVariant = (variant = {}) => ({
   prevalenza_label: variant.prevalenza_label ?? '',
 });
 
-const normalizeProduct = (product, storesList) => {
+const normalizeProduct = (product, storesList, selectedStoreId = '') => {
   const storeIds = Array.from(new Set((product?.variants || []).flatMap((variant) =>
     (variant.assigned_stores || []).map((store) => Number(store.store_id))
   )));
+
+  const selectedStoreNumericId = selectedStoreId ? Number(selectedStoreId) : null;
+  const defaultStoreIds = selectedStoreNumericId ? [selectedStoreNumericId] : storesList.map((store) => Number(store.id));
 
   return {
     sku: product?.sku || '',
@@ -53,19 +56,19 @@ const normalizeProduct = (product, storesList) => {
     reorder_days: product?.reorder_days ?? 30,
     min_stock_qty: product?.min_stock_qty ?? 0,
     auto_reorder_enabled: product?.auto_reorder_enabled ?? true,
-    store_ids: storeIds.length > 0 ? storeIds : storesList.map((store) => Number(store.id)),
+    store_ids: storeIds.length > 0 ? storeIds : defaultStoreIds,
     variants: product?.variants?.length ? product.variants.map(normalizeVariant) : [createEmptyVariant()],
   };
 };
 
-export default function CatalogModal({ product, storesList = [], onClose, onSave }) {
-  const [formData, setFormData] = useState(() => normalizeProduct(product, storesList));
+export default function CatalogModal({ product, storesList = [], selectedStoreId = '', onClose, onSave }) {
+  const [formData, setFormData] = useState(() => normalizeProduct(product, storesList, selectedStoreId));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setFormData(normalizeProduct(product, storesList));
-  }, [product, storesList]);
+    setFormData(normalizeProduct(product, storesList, selectedStoreId));
+  }, [product, storesList, selectedStoreId]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;

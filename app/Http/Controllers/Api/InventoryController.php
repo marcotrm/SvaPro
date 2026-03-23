@@ -13,12 +13,18 @@ class InventoryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
+        $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
+
+        if ($storeId !== null && ! DB::table('stores')->where('tenant_id', $tenantId)->where('id', $storeId)->exists()) {
+            return response()->json(['message' => 'Store non valido per il tenant.'], 422);
+        }
 
         $rows = DB::table('stock_items as si')
             ->join('warehouses as w', 'w.id', '=', 'si.warehouse_id')
             ->join('product_variants as pv', 'pv.id', '=', 'si.product_variant_id')
             ->join('products as p', 'p.id', '=', 'pv.product_id')
             ->where('si.tenant_id', $tenantId)
+            ->when($storeId !== null, fn ($query) => $query->where('w.store_id', $storeId))
             ->select([
                 'si.id',
                 'si.warehouse_id',
@@ -58,12 +64,19 @@ class InventoryController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
+
+        if ($storeId !== null && ! DB::table('stores')->where('tenant_id', $tenantId)->where('id', $storeId)->exists()) {
+            return response()->json(['message' => 'Store non valido per il tenant.'], 422);
+        }
+
         $rows = DB::table('stock_movements as sm')
             ->join('warehouses as w', 'w.id', '=', 'sm.warehouse_id')
             ->join('product_variants as pv', 'pv.id', '=', 'sm.product_variant_id')
             ->join('products as p', 'p.id', '=', 'pv.product_id')
             ->leftJoin('users as u', 'u.id', '=', 'sm.employee_id')
             ->where('sm.tenant_id', $tenantId)
+            ->when($storeId !== null, fn ($query) => $query->where('w.store_id', $storeId))
             ->when($request->filled('warehouse_id'), fn ($query) => $query->where('sm.warehouse_id', (int) $request->integer('warehouse_id')))
             ->when($request->filled('product_variant_id'), fn ($query) => $query->where('sm.product_variant_id', (int) $request->integer('product_variant_id')))
             ->when($request->filled('movement_type'), fn ($query) => $query->where('sm.movement_type', (string) $request->input('movement_type')))

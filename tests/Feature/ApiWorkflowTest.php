@@ -665,6 +665,151 @@ class ApiWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_loyalty_push_monitoring_stats_endpoint_returns_aggregates(): void
+    {
+        $headers = $this->authenticateAsSuperAdmin();
+        $now = now();
+
+        DB::table('outbox_events')->delete();
+        DB::table('loyalty_push_notifications')->delete();
+        DB::table('loyalty_device_tokens')->delete();
+
+        DB::table('loyalty_device_tokens')->insert([
+            [
+                'tenant_id' => 1,
+                'customer_id' => 1,
+                'platform' => 'android',
+                'device_token' => 'monitor-device-1',
+                'device_name' => 'Pixel Monitor',
+                'app_version' => '1.0.0',
+                'notifications_enabled' => true,
+                'last_seen_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'tenant_id' => 1,
+                'customer_id' => 1,
+                'platform' => 'ios',
+                'device_token' => 'monitor-device-2',
+                'device_name' => 'iPhone Monitor',
+                'app_version' => '1.0.0',
+                'notifications_enabled' => false,
+                'last_seen_at' => $now,
+                'created_at' => $now->copy()->subDays(1),
+                'updated_at' => $now->copy()->subDays(1),
+            ],
+        ]);
+
+        DB::table('loyalty_push_notifications')->insert([
+            [
+                'tenant_id' => 1,
+                'customer_id' => 1,
+                'notification_type' => 'points_earned',
+                'title' => 'Hai guadagnato punti',
+                'message' => 'Test monitor 1',
+                'status' => 'queued',
+                'target_devices_count' => 0,
+                'queued_at' => $now,
+                'sent_at' => null,
+                'delivered_at' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'tenant_id' => 1,
+                'customer_id' => 1,
+                'notification_type' => 'points_earned',
+                'title' => 'Push in consegna',
+                'message' => 'Test monitor 2',
+                'status' => 'dispatched',
+                'target_devices_count' => 1,
+                'queued_at' => $now->copy()->subDay(),
+                'sent_at' => $now->copy()->subDay(),
+                'delivered_at' => null,
+                'created_at' => $now->copy()->subDay(),
+                'updated_at' => $now->copy()->subDay(),
+            ],
+            [
+                'tenant_id' => 1,
+                'customer_id' => 1,
+                'notification_type' => 'new_offer',
+                'title' => 'Promozione attiva',
+                'message' => 'Test monitor 3',
+                'status' => 'delivered',
+                'target_devices_count' => 1,
+                'queued_at' => $now->copy()->subDays(2),
+                'sent_at' => $now->copy()->subDays(2),
+                'delivered_at' => $now->copy()->subDays(2),
+                'created_at' => $now->copy()->subDays(2),
+                'updated_at' => $now->copy()->subDays(2),
+            ],
+        ]);
+
+        DB::table('outbox_events')->insert([
+            [
+                'tenant_id' => 1,
+                'event_name' => 'loyalty.push.notification.dispatch',
+                'payload_json' => json_encode(['notification_id' => 1]),
+                'event_data' => json_encode(['notification_id' => 1]),
+                'published_at' => null,
+                'processed_at' => $now,
+                'processing_status' => 'success',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'tenant_id' => 1,
+                'event_name' => 'loyalty.push.notification.dispatch',
+                'payload_json' => json_encode(['notification_id' => 2]),
+                'event_data' => json_encode(['notification_id' => 2]),
+                'published_at' => null,
+                'processed_at' => $now->copy()->subDay(),
+                'processing_status' => 'failed',
+                'created_at' => $now->copy()->subDay(),
+                'updated_at' => $now->copy()->subDay(),
+            ],
+        ]);
+
+        $this->withHeaders($headers)->getJson('/api/loyalty/monitoring/push-stats?days=7')
+            ->assertOk()
+            ->assertJsonPath('summary.pending_queue', 1)
+            ->assertJsonPath('summary.in_flight', 1)
+            ->assertJsonPath('summary.success_count', 1)
+            ->assertJsonPath('summary.failed_count', 1)
+            ->assertJsonPath('summary.processed_count', 2)
+            ->assertJsonPath('summary.success_rate', 50)
+            ->assertJsonPath('summary.active_devices', 1)
+            ->assertJsonPath('summary.total_devices', 2)
+            ->assertJsonPath('status_breakdown.queued', 1)
+            ->assertJsonPath('status_breakdown.dispatched', 1)
+            ->assertJsonPath('status_breakdown.delivered', 1)
+            ->assertJsonPath('meta.days', 7);
+    }
+
+    public function test_store_filter_scopes_inventory_and_employees_endpoints(): void
+    {
+        $headers = $this->authenticateAsSuperAdmin();
+
+        $inventoryRome = $this->withHeaders($headers)->getJson('/api/inventory/stock?store_id=1');
+        $inventoryRome->assertOk();
+        $romeWarehouseNames = collect($inventoryRome->json('data'))->pluck('warehouse_name')->unique()->values()->all();
+        $this->assertSame(['Magazzino Centrale'], $romeWarehouseNames);
+
+        $inventoryMilan = $this->withHeaders($headers)->getJson('/api/inventory/stock?store_id=2');
+        $inventoryMilan->assertOk();
+        $milanWarehouseNames = collect($inventoryMilan->json('data'))->pluck('warehouse_name')->unique()->values()->all();
+        $this->assertSame(['Magazzino Milano'], $milanWarehouseNames);
+
+        $employeesRome = $this->withHeaders($headers)->getJson('/api/employees?store_id=1');
+        $employeesRome->assertOk()
+            ->assertJsonPath('data.0.store_name', 'Negozio Centrale');
+
+        $employeesMilan = $this->withHeaders($headers)->getJson('/api/employees?store_id=2');
+        $employeesMilan->assertOk();
+        $this->assertCount(0, $employeesMilan->json('data'));
+    }
+
     private function authenticateAsSuperAdmin(): array
     {
         $loginResponse = $this->postJson('/api/login', [

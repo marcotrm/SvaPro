@@ -4,7 +4,7 @@ import { orders, inventory, customers, employees } from '../api.jsx';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { setLowStockCount } = useOutletContext();
+  const { setLowStockCount, selectedStoreId } = useOutletContext();
 
   const [data, setData] = useState({
     totalOrders: 0,
@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  useEffect(() => { fetchDashboardData(); }, []);
+  useEffect(() => { fetchDashboardData(); }, [selectedStoreId]);
 
   const fetchDashboardData = async () => {
     try {
@@ -27,10 +27,10 @@ export default function DashboardPage() {
       setError('');
 
       const [ordersRes, inventoryRes, customersRes, employeesRes] = await Promise.all([
-        orders.getOrders().catch(() => ({})),
-        inventory.getStock().catch(() => ({})),
-        customers.getCustomers().catch(() => ({})),
-        employees.getEmployees().catch(() => ({})),
+        orders.getOrders(selectedStoreId ? { store_id: selectedStoreId } : {}).catch(() => ({})),
+        inventory.getStock(selectedStoreId ? { store_id: selectedStoreId } : {}).catch(() => ({})),
+        customers.getCustomers(selectedStoreId ? { store_id: selectedStoreId } : {}).catch(() => ({})),
+        employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId } : {}).catch(() => ({})),
       ]);
 
       const ordersList    = ordersRes.data?.data    || [];

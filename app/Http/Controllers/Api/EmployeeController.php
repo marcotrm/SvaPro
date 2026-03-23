@@ -13,8 +13,13 @@ class EmployeeController extends Controller
     public function index(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
+        $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
 
-        $employees = $this->employeeBaseQuery($tenantId)
+        if ($storeId !== null && ! DB::table('stores')->where('tenant_id', $tenantId)->where('id', $storeId)->exists()) {
+            return response()->json(['message' => 'Store non valido per il tenant.'], 422);
+        }
+
+        $employees = $this->employeeBaseQuery($tenantId, $storeId)
             ->orderByDesc('e.id')
             ->get();
 
@@ -24,8 +29,13 @@ class EmployeeController extends Controller
     public function topPerformers(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
+        $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
 
-        $employees = collect($this->employeeBaseQuery($tenantId)->get())
+        if ($storeId !== null && ! DB::table('stores')->where('tenant_id', $tenantId)->where('id', $storeId)->exists()) {
+            return response()->json(['message' => 'Store non valido per il tenant.'], 422);
+        }
+
+        $employees = collect($this->employeeBaseQuery($tenantId, $storeId)->get())
             ->map(function ($employee) {
                 $ordersCount = (int) ($employee->orders_count ?? 0);
                 $netSales = (float) ($employee->total_net_sales ?? 0);
@@ -141,7 +151,7 @@ class EmployeeController extends Controller
         return response()->json(['message' => 'Dipendente aggiornato.']);
     }
 
-    private function employeeBaseQuery(int $tenantId)
+    private function employeeBaseQuery(int $tenantId, ?int $storeId = null)
     {
         $salesStats = DB::table('employee_sales_facts')
             ->where('tenant_id', $tenantId)
@@ -157,6 +167,7 @@ class EmployeeController extends Controller
                 $join->on('sales_stats.employee_id', '=', 'e.id');
             })
             ->where('e.tenant_id', $tenantId)
+            ->when($storeId !== null, fn ($query) => $query->where('e.store_id', $storeId))
             ->select([
                 'e.*',
                 's.name as store_name',

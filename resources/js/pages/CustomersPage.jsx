@@ -1,10 +1,12 @@
 ﻿import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { customers } from '../api.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import CustomerModal from '../components/CustomerModal.jsx';
 
 export default function CustomersPage() {
+  const { selectedStoreId, selectedStore } = useOutletContext();
   const [customersList, setCustomersList] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -14,14 +16,14 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [cityFilter, setCityFilter] = useState('');
 
-  useEffect(() => { fetchCustomers(); }, []);
+  useEffect(() => { fetchCustomers(); }, [selectedStoreId]);
 
   const fetchCustomers = async () => {
     try {
       setLoading(true); setError('');
       const [customersResponse, analyticsResponse] = await Promise.all([
-        customers.getCustomers(),
-        customers.getReturnAnalytics(),
+        customers.getCustomers(selectedStoreId ? { store_id: selectedStoreId } : {}),
+        customers.getReturnAnalytics(selectedStoreId ? { store_id: selectedStoreId } : {}),
       ]);
 
       setCustomersList(customersResponse.data.data || []);
@@ -67,7 +69,9 @@ export default function CustomersPage() {
       <div className="page-head">
         <div>
           <div className="page-head-title">Clienti</div>
-          <div className="page-head-sub">{customersList.length} clienti registrati</div>
+          <div className="page-head-sub">
+            {customersList.length} clienti registrati{selectedStore ? ` - Store: ${selectedStore.name}` : ''}
+          </div>
         </div>
         <button className="btn btn-gold" onClick={() => handleOpenModal()}>
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
