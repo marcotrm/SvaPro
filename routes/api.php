@@ -19,6 +19,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::middleware('role:superadmin,admin_cliente')->group(function () {
+        Route::get('/tenants', [StoreController::class, 'tenants']);
+        Route::get('/auth/switchable-users', [AuthController::class, 'switchableUsers']);
+        Route::post('/auth/impersonate', [AuthController::class, 'impersonate']);
         Route::get('/stores', [StoreController::class, 'index']);
         Route::get('/loyalty/monitoring/push-stats', [LoyaltyController::class, 'pushMonitoringStats']);
 

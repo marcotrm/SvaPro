@@ -4,13 +4,13 @@ import { auth } from '../api.jsx';
 
 export default function LoginPage({ setUser }) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@demo.local');
+  const [email, setEmail] = useState('superadmin@demo.local');
   const [password, setPassword] = useState('ChangeMe123!');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const applyDemoAccess = () => {
-    setEmail('admin@demo.local');
+  const applyDemoAccess = (nextEmail = 'superadmin@demo.local') => {
+    setEmail(nextEmail);
     setPassword('ChangeMe123!');
     setError('');
   };
@@ -42,7 +42,9 @@ export default function LoginPage({ setUser }) {
 
         {/* Logo */}
         <div className="login-brand">
-          <div className="login-brand-icon">S</div>
+          <div className="login-brand-icon">
+            <img src="/brand-mark.svg" alt="SvaPro" />
+          </div>
           <div>
             <div className="login-brand-name">Sva<span>Pro</span></div>
             <div className="login-brand-sub">Retail Intelligence Suite</div>
@@ -78,8 +80,8 @@ export default function LoginPage({ setUser }) {
           </div>
           <div className="login-stat">
             <div className="login-stat-label">Tenant</div>
-            <div className="login-stat-value">DEMO</div>
-            <div className="login-stat-desc">Accesso pronto senza config</div>
+            <div className="login-stat-value">2</div>
+            <div className="login-stat-desc">DEMO e NORD pronti per switch</div>
           </div>
         </div>
 
@@ -108,7 +110,7 @@ export default function LoginPage({ setUser }) {
                 <div className="login-demo-creds">
                   <div>
                     <div className="login-demo-cred-label">Email</div>
-                    <div className="login-demo-cred-value">admin@demo.local</div>
+                    <div className="login-demo-cred-value">superadmin@demo.local</div>
                   </div>
                   <div>
                     <div className="login-demo-cred-label">Password</div>
@@ -116,9 +118,17 @@ export default function LoginPage({ setUser }) {
                   </div>
                 </div>
               </div>
-              <button className="login-submit-ghost" onClick={applyDemoAccess} type="button">
-                Usa demo
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button className="login-submit-ghost" onClick={() => applyDemoAccess('superadmin@demo.local')} type="button">
+                  Superadmin
+                </button>
+                <button className="login-submit-ghost" onClick={() => applyDemoAccess('admin@demo.local')} type="button">
+                  Admin Demo
+                </button>
+                <button className="login-submit-ghost" onClick={() => applyDemoAccess('admin@nord.local')} type="button">
+                  Admin Nord
+                </button>
+              </div>
             </div>
 
             {/* Error */}

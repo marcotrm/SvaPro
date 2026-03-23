@@ -27,10 +27,10 @@ export default function DashboardPage() {
       setError('');
 
       const [ordersRes, inventoryRes, customersRes, employeesRes] = await Promise.all([
-        orders.getOrders(selectedStoreId ? { store_id: selectedStoreId } : {}).catch(() => ({})),
-        inventory.getStock(selectedStoreId ? { store_id: selectedStoreId } : {}).catch(() => ({})),
-        customers.getCustomers(selectedStoreId ? { store_id: selectedStoreId } : {}).catch(() => ({})),
-        employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId } : {}).catch(() => ({})),
+        orders.getOrders(selectedStoreId ? { store_id: selectedStoreId, limit: 20 } : { limit: 20 }).catch(() => ({})),
+        inventory.getStock(selectedStoreId ? { store_id: selectedStoreId, limit: 80 } : { limit: 80 }).catch(() => ({})),
+        customers.getCustomers(selectedStoreId ? { store_id: selectedStoreId, limit: 50 } : { limit: 50 }).catch(() => ({})),
+        employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId, limit: 50 } : { limit: 50 }).catch(() => ({})),
       ]);
 
       const ordersList    = ordersRes.data?.data    || [];

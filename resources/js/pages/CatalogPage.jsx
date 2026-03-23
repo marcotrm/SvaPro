@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { catalog, stores } from '../api.jsx';
+import { catalog } from '../api.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
 
 export default function CatalogPage() {
-  const { selectedStoreId, selectedStore } = useOutletContext();
+  const { selectedStoreId, selectedStore, storesList } = useOutletContext();
   const [products, setProducts] = useState([]);
-  const [storesList, setStoresList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -19,13 +18,9 @@ export default function CatalogPage() {
   const fetchProducts = async () => {
     try {
       setLoading(true); setError('');
-      const [productsResponse, storesResponse] = await Promise.all([
-        catalog.getProducts(selectedStoreId ? { store_id: selectedStoreId } : {}),
-        stores.getStores(),
-      ]);
+      const productsResponse = await catalog.getProducts(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 });
 
       setProducts(productsResponse.data.data || []);
-      setStoresList(storesResponse.data.data || []);
     } catch (err) {
       setError(err.message || 'Errore nel caricamento dei prodotti');
     } finally { setLoading(false); }

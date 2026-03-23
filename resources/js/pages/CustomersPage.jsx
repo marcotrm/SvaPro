@@ -22,7 +22,7 @@ export default function CustomersPage() {
     try {
       setLoading(true); setError('');
       const [customersResponse, analyticsResponse] = await Promise.all([
-        customers.getCustomers(selectedStoreId ? { store_id: selectedStoreId } : {}),
+        customers.getCustomers(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 }),
         customers.getReturnAnalytics(selectedStoreId ? { store_id: selectedStoreId } : {}),
       ]);
 

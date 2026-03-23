@@ -18,16 +18,21 @@ export default function InventoryPage() {
   const [dateFromFilter, setDateFromFilter] = useState('');
   const [dateToFilter, setDateToFilter] = useState('');
   const [showMovementModal, setShowMovementModal] = useState(false);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
   useEffect(() => { fetchStockAndMovements(); }, [selectedStoreId]);
-  useEffect(() => { fetchMovements(); }, [searchTerm, movementTypeFilter, warehouseFilter, dateFromFilter, dateToFilter, selectedStoreId]);
+  useEffect(() => {
+    const timeoutId = setTimeout(() => setDebouncedSearchTerm(searchTerm), 220);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+  useEffect(() => { fetchMovements(); }, [debouncedSearchTerm, movementTypeFilter, warehouseFilter, dateFromFilter, dateToFilter, selectedStoreId]);
 
   const fetchStockAndMovements = async () => {
     try {
       setLoading(true); setError('');
       const [stockResponse, movementsResponse] = await Promise.all([
-        inventory.getStock(selectedStoreId ? { store_id: selectedStoreId } : {}),
-        inventory.getMovements(selectedStoreId ? { store_id: selectedStoreId } : {}),
+        inventory.getStock(selectedStoreId ? { store_id: selectedStoreId, limit: 80 } : { limit: 80 }),
+        inventory.getMovements(selectedStoreId ? { store_id: selectedStoreId, limit: 80 } : { limit: 80 }),
       ]);
       setStock(stockResponse.data.data || []);
       setMovements(movementsResponse.data.data || []);
@@ -40,11 +45,12 @@ export default function InventoryPage() {
     try {
       const response = await inventory.getMovements({
         store_id: selectedStoreId || undefined,
-        q: searchTerm || undefined,
+        q: debouncedSearchTerm || undefined,
         movement_type: movementTypeFilter || undefined,
         warehouse_id: warehouseFilter || undefined,
         date_from: dateFromFilter || undefined,
         date_to: dateToFilter || undefined,
+        limit: 80,
       });
       setMovements(response.data.data || []);
     } catch (err) {

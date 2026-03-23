@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores } from '../api.jsx';
+import { prefetchRoute } from '../routePrefetch.js';
 
 const navGroups = [
   {
@@ -77,42 +78,98 @@ export default function Layout({ user, setUser }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [lowStockCount, setLowStockCount] = useState(0);
+  const [tenantsList, setTenantsList] = useState([]);
+  const [switchableUsers, setSwitchableUsers] = useState([]);
+  const [switchUserId, setSwitchUserId] = useState('');
+  const [switchingUser, setSwitchingUser] = useState(false);
+  const [userPanelOpen, setUserPanelOpen] = useState(false);
   const [storesList, setStoresList] = useState([]);
+  const [selectedTenantCode, setSelectedTenantCode] = useState(localStorage.getItem('tenantCode') || user?.tenant_code || 'DEMO');
   const [selectedStoreId, setSelectedStoreId] = useState(localStorage.getItem('selectedStoreId') || '');
+  const isSuperAdmin = (user?.roles || []).includes('superadmin');
 
-  useEffect(() => {
-    const loadStores = async () => {
-      try {
-        const response = await stores.getStores();
-        const list = response.data?.data || [];
-        setStoresList(list);
+  const loadStores = async () => {
+    try {
+      const response = await stores.getStores();
+      const list = response.data?.data || [];
+      setStoresList(list);
 
-        if (!list.length) {
-          localStorage.removeItem('selectedStoreId');
-          setSelectedStoreId('');
-          return;
-        }
-
-        const current = localStorage.getItem('selectedStoreId');
-        const isCurrentValid = current ? list.some((store) => String(store.id) === String(current)) : false;
-
-        if (!isCurrentValid) {
-          const mainStore = list.find((store) => store.is_main) || list[0];
-          if (mainStore) {
-            const nextId = String(mainStore.id);
-            localStorage.setItem('selectedStoreId', nextId);
-            setSelectedStoreId(nextId);
-          }
-        }
-      } catch {
-        setStoresList([]);
+      if (!list.length) {
         localStorage.removeItem('selectedStoreId');
         setSelectedStoreId('');
+        return;
       }
-    };
 
+      const current = localStorage.getItem('selectedStoreId');
+      const isCurrentValid = current ? list.some((store) => String(store.id) === String(current)) : false;
+
+      if (!isCurrentValid) {
+        const mainStore = list.find((store) => store.is_main) || list[0];
+        if (mainStore) {
+          const nextId = String(mainStore.id);
+          localStorage.setItem('selectedStoreId', nextId);
+          setSelectedStoreId(nextId);
+        }
+      }
+    } catch {
+      setStoresList([]);
+      localStorage.removeItem('selectedStoreId');
+      setSelectedStoreId('');
+    }
+  };
+
+  const loadTenants = async () => {
+    try {
+      const response = await stores.getTenants();
+      const list = response.data?.data || [];
+      setTenantsList(list);
+    } catch {
+      setTenantsList([]);
+    }
+  };
+
+  const loadSwitchableUsers = async (tenantCodeOverride = selectedTenantCode) => {
+    if (!isSuperAdmin) {
+      setSwitchableUsers([]);
+      setSwitchUserId('');
+      return;
+    }
+
+    try {
+      const response = await auth.switchableUsers({ tenant_code: tenantCodeOverride });
+      const list = response.data?.data || [];
+      setSwitchableUsers(list);
+      setSwitchUserId(list[0] ? String(list[0].id) : '');
+    } catch {
+      setSwitchableUsers([]);
+      setSwitchUserId('');
+    }
+  };
+
+  useEffect(() => {
+    localStorage.setItem('tenantCode', selectedTenantCode);
     loadStores();
+  }, [selectedTenantCode]);
+
+  useEffect(() => {
+    loadTenants();
+    if (isSuperAdmin) {
+      loadSwitchableUsers(selectedTenantCode);
+    }
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    if (!isSuperAdmin && user.tenant_code) {
+      setSelectedTenantCode(user.tenant_code);
+      localStorage.setItem('tenantCode', user.tenant_code);
+      localStorage.removeItem('selectedStoreId');
+      setSelectedStoreId('');
+    }
+  }, [user, isSuperAdmin]);
 
   const selectedStore = useMemo(
     () => storesList.find((store) => String(store.id) === String(selectedStoreId)) || null,
@@ -127,6 +184,36 @@ export default function Layout({ user, setUser }) {
       localStorage.setItem('selectedStoreId', nextValue);
     } else {
       localStorage.removeItem('selectedStoreId');
+    }
+  };
+
+  const handleTenantChange = (event) => {
+    const nextTenantCode = event.target.value;
+    setSelectedTenantCode(nextTenantCode);
+    localStorage.setItem('tenantCode', nextTenantCode);
+    localStorage.removeItem('selectedStoreId');
+    setSelectedStoreId('');
+    loadSwitchableUsers(nextTenantCode);
+    setUserPanelOpen(false);
+  };
+
+  const handleSwitchAdmin = async () => {
+    if (!switchUserId || switchingUser) {
+      return;
+    }
+
+    setSwitchingUser(true);
+    try {
+      const response = await auth.impersonate(Number(switchUserId));
+      localStorage.setItem('authToken', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      localStorage.setItem('tenantCode', response.data.user.tenant_code || 'DEMO');
+      localStorage.removeItem('selectedStoreId');
+      setUser(response.data.user);
+      setUserPanelOpen(false);
+      navigate('/');
+    } finally {
+      setSwitchingUser(false);
     }
   };
 
@@ -146,7 +233,7 @@ export default function Layout({ user, setUser }) {
 
   const primaryRole = user?.roles?.[0] || 'operatore';
 
-  const tenantCode = localStorage.getItem('tenantCode') || 'DEMO';
+  const tenantCode = selectedTenantCode || localStorage.getItem('tenantCode') || 'DEMO';
   const pageTitle = pageTitles[location.pathname] || 'Dashboard';
 
   return (
@@ -155,7 +242,9 @@ export default function Layout({ user, setUser }) {
       {/* SIDEBAR */}
       <aside className="sidebar">
         <a className="logo" href="/" onClick={e => { e.preventDefault(); navigate('/'); }}>
-          <div className="logo-icon">S</div>
+          <div className="logo-icon">
+            <img src="/brand-mark.svg" alt="SvaPro" className="logo-mark" />
+          </div>
           <div className="logo-text">Sva<span>Pro</span></div>
         </a>
 
@@ -172,6 +261,7 @@ export default function Layout({ user, setUser }) {
                     key={item.href}
                     className={`nav-item${isActive ? ' active' : ''}`}
                     href={item.href}
+                    onMouseEnter={() => prefetchRoute(item.href)}
                     onClick={e => { e.preventDefault(); navigate(item.href); }}
                   >
                     {item.icon}
@@ -187,16 +277,72 @@ export default function Layout({ user, setUser }) {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="user-card">
+          {userPanelOpen && (
+            <div className="user-panel">
+              <div className="user-panel-title">Pannello Utente</div>
+              <div className="user-panel-row">
+                <span>Ruolo</span>
+                <strong>{primaryRole}</strong>
+              </div>
+              <div className="user-panel-row">
+                <span>Tenant</span>
+                <strong>{tenantCode}</strong>
+              </div>
+              {isSuperAdmin && (
+                <div className="form-group" style={{ marginTop: 10 }}>
+                  <label className="form-label">Switch Tenant</label>
+                  <select className="form-select" value={selectedTenantCode} onChange={handleTenantChange}>
+                    {tenantsList.map((tenant) => (
+                      <option key={tenant.id} value={tenant.code}>
+                        {tenant.name} ({tenant.code})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn btn-gold"
+                    style={{ width: '100%', marginTop: 8, justifyContent: 'center' }}
+                    onClick={() => {
+                      setUserPanelOpen(false);
+                      navigate('/');
+                    }}
+                  >
+                    Entra nel tenant
+                  </button>
+
+                  <label className="form-label" style={{ marginTop: 10 }}>Switch Admin</label>
+                  <select className="form-select" value={switchUserId} onChange={(event) => setSwitchUserId(event.target.value)}>
+                    {switchableUsers.length === 0 ? (
+                      <option value="">Nessun admin disponibile</option>
+                    ) : (
+                      switchableUsers.map((entry) => (
+                        <option key={entry.id} value={entry.id}>
+                          {entry.name} ({entry.tenant_code})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <button
+                    className="btn btn-ghost"
+                    disabled={!switchUserId || switchingUser}
+                    style={{ width: '100%', marginTop: 8, justifyContent: 'center' }}
+                    onClick={handleSwitchAdmin}
+                  >
+                    {switchingUser ? 'Cambio account...' : 'Passa a questo admin'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          <button className="user-card" onClick={() => setUserPanelOpen((prev) => !prev)} style={{width: '100%', border: 'none', background: 'transparent', padding: 0}}>
             <div className="user-avatar">{initials}</div>
-            <div>
+            <div style={{flex: 1, textAlign: 'left'}}>
               <div className="user-name">{user?.name || user?.email}</div>
               <div className="user-role">{primaryRole}</div>
             </div>
-            <svg style={{ marginLeft: 'auto', opacity: .4 }} width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z"/>
+            <svg style={{ marginLeft: 'auto', opacity: .55 }} width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M6 8l4 4 4-4"/>
             </svg>
-          </div>
+          </button>
         </div>
       </aside>
 
@@ -206,6 +352,14 @@ export default function Layout({ user, setUser }) {
         {/* TOPBAR */}
         <header className="topbar">
           <div className="page-title">{pageTitle}</div>
+
+          <div className="session-chip" title="Contesto sessione">
+            <span className="session-chip-label">Tenant</span>
+            <strong>{tenantCode}</strong>
+            <span className="session-chip-sep">•</span>
+            <span className="session-chip-label">Store</span>
+            <strong>{selectedStore?.name || 'Tutti'}</strong>
+          </div>
 
           <div className="location-select">
             <div className="location-dot"></div>
@@ -231,12 +385,12 @@ export default function Layout({ user, setUser }) {
           </div>
 
           <div className="topbar-actions">
-            <div className="icon-btn" data-tip="Notifiche">
+            <button className="icon-btn" data-tip="Notifiche" onClick={() => navigate('/analytics/loyalty/push-monitor')}>
               <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
               </svg>
               {lowStockCount > 0 && <span className="dot"></span>}
-            </div>
+            </button>
             <button className="icon-btn" data-tip="Logout" onClick={handleLogout}>
               <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd"/>

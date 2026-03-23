@@ -424,5 +424,122 @@ class CoreSetupSeeder extends Seeder
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+
+        $secondTenantId = DB::table('tenants')->insertGetId([
+            'name' => 'Tenant Nord',
+            'code' => 'NORD',
+            'vat_number' => 'IT22222222222',
+            'timezone' => 'Europe/Rome',
+            'status' => 'active',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $secondStoreId = DB::table('stores')->insertGetId([
+            'tenant_id' => $secondTenantId,
+            'code' => 'TORINO',
+            'name' => 'Negozio Torino',
+            'city' => 'Torino',
+            'country' => 'IT',
+            'timezone' => 'Europe/Rome',
+            'is_main' => true,
+            'auto_reorder_enabled' => true,
+            'smart_reorder_threshold' => 4,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $northAdminUserId = DB::table('users')->insertGetId([
+            'tenant_id' => $secondTenantId,
+            'name' => 'Admin Nord',
+            'email' => 'admin@nord.local',
+            'password' => Hash::make('ChangeMe123!'),
+            'status' => 'active',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('user_roles')->insert([
+            'user_id' => $northAdminUserId,
+            'role_id' => $adminClienteRoleId,
+            'tenant_id' => $secondTenantId,
+            'store_id' => $secondStoreId,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $northBrandId = DB::table('brands')->insertGetId([
+            'tenant_id' => $secondTenantId,
+            'name' => 'Nord Vape',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $northCategoryId = DB::table('categories')->insertGetId([
+            'tenant_id' => $secondTenantId,
+            'parent_id' => null,
+            'name' => 'Pod',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $northTaxClassId = DB::table('tax_classes')->insertGetId([
+            'tenant_id' => $secondTenantId,
+            'code' => 'STANDARD',
+            'name' => 'IVA Standard',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $northProductId = DB::table('products')->insertGetId([
+            'tenant_id' => $secondTenantId,
+            'sku' => 'POD-NORD-001',
+            'barcode' => '800000000901',
+            'name' => 'Starter Kit Nord',
+            'product_type' => 'device',
+            'brand_id' => $northBrandId,
+            'category_id' => $northCategoryId,
+            'default_supplier_id' => null,
+            'nicotine_mg' => null,
+            'volume_ml' => null,
+            'is_active' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $northVariantId = DB::table('product_variants')->insertGetId([
+            'tenant_id' => $secondTenantId,
+            'product_id' => $northProductId,
+            'flavor' => null,
+            'resistance_ohm' => 1.2,
+            'pack_size' => 1,
+            'cost_price' => 10.00,
+            'sale_price' => 19.90,
+            'tax_class_id' => $northTaxClassId,
+            'is_active' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $northWarehouseId = DB::table('warehouses')->insertGetId([
+            'tenant_id' => $secondTenantId,
+            'store_id' => $secondStoreId,
+            'name' => 'Magazzino Torino',
+            'type' => 'store',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('stock_items')->insert([
+            'tenant_id' => $secondTenantId,
+            'warehouse_id' => $northWarehouseId,
+            'product_variant_id' => $northVariantId,
+            'on_hand' => 22,
+            'reserved' => 0,
+            'reorder_point' => 5,
+            'safety_stock' => 3,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 }

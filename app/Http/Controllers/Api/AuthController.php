@@ -12,6 +12,35 @@ use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
+    private function hasRole(int $userId, string $roleCode): bool
+    {
+        return DB::table('user_roles')
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->where('user_roles.user_id', $userId)
+            ->where('roles.code', $roleCode)
+            ->exists();
+    }
+
+    private function buildUserPayload(User $user): array
+    {
+        $roles = DB::table('user_roles')
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->where('user_roles.user_id', $user->id)
+            ->pluck('roles.code')
+            ->values();
+
+        $tenantCode = DB::table('tenants')->where('id', $user->tenant_id)->value('code');
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'tenant_id' => $user->tenant_id,
+            'tenant_code' => $tenantCode,
+            'roles' => $roles,
+        ];
+    }
+
     public function login(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -37,25 +66,10 @@ class AuthController extends Controller
 
         $token = $user->createToken((string) ($request->input('device_name') ?: 'api-client'))->plainTextToken;
 
-        $roles = DB::table('user_roles')
-            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
-            ->where('user_roles.user_id', $user->id)
-            ->pluck('roles.code')
-            ->values();
-
-        $tenantCode = DB::table('tenants')->where('id', $user->tenant_id)->value('code');
-
         return response()->json([
             'token' => $token,
             'token_type' => 'Bearer',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'tenant_id' => $user->tenant_id,
-                'tenant_code' => $tenantCode,
-                'roles' => $roles,
-            ],
+            'user' => $this->buildUserPayload($user),
         ]);
     }
 
@@ -63,18 +77,79 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        $roles = DB::table('user_roles')
-            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
-            ->where('user_roles.user_id', $user->id)
-            ->pluck('roles.code')
-            ->values();
+        $tenantCode = DB::table('tenants')->where('id', $user->tenant_id)->value('code');
+
+        return response()->json($this->buildUserPayload($user));
+    }
+
+    public function switchableUsers(Request $request): JsonResponse
+    {
+        $actor = $request->user();
+
+        if (! $this->hasRole((int) $actor->id, 'superadmin')) {
+            return response()->json(['message' => 'Permessi insufficienti.'], 403);
+        }
+
+        $tenantCode = (string) $request->query('tenant_code', '');
+
+        $query = DB::table('users as u')
+            ->join('tenants as t', 't.id', '=', 'u.tenant_id')
+            ->join('user_roles as ur', 'ur.user_id', '=', 'u.id')
+            ->join('roles as r', 'r.id', '=', 'ur.role_id')
+            ->where('u.status', 'active')
+            ->where('r.code', 'admin_cliente')
+            ->select([
+                'u.id',
+                'u.name',
+                'u.email',
+                'u.tenant_id',
+                't.code as tenant_code',
+                't.name as tenant_name',
+            ])
+            ->distinct()
+            ->orderBy('t.name')
+            ->orderBy('u.name');
+
+        if ($tenantCode !== '') {
+            $query->where('t.code', $tenantCode);
+        }
+
+        return response()->json(['data' => $query->get()]);
+    }
+
+    public function impersonate(Request $request): JsonResponse
+    {
+        $actor = $request->user();
+
+        if (! $this->hasRole((int) $actor->id, 'superadmin')) {
+            return response()->json(['message' => 'Permessi insufficienti.'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        /** @var User|null $target */
+        $target = User::find((int) $request->integer('user_id'));
+
+        if (! $target || $target->status !== 'active') {
+            return response()->json(['message' => 'Utente non disponibile per accesso rapido.'], 422);
+        }
+
+        if (! $this->hasRole((int) $target->id, 'admin_cliente')) {
+            return response()->json(['message' => 'Puoi fare switch solo su utenti admin_cliente.'], 422);
+        }
+
+        $token = $target->createToken('impersonation')->plainTextToken;
 
         return response()->json([
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'tenant_id' => $user->tenant_id,
-            'roles' => $roles,
+            'token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $this->buildUserPayload($target),
         ]);
     }
 

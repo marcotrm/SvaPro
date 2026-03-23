@@ -34,7 +34,8 @@ class ApiWorkflowTest extends TestCase
             'X-Tenant-Code' => 'DEMO',
         ])->getJson('/api/me')
             ->assertOk()
-            ->assertJsonPath('email', 'superadmin@demo.local');
+            ->assertJsonPath('email', 'superadmin@demo.local')
+            ->assertJsonPath('tenant_code', 'DEMO');
     }
 
     public function test_quote_and_place_reduce_stock(): void
@@ -808,6 +809,25 @@ class ApiWorkflowTest extends TestCase
         $employeesMilan = $this->withHeaders($headers)->getJson('/api/employees?store_id=2');
         $employeesMilan->assertOk();
         $this->assertCount(0, $employeesMilan->json('data'));
+    }
+
+    public function test_superadmin_can_list_and_switch_tenants(): void
+    {
+        $headers = $this->authenticateAsSuperAdmin();
+
+        $tenantsResponse = $this->withHeaders($headers)->getJson('/api/tenants');
+        $tenantsResponse->assertOk();
+        $tenantCodes = collect($tenantsResponse->json('data'))->pluck('code')->all();
+        $this->assertContains('DEMO', $tenantCodes);
+        $this->assertContains('NORD', $tenantCodes);
+
+        $northStoresResponse = $this->withHeaders([
+            'Authorization' => $headers['Authorization'],
+            'X-Tenant-Code' => 'NORD',
+        ])->getJson('/api/stores');
+
+        $northStoresResponse->assertOk()
+            ->assertJsonPath('data.0.name', 'Negozio Torino');
     }
 
     private function authenticateAsSuperAdmin(): array

@@ -21,7 +21,7 @@ export default function EmployeesPage() {
     try {
       setLoading(true); setError('');
       const [employeesResponse, analyticsResponse] = await Promise.all([
-        employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId } : {}),
+        employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 }),
         employees.getTopPerformers(selectedStoreId ? { store_id: selectedStoreId } : {}),
       ]);
 

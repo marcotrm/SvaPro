@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { auth } from './api.jsx';
 
 // Pages
-import LoginPage from './pages/LoginPage.jsx';
-import DashboardPage from './pages/DashboardPage.jsx';
-import CatalogPage from './pages/CatalogPage.jsx';
-import OrdersPage from './pages/OrdersPage.jsx';
-import InventoryPage from './pages/InventoryPage.jsx';
-import CustomersPage from './pages/CustomersPage.jsx';
-import EmployeesPage from './pages/EmployeesPage.jsx';
-import SmartReorderPage from './pages/SmartReorderPage.jsx';
-import LoyaltyAnalyticsPage from './pages/LoyaltyAnalyticsPage.jsx';
-import LoyaltyPushMonitoringPage from './pages/LoyaltyPushMonitoringPage.jsx';
+const LoginPage = lazy(() => import('./pages/LoginPage.jsx'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'));
+const CatalogPage = lazy(() => import('./pages/CatalogPage.jsx'));
+const OrdersPage = lazy(() => import('./pages/OrdersPage.jsx'));
+const InventoryPage = lazy(() => import('./pages/InventoryPage.jsx'));
+const CustomersPage = lazy(() => import('./pages/CustomersPage.jsx'));
+const EmployeesPage = lazy(() => import('./pages/EmployeesPage.jsx'));
+const SmartReorderPage = lazy(() => import('./pages/SmartReorderPage.jsx'));
+const LoyaltyAnalyticsPage = lazy(() => import('./pages/LoyaltyAnalyticsPage.jsx'));
+const LoyaltyPushMonitoringPage = lazy(() => import('./pages/LoyaltyPushMonitoringPage.jsx'));
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -21,6 +21,12 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const routeFallback = (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 240 }}>
+      <div style={{ width: 28, height: 28, border: '3px solid #243450', borderTopColor: '#c9a227', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+    </div>
+  );
 
   useEffect(() => {
     // Check if user is already logged in
@@ -31,10 +37,14 @@ export default function App() {
           const response = await auth.me();
           setUser(response.data);
           localStorage.setItem('user', JSON.stringify(response.data));
+          if (response.data?.tenant_code) {
+            localStorage.setItem('tenantCode', response.data.tenant_code);
+          }
         } catch (error) {
           localStorage.removeItem('authToken');
           localStorage.removeItem('user');
           localStorage.removeItem('tenantCode');
+          localStorage.removeItem('selectedStoreId');
         }
       }
       setLoading(false);
@@ -56,25 +66,27 @@ export default function App() {
 
   return (
     <Router>
-      <Routes>
-        <Route path="/login" element={<LoginPage setUser={setUser} />} />
-        
-        <Route element={<ProtectedRoute user={user} />}>
-          <Route element={<Layout user={user} setUser={setUser} />}>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/catalog" element={<CatalogPage />} />
-            <Route path="/orders" element={<OrdersPage />} />
-            <Route path="/inventory" element={<InventoryPage />} />
-            <Route path="/inventory/smart-reorder" element={<SmartReorderPage />} />
-            <Route path="/customers" element={<CustomersPage />} />
-            <Route path="/employees" element={<EmployeesPage />} />
-            <Route path="/analytics/loyalty" element={<LoyaltyAnalyticsPage />} />
-            <Route path="/analytics/loyalty/push-monitor" element={<LoyaltyPushMonitoringPage />} />
+      <Suspense fallback={routeFallback}>
+        <Routes>
+          <Route path="/login" element={<LoginPage setUser={setUser} />} />
+          
+          <Route element={<ProtectedRoute user={user} />}>
+            <Route element={<Layout user={user} setUser={setUser} />}>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/catalog" element={<CatalogPage />} />
+              <Route path="/orders" element={<OrdersPage />} />
+              <Route path="/inventory" element={<InventoryPage />} />
+              <Route path="/inventory/smart-reorder" element={<SmartReorderPage />} />
+              <Route path="/customers" element={<CustomersPage />} />
+              <Route path="/employees" element={<EmployeesPage />} />
+              <Route path="/analytics/loyalty" element={<LoyaltyAnalyticsPage />} />
+              <Route path="/analytics/loyalty/push-monitor" element={<LoyaltyPushMonitoringPage />} />
+            </Route>
           </Route>
-        </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </Router>
   );
 }
