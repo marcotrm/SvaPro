@@ -46,6 +46,19 @@ export default function CatalogPage() {
     if (product.store_count === 1) return '1 store';
     return `${product.store_count} store`;
   };
+  const getFiscalSummary = product => {
+    const variant = getPrimaryVariant(product);
+    if (!variant) return 'Regime standard';
+
+    const parts = [];
+    if (variant.excise_profile_code) parts.push(`Accisa ${variant.excise_profile_code}`);
+    if (variant.excise_unit_amount_override !== null && variant.excise_unit_amount_override !== undefined) {
+      parts.push(`Override €${Number(variant.excise_unit_amount_override).toFixed(2)}`);
+    }
+    if (variant.prevalenza_code) parts.push(`Prev. ${variant.prevalenza_code}`);
+
+    return parts.length ? parts.join(' • ') : 'Regime standard';
+  };
 
   if (loading) return <LoadingSpinner />;
 
@@ -93,6 +106,7 @@ export default function CatalogPage() {
               <th>SKU</th>
               <th>Variante Principale</th>
               <th>Prezzo</th>
+              <th>Accise / Prevalenza</th>
               <th>Store Abilitati</th>
               <th style={{textAlign:'right'}}>Azioni</th>
             </tr>
@@ -104,6 +118,7 @@ export default function CatalogPage() {
                 <td><span className="mono" style={{color:'var(--muted2)'}}>{product.sku}</span></td>
                 <td style={{color:'var(--muted2)'}}>{getPrimaryVariant(product)?.flavor || getPrimaryVariant(product)?.resistance_ohm || '-'}</td>
                 <td><span className="mono positive">€{Number(getPrimaryVariant(product)?.sale_price || 0).toFixed(2)}</span></td>
+                <td style={{color:'var(--muted2)', maxWidth: 220}}>{getFiscalSummary(product)}</td>
                 <td>
                   <span className={`badge ${product.store_count > 1 ? 'high' : 'mid'}`}>
                     <span className="badge-dot" />
@@ -123,7 +138,7 @@ export default function CatalogPage() {
               </tr>
             )) : (
               <tr>
-                <td colSpan="6" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
+                <td colSpan="7" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
                   Nessun prodotto trovato
                 </td>
               </tr>
@@ -133,7 +148,7 @@ export default function CatalogPage() {
       </div>
 
       {showModal && (
-        <CatalogModal product={selectedProduct} onClose={handleCloseModal} onSave={handleSaveProduct} />
+        <CatalogModal product={selectedProduct} storesList={storesList} onClose={handleCloseModal} onSave={handleSaveProduct} />
       )}
     </>
   );

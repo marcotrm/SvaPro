@@ -23,6 +23,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
 
         Route::get('/catalog/products', [CatalogController::class, 'index']);
         Route::post('/catalog/products', [CatalogController::class, 'store']);
+        Route::put('/catalog/products/{productId}', [CatalogController::class, 'update']);
 
         Route::get('/customers', [CustomerController::class, 'index']);
         Route::get('/customers/analytics/return-frequency', [CustomerController::class, 'returnFrequencyAnalytics']);

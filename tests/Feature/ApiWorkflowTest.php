@@ -422,6 +422,97 @@ class ApiWorkflowTest extends TestCase
         $this->assertNotContains('Liquido Zona Roma', $productNames);
     }
 
+    public function test_catalog_variant_fiscal_metadata_can_be_saved_updated_and_used_in_quote(): void
+    {
+        $headers = $this->authenticateAsSuperAdmin();
+
+        $createResponse = $this->withHeaders($headers)->postJson('/api/catalog/products', [
+            'sku' => 'LIQ-FISC-001',
+            'name' => 'Liquido Fiscale Demo',
+            'product_type' => 'liquid',
+            'default_supplier_id' => 1,
+            'volume_ml' => 10,
+            'nicotine_mg' => 4,
+            'store_ids' => [1],
+            'variants' => [
+                [
+                    'sale_price' => 8.90,
+                    'cost_price' => 3.10,
+                    'pack_size' => 1,
+                    'flavor' => 'Fiscal Mint',
+                    'tax_class_id' => 1,
+                    'excise_profile_code' => 'LIQUID-IT',
+                    'excise_unit_amount_override' => 0.50,
+                    'prevalenza_code' => 'PV-LIQ',
+                    'prevalenza_label' => 'Liquidi pronta vendita',
+                ],
+            ],
+        ])->assertCreated();
+
+        $productId = (int) $createResponse->json('product_id');
+
+        $createdProduct = $this->withHeaders($headers)->getJson('/api/catalog/products')
+            ->assertOk()
+            ->json('data');
+
+        $created = collect($createdProduct)->firstWhere('id', $productId);
+
+        $this->assertSame('LIQ-FISC-001', $created['sku']);
+        $this->assertSame('LIQUID-IT', $created['variants'][0]['excise_profile_code']);
+        $this->assertSame('PV-LIQ', $created['variants'][0]['prevalenza_code']);
+
+        $this->withHeaders($headers)->putJson('/api/catalog/products/'.$productId, [
+            'sku' => 'LIQ-FISC-001',
+            'name' => 'Liquido Fiscale Demo Aggiornato',
+            'product_type' => 'liquid',
+            'default_supplier_id' => 1,
+            'volume_ml' => 10,
+            'nicotine_mg' => 4,
+            'store_ids' => [1, 2],
+            'variants' => [
+                [
+                    'id' => $created['variants'][0]['id'],
+                    'sale_price' => 9.40,
+                    'cost_price' => 3.10,
+                    'pack_size' => 1,
+                    'flavor' => 'Fiscal Mint',
+                    'tax_class_id' => 1,
+                    'excise_profile_code' => 'LIQUID-IT-REV',
+                    'excise_unit_amount_override' => 0.75,
+                    'prevalenza_code' => 'PV-LIQ-REV',
+                    'prevalenza_label' => 'Liquidi revisione rete',
+                ],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('message', 'Prodotto aggiornato.');
+
+        $variantId = (int) $created['variants'][0]['id'];
+
+        $this->assertDatabaseHas('product_variants', [
+            'id' => $variantId,
+            'excise_profile_code' => 'LIQUID-IT-REV',
+            'prevalenza_code' => 'PV-LIQ-REV',
+        ]);
+
+        $quote = $this->withHeaders($headers)->postJson('/api/orders/quote', [
+            'lines' => [
+                ['product_variant_id' => $variantId, 'qty' => 2],
+            ],
+        ]);
+
+        $quote->assertOk()
+            ->assertJsonPath('totals.excise_total', 1.5)
+            ->assertJsonPath('lines.0.tax_snapshot.excise_profile_code', 'LIQUID-IT-REV')
+            ->assertJsonPath('lines.0.tax_snapshot.prevalenza_code', 'PV-LIQ-REV')
+            ->assertJsonPath('lines.0.tax_snapshot.excise_source', 'variant_override');
+
+        $storeTwoCatalog = $this->withHeaders($headers)->getJson('/api/catalog/products?store_id=2');
+        $storeTwoCatalog->assertOk();
+
+        $storeTwoNames = collect($storeTwoCatalog->json('data'))->pluck('name')->all();
+        $this->assertContains('Liquido Fiscale Demo Aggiornato', $storeTwoNames);
+    }
+
     public function test_smart_inventory_creates_purchase_order_for_best_seller_low_stock_in_milan(): void
     {
         $headers = $this->authenticateAsSuperAdmin();

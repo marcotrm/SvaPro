@@ -286,6 +286,10 @@ class OrderController extends Controller
                     'pv.sale_price',
                     'pv.cost_price',
                     'pv.tax_class_id',
+                    'pv.excise_profile_code',
+                    'pv.excise_unit_amount_override',
+                    'pv.prevalenza_code',
+                    'pv.prevalenza_label',
                     'p.product_type',
                     'p.volume_ml',
                     'p.nicotine_mg',
@@ -307,7 +311,14 @@ class OrderController extends Controller
             $vatRate = $this->resolveVatRate($tenantId, $variant->tax_class_id);
             $taxAmount = round($lineNet * ($vatRate / 100), 2);
 
-            $exciseAmount = $this->resolveExcise($tenantId, (string) $variant->product_type, (int) ($variant->volume_ml ?? 0), $qty, $lineNet);
+            $exciseAmount = $this->resolveExcise(
+                $tenantId,
+                (string) $variant->product_type,
+                (int) ($variant->volume_ml ?? 0),
+                $qty,
+                $lineNet,
+                isset($variant->excise_unit_amount_override) ? (float) $variant->excise_unit_amount_override : null
+            );
 
             $lineTotal = round($lineNet + $taxAmount + $exciseAmount, 2);
             $lineMargin = round(($unitPrice - (float) $variant->cost_price) * $qty, 2);
@@ -329,6 +340,11 @@ class OrderController extends Controller
                 'tax_snapshot' => [
                     'vat_rate' => $vatRate,
                     'product_type' => (string) $variant->product_type,
+                    'excise_profile_code' => $variant->excise_profile_code,
+                    'excise_unit_amount_override' => $variant->excise_unit_amount_override !== null ? (float) $variant->excise_unit_amount_override : null,
+                    'prevalenza_code' => $variant->prevalenza_code,
+                    'prevalenza_label' => $variant->prevalenza_label,
+                    'excise_source' => $variant->excise_unit_amount_override !== null ? 'variant_override' : 'rule_set',
                 ],
             ];
         }
@@ -471,8 +487,12 @@ class OrderController extends Controller
         return $rate !== null ? (float) $rate : 22.0;
     }
 
-    private function resolveExcise(int $tenantId, string $productType, int $volumeMl, int $qty, float $lineNet): float
+    private function resolveExcise(int $tenantId, string $productType, int $volumeMl, int $qty, float $lineNet, ?float $exciseUnitAmountOverride = null): float
     {
+        if ($exciseUnitAmountOverride !== null) {
+            return round($qty * $exciseUnitAmountOverride, 2);
+        }
+
         $now = now()->toDateTimeString();
 
         $rule = DB::table('excise_rules as er')
