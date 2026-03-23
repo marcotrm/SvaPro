@@ -6,6 +6,7 @@ import EmployeeModal from '../components/EmployeeModal.jsx';
 
 export default function EmployeesPage() {
   const [employeesList, setEmployeesList] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -17,8 +18,13 @@ export default function EmployeesPage() {
   const fetchEmployees = async () => {
     try {
       setLoading(true); setError('');
-      const response = await employees.getEmployees();
-      setEmployeesList(response.data.data || []);
+      const [employeesResponse, analyticsResponse] = await Promise.all([
+        employees.getEmployees(),
+        employees.getTopPerformers(),
+      ]);
+
+      setEmployeesList(employeesResponse.data.data || []);
+      setAnalytics(analyticsResponse.data || null);
     } catch (err) {
       setError(err.message || 'Errore nel caricamento dei dipendenti');
     } finally { setLoading(false); }
@@ -30,10 +36,13 @@ export default function EmployeesPage() {
 
   const filtered = employeesList.filter(e =>
     e.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    e.last_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    e.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    e.store_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const initials = e => `${e.first_name?.[0] || ''}${e.last_name?.[0] || ''}`.toUpperCase();
+  const formatDate = value => value ? new Date(value).toLocaleDateString('it-IT') : '-';
+  const formatCurrency = value => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(Number(value || 0));
 
   if (loading) return <LoadingSpinner />;
 
@@ -50,6 +59,31 @@ export default function EmployeesPage() {
           Nuovo Dipendente
         </button>
       </div>
+
+      {analytics && (
+        <div className="kpi-grid">
+          <div className="kpi-card">
+            <div className="kpi-label">Dipendenti Totali</div>
+            <div className="kpi-value">{analytics.overview?.total_employees ?? 0}</div>
+            <div className="kpi-delta up">Anagrafica team</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-label">Dipendenti Attivi</div>
+            <div className="kpi-value gold">{analytics.overview?.active_employees ?? 0}</div>
+            <div className="kpi-delta up">Presidio operativo</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-label">Vendite Generate</div>
+            <div className="kpi-value">{formatCurrency(analytics.overview?.total_net_sales)}</div>
+            <div className="kpi-delta warn">Ordini: {analytics.overview?.total_orders ?? 0}</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-label">Ticket Medio</div>
+            <div className="kpi-value">{formatCurrency(analytics.overview?.avg_ticket)}</div>
+            <div className="kpi-delta up">Resa commerciale media</div>
+          </div>
+        </div>
+      )}
 
       {error && <ErrorAlert message={error} onRetry={fetchEmployees} />}
 
@@ -70,8 +104,10 @@ export default function EmployeesPage() {
           <thead>
             <tr>
               <th>Nome</th>
-              <th>Magazzino</th>
-              <th>Data Assunzione</th>
+              <th>Store</th>
+              <th>Ordini</th>
+              <th>Punti</th>
+              <th>Ultima Vendita</th>
               <th>Stato</th>
               <th style={{textAlign:'right'}}>Azioni</th>
             </tr>
@@ -82,13 +118,16 @@ export default function EmployeesPage() {
                 <td>
                   <div className="avatar-cell">
                     <div className="avatar-sm">{initials(employee)}</div>
-                    <div className="avatar-name">{employee.first_name} {employee.last_name}</div>
+                    <div>
+                      <div className="avatar-name">{employee.first_name} {employee.last_name}</div>
+                      <div className="avatar-sub">Assunto: {employee.hire_date ? new Date(employee.hire_date).toLocaleDateString('it-IT') : '-'}</div>
+                    </div>
                   </div>
                 </td>
-                <td style={{color:'var(--muted2)'}}>{employee.store?.name || 'â€”'}</td>
-                <td style={{color:'var(--muted2)'}}>
-                  {employee.hire_date ? new Date(employee.hire_date).toLocaleDateString('it-IT') : 'â€”'}
-                </td>
+                <td style={{color:'var(--muted2)'}}>{employee.store_name || '-'}</td>
+                <td className="mono">{employee.orders_count || 0}</td>
+                <td className="mono" style={{color:'var(--gold)'}}>{employee.points_balance || 0}</td>
+                <td style={{color:'var(--muted2)'}}>{formatDate(employee.last_sale_at)}</td>
                 <td>
                   <span className={`badge ${employee.status === 'active' ? 'high' : 'mid'}`}>
                     <span className="badge-dot" />
@@ -108,7 +147,7 @@ export default function EmployeesPage() {
               </tr>
             )) : (
               <tr>
-                <td colSpan="5" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
+                <td colSpan="7" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
                   Nessun dipendente trovato
                 </td>
               </tr>
@@ -116,6 +155,39 @@ export default function EmployeesPage() {
           </tbody>
         </table>
       </div>
+
+      {analytics?.top_performers?.length > 0 && (
+        <div className="table-card">
+          <div className="table-toolbar">
+            <div className="section-title">Top performer</div>
+            <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>Ranking automatico</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Dipendente</th>
+                <th>Store</th>
+                <th>Vendite</th>
+                <th>Margine</th>
+                <th>Punti</th>
+              </tr>
+            </thead>
+            <tbody>
+              {analytics.top_performers.map(item => (
+                <tr key={item.employee_id}>
+                  <td><span className="mono">#{item.rank}</span></td>
+                  <td>{item.employee_name}</td>
+                  <td style={{color:'var(--muted2)'}}>{item.store_name || '-'}</td>
+                  <td className="mono">{formatCurrency(item.total_net_sales)}</td>
+                  <td className="mono">{formatCurrency(item.total_margin)}</td>
+                  <td className="mono" style={{color:'var(--gold)'}}>{item.points_balance}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {showModal && (
         <EmployeeModal employee={selectedEmployee} onClose={handleCloseModal} onSave={handleSaveEmployee} />

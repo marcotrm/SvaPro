@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -14,13 +15,93 @@ class CustomerController extends Controller
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
 
-        $customers = DB::table('customers')
-            ->where('tenant_id', $tenantId)
+        $customers = $this->customerBaseQuery($tenantId)
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $term = trim((string) $request->input('q'));
+                $query->where(function ($inner) use ($term) {
+                    $inner->where('c.first_name', 'like', '%'.$term.'%')
+                        ->orWhere('c.last_name', 'like', '%'.$term.'%')
+                        ->orWhere('c.email', 'like', '%'.$term.'%')
+                        ->orWhere('c.code', 'like', '%'.$term.'%')
+                        ->orWhere('ca.city', 'like', '%'.$term.'%');
+                });
+            })
+            ->when($request->filled('city'), function ($query) use ($request) {
+                $query->where('ca.city', $request->input('city'));
+            })
             ->orderByDesc('id')
             ->limit((int) $request->input('limit', 100))
             ->get();
 
-        return response()->json(['data' => $customers]);
+        return response()->json(['data' => $this->hydrateCustomers($customers)]);
+    }
+
+    public function returnFrequencyAnalytics(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $customers = $this->hydrateCustomers($this->customerBaseQuery($tenantId)->get());
+
+        $cityBreakdown = collect($customers)
+            ->filter(fn (array $customer) => ! empty($customer['city']))
+            ->groupBy('city')
+            ->map(fn ($items, $city) => [
+                'city' => $city,
+                'customers' => count($items),
+            ])
+            ->sortByDesc('customers')
+            ->values()
+            ->all();
+
+        $returningCustomers = collect($customers)
+            ->filter(fn (array $customer) => ($customer['paid_orders_count'] ?? 0) > 1)
+            ->values();
+
+        $avgReturnDays = round((float) $returningCustomers
+            ->pluck('return_frequency_days')
+            ->filter(fn ($value) => $value !== null)
+            ->avg(), 1);
+
+        $inactiveCutoff = now()->subDays(30);
+        $inactiveCustomers = collect($customers)
+            ->filter(function (array $customer) use ($inactiveCutoff) {
+                if (empty($customer['last_purchase_at'])) {
+                    return false;
+                }
+
+                return Carbon::parse($customer['last_purchase_at'])->lt($inactiveCutoff);
+            })
+            ->count();
+
+        $topReturners = $returningCustomers
+            ->sortBy([
+                ['return_frequency_days', 'asc'],
+                ['last_purchase_at', 'desc'],
+            ])
+            ->take(5)
+            ->map(function (array $customer) {
+                return [
+                    'customer_id' => $customer['id'],
+                    'customer_name' => trim($customer['first_name'].' '.$customer['last_name']),
+                    'city' => $customer['city'],
+                    'paid_orders_count' => $customer['paid_orders_count'],
+                    'return_frequency_days' => $customer['return_frequency_days'],
+                    'last_purchase_at' => $customer['last_purchase_at'],
+                ];
+            })
+            ->values()
+            ->all();
+
+        return response()->json([
+            'overview' => [
+                'total_customers' => count($customers),
+                'loyalty_card_customers' => collect($customers)->whereNotNull('card_code')->count(),
+                'returning_customers' => $returningCustomers->count(),
+                'avg_return_days' => $avgReturnDays,
+                'inactive_customers_30d' => $inactiveCustomers,
+            ],
+            'city_breakdown' => $cityBreakdown,
+            'top_returners' => $topReturners,
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -77,5 +158,74 @@ class CustomerController extends Controller
         }
 
         return response()->json(['message' => 'Cliente aggiornato.']);
+    }
+
+    private function customerBaseQuery(int $tenantId)
+    {
+        $orderStats = DB::table('sales_orders')
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'paid')
+            ->whereNotNull('customer_id')
+            ->groupBy('customer_id')
+            ->selectRaw('customer_id, COUNT(*) as paid_orders_count, MAX(paid_at) as last_purchase_at, MIN(paid_at) as first_purchase_at');
+
+        return DB::table('customers as c')
+            ->leftJoin('customer_addresses as ca', function ($join) {
+                $join->on('ca.customer_id', '=', 'c.id')
+                    ->where('ca.is_default', true);
+            })
+            ->leftJoinSub($orderStats, 'order_stats', function ($join) {
+                $join->on('order_stats.customer_id', '=', 'c.id');
+            })
+            ->leftJoin('loyalty_cards as lc', function ($join) use ($tenantId) {
+                $join->on('lc.customer_id', '=', 'c.id')
+                    ->where('lc.tenant_id', '=', $tenantId);
+            })
+            ->where('c.tenant_id', $tenantId)
+            ->select([
+                'c.*',
+                'ca.city',
+                'order_stats.paid_orders_count',
+                'order_stats.last_purchase_at',
+                'order_stats.first_purchase_at',
+                'lc.card_code',
+                'lc.status as loyalty_status',
+            ]);
+    }
+
+    private function hydrateCustomers($customers): array
+    {
+        return collect($customers)
+            ->map(function ($customer) {
+                $paidOrdersCount = (int) ($customer->paid_orders_count ?? 0);
+                $firstPurchaseAt = $customer->first_purchase_at ? Carbon::parse($customer->first_purchase_at) : null;
+                $lastPurchaseAt = $customer->last_purchase_at ? Carbon::parse($customer->last_purchase_at) : null;
+
+                $returnFrequencyDays = null;
+                if ($paidOrdersCount > 1 && $firstPurchaseAt && $lastPurchaseAt) {
+                    $totalDays = max(1, $firstPurchaseAt->diffInDays($lastPurchaseAt));
+                    $returnFrequencyDays = round($totalDays / ($paidOrdersCount - 1), 1);
+                }
+
+                return [
+                    'id' => (int) $customer->id,
+                    'code' => $customer->code,
+                    'first_name' => $customer->first_name,
+                    'last_name' => $customer->last_name,
+                    'email' => $customer->email,
+                    'phone' => $customer->phone,
+                    'birth_date' => $customer->birth_date,
+                    'marketing_consent' => (bool) $customer->marketing_consent,
+                    'city' => $customer->city,
+                    'card_code' => $customer->card_code,
+                    'loyalty_status' => $customer->loyalty_status,
+                    'paid_orders_count' => $paidOrdersCount,
+                    'last_purchase_at' => $lastPurchaseAt?->toDateTimeString(),
+                    'return_frequency_days' => $returnFrequencyDays,
+                    'created_at' => $customer->created_at,
+                    'updated_at' => $customer->updated_at,
+                ];
+            })
+            ->all();
     }
 }

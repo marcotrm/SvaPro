@@ -298,6 +298,92 @@ class ApiWorkflowTest extends TestCase
         $this->assertDatabaseHas('shipments', ['id' => $shipmentResponse->json('shipment_id'), 'status' => 'shipped']);
     }
 
+    public function test_customer_return_analytics_support_city_breakdown_and_frequency(): void
+    {
+        $headers = $this->authenticateAsSuperAdmin();
+        $now = now();
+
+        DB::table('customer_addresses')->insert([
+            'customer_id' => 1,
+            'type' => 'shipping',
+            'line1' => 'Via Roma 1',
+            'line2' => null,
+            'city' => 'Afragola',
+            'zip' => '80021',
+            'country' => 'IT',
+            'is_default' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $historicOrderId = DB::table('sales_orders')->insertGetId([
+            'tenant_id' => 1,
+            'store_id' => 1,
+            'channel' => 'pos',
+            'customer_id' => 1,
+            'status' => 'paid',
+            'currency' => 'EUR',
+            'subtotal' => 20.00,
+            'discount_total' => 0,
+            'tax_total' => 4.40,
+            'excise_total' => 0,
+            'grand_total' => 24.40,
+            'paid_at' => $now->copy()->subDays(11),
+            'created_at' => $now->copy()->subDays(11),
+            'updated_at' => $now->copy()->subDays(11),
+        ]);
+
+        DB::table('sales_order_lines')->insert([
+            'sales_order_id' => $historicOrderId,
+            'product_variant_id' => 1,
+            'qty' => 1,
+            'unit_price' => 20.00,
+            'discount_amount' => 0,
+            'tax_amount' => 4.40,
+            'excise_amount' => 0,
+            'line_total' => 24.40,
+            'tax_snapshot_json' => json_encode(['vat_rate' => 22]),
+            'created_at' => $now->copy()->subDays(11),
+            'updated_at' => $now->copy()->subDays(11),
+        ]);
+
+        $this->withHeaders($headers)->getJson('/api/customers?city=Afragola')
+            ->assertOk()
+            ->assertJsonPath('data.0.city', 'Afragola')
+            ->assertJsonPath('data.0.paid_orders_count', 2);
+
+        $this->withHeaders($headers)->getJson('/api/customers/analytics/return-frequency')
+            ->assertOk()
+            ->assertJsonPath('overview.total_customers', 1)
+            ->assertJsonPath('overview.returning_customers', 1)
+            ->assertJsonPath('overview.loyalty_card_customers', 1)
+            ->assertJsonPath('city_breakdown.0.city', 'Afragola')
+            ->assertJsonPath('top_returners.0.customer_id', 1);
+    }
+
+    public function test_employee_top_performers_analytics_are_available(): void
+    {
+        $headers = $this->authenticateAsSuperAdmin();
+
+        $this->withHeaders($headers)->postJson('/api/orders/place', [
+            'channel' => 'pos',
+            'store_id' => 1,
+            'warehouse_id' => 1,
+            'employee_id' => 1,
+            'status' => 'paid',
+            'lines' => [
+                ['product_variant_id' => 1, 'qty' => 2],
+            ],
+        ])->assertCreated();
+
+        $this->withHeaders($headers)->getJson('/api/employees/analytics/top-performers')
+            ->assertOk()
+            ->assertJsonPath('overview.total_employees', 1)
+            ->assertJsonPath('overview.active_employees', 1)
+            ->assertJsonPath('top_performers.0.employee_id', 1)
+            ->assertJsonPath('top_performers.0.rank', 1);
+    }
+
     public function test_smart_inventory_creates_purchase_order_for_best_seller_low_stock_in_milan(): void
     {
         $headers = $this->authenticateAsSuperAdmin();

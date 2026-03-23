@@ -82,14 +82,16 @@ export const inventory = {
   adjustStock: (data) => api.post('/inventory/adjust', data),
   getSmartReorderPreview: () => api.get('/inventory/smart-reorder/preview'),
   runSmartReorder: () => api.post('/inventory/smart-reorder/run'),
+  runSmartReorderAuto: () => api.post('/inventory/smart-reorder/run-auto'),
 };
 
 // Customer APIs
 export const customers = {
-  getCustomers: () => api.get('/customers'),
+  getCustomers: (params = {}) => api.get('/customers', { params }),
   getCustomer: (id) => api.get(`/customers/${id}`),
   createCustomer: (data) => api.post('/customers', data),
   updateCustomer: (id, data) => api.put(`/customers/${id}`, data),
+  getReturnAnalytics: () => api.get('/customers/analytics/return-frequency'),
 };
 
 // Employee APIs
@@ -98,6 +100,7 @@ export const employees = {
   getEmployee: (id) => api.get(`/employees/${id}`),
   createEmployee: (data) => api.post('/employees', data),
   updateEmployee: (id, data) => api.put(`/employees/${id}`, data),
+  getTopPerformers: () => api.get('/employees/analytics/top-performers'),
 };
 
 // Loyalty APIs

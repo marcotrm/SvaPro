@@ -22,10 +22,12 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         Route::post('/catalog/products', [CatalogController::class, 'store']);
 
         Route::get('/customers', [CustomerController::class, 'index']);
+        Route::get('/customers/analytics/return-frequency', [CustomerController::class, 'returnFrequencyAnalytics']);
         Route::post('/customers', [CustomerController::class, 'store']);
         Route::put('/customers/{customerId}', [CustomerController::class, 'update']);
 
         Route::get('/employees', [EmployeeController::class, 'index']);
+        Route::get('/employees/analytics/top-performers', [EmployeeController::class, 'topPerformers']);
         Route::post('/employees', [EmployeeController::class, 'store']);
         Route::put('/employees/{employeeId}', [EmployeeController::class, 'update']);
 
