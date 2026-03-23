@@ -59,13 +59,17 @@ export const auth = {
 
 // Catalog APIs
 export const catalog = {
-  getProducts: () => api.get('/catalog/products'),
+  getProducts: (params = {}) => api.get('/catalog/products', { params }),
   getProduct: (id) => api.get(`/catalog/products/${id}`),
   createProduct: (data) => api.post('/catalog/products', data),
   updateProduct: (id, data) => api.put(`/catalog/products/${id}`, data),
   getBrands: () => api.get('/catalog/brands'),
   getCategories: () => api.get('/catalog/categories'),
   getTaxClasses: () => api.get('/catalog/tax-classes'),
+};
+
+export const stores = {
+  getStores: () => api.get('/stores'),
 };
 
 // Order APIs

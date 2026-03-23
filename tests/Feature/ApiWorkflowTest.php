@@ -384,6 +384,44 @@ class ApiWorkflowTest extends TestCase
             ->assertJsonPath('top_performers.0.rank', 1);
     }
 
+    public function test_catalog_can_be_filtered_by_store_assignments(): void
+    {
+        $headers = $this->authenticateAsSuperAdmin();
+
+        $storesResponse = $this->withHeaders($headers)->getJson('/api/stores');
+        $storesResponse->assertOk()
+            ->assertJsonPath('data.0.name', 'Negozio Centrale');
+
+        $this->withHeaders($headers)->postJson('/api/catalog/products', [
+            'sku' => 'LIQ-ZONA-001',
+            'name' => 'Liquido Zona Roma',
+            'product_type' => 'liquid',
+            'brand_id' => 1,
+            'category_id' => 1,
+            'default_supplier_id' => 1,
+            'store_ids' => [1],
+            'variants' => [
+                [
+                    'sale_price' => 7.90,
+                    'cost_price' => 3.20,
+                    'pack_size' => 1,
+                    'flavor' => 'Mint Roma',
+                    'tax_class_id' => 1,
+                ],
+            ],
+        ])->assertCreated();
+
+        $this->withHeaders($headers)->getJson('/api/catalog/products?store_id=1')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Liquido Zona Roma']);
+
+        $milanCatalog = $this->withHeaders($headers)->getJson('/api/catalog/products?store_id=2');
+        $milanCatalog->assertOk();
+
+        $productNames = collect($milanCatalog->json('data'))->pluck('name')->all();
+        $this->assertNotContains('Liquido Zona Roma', $productNames);
+    }
+
     public function test_smart_inventory_creates_purchase_order_for_best_seller_low_stock_in_milan(): void
     {
         $headers = $this->authenticateAsSuperAdmin();

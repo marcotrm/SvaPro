@@ -1,24 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { catalog } from '../api.jsx';
+import { catalog, stores } from '../api.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
 
 export default function CatalogPage() {
   const [products, setProducts] = useState([]);
+  const [storesList, setStoresList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStoreId, setSelectedStoreId] = useState('');
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { fetchProducts(); }, [selectedStoreId]);
 
   const fetchProducts = async () => {
     try {
       setLoading(true); setError('');
-      const response = await catalog.getProducts();
-      setProducts(response.data.data || []);
+      const [productsResponse, storesResponse] = await Promise.all([
+        catalog.getProducts(selectedStoreId ? { store_id: selectedStoreId } : {}),
+        stores.getStores(),
+      ]);
+
+      setProducts(productsResponse.data.data || []);
+      setStoresList(storesResponse.data.data || []);
     } catch (err) {
       setError(err.message || 'Errore nel caricamento dei prodotti');
     } finally { setLoading(false); }
@@ -32,6 +39,13 @@ export default function CatalogPage() {
     p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const getPrimaryVariant = product => product.variants?.[0] || null;
+  const getStoresLabel = product => {
+    if (!product.store_count) return 'Nessuno store';
+    if (product.store_count === 1) return '1 store';
+    return `${product.store_count} store`;
+  };
 
   if (loading) return <LoadingSpinner />;
 
@@ -62,6 +76,12 @@ export default function CatalogPage() {
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
+          <select className="form-select" style={{maxWidth: 220}} value={selectedStoreId} onChange={e => setSelectedStoreId(e.target.value)}>
+            <option value="">Tutti gli store</option>
+            {storesList.map(store => (
+              <option key={store.id} value={store.id}>{store.name}</option>
+            ))}
+          </select>
           <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>
             {filtered.length} risultati
           </span>
@@ -71,9 +91,9 @@ export default function CatalogPage() {
             <tr>
               <th>Nome</th>
               <th>SKU</th>
-              <th>Brand</th>
-              <th>Categoria</th>
+              <th>Variante Principale</th>
               <th>Prezzo</th>
+              <th>Store Abilitati</th>
               <th style={{textAlign:'right'}}>Azioni</th>
             </tr>
           </thead>
@@ -82,9 +102,14 @@ export default function CatalogPage() {
               <tr key={product.id}>
                 <td style={{fontWeight:600,color:'var(--text)'}}>{product.name}</td>
                 <td><span className="mono" style={{color:'var(--muted2)'}}>{product.sku}</span></td>
-                <td style={{color:'var(--muted2)'}}>{product.brand?.name || '—'}</td>
-                <td style={{color:'var(--muted2)'}}>{product.category?.name || '—'}</td>
-                <td><span className="mono positive">€{product.price?.toFixed(2)}</span></td>
+                <td style={{color:'var(--muted2)'}}>{getPrimaryVariant(product)?.flavor || getPrimaryVariant(product)?.resistance_ohm || '-'}</td>
+                <td><span className="mono positive">€{Number(getPrimaryVariant(product)?.sale_price || 0).toFixed(2)}</span></td>
+                <td>
+                  <span className={`badge ${product.store_count > 1 ? 'high' : 'mid'}`}>
+                    <span className="badge-dot" />
+                    {getStoresLabel(product)}
+                  </span>
+                </td>
                 <td>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}}>
                     <button className="icon-action edit" onClick={() => handleOpenModal(product)} title="Modifica">

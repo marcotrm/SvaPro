@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ShippingController;
 use App\Http\Controllers\Api\SmartInventoryController;
+use App\Http\Controllers\Api\StoreController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -18,6 +19,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::middleware('role:superadmin,admin_cliente')->group(function () {
+        Route::get('/stores', [StoreController::class, 'index']);
+
         Route::get('/catalog/products', [CatalogController::class, 'index']);
         Route::post('/catalog/products', [CatalogController::class, 'store']);
 
