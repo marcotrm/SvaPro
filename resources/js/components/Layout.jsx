@@ -86,6 +86,8 @@ export default function Layout({ user, setUser }) {
     ? user.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
     : (user?.email?.[0] || 'U').toUpperCase();
 
+  const primaryRole = user?.roles?.[0] || 'operatore';
+
   const tenantCode = localStorage.getItem('tenantCode') || 'DEMO';
   const pageTitle = pageTitles[location.pathname] || 'Dashboard';
 
@@ -131,7 +133,7 @@ export default function Layout({ user, setUser }) {
             <div className="user-avatar">{initials}</div>
             <div>
               <div className="user-name">{user?.name || user?.email}</div>
-              <div className="user-role">{user?.role || 'Operatore'}</div>
+              <div className="user-role">{primaryRole}</div>
             </div>
             <svg style={{ marginLeft: 'auto', opacity: .4 }} width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
               <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z"/>
@@ -172,7 +174,7 @@ export default function Layout({ user, setUser }) {
 
         {/* PAGE CONTENT */}
         <div className="content">
-          <Outlet context={{ setLowStockCount }} />
+          <Outlet context={{ setLowStockCount, user }} />
         </div>
       </div>
     </div>

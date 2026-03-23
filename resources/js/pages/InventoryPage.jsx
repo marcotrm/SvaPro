@@ -1,10 +1,12 @@
 ﻿import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { inventory } from '../api.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import InventoryMovementModal from '../components/InventoryMovementModal.jsx';
 
 export default function InventoryPage() {
+  const { user } = useOutletContext();
   const [stock, setStock] = useState([]);
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +57,9 @@ export default function InventoryPage() {
   const movementTypes = Array.from(new Set(movements.map(item => item.movement_type))).filter(Boolean).sort();
 
   const formatDateTime = value => value ? new Date(value).toLocaleString('it-IT') : '-';
+  const userRoles = user?.roles || [];
+  const canAdjustInventory = userRoles.includes('superadmin') || userRoles.includes('admin_cliente');
+
   const handleSavedMovement = async () => {
     await fetchStockAndMovements();
     setShowMovementModal(false);
@@ -78,10 +83,12 @@ export default function InventoryPage() {
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           Solo stock basso
         </button>
-        <button className="btn btn-gold" onClick={() => setShowMovementModal(true)}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nuovo Movimento
-        </button>
+        {canAdjustInventory && (
+          <button className="btn btn-gold" onClick={() => setShowMovementModal(true)}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nuovo Movimento
+          </button>
+        )}
       </div>
 
       {error && <ErrorAlert message={error} onRetry={fetchStockAndMovements} />}

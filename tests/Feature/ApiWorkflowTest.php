@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -171,6 +172,56 @@ class ApiWorkflowTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('remaining_balance', 0)
             ->assertJsonPath('monetary_value', 0.05);
+    }
+
+    public function test_loyalty_push_dispatch_command_processes_queued_notifications(): void
+    {
+        $headers = $this->authenticateAsSuperAdmin();
+
+        $this->withHeaders($headers)->postJson('/api/loyalty/customers/1/devices', [
+            'platform' => 'android',
+            'device_token' => 'device-token-loyalty-dispatch-1',
+            'device_name' => 'Pixel Dispatch',
+            'app_version' => '1.0.1',
+        ])->assertOk();
+
+        $this->withHeaders($headers)->postJson('/api/orders/place', [
+            'channel' => 'pos',
+            'store_id' => 1,
+            'warehouse_id' => 1,
+            'customer_id' => 1,
+            'status' => 'paid',
+            'lines' => [
+                ['product_variant_id' => 1, 'qty' => 2],
+            ],
+        ])->assertCreated();
+
+        $queuedNotification = DB::table('loyalty_push_notifications')
+            ->where('tenant_id', 1)
+            ->where('customer_id', 1)
+            ->where('status', 'queued')
+            ->orderByDesc('id')
+            ->first();
+
+        $this->assertNotNull($queuedNotification);
+        $this->assertNull($queuedNotification->sent_at);
+
+        Artisan::call('loyalty:dispatch-push', [
+            '--tenantId' => 1,
+            '--limit' => 50,
+        ]);
+
+        $dispatchedNotification = DB::table('loyalty_push_notifications')
+            ->where('id', $queuedNotification->id)
+            ->first();
+
+        $this->assertSame('dispatched', $dispatchedNotification->status);
+        $this->assertNotNull($dispatchedNotification->sent_at);
+
+        $this->assertDatabaseHas('outbox_events', [
+            'tenant_id' => 1,
+            'event_name' => 'loyalty.push.notification.dispatch',
+        ]);
     }
 
     public function test_paid_order_is_created_with_alert_when_stock_is_insufficient(): void

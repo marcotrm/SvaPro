@@ -55,7 +55,7 @@ class LoyaltyPushService
             'status' => $status,
             'target_devices_count' => $targetDevicesCount,
             'queued_at' => $now,
-            'sent_at' => $targetDevicesCount > 0 ? $now : null,
+            'sent_at' => null,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
