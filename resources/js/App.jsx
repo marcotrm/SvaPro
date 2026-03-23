@@ -17,6 +17,8 @@ const ControlTowerPage = lazy(() => import('./pages/ControlTowerPage.jsx'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage.jsx'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
 const RolesPermissionsPage = lazy(() => import('./pages/RolesPermissionsPage.jsx'));
+const InvoicesPage = lazy(() => import('./pages/InvoicesPage.jsx'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage.jsx'));
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -89,6 +91,8 @@ export default function App() {
               <Route path="/audit-log" element={<AuditLogPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/roles-permissions" element={<RolesPermissionsPage />} />
+              <Route path="/invoices" element={<InvoicesPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
             </Route>
           </Route>
 

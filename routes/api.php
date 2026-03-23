@@ -5,9 +5,12 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RolesPermissionsController;
 use App\Http\Controllers\Api\ShippingController;
 use App\Http\Controllers\Api\SmartInventoryController;
@@ -59,6 +62,22 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         Route::get('/inventory/smart-reorder/preview', [SmartInventoryController::class, 'preview']);
         Route::post('/inventory/smart-reorder/run', [SmartInventoryController::class, 'run']);
         Route::post('/inventory/smart-reorder/run-auto', [SmartInventoryController::class, 'runAutoToCentral']);
+
+        // Exports
+        Route::get('/export/orders', [ExportController::class, 'exportOrders']);
+        Route::get('/export/customers', [ExportController::class, 'exportCustomers']);
+        Route::get('/export/inventory', [ExportController::class, 'exportInventory']);
+
+        // Invoices
+        Route::get('/invoices', [InvoiceController::class, 'index']);
+        Route::post('/invoices/generate', [InvoiceController::class, 'generate']);
+        Route::get('/invoices/{id}/download', [InvoiceController::class, 'download']);
+
+        // Reports
+        Route::get('/reports/revenue-trend', [ReportController::class, 'revenueTrend']);
+        Route::get('/reports/top-products', [ReportController::class, 'topProducts']);
+        Route::get('/reports/customer-acquisition', [ReportController::class, 'customerAcquisition']);
+        Route::get('/reports/summary', [ReportController::class, 'summary']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente')->group(function () {

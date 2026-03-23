@@ -1,4 +1,4 @@
-import { catalog, orders, inventory, customers, employees, loyalty, stores, audit, rolesPermissions } from './api.jsx';
+import { catalog, orders, inventory, customers, employees, loyalty, stores, audit, rolesPermissions, reports, invoices } from './api.jsx';
 
 const routeLoaders = {
   '/': () => import('./pages/DashboardPage.jsx'),
@@ -14,6 +14,8 @@ const routeLoaders = {
   '/audit-log': () => import('./pages/AuditLogPage.jsx'),
   '/settings': () => import('./pages/SettingsPage.jsx'),
   '/roles-permissions': () => import('./pages/RolesPermissionsPage.jsx'),
+  '/invoices': () => import('./pages/InvoicesPage.jsx'),
+  '/reports': () => import('./pages/ReportsPage.jsx'),
 };
 
 /* Map routes to the API calls they'll make on mount.
@@ -60,6 +62,13 @@ const routeDataLoaders = {
   },
   '/roles-permissions': () => {
     rolesPermissions.getMatrix();
+  },
+  '/invoices': () => {
+    invoices.list({});
+  },
+  '/reports': () => {
+    reports.summary({});
+    reports.revenueTrend({ period: 'daily', days: 30 });
   },
 };
 

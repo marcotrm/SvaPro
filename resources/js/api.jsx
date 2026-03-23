@@ -305,6 +305,40 @@ export const rolesPermissions = {
   toggle: (roleId, permissionId) => api.post('/roles-permissions/toggle', { role_id: roleId, permission_id: permissionId }),
 };
 
+// Export APIs
+export const exports_ = {
+  orders: (params = {}) => api.get('/export/orders', { params, responseType: 'blob' }),
+  customers: (params = {}) => api.get('/export/customers', { params, responseType: 'blob' }),
+  inventory: (params = {}) => api.get('/export/inventory', { params, responseType: 'blob' }),
+  download: (promise, filename) => {
+    return promise.then(res => {
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    });
+  },
+};
+
+// Invoice APIs
+export const invoices = {
+  list: (params = {}) => cachedGet('/invoices', params, 15000, 120000),
+  generate: (orderId) => api.post('/invoices/generate', { order_id: orderId }),
+  download: (id) => api.get(`/invoices/${id}/download`, { responseType: 'blob' }),
+};
+
+// Report APIs
+export const reports = {
+  revenueTrend: (params = {}) => cachedGet('/reports/revenue-trend', params, 30000, 300000),
+  topProducts: (params = {}) => cachedGet('/reports/top-products', params, 30000, 300000),
+  customerAcquisition: (params = {}) => cachedGet('/reports/customer-acquisition', params, 30000, 300000),
+  summary: (params = {}) => cachedGet('/reports/summary', params, 30000, 300000),
+};
+
 export default api;
 
 export { clearApiCache };

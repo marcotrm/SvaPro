@@ -32,6 +32,10 @@ const navGroups = [
         label: 'Clienti', href: '/customers',
         icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>,
       },
+      {
+        label: 'Fatture', href: '/invoices',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-.847.99l-1-.116-.86 1.148a1 1 0 01-1.586 0L11 14.874l-.707.942a1 1 0 01-1.586 0L8 14.874l-.707.942a1 1 0 01-1.586 0L4.847 14.69A1 1 0 014 14V4zm2 2a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd"/></svg>,
+      },
     ],
   },
   {
@@ -48,6 +52,10 @@ const navGroups = [
       {
         label: 'Push Monitor', href: '/analytics/loyalty/push-monitor',
         icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a4 4 0 00-4 4v1.268A2 2 0 005 9v5l-1 1v1h12v-1l-1-1V9a2 2 0 00-1-1.732V6a4 4 0 00-4-4zm2 5.1V6a2 2 0 10-4 0v1.1A2 2 0 007 9v5h6V9a2 2 0 00-1-1.9z"/></svg>,
+      },
+      {
+        label: 'Report & Export', href: '/reports',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v7a1 1 0 102 0V8z" clipRule="evenodd"/></svg>,
       },
     ],
   },
@@ -80,6 +88,8 @@ const pageTitles = {
   '/audit-log': 'Registro Attività',
   '/settings': 'Impostazioni',
   '/roles-permissions': 'Ruoli & Permessi',
+  '/invoices': 'Fatture',
+  '/reports': 'Report & Export',
 };
 
 export default function Layout({ user, setUser }) {
@@ -92,6 +102,7 @@ export default function Layout({ user, setUser }) {
   const [switchingUser, setSwitchingUser] = useState(false);
   const [userPanelOpen, setUserPanelOpen] = useState(false);
   const [storesList, setStoresList] = useState([]);
+  const [storesReady, setStoresReady] = useState(false);
   const [selectedTenantCode, setSelectedTenantCode] = useState(localStorage.getItem('tenantCode') || user?.tenant_code || 'DEMO');
   const [selectedStoreId, setSelectedStoreId] = useState(localStorage.getItem('selectedStoreId') || '');
   const isSuperAdmin = (user?.roles || []).includes('superadmin');
@@ -123,6 +134,8 @@ export default function Layout({ user, setUser }) {
       setStoresList([]);
       localStorage.removeItem('selectedStoreId');
       setSelectedStoreId('');
+    } finally {
+      setStoresReady(true);
     }
   };
 
@@ -173,10 +186,15 @@ export default function Layout({ user, setUser }) {
     }
 
     if (!isSuperAdmin && user.tenant_code) {
-      setSelectedTenantCode(user.tenant_code);
-      localStorage.setItem('tenantCode', user.tenant_code);
-      localStorage.removeItem('selectedStoreId');
-      setSelectedStoreId('');
+      const currentTenant = selectedTenantCode;
+      const userTenant = user.tenant_code;
+      if (currentTenant !== userTenant) {
+        setStoresReady(false);
+        setSelectedTenantCode(userTenant);
+        localStorage.setItem('tenantCode', userTenant);
+        localStorage.removeItem('selectedStoreId');
+        setSelectedStoreId('');
+      }
     }
   }, [user, isSuperAdmin]);
 
@@ -198,6 +216,7 @@ export default function Layout({ user, setUser }) {
 
   const handleTenantChange = (event) => {
     const nextTenantCode = event.target.value;
+    setStoresReady(false);
     setSelectedTenantCode(nextTenantCode);
     localStorage.setItem('tenantCode', nextTenantCode);
     localStorage.removeItem('selectedStoreId');
@@ -447,7 +466,13 @@ export default function Layout({ user, setUser }) {
 
         {/* PAGE CONTENT */}
         <div className="content">
-          <Outlet context={{ setLowStockCount, user, setUser, storesList, selectedStoreId, selectedStore }} />
+          {storesReady ? (
+            <Outlet context={{ setLowStockCount, user, setUser, storesList, selectedStoreId, selectedStore }} />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+              <div style={{ width: 36, height: 36, border: '3px solid var(--border2)', borderTopColor: 'var(--gold)', borderRadius: '50%', animation: 'spin .6s linear infinite' }} />
+            </div>
+          )}
         </div>
       </div>
     </div>

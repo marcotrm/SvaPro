@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { auth, stores, clearApiCache } from '../api.jsx';
+import { useTranslation } from '../i18n/index.jsx';
 
 export default function SettingsPage() {
   const { user, setUser } = useOutletContext();
+  const { lang, setLang, t } = useTranslation();
   const isSuperAdmin = (user?.roles || []).includes('superadmin');
   const isAdmin = isSuperAdmin || (user?.roles || []).includes('admin_cliente');
 
@@ -134,6 +136,29 @@ export default function SettingsPage() {
             {savingProfile ? 'Salvataggio...' : 'Salva Profilo'}
           </button>
         </form>
+      </div>
+
+      {/* ── Language Card ── */}
+      <div className="table-card" style={{ padding: 24, marginBottom: 20 }}>
+        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>
+          {t('language')}
+        </h3>
+        <div style={{ display: 'flex', gap: 10, maxWidth: 480 }}>
+          <button
+            className={`btn ${lang === 'it' ? 'btn-gold' : 'btn-ghost'}`}
+            onClick={() => setLang('it')}
+            style={{ flex: 1, justifyContent: 'center' }}
+          >
+            🇮🇹 {t('italian')}
+          </button>
+          <button
+            className={`btn ${lang === 'en' ? 'btn-gold' : 'btn-ghost'}`}
+            onClick={() => setLang('en')}
+            style={{ flex: 1, justifyContent: 'center' }}
+          >
+            🇬🇧 {t('english')}
+          </button>
+        </div>
       </div>
 
       {/* ── Tenant Settings Card ── */}

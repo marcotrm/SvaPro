@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { orders, inventory, customers, employees } from '../api.jsx';
+import { orders, inventory, customers, employees, reports } from '../api.jsx';
 import { DashboardSkeleton } from '../components/Skeleton.jsx';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -15,6 +16,8 @@ export default function DashboardPage() {
     activeEmployees: 0,
     recentOrders: [],
   });
+  const [kpi, setKpi] = useState(null);
+  const [revenueChart, setRevenueChart] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -27,11 +30,15 @@ export default function DashboardPage() {
       setLoading(true);
       setError('');
 
-      const [ordersRes, inventoryRes, customersRes, employeesRes] = await Promise.all([
-        orders.getOrders(selectedStoreId ? { store_id: selectedStoreId, limit: 20 } : { limit: 20 }).catch(() => ({})),
-        inventory.getStock(selectedStoreId ? { store_id: selectedStoreId, limit: 80 } : { limit: 80 }).catch(() => ({})),
-        customers.getCustomers(selectedStoreId ? { store_id: selectedStoreId, limit: 50 } : { limit: 50 }).catch(() => ({})),
-        employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId, limit: 50 } : { limit: 50 }).catch(() => ({})),
+      const storeParam = selectedStoreId ? { store_id: selectedStoreId } : {};
+
+      const [ordersRes, inventoryRes, customersRes, employeesRes, summaryRes, trendRes] = await Promise.all([
+        orders.getOrders({ ...storeParam, limit: 20 }).catch(() => ({})),
+        inventory.getStock({ ...storeParam, limit: 80 }).catch(() => ({})),
+        customers.getCustomers({ ...storeParam, limit: 50 }).catch(() => ({})),
+        employees.getEmployees({ ...storeParam, limit: 50 }).catch(() => ({})),
+        reports.summary(storeParam).catch(() => ({})),
+        reports.revenueTrend({ ...storeParam, period: 'daily', days: 14 }).catch(() => ({})),
       ]);
 
       const ordersList    = ordersRes.data?.data    || [];
@@ -41,6 +48,17 @@ export default function DashboardPage() {
 
       const totalRevenue  = ordersList.reduce((sum, o) => sum + (o.grand_total || 0), 0);
       const lowStockItems = stockList.filter(i => i.on_hand < i.reorder_point).length;
+
+      // KPI summary from reports API
+      const summaryData = summaryRes.data?.data || null;
+      if (summaryData) setKpi(summaryData);
+
+      // Revenue chart data
+      const chartData = trendRes.data?.data || [];
+      setRevenueChart(chartData.map(d => ({
+        date: d.label,
+        revenue: parseFloat(d.revenue) || 0,
+      })));
 
       setData({
         totalOrders:     ordersList.length,
@@ -84,15 +102,23 @@ export default function DashboardPage() {
         <div className="kpi-card">
           <div className="kpi-label">Ricavi Totali</div>
           <div className="kpi-value gold">
-            €{data.totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            €{(kpi?.revenue ?? data.totalRevenue).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <span className="kpi-delta up">↑ live</span>
+          {kpi?.revenue_delta != null
+            ? <span className={`kpi-delta ${kpi.revenue_delta >= 0 ? 'up' : 'down'}`}>
+                {kpi.revenue_delta >= 0 ? '↑' : '↓'} {Math.abs(kpi.revenue_delta).toFixed(1)}%
+              </span>
+            : <span className="kpi-delta up">↑ live</span>}
         </div>
 
         <div className="kpi-card">
           <div className="kpi-label">Ordini</div>
-          <div className="kpi-value">{data.totalOrders}</div>
-          <span className="kpi-delta up">Totale</span>
+          <div className="kpi-value">{kpi?.orders ?? data.totalOrders}</div>
+          {kpi?.orders_delta != null
+            ? <span className={`kpi-delta ${kpi.orders_delta >= 0 ? 'up' : 'down'}`}>
+                {kpi.orders_delta >= 0 ? '↑' : '↓'} {Math.abs(kpi.orders_delta).toFixed(1)}%
+              </span>
+            : <span className="kpi-delta up">Totale</span>}
         </div>
 
         <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/inventory')}>
@@ -130,6 +156,30 @@ export default function DashboardPage() {
           <span className="icon">✕</span>
           <span><strong>Errore:</strong> {error}</span>
           <button className="banner-link" onClick={fetchDashboardData}>Riprova →</button>
+        </div>
+      )}
+
+      {/* ── REVENUE CHART ── */}
+      {revenueChart.length > 0 && (
+        <div className="table-card" style={{ padding: '20px 16px' }}>
+          <div className="section-title" style={{ marginBottom: 16 }}>
+            Andamento Ricavi
+            <span className="section-subtitle"> — ultimi 14 giorni</span>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={revenueChart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
+              <XAxis dataKey="date" tick={{ fill: '#8a8fa8', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#8a8fa8', fontSize: 11 }} axisLine={false} tickLine={false}
+                tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+              <Tooltip
+                contentStyle={{ background: '#0e1726', border: '1px solid rgba(201,162,39,.25)', borderRadius: 8, color: '#e8edf5', fontSize: 12 }}
+                formatter={v => [`€${Number(v).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, 'Ricavi']}
+                labelStyle={{ color: '#c9a227' }}
+              />
+              <Bar dataKey="revenue" fill="#c9a227" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
 
