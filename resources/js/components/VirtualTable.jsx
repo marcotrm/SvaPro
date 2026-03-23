@@ -65,7 +65,7 @@ export default function VirtualTable({
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        style={{ maxHeight: viewportHeight + 42 /* header */, overflowY: 'auto', overflowX: 'hidden' }}
+        style={{ maxHeight: viewportHeight + 42 /* header */, overflowY: 'auto', overflowX: 'auto' }}
       >
         <table>
           {headers}

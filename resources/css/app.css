@@ -172,7 +172,7 @@ html, body {
 .user-role { font-size: 11px; color: var(--muted); }
 
 /* ── MAIN ── */
-.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 
 /* ── TOPBAR ── */
 .topbar {
@@ -305,7 +305,7 @@ html, body {
 /* ── TABLE CARD ── */
 .table-card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden;
+  border-radius: var(--radius); overflow: auto;
 }
 .table-toolbar {
   display: flex; align-items: center; gap: 12px;
@@ -476,6 +476,9 @@ tbody td { padding: 13px 16px; font-size: 13.5px; vertical-align: middle; }
   background: #1e2d47; color: var(--text); font-size: 11px;
   padding: 4px 8px; border-radius: 4px; white-space: nowrap;
   pointer-events: none; z-index: 999; border: 1px solid var(--border2);
+}
+.topbar [data-tip]:hover::after {
+  bottom: auto; top: calc(100% + 6px);
 }
 
 /* ── ANIMATIONS ── */

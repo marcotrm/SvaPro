@@ -74,12 +74,28 @@ export const prefetchRoute = (path) => {
     loader().catch(() => { prefetched.delete(path); });
   }
 
-  // Data prefetch (warm API cache)
+  // Data prefetch (warm SWR cache — stale data is already returned instantly,
+  // this just ensures the cache is populated ahead of navigation)
   const dataLoader = routeDataLoaders[path];
   if (dataLoader && !dataPrefetched.has(path)) {
     dataPrefetched.add(path);
-    try { dataLoader(); } catch { /* swallow - cache will miss, page will fetch normally */ }
-    // Allow re-prefetch after 10s (cache TTL is 4-10s)
-    setTimeout(() => { dataPrefetched.delete(path); }, 10000);
+    try { dataLoader(); } catch { /* swallow */ }
+    // With SWR cache (30s fresh) we can re-prefetch less often
+    setTimeout(() => { dataPrefetched.delete(path); }, 30000);
   }
+};
+
+/**
+ * Eagerly prefetch code + data for the most common routes.
+ * Call once shortly after layout mount to warm JS chunks in the background.
+ */
+const EAGER_ROUTES = ['/', '/catalog', '/orders', '/inventory', '/customers', '/employees'];
+let eagerDone = false;
+export const eagerPrefetchAll = () => {
+  if (eagerDone) return;
+  eagerDone = true;
+  // Stagger loads to avoid blocking the main thread
+  EAGER_ROUTES.forEach((path, i) => {
+    setTimeout(() => prefetchRoute(path), 800 + i * 400);
+  });
 };

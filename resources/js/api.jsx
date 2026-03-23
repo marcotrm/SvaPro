@@ -37,21 +37,44 @@ const clearApiCache = () => {
   responseCache.clear();
 };
 
-const cachedGet = (path, params = {}, ttlMs = 7000) => {
+/**
+ * Stale-While-Revalidate GET cache.
+ *
+ * freshMs  – return cached without any network call (default 30s)
+ * staleMs  – return cached instantly, refetch in background (default 5min)
+ * Beyond staleMs the entry is discarded and a fresh fetch is made.
+ */
+const cachedGet = (path, params = {}, freshMs = 30000, staleMs = 300000) => {
   const key = cacheKey(path, params);
   const now = Date.now();
   const cached = responseCache.get(key);
 
-  if (cached && cached.expiresAt > now) {
-    return cached.promise;
+  // 1. FRESH — return immediately, no network
+  if (cached && cached.fetchedAt + freshMs > now) {
+    return cached.resolved
+      ? Promise.resolve(cached.resolved)
+      : cached.promise;
   }
 
-  const promise = api.get(path, { params }).catch((error) => {
+  // 2. STALE — return cached data instantly, refresh in background
+  if (cached && cached.resolved && cached.fetchedAt + staleMs > now) {
+    api.get(path, { params }).then(res => {
+      responseCache.set(key, { promise: Promise.resolve(res), fetchedAt: Date.now(), resolved: res });
+    }).catch(() => {});
+    return Promise.resolve(cached.resolved);
+  }
+
+  // 3. EXPIRED or MISS — fresh fetch
+  const promise = api.get(path, { params }).then(res => {
+    const entry = responseCache.get(key);
+    if (entry) entry.resolved = res;
+    return res;
+  }).catch(err => {
     responseCache.delete(key);
-    throw error;
+    throw err;
   });
 
-  responseCache.set(key, { promise, expiresAt: now + ttlMs });
+  responseCache.set(key, { promise, fetchedAt: now, resolved: null });
   return promise;
 };
 
@@ -88,7 +111,15 @@ const getAuthToken = () => {
 api.interceptors.request.use((config) => {
   const method = (config.method || 'get').toLowerCase();
   if (method !== 'get' && method !== 'head' && method !== 'options') {
-    clearApiCache();
+    // Surgical cache invalidation: only clear entries whose path shares a prefix
+    // with the mutated resource (e.g. POST /catalog/products clears /catalog/*)
+    const mutatedPath = (config.url || '').replace(API_URL, '').split('?')[0];
+    const prefix = mutatedPath.split('/').slice(0, 3).join('/'); // e.g. "/catalog/products" → "/catalog/products"
+    for (const [key] of responseCache) {
+      if (key.includes(prefix)) {
+        responseCache.delete(key);
+      }
+    }
   }
 
   const token = getAuthToken();
@@ -190,7 +221,7 @@ export const auth = {
 
 // Catalog APIs
 export const catalog = {
-  getProducts: (params = {}) => cachedGet('/catalog/products', params, 8000),
+  getProducts: (params = {}) => cachedGet('/catalog/products', params, 30000, 300000),
   getProduct: (id) => api.get(`/catalog/products/${id}`),
   createProduct: (data) => api.post('/catalog/products', data),
   updateProduct: (id, data) => api.put(`/catalog/products/${id}`, data),
@@ -200,16 +231,16 @@ export const catalog = {
 };
 
 export const stores = {
-  getTenants: () => cachedGet('/tenants', {}, 10000),
-  getTenantHealth: () => cachedGet('/tenants/health', {}, 8000),
-  getStores: () => cachedGet('/stores', {}, 10000),
-  getTenantSettings: () => cachedGet('/tenant-settings', {}, 8000),
+  getTenants: () => cachedGet('/tenants', {}, 60000, 600000),
+  getTenantHealth: () => cachedGet('/tenants/health', {}, 20000, 120000),
+  getStores: () => cachedGet('/stores', {}, 60000, 600000),
+  getTenantSettings: () => cachedGet('/tenant-settings', {}, 30000, 300000),
   updateTenantSettings: (data) => api.put('/tenant-settings', data),
 };
 
 // Order APIs
 export const orders = {
-  getOrders: (params = {}) => cachedGet('/orders', params, 6000),
+  getOrders: (params = {}) => cachedGet('/orders', params, 15000, 120000),
   getOrder: (id) => api.get(`/orders/${id}`),
   quote: (data) => api.post('/orders/quote', data),
   place: (data) => api.post('/orders/place', data),
@@ -217,30 +248,30 @@ export const orders = {
 
 // Inventory APIs
 export const inventory = {
-  getStock: (params = {}) => cachedGet('/inventory/stock', params, 6000),
-  getMovements: (params = {}) => cachedGet('/inventory/movements', params, 4000),
+  getStock: (params = {}) => cachedGet('/inventory/stock', params, 15000, 120000),
+  getMovements: (params = {}) => cachedGet('/inventory/movements', params, 10000, 120000),
   adjustStock: (data) => api.post('/inventory/adjust', data),
-  getSmartReorderPreview: (params = {}) => cachedGet('/inventory/smart-reorder/preview', params, 5000),
+  getSmartReorderPreview: (params = {}) => cachedGet('/inventory/smart-reorder/preview', params, 20000, 180000),
   runSmartReorder: (data = {}) => api.post('/inventory/smart-reorder/run', data),
   runSmartReorderAuto: (data = {}) => api.post('/inventory/smart-reorder/run-auto', data),
 };
 
 // Customer APIs
 export const customers = {
-  getCustomers: (params = {}) => cachedGet('/customers', params, 7000),
+  getCustomers: (params = {}) => cachedGet('/customers', params, 30000, 300000),
   getCustomer: (id) => api.get(`/customers/${id}`),
   createCustomer: (data) => api.post('/customers', data),
   updateCustomer: (id, data) => api.put(`/customers/${id}`, data),
-  getReturnAnalytics: (params = {}) => cachedGet('/customers/analytics/return-frequency', params, 10000),
+  getReturnAnalytics: (params = {}) => cachedGet('/customers/analytics/return-frequency', params, 30000, 300000),
 };
 
 // Employee APIs
 export const employees = {
-  getEmployees: (params = {}) => cachedGet('/employees', params, 7000),
+  getEmployees: (params = {}) => cachedGet('/employees', params, 30000, 300000),
   getEmployee: (id) => api.get(`/employees/${id}`),
   createEmployee: (data) => api.post('/employees', data),
   updateEmployee: (id, data) => api.put(`/employees/${id}`, data),
-  getTopPerformers: (params = {}) => cachedGet('/employees/analytics/top-performers', params, 9000),
+  getTopPerformers: (params = {}) => cachedGet('/employees/analytics/top-performers', params, 30000, 300000),
 };
 
 // Loyalty APIs
@@ -249,7 +280,7 @@ export const loyalty = {
   registerDevice: (customerId, data) => api.post(`/loyalty/customers/${customerId}/devices`, data),
   getNotifications: (customerId, params = {}) => api.get(`/loyalty/customers/${customerId}/notifications`, { params }),
   markNotificationRead: (customerId, notificationId) => api.post(`/loyalty/customers/${customerId}/notifications/${notificationId}/read`),
-  getPushMonitoringStats: (params = {}) => cachedGet('/loyalty/monitoring/push-stats', params, 6000),
+  getPushMonitoringStats: (params = {}) => cachedGet('/loyalty/monitoring/push-stats', params, 15000, 120000),
   getRedemptionPreview: (customerId, pointsToRedeem) => 
     api.post(`/loyalty/customers/${customerId}/redeem-preview`, { points_to_redeem: pointsToRedeem }),
 };
@@ -265,12 +296,12 @@ export const shipping = {
 
 // Audit APIs
 export const audit = {
-  getLogs: (params = {}) => cachedGet('/audit-logs', params, 4000),
+  getLogs: (params = {}) => cachedGet('/audit-logs', params, 10000, 120000),
 };
 
 // Roles & Permissions APIs
 export const rolesPermissions = {
-  getMatrix: () => cachedGet('/roles-permissions', {}, 10000),
+  getMatrix: () => cachedGet('/roles-permissions', {}, 60000, 600000),
   toggle: (roleId, permissionId) => api.post('/roles-permissions/toggle', { role_id: roleId, permission_id: permissionId }),
 };
 
