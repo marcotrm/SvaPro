@@ -58,13 +58,20 @@ const cachedGet = (path, params = {}, freshMs = 30000, staleMs = 300000) => {
 
   // 2. STALE — return cached data instantly, refresh in background
   if (cached && cached.resolved && cached.fetchedAt + staleMs > now) {
-    api.get(path, { params }).then(res => {
-      responseCache.set(key, { promise: Promise.resolve(res), fetchedAt: Date.now(), resolved: res });
-    }).catch(() => {});
+    if (!cached.revalidating) {
+      cached.revalidating = true;
+      api.get(path, { params }).then(res => {
+        responseCache.set(key, { promise: Promise.resolve(res), fetchedAt: Date.now(), resolved: res });
+      }).catch(() => {}).finally(() => { const e = responseCache.get(key); if (e) e.revalidating = false; });
+    }
     return Promise.resolve(cached.resolved);
   }
 
-  // 3. EXPIRED or MISS — fresh fetch
+  // 3. EXPIRED or MISS — deduplicate in-flight requests
+  if (cached && cached.promise && !cached.resolved && cached.fetchedAt + 5000 > now) {
+    return cached.promise;
+  }
+
   const promise = api.get(path, { params }).then(res => {
     const entry = responseCache.get(key);
     if (entry) entry.resolved = res;

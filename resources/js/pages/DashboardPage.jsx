@@ -1,83 +1,81 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { orders, inventory, customers, employees, reports } from '../api.jsx';
-import { DashboardSkeleton } from '../components/Skeleton.jsx';
+import { SkeletonKpi, SkeletonTable } from '../components/Skeleton.jsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { setLowStockCount, selectedStoreId } = useOutletContext();
 
-  const [data, setData] = useState({
-    totalOrders: 0,
-    totalRevenue: 0,
-    lowStockItems: 0,
-    activeCustomers: 0,
-    activeEmployees: 0,
-    recentOrders: [],
-  });
+  /* ── Progressive state: each section has its own loading ── */
   const [kpi, setKpi] = useState(null);
+  const [kpiLoading, setKpiLoading] = useState(true);
   const [revenueChart, setRevenueChart] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [chartLoading, setChartLoading] = useState(true);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [stockInfo, setStockInfo] = useState({ lowStockItems: 0, total: 0 });
+  const [custCount, setCustCount] = useState(0);
+  const [empCount, setEmpCount] = useState(0);
+  const [countsReady, setCountsReady] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  useEffect(() => { fetchDashboardData(); }, [selectedStoreId]);
+  const fetchDashboardData = useCallback(() => {
+    setError('');
+    const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      setError('');
+    /* Each fetch is independent — UI updates as data arrives */
+    reports.summary(sp)
+      .then(res => { const d = res.data?.data; if (d) setKpi(d); })
+      .catch(() => {})
+      .finally(() => setKpiLoading(false));
 
-      const storeParam = selectedStoreId ? { store_id: selectedStoreId } : {};
+    reports.revenueTrend({ ...sp, period: 'daily', days: 14 })
+      .then(res => {
+        const arr = res.data?.data || [];
+        setRevenueChart(arr.map(d => ({ date: d.label, revenue: parseFloat(d.revenue) || 0 })));
+      })
+      .catch(() => {})
+      .finally(() => setChartLoading(false));
 
-      const [ordersRes, inventoryRes, customersRes, employeesRes, summaryRes, trendRes] = await Promise.all([
-        orders.getOrders({ ...storeParam, limit: 20 }).catch(() => ({})),
-        inventory.getStock({ ...storeParam, limit: 80 }).catch(() => ({})),
-        customers.getCustomers({ ...storeParam, limit: 50 }).catch(() => ({})),
-        employees.getEmployees({ ...storeParam, limit: 50 }).catch(() => ({})),
-        reports.summary(storeParam).catch(() => ({})),
-        reports.revenueTrend({ ...storeParam, period: 'daily', days: 14 }).catch(() => ({})),
-      ]);
+    orders.getOrders({ ...sp, limit: 20 })
+      .then(res => setRecentOrders(res.data?.data || []))
+      .catch(() => setRecentOrders([]))
+      .finally(() => setOrdersLoading(false));
 
-      const ordersList    = ordersRes.data?.data    || [];
-      const stockList     = inventoryRes.data?.data || [];
-      const customersList = customersRes.data?.data || [];
-      const employeesList = employeesRes.data?.data || [];
+    inventory.getStock({ ...sp, limit: 80 })
+      .then(res => {
+        const list = res.data?.data || [];
+        const low = list.filter(i => i.on_hand < i.reorder_point).length;
+        setStockInfo({ lowStockItems: low, total: list.length });
+        setLowStockCount(low);
+      })
+      .catch(() => {});
 
-      const totalRevenue  = ordersList.reduce((sum, o) => sum + (o.grand_total || 0), 0);
-      const lowStockItems = stockList.filter(i => i.on_hand < i.reorder_point).length;
+    Promise.all([
+      customers.getCustomers({ ...sp, limit: 50 }).catch(() => ({})),
+      employees.getEmployees({ ...sp, limit: 50 }).catch(() => ({})),
+    ]).then(([cRes, eRes]) => {
+      setCustCount((cRes.data?.data || []).length);
+      setEmpCount((eRes.data?.data || []).length);
+      setCountsReady(true);
+    });
+  }, [selectedStoreId]);
 
-      // KPI summary from reports API
-      const summaryData = summaryRes.data?.data || null;
-      if (summaryData) setKpi(summaryData);
+  useEffect(() => {
+    setKpiLoading(true);
+    setChartLoading(true);
+    setOrdersLoading(true);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
-      // Revenue chart data
-      const chartData = trendRes.data?.data || [];
-      setRevenueChart(chartData.map(d => ({
-        date: d.label,
-        revenue: parseFloat(d.revenue) || 0,
-      })));
+  /* ── Derived ── */
+  const totalRevenue = recentOrders.reduce((sum, o) => sum + (o.grand_total || 0), 0);
 
-      setData({
-        totalOrders:     ordersList.length,
-        totalRevenue,
-        lowStockItems,
-        activeCustomers: customersList.length,
-        activeEmployees: employeesList.length,
-        recentOrders:    ordersList.slice(0, 10),
-      });
-
-      setLowStockCount(lowStockItems);
-    } catch (err) {
-      setError(err.message || 'Errore nel caricamento dei dati');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredOrders = data.recentOrders.filter(order => {
+  const filteredOrders = recentOrders.filter(order => {
     const matchSearch =
       !search ||
       String(order.id).includes(search) ||
@@ -93,16 +91,15 @@ export default function DashboardPage() {
     return                           <span className="badge low"><span className="badge-dot"></span>Pendente</span>;
   };
 
-  if (loading) return <DashboardSkeleton />;
-
   return (
     <>
       {/* ── KPI GRID ── */}
+      {kpiLoading ? <SkeletonKpi /> : (
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-label">Ricavi Totali</div>
           <div className="kpi-value gold">
-            €{(kpi?.revenue ?? data.totalRevenue).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            €{(kpi?.revenue ?? totalRevenue).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           {kpi?.revenue_delta != null
             ? <span className={`kpi-delta ${kpi.revenue_delta >= 0 ? 'up' : 'down'}`}>
@@ -113,7 +110,7 @@ export default function DashboardPage() {
 
         <div className="kpi-card">
           <div className="kpi-label">Ordini</div>
-          <div className="kpi-value">{kpi?.orders ?? data.totalOrders}</div>
+          <div className="kpi-value">{kpi?.orders ?? recentOrders.length}</div>
           {kpi?.orders_delta != null
             ? <span className={`kpi-delta ${kpi.orders_delta >= 0 ? 'up' : 'down'}`}>
                 {kpi.orders_delta >= 0 ? '↑' : '↓'} {Math.abs(kpi.orders_delta).toFixed(1)}%
@@ -123,25 +120,26 @@ export default function DashboardPage() {
 
         <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/inventory')}>
           <div className="kpi-label">Stock Basso</div>
-          <div className={`kpi-value${data.lowStockItems > 0 ? ' red' : ''}`}>{data.lowStockItems}</div>
-          {data.lowStockItems > 0
+          <div className={`kpi-value${stockInfo.lowStockItems > 0 ? ' red' : ''}`}>{stockInfo.lowStockItems}</div>
+          {stockInfo.lowStockItems > 0
             ? <span className="kpi-delta warn">⚠ da riordinare</span>
             : <span className="kpi-delta up">✓ ok</span>}
         </div>
 
         <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/customers')}>
           <div className="kpi-label">Clienti</div>
-          <div className="kpi-value">{data.activeCustomers}</div>
+          <div className="kpi-value">{custCount}</div>
           <span className="kpi-delta up">Registrati</span>
         </div>
       </div>
+      )}
 
       {/* ── ALERT BANNER ── */}
-      {data.lowStockItems > 0 && (
+      {stockInfo.lowStockItems > 0 && (
         <div className="alert-banner">
           <span className="icon">⚠</span>
           <span>
-            <strong>{data.lowStockItems} {data.lowStockItems === 1 ? 'prodotto' : 'prodotti'}</strong>
+            <strong>{stockInfo.lowStockItems} {stockInfo.lowStockItems === 1 ? 'prodotto' : 'prodotti'}</strong>
             con stock sotto la soglia di riordino
           </span>
           <button className="banner-link" onClick={() => navigate('/inventory/smart-reorder')}>
@@ -160,7 +158,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── REVENUE CHART ── */}
-      {revenueChart.length > 0 && (
+      {chartLoading ? null : revenueChart.length > 0 && (
         <div className="table-card" style={{ padding: '20px 16px' }}>
           <div className="section-title" style={{ marginBottom: 16 }}>
             Andamento Ricavi
@@ -184,11 +182,12 @@ export default function DashboardPage() {
       )}
 
       {/* ── RECENT ORDERS ── */}
+      {ordersLoading ? <SkeletonTable /> : (
       <div>
         <div className="section-header">
           <div className="section-title">
             Ordini Recenti
-            <span className="section-subtitle"> — ultimi {data.recentOrders.length}</span>
+            <span className="section-subtitle"> — ultimi {recentOrders.length}</span>
           </div>
           <button className="btn btn-ghost" onClick={() => navigate('/orders')}>Vedi tutti</button>
           <button className="btn btn-gold" onClick={() => navigate('/orders')}>
@@ -273,6 +272,7 @@ export default function DashboardPage() {
           </table>
         </div>
       </div>
+      )}
 
       {/* ── BOTTOM GRID ── */}
       <div className="bottom-grid">
@@ -330,33 +330,33 @@ export default function DashboardPage() {
             <div className="activity-dot" style={{ background: 'var(--gold)' }}></div>
             <div className="activity-text">Ricavi totali</div>
             <span className="mono positive">
-              €{data.totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              €{totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
 
           <div className="activity-item">
             <div className="activity-dot" style={{ background: 'var(--blue)' }}></div>
             <div className="activity-text">Ordini registrati</div>
-            <span className="mono" style={{ color: 'var(--text)' }}>{data.totalOrders}</span>
+            <span className="mono" style={{ color: 'var(--text)' }}>{recentOrders.length}</span>
           </div>
 
           <div className="activity-item">
             <div className="activity-dot" style={{ background: 'var(--green)' }}></div>
             <div className="activity-text">Clienti attivi</div>
-            <span className="mono" style={{ color: 'var(--text)' }}>{data.activeCustomers}</span>
+            <span className="mono" style={{ color: 'var(--text)' }}>{custCount}</span>
           </div>
 
           <div className="activity-item">
             <div className="activity-dot" style={{ background: 'var(--muted2)' }}></div>
             <div className="activity-text">Dipendenti</div>
-            <span className="mono" style={{ color: 'var(--text)' }}>{data.activeEmployees}</span>
+            <span className="mono" style={{ color: 'var(--text)' }}>{empCount}</span>
           </div>
 
           <div className="activity-item">
-            <div className="activity-dot" style={{ background: data.lowStockItems > 0 ? 'var(--red)' : 'var(--green)' }}></div>
+            <div className="activity-dot" style={{ background: stockInfo.lowStockItems > 0 ? 'var(--red)' : 'var(--green)' }}></div>
             <div className="activity-text">Prodotti sotto soglia</div>
-            <span className={`mono${data.lowStockItems > 0 ? ' negative' : ' positive'}`}>
-              {data.lowStockItems}
+            <span className={`mono${stockInfo.lowStockItems > 0 ? ' negative' : ' positive'}`}>
+              {stockInfo.lowStockItems}
             </span>
           </div>
         </div>

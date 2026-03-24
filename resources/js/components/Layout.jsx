@@ -103,6 +103,7 @@ export default function Layout({ user, setUser }) {
   const [userPanelOpen, setUserPanelOpen] = useState(false);
   const [storesList, setStoresList] = useState([]);
   const [storesReady, setStoresReady] = useState(false);
+  const [tenantsLoaded, setTenantsLoaded] = useState(false);
   const [selectedTenantCode, setSelectedTenantCode] = useState(localStorage.getItem('tenantCode') || user?.tenant_code || 'DEMO');
   const [selectedStoreId, setSelectedStoreId] = useState(localStorage.getItem('selectedStoreId') || '');
   const isSuperAdmin = (user?.roles || []).includes('superadmin');
@@ -172,11 +173,16 @@ export default function Layout({ user, setUser }) {
     loadStores();
   }, [selectedTenantCode]);
 
+  // Tenants & switchable users — lazy-load only when panel opens
   useEffect(() => {
-    loadTenants();
-    if (isSuperAdmin) {
-      loadSwitchableUsers(selectedTenantCode);
+    if (userPanelOpen && !tenantsLoaded) {
+      setTenantsLoaded(true);
+      loadTenants();
+      if (isSuperAdmin) loadSwitchableUsers(selectedTenantCode);
     }
+  }, [userPanelOpen]);
+
+  useEffect(() => {
     eagerPrefetchAll();
   }, []);
 
@@ -466,13 +472,7 @@ export default function Layout({ user, setUser }) {
 
         {/* PAGE CONTENT */}
         <div className="content">
-          {storesReady ? (
-            <Outlet context={{ setLowStockCount, user, setUser, storesList, selectedStoreId, selectedStore }} />
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-              <div style={{ width: 36, height: 36, border: '3px solid var(--border2)', borderTopColor: 'var(--gold)', borderRadius: '50%', animation: 'spin .6s linear infinite' }} />
-            </div>
-          )}
+          <Outlet context={{ setLowStockCount, user, setUser, storesList, selectedStoreId, selectedStore, storesReady }} />
         </div>
       </div>
     </div>

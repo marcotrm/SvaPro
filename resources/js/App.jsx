@@ -25,8 +25,19 @@ import Layout from './components/Layout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Use cached user for instant first render — no spinner
+  const [user, setUser] = useState(() => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const raw = localStorage.getItem('user');
+      if (token && raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  });
+  const [loading, setLoading] = useState(() => {
+    // If we have a cached user, skip the loading spinner entirely
+    return !(localStorage.getItem('authToken') && localStorage.getItem('user'));
+  });
 
   const routeFallback = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 240 }}>
@@ -35,7 +46,6 @@ export default function App() {
   );
 
   useEffect(() => {
-    // Check if user is already logged in
     const checkAuth = async () => {
       const token = localStorage.getItem('authToken');
       if (token) {
@@ -51,6 +61,7 @@ export default function App() {
           localStorage.removeItem('user');
           localStorage.removeItem('tenantCode');
           localStorage.removeItem('selectedStoreId');
+          setUser(null);
         }
       }
       setLoading(false);

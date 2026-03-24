@@ -105,6 +105,6 @@ export const eagerPrefetchAll = () => {
   eagerDone = true;
   // Stagger loads to avoid blocking the main thread
   EAGER_ROUTES.forEach((path, i) => {
-    setTimeout(() => prefetchRoute(path), 800 + i * 400);
+    setTimeout(() => prefetchRoute(path), 50 + i * 80);
   });
 };
