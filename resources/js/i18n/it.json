@@ -99,6 +99,13 @@
   "error_loading": "Errore nel caricamento dei dati",
   "retry": "Riprova",
   "loading": "Caricamento…",
+  "login_failed_check_credentials": "Login fallito. Controlla email e password.",
+  "login_seed_verified": "Seed verificato - login reale con API Laravel",
+  "login_secure_access": "Accesso sicuro con API Laravel",
+  "login_email_placeholder": "nome@azienda.it",
+  "login_password_placeholder": "**********",
+  "login_in_progress": "Accesso in corso...",
+  "stock_alerts": "Alert Stock",
 
   "products_below_threshold": "prodotti con stock sotto la soglia di riordino",
   "product_below_threshold": "prodotto con stock sotto la soglia di riordino",

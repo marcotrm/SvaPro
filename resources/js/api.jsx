@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 // API configuration
-export const API_URL = 'http://localhost:8000/api';
+const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
+export const API_URL = configuredApiUrl || '/api';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -35,6 +36,144 @@ const cacheKey = (path, params = {}) => {
 
 const clearApiCache = () => {
   responseCache.clear();
+};
+
+const OFFLINE_SALES_QUEUE_KEY = 'svapro.offline.sales.queue.v1';
+const OFFLINE_SALES_QUEUE_EVENT = 'svapro-offline-sales-queue-updated';
+let offlineSyncInitialized = false;
+let offlineSyncInProgress = false;
+
+const readOfflineSalesQueue = () => {
+  try {
+    const raw = localStorage.getItem(OFFLINE_SALES_QUEUE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeOfflineSalesQueue = (items) => {
+  localStorage.setItem(OFFLINE_SALES_QUEUE_KEY, JSON.stringify(items));
+  window.dispatchEvent(new CustomEvent(OFFLINE_SALES_QUEUE_EVENT, {
+    detail: { size: items.length },
+  }));
+};
+
+const isOfflineSalesRequest = (config) => {
+  const method = (config?.method || 'get').toLowerCase();
+  const url = String(config?.url || '');
+  return method === 'post' && /\/orders\/place(?:\?|$)/.test(url);
+};
+
+const queueOfflineSale = (config) => {
+  const queue = readOfflineSalesQueue();
+  const id = `ofs_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const item = {
+    id,
+    url: String(config?.url || '/orders/place'),
+    method: 'post',
+    data: config?.data ?? null,
+    params: config?.params ?? {},
+    headers: {
+      'X-Tenant-Code': config?.headers?.['X-Tenant-Code'] || getTenantCode(),
+      'X-Store-Id': config?.headers?.['X-Store-Id'] || '',
+    },
+    created_at: new Date().toISOString(),
+  };
+
+  queue.push(item);
+  writeOfflineSalesQueue(queue);
+
+  return item;
+};
+
+const buildOfflineQueuedResponse = (config, queueItem) => ({
+  status: 202,
+  statusText: 'Accepted (offline queued)',
+  headers: {},
+  config,
+  data: {
+    offline_queued: true,
+    offline_queue_id: queueItem.id,
+    message: 'Vendita salvata offline. Verra sincronizzata automaticamente al ritorno della connessione.',
+  },
+});
+
+export const getOfflineSalesQueueSize = () => readOfflineSalesQueue().length;
+
+export const onOfflineSalesQueueChanged = (callback) => {
+  const handler = (event) => {
+    callback?.(event?.detail?.size ?? getOfflineSalesQueueSize());
+  };
+  window.addEventListener(OFFLINE_SALES_QUEUE_EVENT, handler);
+  return () => window.removeEventListener(OFFLINE_SALES_QUEUE_EVENT, handler);
+};
+
+export const syncOfflineSalesNow = async () => {
+  if (offlineSyncInProgress) {
+    return { synced: 0, failed: 0, remaining: getOfflineSalesQueueSize() };
+  }
+
+  if (!navigator.onLine) {
+    return { synced: 0, failed: 0, remaining: getOfflineSalesQueueSize() };
+  }
+
+  offlineSyncInProgress = true;
+
+  let queue = readOfflineSalesQueue();
+  let synced = 0;
+  let failed = 0;
+  const nextQueue = [];
+
+  for (const item of queue) {
+    try {
+      await api.request({
+        url: item.url,
+        method: item.method,
+        data: item.data,
+        params: item.params,
+        headers: {
+          ...(item.headers || {}),
+          'X-Sync-Source': 'offline-queue',
+        },
+        __skipOfflineQueue: true,
+      });
+      synced += 1;
+    } catch (error) {
+      // Network errors keep the remaining queue for next retry.
+      if (!error?.response) {
+        nextQueue.push(item, ...queue.slice(queue.indexOf(item) + 1));
+        failed += 1;
+        break;
+      }
+
+      // Validation/business failures are dropped to avoid permanent blocking.
+      failed += 1;
+      console.error('Offline sale dropped after sync failure:', item.id, error?.response?.status);
+    }
+  }
+
+  writeOfflineSalesQueue(nextQueue);
+  offlineSyncInProgress = false;
+
+  return {
+    synced,
+    failed,
+    remaining: nextQueue.length,
+  };
+};
+
+export const initOfflineSalesSync = () => {
+  if (offlineSyncInitialized) {
+    return;
+  }
+
+  offlineSyncInitialized = true;
+
+  window.addEventListener('online', () => {
+    syncOfflineSalesNow().catch(() => {});
+  });
 };
 
 /**
@@ -212,6 +351,12 @@ api.interceptors.response.use(
       localStorage.removeItem('selectedStoreId');
       window.location.href = '/login';
     }
+
+    if (!error.response && isOfflineSalesRequest(originalRequest) && !originalRequest.__skipOfflineQueue) {
+      const queued = queueOfflineSale(originalRequest);
+      return Promise.resolve(buildOfflineQueuedResponse(originalRequest, queued));
+    }
+
     return Promise.reject(error);
   }
 );
@@ -247,10 +392,13 @@ export const stores = {
 
 // Order APIs
 export const orders = {
+  getOptions: (params = {}) => cachedGet('/orders/options', params, 30000, 120000),
   getOrders: (params = {}) => cachedGet('/orders', params, 15000, 120000),
   getOrder: (id) => api.get(`/orders/${id}`),
   quote: (data) => api.post('/orders/quote', data),
   place: (data) => api.post('/orders/place', data),
+  getStockAlerts: (params = {}) => cachedGet('/orders/stock-alerts', params, 10000, 60000),
+  resolveStockAlert: (alertId) => api.post(`/orders/stock-alerts/${alertId}/resolve`),
 };
 
 // Inventory APIs

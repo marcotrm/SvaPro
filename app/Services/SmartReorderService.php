@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class SmartReorderService
 {
@@ -75,6 +78,12 @@ class SmartReorderService
                 $suggestedQty = max(0, $targetStock - $available);
                 if ($suggestedQty === 0) {
                     continue;
+                }
+
+                // Cap massimo configurabile per negozio o prodotto
+                $maxQty = (int) ($store->smart_reorder_max_qty ?? 0);
+                if ($maxQty > 0) {
+                    $suggestedQty = min($suggestedQty, $maxQty);
                 }
 
                 $alerts[] = [
@@ -213,5 +222,122 @@ class SmartReorderService
     private function centralSupplierId(): int
     {
         return (int) config('services.smart_inventory.central_supplier_id', 0);
+    }
+
+    /**
+     * Esporta le suggerimenti di riordino come CSV.
+     */
+    public function exportCsv(int $tenantId): string
+    {
+        $preview = $this->previewForTenant($tenantId);
+        $alerts = $preview['alerts'];
+
+        $csv = "Negozio;Magazzino;Prodotto;Variante ID;Disponibile;Soglia;Suggerito;Fornitore;Costo Un.\n";
+
+        foreach ($alerts as $alert) {
+            $csv .= implode(';', [
+                $alert['store_name'],
+                $alert['warehouse_name'],
+                $alert['product_name'],
+                $alert['product_variant_id'],
+                $alert['available'],
+                $alert['threshold'],
+                $alert['suggested_qty'],
+                $alert['supplier_id'] ?? '',
+                number_format($alert['unit_cost'], 2, ',', ''),
+            ]) . "\n";
+        }
+
+        return $csv;
+    }
+
+    /**
+     * Esporta le suggerimenti come PDF.
+     */
+    public function exportPdf(int $tenantId): string
+    {
+        $preview = $this->previewForTenant($tenantId);
+        $alerts = $preview['alerts'];
+        $tenant = DB::table('tenants')->where('id', $tenantId)->first();
+        $tenantName = htmlspecialchars($tenant->name ?? 'SvaPro', ENT_QUOTES, 'UTF-8');
+        $date = now()->format('d/m/Y H:i');
+
+        $rowsHtml = '';
+        foreach ($alerts as $a) {
+            $rowsHtml .= '<tr>'
+                . '<td style="padding:3px 6px;border-bottom:1px solid #ddd;">' . htmlspecialchars($a['store_name'], ENT_QUOTES, 'UTF-8') . '</td>'
+                . '<td style="padding:3px 6px;border-bottom:1px solid #ddd;">' . htmlspecialchars($a['product_name'], ENT_QUOTES, 'UTF-8') . '</td>'
+                . '<td style="padding:3px 6px;border-bottom:1px solid #ddd;text-align:right;">' . $a['available'] . '</td>'
+                . '<td style="padding:3px 6px;border-bottom:1px solid #ddd;text-align:right;">' . $a['threshold'] . '</td>'
+                . '<td style="padding:3px 6px;border-bottom:1px solid #ddd;text-align:right;font-weight:bold;">' . $a['suggested_qty'] . '</td>'
+                . '<td style="padding:3px 6px;border-bottom:1px solid #ddd;text-align:right;">€ ' . number_format($a['unit_cost'], 2, ',', '.') . '</td>'
+                . '</tr>';
+        }
+
+        $html = <<<HTML
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Smart Reorder</title></head>
+<body style="font-family:DejaVu Sans,sans-serif;font-size:11px;margin:25px;">
+<h2>{$tenantName} — Report Riordino Intelligente</h2>
+<p style="color:#666;font-size:10px;">Generato il {$date} — {$this->count($alerts)} prodotti sotto soglia</p>
+<table style="width:100%;border-collapse:collapse;margin-top:15px;">
+<thead><tr style="background:#f0f0f0;">
+<th style="padding:5px 6px;text-align:left;border-bottom:2px solid #333;">Negozio</th>
+<th style="padding:5px 6px;text-align:left;border-bottom:2px solid #333;">Prodotto</th>
+<th style="padding:5px 6px;text-align:right;border-bottom:2px solid #333;">Disp.</th>
+<th style="padding:5px 6px;text-align:right;border-bottom:2px solid #333;">Soglia</th>
+<th style="padding:5px 6px;text-align:right;border-bottom:2px solid #333;">Suggerito</th>
+<th style="padding:5px 6px;text-align:right;border-bottom:2px solid #333;">Costo</th>
+</tr></thead>
+<tbody>{$rowsHtml}</tbody>
+</table></body></html>
+HTML;
+
+        return Pdf::loadHTML($html)->setPaper('A4', 'landscape')->output();
+    }
+
+    /**
+     * Invia email al fornitore con il riepilogo degli articoli da riordinare.
+     */
+    public function emailSupplier(int $tenantId, int $supplierId, array $alerts): bool
+    {
+        $supplier = DB::table('suppliers')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $supplierId)
+            ->first();
+
+        if (! $supplier || empty($supplier->email)) {
+            return false;
+        }
+
+        $tenant = DB::table('tenants')->where('id', $tenantId)->first();
+        $tenantName = $tenant->name ?? 'SvaPro';
+
+        $body = "Gentile {$supplier->name},\n\n";
+        $body .= "Di seguito l'elenco dei prodotti da riordinare per {$tenantName}:\n\n";
+
+        foreach ($alerts as $alert) {
+            $body .= "- {$alert['product_name']} — Qtà suggerita: {$alert['suggested_qty']} — Costo un.: €" . number_format($alert['unit_cost'], 2, ',', '.') . "\n";
+        }
+
+        $body .= "\nGrazie per la collaborazione.\n{$tenantName}";
+
+        try {
+            Mail::raw($body, function ($message) use ($supplier, $tenantName) {
+                $message->to($supplier->email)
+                    ->subject("Richiesta Riordino — {$tenantName}");
+            });
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Smart reorder email to supplier failed', [
+                'supplier_id' => $supplierId,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    private function count(array $arr): int
+    {
+        return count($arr);
     }
 }

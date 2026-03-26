@@ -72,6 +72,17 @@ class CoreSetupSeeder extends Seeder
             ['code' => 'inventory.manage', 'name' => 'Gestione inventario'],
             ['code' => 'employees.manage', 'name' => 'Gestione dipendenti'],
             ['code' => 'loyalty.manage', 'name' => 'Gestione loyalty'],
+            ['code' => 'catalog.manage', 'name' => 'Gestione catalogo'],
+            ['code' => 'customers.manage', 'name' => 'Gestione clienti'],
+            ['code' => 'suppliers.manage', 'name' => 'Gestione fornitori'],
+            ['code' => 'purchase_orders.manage', 'name' => 'Gestione ordini acquisto'],
+            ['code' => 'pos_sessions.manage', 'name' => 'Gestione sessioni POS'],
+            ['code' => 'invoices.manage', 'name' => 'Gestione fatture e SDI'],
+            ['code' => 'documents.generate', 'name' => 'Generazione documenti'],
+            ['code' => 'reports.view', 'name' => 'Visualizzazione report'],
+            ['code' => 'shipping.manage', 'name' => 'Gestione spedizioni'],
+            ['code' => 'audit.view', 'name' => 'Visualizzazione audit log'],
+            ['code' => 'roles.manage', 'name' => 'Gestione ruoli e permessi'],
         ];
 
         foreach ($permissions as $permission) {
@@ -146,6 +157,34 @@ class CoreSetupSeeder extends Seeder
         foreach ($allPermissionIds as $permissionId) {
             DB::table('role_permissions')->updateOrInsert(
                 ['role_id' => $superAdminRoleId, 'permission_id' => $permissionId],
+                ['created_at' => $now, 'updated_at' => $now]
+            );
+        }
+
+        // Admin Cliente: tutto tranne tenant.manage e roles.manage
+        $adminPermCodes = [
+            'tax.manage', 'orders.manage', 'inventory.manage', 'employees.manage',
+            'loyalty.manage', 'catalog.manage', 'customers.manage', 'suppliers.manage',
+            'purchase_orders.manage', 'pos_sessions.manage', 'invoices.manage',
+            'documents.generate', 'reports.view', 'shipping.manage', 'audit.view',
+        ];
+        $adminPermIds = DB::table('permissions')->whereIn('code', $adminPermCodes)->pluck('id')->all();
+        foreach ($adminPermIds as $permissionId) {
+            DB::table('role_permissions')->updateOrInsert(
+                ['role_id' => $adminClienteRoleId, 'permission_id' => $permissionId],
+                ['created_at' => $now, 'updated_at' => $now]
+            );
+        }
+
+        // Dipendente: operazioni quotidiane
+        $dipPermCodes = [
+            'orders.manage', 'inventory.manage', 'pos_sessions.manage',
+            'customers.manage', 'documents.generate',
+        ];
+        $dipPermIds = DB::table('permissions')->whereIn('code', $dipPermCodes)->pluck('id')->all();
+        foreach ($dipPermIds as $permissionId) {
+            DB::table('role_permissions')->updateOrInsert(
+                ['role_id' => $dipendenteRoleId, 'permission_id' => $permissionId],
                 ['created_at' => $now, 'updated_at' => $now]
             );
         }

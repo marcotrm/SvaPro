@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
+import { useTranslation } from '../i18n/index.jsx';
 
 const navGroups = [
   {
@@ -27,6 +28,10 @@ const navGroups = [
       {
         label: 'Ordini', href: '/orders',
         icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zm14 15a2 2 0 11-4 0 2 2 0 014 0zM5 17a2 2 0 110-4 2 2 0 010 4z"/></svg>,
+      },
+      {
+        label: 'Alert Stock', href: '/orders/stock-alerts',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l6.518 11.591c.75 1.334-.213 2.99-1.743 2.99H3.482c-1.53 0-2.493-1.656-1.743-2.99L8.257 3.1zM11 14a1 1 0 10-2 0 1 1 0 002 0zm-1-7a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/></svg>,
       },
       {
         label: 'Clienti', href: '/customers',
@@ -78,6 +83,7 @@ const pageTitles = {
   '/': 'Dashboard',
   '/catalog': 'Prodotti',
   '/orders': 'Ordini',
+  '/orders/stock-alerts': 'Alert Stock',
   '/inventory': 'Magazzino',
   '/inventory/smart-reorder': 'Smart Reorder',
   '/customers': 'Clienti',
@@ -92,7 +98,28 @@ const pageTitles = {
   '/reports': 'Report & Export',
 };
 
+const labelToI18nKey = {
+  Principale: 'main',
+  Vendite: 'sales',
+  Analisi: 'analysis',
+  Gestione: 'management',
+  Dashboard: 'dashboard',
+  Prodotti: 'products',
+  Magazzino: 'warehouse',
+  Ordini: 'orders',
+  'Alert Stock': 'stock_alerts',
+  Clienti: 'customers',
+  Fatture: 'invoices',
+  'Smart Reorder': 'smart_reorder',
+  Loyalty: 'loyalty',
+  'Push Monitor': 'push_monitor',
+  'Report & Export': 'reports',
+  Dipendenti: 'employees',
+  'Registro Attività': 'audit_log',
+};
+
 export default function Layout({ user, setUser }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [lowStockCount, setLowStockCount] = useState(0);
@@ -271,7 +298,9 @@ export default function Layout({ user, setUser }) {
   const primaryRole = user?.roles?.[0] || 'operatore';
 
   const tenantCode = selectedTenantCode || localStorage.getItem('tenantCode') || 'DEMO';
-  const pageTitle = pageTitles[location.pathname] || 'Dashboard';
+  const pageTitle = t(labelToI18nKey[pageTitles[location.pathname] || 'Dashboard'] || (pageTitles[location.pathname] || 'Dashboard'));
+
+  const trLabel = (label) => t(labelToI18nKey[label] || label);
 
   return (
     <div className="app">
@@ -288,7 +317,7 @@ export default function Layout({ user, setUser }) {
         <nav className="nav">
           {navGroups.map(group => (
             <React.Fragment key={group.label}>
-              <div className="nav-label">{group.label}</div>
+              <div className="nav-label">{trLabel(group.label)}</div>
               {group.items.map(item => {
                 const isActive = item.href === '/'
                   ? location.pathname === '/'
@@ -302,7 +331,7 @@ export default function Layout({ user, setUser }) {
                     onClick={e => { e.preventDefault(); navigate(item.href); }}
                   >
                     {item.icon}
-                    {item.label}
+                    {trLabel(item.label)}
                     {item.badge && lowStockCount > 0 && (
                       <span className="nav-badge">{lowStockCount}</span>
                     )}

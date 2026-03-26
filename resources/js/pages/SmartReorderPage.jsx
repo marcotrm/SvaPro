@@ -127,7 +127,7 @@ export default function SmartReorderPage() {
           <span className="badge mid" style={{marginLeft:8}}>{suggestedOrders.length}</span>
           {suggestedOrders.length > 0 && (
             <span style={{marginLeft:'auto',fontSize:13,fontWeight:700,color:'var(--gold)',fontFamily:'IBM Plex Mono, monospace'}}>
-              Totale: â‚¬{totalCost.toFixed(2)}
+              Totale: €{totalCost.toFixed(2)}
             </span>
           )}
         </div>
@@ -137,7 +137,7 @@ export default function SmartReorderPage() {
               <th>Magazzino</th>
               <th>Fornitore</th>
               <th>Prodotto</th>
-              <th>QuantitÃ </th>
+              <th>Quantita</th>
               <th>Costo unitario</th>
               <th>Totale</th>
             </tr>
@@ -149,8 +149,8 @@ export default function SmartReorderPage() {
                 <td style={{color:'var(--muted2)'}}>{order.supplier_name}</td>
                 <td style={{color:'var(--muted2)'}}>{order.product_name}</td>
                 <td><span className="mono" style={{color:'var(--text)'}}>{order.suggested_qty}</span></td>
-                <td><span className="mono" style={{color:'var(--muted2)'}}>â‚¬{order.unit_cost?.toFixed(2)}</span></td>
-                <td><span className="mono positive">â‚¬{(order.suggested_qty * order.unit_cost)?.toFixed(2)}</span></td>
+                <td><span className="mono" style={{color:'var(--muted2)'}}>€{order.unit_cost?.toFixed(2)}</span></td>
+                <td><span className="mono positive">€{(order.suggested_qty * order.unit_cost)?.toFixed(2)}</span></td>
               </tr>
             )) : (
               <tr>

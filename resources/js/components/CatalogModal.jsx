@@ -172,7 +172,7 @@ export default function CatalogModal({ product, storesList = [], selectedStoreId
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-screen overflow-y-auto">
+      <div className="bg-white modal-light rounded-lg shadow-xl w-full max-w-5xl max-h-screen overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 flex items-center justify-between p-6 border-b border-gray-200 bg-white">
           <h2 className="text-xl font-bold text-gray-900">

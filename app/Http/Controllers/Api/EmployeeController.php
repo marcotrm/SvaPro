@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\AuditLogger;
+use App\Services\EmployeeNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -184,5 +185,53 @@ class EmployeeController extends Controller
                 DB::raw('COALESCE(sales_stats.total_margin, 0) as total_margin'),
                 'sales_stats.last_sale_at',
             ]);
+    }
+
+    public function notifications(Request $request, int $employeeId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        if (! DB::table('employees')->where('tenant_id', $tenantId)->where('id', $employeeId)->exists()) {
+            return response()->json(['message' => 'Dipendente non trovato.'], 404);
+        }
+
+        $svc = new EmployeeNotificationService();
+        $unread = $svc->getUnread($tenantId, $employeeId, 50);
+
+        $all = DB::table('employee_notifications')
+            ->where('tenant_id', $tenantId)
+            ->where('employee_id', $employeeId)
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'unread_count' => count($unread),
+            'data' => $all,
+        ]);
+    }
+
+    public function markNotificationRead(Request $request, int $employeeId, int $notificationId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $svc = new EmployeeNotificationService();
+        $marked = $svc->markAsRead($tenantId, $employeeId, $notificationId);
+
+        if (! $marked) {
+            return response()->json(['message' => 'Notifica non trovata.'], 404);
+        }
+
+        return response()->json(['message' => 'Notifica letta.']);
+    }
+
+    public function markAllNotificationsRead(Request $request, int $employeeId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $svc = new EmployeeNotificationService();
+        $count = $svc->markAllAsRead($tenantId, $employeeId);
+
+        return response()->json(['message' => $count . ' notifiche segnate come lette.']);
     }
 }

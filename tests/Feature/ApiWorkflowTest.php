@@ -277,6 +277,54 @@ class ApiWorkflowTest extends TestCase
         $this->assertSame($beforeCount + 1, DB::table('sales_orders')->count());
     }
 
+    public function test_stock_alerts_can_be_listed_and_resolved(): void
+    {
+        $headers = $this->authenticateAsSuperAdmin();
+
+        $response = $this->withHeaders($headers)->postJson('/api/orders/place', [
+            'channel' => 'pos',
+            'store_id' => 1,
+            'warehouse_id' => 1,
+            'status' => 'paid',
+            'lines' => [
+                ['product_variant_id' => 1, 'qty' => 999],
+            ],
+        ])->assertCreated();
+
+        $orderId = (int) $response->json('order_id');
+
+        $alertsResponse = $this->withHeaders($headers)
+            ->getJson('/api/orders/stock-alerts?status=unresolved&limit=50');
+
+        $alertsResponse->assertOk();
+
+        $createdAlert = collect($alertsResponse->json('data'))
+            ->first(fn ($alert) => (int) ($alert['sales_order_id'] ?? 0) === $orderId);
+
+        $this->assertNotNull($createdAlert);
+        $this->assertSame('insufficient_stock', $createdAlert['alert_type']);
+
+        $alertId = (int) $createdAlert['id'];
+
+        $this->withHeaders($headers)
+            ->postJson('/api/orders/stock-alerts/'.$alertId.'/resolve')
+            ->assertOk()
+            ->assertJsonPath('message', 'Alert risolto con successo.');
+
+        $this->assertDatabaseHas('sales_order_alerts', [
+            'id' => $alertId,
+            'sales_order_id' => $orderId,
+        ]);
+
+        $resolvedAt = DB::table('sales_order_alerts')->where('id', $alertId)->value('resolved_at');
+        $this->assertNotNull($resolvedAt);
+
+        $this->assertDatabaseHas('sales_orders', [
+            'id' => $orderId,
+            'has_stock_alert' => false,
+        ]);
+    }
+
     public function test_employee_cannot_adjust_inventory_manually(): void
     {
         $loginResponse = $this->postJson('/api/login', [
@@ -828,6 +876,52 @@ class ApiWorkflowTest extends TestCase
 
         $northStoresResponse->assertOk()
             ->assertJsonPath('data.0.name', 'Negozio Torino');
+    }
+
+    public function test_order_endpoints_list_options_and_place_flow_work(): void
+    {
+        $headers = $this->authenticateAsSuperAdmin();
+
+        $optionsResponse = $this->withHeaders($headers)->getJson('/api/orders/options?store_id=1');
+        $optionsResponse->assertOk()
+            ->assertJsonStructure([
+                'data' => [
+                    'customers',
+                    'employees',
+                    'warehouses',
+                    'variants',
+                ],
+            ]);
+
+        $warehouseId = (int) collect($optionsResponse->json('data.warehouses'))->first()['id'];
+        $variantId = (int) collect($optionsResponse->json('data.variants'))->first()['id'];
+
+        $createResponse = $this->withHeaders($headers)->postJson('/api/orders/place', [
+            'channel' => 'pos',
+            'store_id' => 1,
+            'warehouse_id' => $warehouseId,
+            'status' => 'paid',
+            'payment_method' => 'cash',
+            'lines' => [
+                [
+                    'product_variant_id' => $variantId,
+                    'qty' => 1,
+                ],
+            ],
+        ]);
+
+        $createResponse->assertCreated();
+
+        $orderId = (int) $createResponse->json('order_id');
+
+        $this->withHeaders($headers)->getJson('/api/orders?store_id=1&limit=20')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $orderId);
+
+        $this->withHeaders($headers)->getJson('/api/orders/'.$orderId)
+            ->assertOk()
+            ->assertJsonPath('data.id', $orderId)
+            ->assertJsonPath('data.lines.0.product_variant_id', $variantId);
     }
 
     private function authenticateAsSuperAdmin(): array

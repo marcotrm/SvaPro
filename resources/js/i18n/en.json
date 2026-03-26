@@ -99,6 +99,13 @@
   "error_loading": "Error loading data",
   "retry": "Retry",
   "loading": "Loading…",
+  "login_failed_check_credentials": "Login failed. Check email and password.",
+  "login_seed_verified": "Seed verified - real login via Laravel API",
+  "login_secure_access": "Secure access via Laravel API",
+  "login_email_placeholder": "name@company.com",
+  "login_password_placeholder": "**********",
+  "login_in_progress": "Signing in...",
+  "stock_alerts": "Stock Alerts",
 
   "products_below_threshold": "products with stock below reorder threshold",
   "product_below_threshold": "product with stock below reorder threshold",

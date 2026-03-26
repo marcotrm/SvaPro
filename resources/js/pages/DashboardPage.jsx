@@ -90,7 +90,8 @@ export default function DashboardPage() {
     if (status === 'draft')   return <span className="badge mid"><span className="badge-dot"></span>Bozza</span>;
     return                           <span className="badge low"><span className="badge-dot"></span>Pendente</span>;
   };
-
+  const revenueDelta = kpi?.delta_revenue ?? kpi?.revenue_delta;
+  const ordersDelta = kpi?.delta_orders ?? kpi?.orders_delta;
   return (
     <>
       {/* ── KPI GRID ── */}
@@ -101,9 +102,9 @@ export default function DashboardPage() {
           <div className="kpi-value gold">
             €{(kpi?.revenue ?? totalRevenue).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          {kpi?.revenue_delta != null
-            ? <span className={`kpi-delta ${kpi.revenue_delta >= 0 ? 'up' : 'down'}`}>
-                {kpi.revenue_delta >= 0 ? '↑' : '↓'} {Math.abs(kpi.revenue_delta).toFixed(1)}%
+          {revenueDelta != null
+            ? <span className={`kpi-delta ${revenueDelta >= 0 ? 'up' : 'down'}`}>
+                {revenueDelta >= 0 ? '↑' : '↓'} {Math.abs(revenueDelta).toFixed(1)}%
               </span>
             : <span className="kpi-delta up">↑ live</span>}
         </div>
@@ -111,9 +112,9 @@ export default function DashboardPage() {
         <div className="kpi-card">
           <div className="kpi-label">Ordini</div>
           <div className="kpi-value">{kpi?.orders ?? recentOrders.length}</div>
-          {kpi?.orders_delta != null
-            ? <span className={`kpi-delta ${kpi.orders_delta >= 0 ? 'up' : 'down'}`}>
-                {kpi.orders_delta >= 0 ? '↑' : '↓'} {Math.abs(kpi.orders_delta).toFixed(1)}%
+          {ordersDelta != null
+            ? <span className={`kpi-delta ${ordersDelta >= 0 ? 'up' : 'down'}`}>
+                {ordersDelta >= 0 ? '↑' : '↓'} {Math.abs(ordersDelta).toFixed(1)}%
               </span>
             : <span className="kpi-delta up">Totale</span>}
         </div>

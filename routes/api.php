@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\InventoryController;
@@ -12,14 +13,18 @@ use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RolesPermissionsController;
+use App\Http\Controllers\Api\PosSessionController;
+use App\Http\Controllers\Api\PurchaseOrderController;
 use App\Http\Controllers\Api\ShippingController;
 use App\Http\Controllers\Api\SmartInventoryController;
 use App\Http\Controllers\Api\StoreController;
+use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\SupplierInvoiceController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
 
-Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
+Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
@@ -28,6 +33,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         Route::get('/tenants', [StoreController::class, 'tenants']);
         Route::get('/tenants/health', [StoreController::class, 'tenantHealth']);
         Route::get('/audit-logs', [AuditController::class, 'index']);
+        Route::get('/audit-logs/filters', [AuditController::class, 'filters']);
+        Route::get('/audit-logs/{logId}', [AuditController::class, 'show']);
         Route::get('/tenant-settings', [StoreController::class, 'tenantSettings']);
         Route::put('/tenant-settings', [StoreController::class, 'updateTenantSettings']);
         Route::get('/roles-permissions', [RolesPermissionsController::class, 'matrix']);
@@ -38,18 +45,42 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         Route::get('/loyalty/monitoring/push-stats', [LoyaltyController::class, 'pushMonitoringStats']);
 
         Route::get('/catalog/products', [CatalogController::class, 'index']);
-        Route::post('/catalog/products', [CatalogController::class, 'store']);
-        Route::put('/catalog/products/{productId}', [CatalogController::class, 'update']);
+        Route::get('/catalog/brands', [CatalogController::class, 'brands']);
+        Route::get('/catalog/categories', [CatalogController::class, 'categories']);
+        Route::get('/catalog/tax-classes', [CatalogController::class, 'taxClasses']);
+        Route::post('/catalog/products', [CatalogController::class, 'store'])->middleware('permission:catalog.manage');
+        Route::put('/catalog/products/{productId}', [CatalogController::class, 'update'])->middleware('permission:catalog.manage');
 
         Route::get('/customers', [CustomerController::class, 'index']);
         Route::get('/customers/analytics/return-frequency', [CustomerController::class, 'returnFrequencyAnalytics']);
         Route::post('/customers', [CustomerController::class, 'store']);
         Route::put('/customers/{customerId}', [CustomerController::class, 'update']);
+        Route::post('/customers/{customerId}/otp/send', [CustomerController::class, 'sendOtp']);
+        Route::post('/customers/{customerId}/otp/verify', [CustomerController::class, 'verifyOtp']);
 
         Route::get('/employees', [EmployeeController::class, 'index']);
         Route::get('/employees/analytics/top-performers', [EmployeeController::class, 'topPerformers']);
         Route::post('/employees', [EmployeeController::class, 'store']);
         Route::put('/employees/{employeeId}', [EmployeeController::class, 'update']);
+        Route::get('/employees/{employeeId}/notifications', [EmployeeController::class, 'notifications']);
+        Route::post('/employees/{employeeId}/notifications/{notificationId}/read', [EmployeeController::class, 'markNotificationRead']);
+        Route::post('/employees/{employeeId}/notifications/read-all', [EmployeeController::class, 'markAllNotificationsRead']);
+
+        // Suppliers
+        Route::get('/suppliers', [SupplierController::class, 'index']);
+        Route::get('/suppliers/{supplierId}', [SupplierController::class, 'show']);
+        Route::post('/suppliers', [SupplierController::class, 'store']);
+        Route::put('/suppliers/{supplierId}', [SupplierController::class, 'update']);
+        Route::delete('/suppliers/{supplierId}', [SupplierController::class, 'destroy']);
+
+        // Purchase Orders
+        Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
+        Route::get('/purchase-orders/{poId}', [PurchaseOrderController::class, 'show']);
+        Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
+        Route::put('/purchase-orders/{poId}', [PurchaseOrderController::class, 'update']);
+        Route::post('/purchase-orders/{poId}/send', [PurchaseOrderController::class, 'send']);
+        Route::post('/purchase-orders/{poId}/receive', [PurchaseOrderController::class, 'receive']);
+        Route::post('/purchase-orders/{poId}/cancel', [PurchaseOrderController::class, 'cancel']);
 
         Route::get('/shipping/carriers', [ShippingController::class, 'carriers']);
         Route::post('/shipping/carriers', [ShippingController::class, 'storeCarrier']);
@@ -57,11 +88,17 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         Route::post('/shipping/shipments', [ShippingController::class, 'createShipment']);
         Route::put('/shipping/shipments/{shipmentId}', [ShippingController::class, 'updateShipmentStatus']);
 
-        Route::post('/inventory/adjust', [InventoryController::class, 'adjust']);
+        Route::post('/inventory/adjust', [InventoryController::class, 'adjust'])->middleware('permission:inventory.manage');
+
+        Route::get('/orders/stock-alerts', [OrderController::class, 'stockAlerts']);
+        Route::post('/orders/stock-alerts/{alertId}/resolve', [OrderController::class, 'resolveStockAlert']);
 
         Route::get('/inventory/smart-reorder/preview', [SmartInventoryController::class, 'preview']);
-        Route::post('/inventory/smart-reorder/run', [SmartInventoryController::class, 'run']);
-        Route::post('/inventory/smart-reorder/run-auto', [SmartInventoryController::class, 'runAutoToCentral']);
+        Route::post('/inventory/smart-reorder/run', [SmartInventoryController::class, 'run'])->middleware('permission:inventory.manage');
+        Route::post('/inventory/smart-reorder/run-auto', [SmartInventoryController::class, 'runAutoToCentral'])->middleware('permission:inventory.manage');
+        Route::get('/inventory/smart-reorder/export-csv', [SmartInventoryController::class, 'exportCsv']);
+        Route::get('/inventory/smart-reorder/export-pdf', [SmartInventoryController::class, 'exportPdf']);
+        Route::post('/inventory/smart-reorder/email-supplier', [SmartInventoryController::class, 'emailSupplier']);
 
         // Exports
         Route::get('/export/orders', [ExportController::class, 'exportOrders']);
@@ -72,6 +109,20 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         Route::get('/invoices', [InvoiceController::class, 'index']);
         Route::post('/invoices/generate', [InvoiceController::class, 'generate']);
         Route::get('/invoices/{id}/download', [InvoiceController::class, 'download']);
+        Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail']);
+        Route::post('/invoices/{id}/send-sdi', [InvoiceController::class, 'sendToSdi']);
+        Route::post('/invoices/{id}/mark-paid', [InvoiceController::class, 'markPaid']);
+
+        // Supplier Invoices (Fatture Passive)
+        Route::get('/supplier-invoices', [SupplierInvoiceController::class, 'index']);
+        Route::get('/supplier-invoices/{id}', [SupplierInvoiceController::class, 'show']);
+        Route::post('/supplier-invoices', [SupplierInvoiceController::class, 'store']);
+        Route::put('/supplier-invoices/{id}', [SupplierInvoiceController::class, 'update']);
+        Route::post('/supplier-invoices/{id}/mark-paid', [SupplierInvoiceController::class, 'markPaid']);
+        Route::delete('/supplier-invoices/{id}', [SupplierInvoiceController::class, 'destroy']);
+
+        // Documents
+        Route::post('/documents/generate', [DocumentController::class, 'generate']);
 
         // Reports
         Route::get('/reports/revenue-trend', [ReportController::class, 'revenueTrend']);
@@ -84,8 +135,17 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         Route::get('/inventory/stock', [InventoryController::class, 'index']);
         Route::get('/inventory/movements', [InventoryController::class, 'movements']);
 
+        Route::get('/orders/options', [OrderController::class, 'options']);
+        Route::get('/orders', [OrderController::class, 'index']);
+        Route::get('/orders/{orderId}', [OrderController::class, 'show']);
         Route::post('/orders/quote', [OrderController::class, 'quote']);
         Route::post('/orders/place', [OrderController::class, 'place']);
+
+        // POS Sessions
+        Route::get('/pos/sessions', [PosSessionController::class, 'index']);
+        Route::get('/pos/active', [PosSessionController::class, 'active']);
+        Route::post('/pos/open', [PosSessionController::class, 'open']);
+        Route::post('/pos/sessions/{sessionId}/close', [PosSessionController::class, 'close']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente,cliente_finale')->group(function () {

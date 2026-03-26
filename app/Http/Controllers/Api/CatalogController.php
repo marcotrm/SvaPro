@@ -11,6 +11,42 @@ use Illuminate\Support\Facades\Validator;
 
 class CatalogController extends Controller
 {
+    public function brands(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $rows = DB::table('brands')
+            ->where('tenant_id', $tenantId)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json(['data' => $rows]);
+    }
+
+    public function categories(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $rows = DB::table('categories')
+            ->where('tenant_id', $tenantId)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json(['data' => $rows]);
+    }
+
+    public function taxClasses(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $rows = DB::table('tax_classes')
+            ->where('tenant_id', $tenantId)
+            ->orderBy('name')
+            ->get(['id', 'code', 'name']);
+
+        return response()->json(['data' => $rows]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
@@ -142,6 +178,7 @@ class CatalogController extends Controller
             'sku' => ['required', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
             'product_type' => ['required', 'string', 'max:50'],
+            'pli_code' => ['nullable', 'string', 'max:50'],
             'barcode' => ['nullable', 'string', 'max:100'],
             'brand_id' => ['nullable', 'integer'],
             'category_id' => ['nullable', 'integer'],
@@ -250,6 +287,7 @@ class CatalogController extends Controller
             'barcode' => $request->input('barcode'),
             'name' => (string) $request->input('name'),
             'product_type' => (string) $request->input('product_type'),
+            'pli_code' => $request->input('pli_code'),
             'brand_id' => $request->input('brand_id'),
             'category_id' => $request->input('category_id'),
             'default_supplier_id' => $request->input('default_supplier_id'),

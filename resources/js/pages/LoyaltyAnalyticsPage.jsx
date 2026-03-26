@@ -108,8 +108,8 @@ export default function LoyaltyAnalyticsPage() {
           {/* Valore */}
           <div className="kpi-card">
             <div className="kpi-label">Valore Monetario</div>
-            <div className="kpi-value positive" style={{fontSize:32,marginTop:8}}>â‚¬{((wallet.current_points || 0) * 0.05).toFixed(2)}</div>
-            <div style={{fontSize:12,color:'var(--muted)',marginTop:4}}>0.05â‚¬ per punto</div>
+            <div className="kpi-value positive" style={{fontSize:32,marginTop:8}}>€{((wallet.current_points || 0) * 0.05).toFixed(2)}</div>
+            <div style={{fontSize:12,color:'var(--muted)',marginTop:4}}>0.05€ per punto</div>
           </div>
           {/* Stato carta */}
           <div className="kpi-card">
@@ -121,7 +121,7 @@ export default function LoyaltyAnalyticsPage() {
               </span>
             </div>
             <div style={{fontSize:11,color:'var(--muted)',marginTop:8,fontFamily:'IBM Plex Mono, monospace'}}>
-              {wallet.card_number ? `â€¢â€¢â€¢â€¢ ${wallet.card_number.slice(-4)}` : 'Nessuna carta'}
+              {wallet.card_number ? `**** ${wallet.card_number.slice(-4)}` : 'Nessuna carta'}
             </div>
           </div>
         </div>
@@ -193,7 +193,7 @@ export default function LoyaltyAnalyticsPage() {
                       {entry.type === 'earn' ? '+' : '-'}{entry.points}
                     </span>
                   </td>
-                  <td style={{color:'var(--muted)'}}>{entry.description || 'â€”'}</td>
+                  <td style={{color:'var(--muted)'}}>{entry.description || '—'}</td>
                 </tr>
               ))}
             </tbody>

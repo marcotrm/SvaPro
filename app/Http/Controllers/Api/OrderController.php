@@ -34,6 +34,256 @@ class OrderController extends Controller
 
         return response()->json($this->buildQuote($tenantId, (array) $request->input('lines')));
     }
+    
+    public function index(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'status' => ['nullable', 'in:all,draft,paid,pending'],
+            'store_id' => ['nullable', 'integer'],
+            'supplier_id' => ['nullable', 'integer'],
+            'product_type' => ['nullable', 'string', 'max:50'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'q' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $status = (string) ($request->input('status') ?: 'all');
+        $limit = (int) ($request->input('limit') ?: 80);
+        $term = trim((string) $request->input('q', ''));
+
+        $rows = DB::table('sales_orders as so')
+            ->leftJoin('customers as c', function ($join) use ($tenantId) {
+                $join->on('c.id', '=', 'so.customer_id')
+                    ->where('c.tenant_id', '=', $tenantId);
+            })
+            ->leftJoin('stores as st', function ($join) use ($tenantId) {
+                $join->on('st.id', '=', 'so.store_id')
+                    ->where('st.tenant_id', '=', $tenantId);
+            })
+            ->leftJoin('loyalty_ledger as ll', function ($join) {
+                $join->on('ll.order_id', '=', 'so.id')
+                    ->where('ll.event_type', '=', 'earn');
+            })
+            ->where('so.tenant_id', $tenantId)
+            ->when($status !== 'all', fn ($query) => $query->where('so.status', $status))
+            ->when($request->filled('store_id'), fn ($query) => $query->where('so.store_id', (int) $request->integer('store_id')))
+            ->when($request->filled('supplier_id'), function ($query) use ($request, $tenantId) {
+                // Filtra ordini che contengono prodotti del fornitore specificato
+                $supplierId = (int) $request->integer('supplier_id');
+                $query->whereExists(function ($sub) use ($supplierId, $tenantId) {
+                    $sub->select(DB::raw(1))
+                        ->from('sales_order_lines as sol_f')
+                        ->join('product_variants as pv_f', 'pv_f.id', '=', 'sol_f.product_variant_id')
+                        ->join('products as p_f', 'p_f.id', '=', 'pv_f.product_id')
+                        ->whereColumn('sol_f.sales_order_id', 'so.id')
+                        ->where('p_f.tenant_id', $tenantId)
+                        ->where('p_f.default_supplier_id', $supplierId);
+                });
+            })
+            ->when($request->filled('product_type'), function ($query) use ($request, $tenantId) {
+                // Filtra ordini che contengono il tipo prodotto specificato
+                $productType = (string) $request->input('product_type');
+                $query->whereExists(function ($sub) use ($productType, $tenantId) {
+                    $sub->select(DB::raw(1))
+                        ->from('sales_order_lines as sol_t')
+                        ->join('product_variants as pv_t', 'pv_t.id', '=', 'sol_t.product_variant_id')
+                        ->join('products as p_t', 'p_t.id', '=', 'pv_t.product_id')
+                        ->whereColumn('sol_t.sales_order_id', 'so.id')
+                        ->where('p_t.tenant_id', $tenantId)
+                        ->where('p_t.product_type', $productType);
+                });
+            })
+            ->when($term !== '', function ($query) use ($term) {
+                $query->where(function ($nested) use ($term) {
+                    $nested->where('so.id', 'like', '%'.$term.'%')
+                        ->orWhere('c.first_name', 'like', '%'.$term.'%')
+                        ->orWhere('c.last_name', 'like', '%'.$term.'%');
+                });
+            })
+            ->groupBy([
+                'so.id',
+                'so.store_id',
+                'so.customer_id',
+                'so.status',
+                'so.grand_total',
+                'so.currency',
+                'so.created_at',
+                'so.updated_at',
+                'c.first_name',
+                'c.last_name',
+                'st.id',
+                'st.name',
+            ])
+            ->select([
+                'so.id',
+                'so.store_id',
+                'so.customer_id',
+                'so.status',
+                'so.grand_total',
+                'so.currency',
+                'so.created_at',
+                'so.updated_at',
+                'c.first_name as customer_first_name',
+                'c.last_name as customer_last_name',
+                'st.id as warehouse_id',
+                'st.name as warehouse_name',
+                DB::raw('COALESCE(SUM(ll.points_delta), 0) as loyalty_points_awarded'),
+            ])
+            ->orderByDesc('so.created_at')
+            ->orderByDesc('so.id')
+            ->limit($limit)
+            ->get();
+
+        $data = $rows->map(fn ($row) => $this->mapOrderListRow($row))->values();
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function show(Request $request, int $orderId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $row = DB::table('sales_orders as so')
+            ->leftJoin('customers as c', function ($join) use ($tenantId) {
+                $join->on('c.id', '=', 'so.customer_id')
+                    ->where('c.tenant_id', '=', $tenantId);
+            })
+            ->leftJoin('stores as st', function ($join) use ($tenantId) {
+                $join->on('st.id', '=', 'so.store_id')
+                    ->where('st.tenant_id', '=', $tenantId);
+            })
+            ->leftJoin('loyalty_ledger as ll', function ($join) {
+                $join->on('ll.order_id', '=', 'so.id')
+                    ->where('ll.event_type', '=', 'earn');
+            })
+            ->where('so.tenant_id', $tenantId)
+            ->where('so.id', $orderId)
+            ->groupBy([
+                'so.id',
+                'so.store_id',
+                'so.customer_id',
+                'so.status',
+                'so.grand_total',
+                'so.currency',
+                'so.created_at',
+                'so.updated_at',
+                'c.first_name',
+                'c.last_name',
+                'st.id',
+                'st.name',
+            ])
+            ->select([
+                'so.id',
+                'so.store_id',
+                'so.customer_id',
+                'so.status',
+                'so.grand_total',
+                'so.currency',
+                'so.created_at',
+                'so.updated_at',
+                'c.first_name as customer_first_name',
+                'c.last_name as customer_last_name',
+                'st.id as warehouse_id',
+                'st.name as warehouse_name',
+                DB::raw('COALESCE(SUM(ll.points_delta), 0) as loyalty_points_awarded'),
+            ])
+            ->first();
+
+        if (! $row) {
+            return response()->json(['message' => 'Ordine non trovato.'], 404);
+        }
+
+        $lines = DB::table('sales_order_lines as sol')
+            ->leftJoin('product_variants as pv', 'pv.id', '=', 'sol.product_variant_id')
+            ->leftJoin('products as p', 'p.id', '=', 'pv.product_id')
+            ->where('sol.sales_order_id', $orderId)
+            ->select([
+                'sol.id',
+                'sol.product_variant_id',
+                'sol.qty',
+                'sol.unit_price',
+                'sol.discount_amount',
+                'sol.tax_amount',
+                'sol.excise_amount',
+                'sol.line_total',
+                'p.sku',
+                'p.name as product_name',
+                'pv.flavor',
+                'pv.resistance_ohm',
+            ])
+            ->get();
+
+        $data = $this->mapOrderListRow($row);
+        $data['lines'] = $lines;
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function options(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
+
+        $customers = DB::table('customers')
+            ->where('tenant_id', $tenantId)
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->limit(300)
+            ->get(['id', 'first_name', 'last_name']);
+
+        $employees = DB::table('employees')
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'active')
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->limit(300)
+            ->get(['id', 'first_name', 'last_name']);
+
+        $warehouses = DB::table('warehouses')
+            ->where('tenant_id', $tenantId)
+            ->when($storeId !== null, fn ($query) => $query->where('store_id', $storeId))
+            ->orderBy('name')
+            ->get(['id', 'store_id', 'name']);
+
+        $variantQuery = DB::table('product_variants as pv')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->where('pv.tenant_id', $tenantId)
+            ->select([
+                'pv.id',
+                'pv.sale_price',
+                'pv.flavor',
+                'pv.resistance_ohm',
+                'p.name as product_name',
+                'p.sku',
+            ])
+            ->orderByDesc('pv.id')
+            ->limit(600);
+
+        if ($storeId !== null) {
+            $variantQuery->join('store_product_variants as spv', function ($join) use ($tenantId, $storeId) {
+                $join->on('spv.product_variant_id', '=', 'pv.id')
+                    ->where('spv.tenant_id', '=', $tenantId)
+                    ->where('spv.store_id', '=', $storeId)
+                    ->where('spv.is_enabled', '=', true);
+            });
+        }
+
+        $variants = $variantQuery->get();
+
+        return response()->json([
+            'data' => [
+                'customers' => $customers,
+                'employees' => $employees,
+                'warehouses' => $warehouses,
+                'variants' => $variants,
+            ],
+        ]);
+    }
 
     public function place(Request $request): JsonResponse
     {
@@ -43,7 +293,7 @@ class OrderController extends Controller
             'channel' => ['required', 'in:web,pos'],
             'store_id' => ['nullable', 'integer'],
             'customer_id' => ['nullable', 'integer'],
-            'employee_id' => ['nullable', 'integer'],
+            'employee_id' => [$request->input('channel') === 'pos' ? 'required' : 'nullable', 'integer'],
             'warehouse_id' => ['required', 'integer'],
             'payment_method' => ['nullable', 'string', 'max:50'],
             'status' => ['nullable', 'in:draft,paid'],
@@ -85,6 +335,7 @@ class OrderController extends Controller
                 'store_id' => $request->input('store_id'),
                 'channel' => $request->input('channel'),
                 'customer_id' => $request->input('customer_id'),
+                'employee_id' => $request->input('employee_id'),
                 'status' => $status,
                 'currency' => 'EUR',
                 'subtotal' => $quote['totals']['subtotal'],
@@ -193,6 +444,18 @@ class OrderController extends Controller
 
                 if ($request->filled('customer_id')) {
                     $customerId = (int) $request->input('customer_id');
+
+                    // Aggiorna statistiche cliente per return analytics
+                    DB::table('customers')
+                        ->where('tenant_id', $tenantId)
+                        ->where('id', $customerId)
+                        ->update([
+                            'last_purchase_at' => $now,
+                            'total_orders' => DB::raw('total_orders + 1'),
+                            'total_spent' => DB::raw('total_spent + ' . (float) $quote['totals']['grand_total']),
+                            'updated_at' => $now,
+                        ]);
+
                     DB::table('loyalty_wallets')->updateOrInsert(
                         ['tenant_id' => $tenantId, 'customer_id' => $customerId],
                         ['points_balance' => 0, 'tier_code' => 'base', 'created_at' => $now, 'updated_at' => $now]
@@ -263,6 +526,14 @@ class OrderController extends Controller
                         'created_at' => $now,
                         'updated_at' => $now,
                     ]);
+
+                    (new \App\Services\EmployeeNotificationService())->notifySaleConfirmed(
+                        $tenantId,
+                        $employeeId,
+                        $orderId,
+                        (float) $quote['totals']['grand_total'],
+                        $employeePoints,
+                    );
                 }
             }
 
@@ -278,6 +549,148 @@ class OrderController extends Controller
             'has_stock_alert' => ! empty($stockAlerts),
             'stock_alerts' => $stockAlerts,
         ], 201);
+    }
+
+    public function stockAlerts(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'status' => ['nullable', 'in:all,resolved,unresolved'],
+            'store_id' => ['nullable', 'integer'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:500'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $status = (string) ($request->input('status') ?: 'unresolved');
+        $limit = (int) ($request->input('limit') ?: 120);
+
+        $query = DB::table('sales_order_alerts as soa')
+            ->join('sales_orders as so', 'so.id', '=', 'soa.sales_order_id')
+            ->where('soa.tenant_id', $tenantId)
+            ->when($request->filled('store_id'), fn ($q) => $q->where('so.store_id', (int) $request->integer('store_id')))
+            ->select([
+                'soa.id',
+                'soa.sales_order_id',
+                'soa.alert_type',
+                'soa.details_json',
+                'soa.resolved_at',
+                'soa.resolved_by',
+                'soa.created_at',
+                'so.status as order_status',
+                'so.grand_total as order_total',
+                'so.store_id',
+            ])
+            ->orderByDesc('soa.created_at');
+
+        if ($status === 'resolved') {
+            $query->whereNotNull('soa.resolved_at');
+        } elseif ($status === 'unresolved') {
+            $query->whereNull('soa.resolved_at');
+        }
+
+        $rows = $query->limit($limit)->get();
+
+        $variantIds = [];
+        foreach ($rows as $row) {
+            $details = json_decode((string) ($row->details_json ?: '{}'), true) ?: [];
+            if (! empty($details['product_variant_id'])) {
+                $variantIds[] = (int) $details['product_variant_id'];
+            }
+        }
+
+        $variantIds = array_values(array_unique($variantIds));
+
+        $variantNames = empty($variantIds)
+            ? []
+            : DB::table('product_variants as pv')
+                ->join('products as p', 'p.id', '=', 'pv.product_id')
+                ->where('pv.tenant_id', $tenantId)
+                ->whereIn('pv.id', $variantIds)
+                ->pluck('p.name', 'pv.id')
+                ->map(fn ($name) => (string) $name)
+                ->all();
+
+        $data = $rows->map(function ($row) use ($variantNames) {
+            $details = json_decode((string) ($row->details_json ?: '{}'), true) ?: [];
+            $variantId = (int) ($details['product_variant_id'] ?? 0);
+
+            return [
+                'id' => (int) $row->id,
+                'sales_order_id' => (int) $row->sales_order_id,
+                'alert_type' => (string) $row->alert_type,
+                'order_status' => (string) ($row->order_status ?: 'unknown'),
+                'order_total' => (float) ($row->order_total ?? 0),
+                'store_id' => $row->store_id !== null ? (int) $row->store_id : null,
+                'product_variant_id' => $variantId ?: null,
+                'product_name' => $variantId ? ($variantNames[$variantId] ?? null) : null,
+                'requested_qty' => isset($details['requested_qty']) ? (int) $details['requested_qty'] : null,
+                'available_qty' => isset($details['available_qty']) ? (int) $details['available_qty'] : null,
+                'shortage_qty' => isset($details['shortage_qty']) ? (int) $details['shortage_qty'] : null,
+                'details' => $details,
+                'resolved_at' => $row->resolved_at,
+                'resolved_by' => $row->resolved_by !== null ? (int) $row->resolved_by : null,
+                'created_at' => $row->created_at,
+            ];
+        })->values();
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function resolveStockAlert(Request $request, int $alertId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $alert = DB::table('sales_order_alerts')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $alertId)
+            ->first();
+
+        if (! $alert) {
+            return response()->json(['message' => 'Alert non trovato.'], 404);
+        }
+
+        if ($alert->resolved_at !== null) {
+            return response()->json(['message' => 'Alert gia risolto.']);
+        }
+
+        $now = now();
+        $actorId = (int) $request->user()->id;
+
+        DB::transaction(function () use ($tenantId, $alertId, $alert, $now, $actorId) {
+            DB::table('sales_order_alerts')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $alertId)
+                ->update([
+                    'resolved_at' => $now,
+                    'resolved_by' => $actorId,
+                    'updated_at' => $now,
+                ]);
+
+            $remaining = DB::table('sales_order_alerts')
+                ->where('tenant_id', $tenantId)
+                ->where('sales_order_id', (int) $alert->sales_order_id)
+                ->whereNull('resolved_at')
+                ->count();
+
+            if ($remaining === 0) {
+                DB::table('sales_orders')
+                    ->where('tenant_id', $tenantId)
+                    ->where('id', (int) $alert->sales_order_id)
+                    ->update([
+                        'has_stock_alert' => false,
+                        'stock_alert_reason' => null,
+                        'updated_at' => $now,
+                    ]);
+            }
+        });
+
+        AuditLogger::log($request, 'resolve', 'stock_alert', $alertId, 'Alert stock risolto per ordine #' . (int) $alert->sales_order_id);
+
+        return response()->json(['message' => 'Alert risolto con successo.']);
     }
 
     private function buildQuote(int $tenantId, array $lines): array
@@ -331,6 +744,7 @@ class OrderController extends Controller
                 $tenantId,
                 (string) $variant->product_type,
                 (int) ($variant->volume_ml ?? 0),
+                (int) ($variant->nicotine_mg ?? 0),
                 $qty,
                 $lineNet,
                 isset($variant->excise_unit_amount_override) ? (float) $variant->excise_unit_amount_override : null
@@ -503,7 +917,11 @@ class OrderController extends Controller
         return $rate !== null ? (float) $rate : 22.0;
     }
 
-    private function resolveExcise(int $tenantId, string $productType, int $volumeMl, int $qty, float $lineNet, ?float $exciseUnitAmountOverride = null): float
+    // Aliquote fisse accisa italiana (AAMS/ADM)
+    private const EXCISE_RATE_NICOTINE_PER_ML = 0.172623;    // liquidi CON nicotina
+    private const EXCISE_RATE_NO_NICOTINE_PER_ML = 0.124672;  // liquidi SENZA nicotina
+
+    private function resolveExcise(int $tenantId, string $productType, int $volumeMl, int $nicotineMg, int $qty, float $lineNet, ?float $exciseUnitAmountOverride = null): float
     {
         if ($exciseUnitAmountOverride !== null) {
             return round($qty * $exciseUnitAmountOverride, 2);
@@ -525,10 +943,34 @@ class OrderController extends Controller
             ->where(function ($q) use ($productType) {
                 $q->whereNull('er.product_type')->orWhere('er.product_type', $productType);
             })
+            ->where(function ($q) use ($nicotineMg) {
+                $q->whereNull('er.nicotine_min')
+                    ->orWhere(function ($inner) use ($nicotineMg) {
+                        $inner->where('er.nicotine_min', '<=', $nicotineMg)
+                            ->where(function ($max) use ($nicotineMg) {
+                                $max->whereNull('er.nicotine_max')->orWhere('er.nicotine_max', '>=', $nicotineMg);
+                            });
+                    });
+            })
+            ->where(function ($q) use ($volumeMl) {
+                $q->whereNull('er.volume_min_ml')
+                    ->orWhere(function ($inner) use ($volumeMl) {
+                        $inner->where('er.volume_min_ml', '<=', $volumeMl)
+                            ->where(function ($max) use ($volumeMl) {
+                                $max->whereNull('er.volume_max_ml')->orWhere('er.volume_max_ml', '>=', $volumeMl);
+                            });
+                    });
+            })
             ->orderByRaw('ers.tenant_id IS NULL')
             ->orderByDesc('er.id')
             ->select(['er.rate_type', 'er.rate_value', 'er.min_amount'])
             ->first();
+
+        // Se non c'è regola custom, applica le aliquote fisse italiane per i liquidi
+        if (! $rule && $volumeMl > 0 && in_array($productType, ['liquido', 'liquid', 'e-liquid', 'eliquid'], true)) {
+            $rate = $nicotineMg > 0 ? self::EXCISE_RATE_NICOTINE_PER_ML : self::EXCISE_RATE_NO_NICOTINE_PER_ML;
+            return round($qty * $volumeMl * $rate, 2);
+        }
 
         if (! $rule) {
             return 0.0;
@@ -660,5 +1102,32 @@ class OrderController extends Controller
         }
 
         return count($stack) === 1 ? (float) $stack[0] : 0.0;
+    }
+
+    private function mapOrderListRow(object $row): array
+    {
+        return [
+            'id' => (int) $row->id,
+            'status' => (string) $row->status,
+            'store_id' => $row->store_id !== null ? (int) $row->store_id : null,
+            'customer_id' => $row->customer_id !== null ? (int) $row->customer_id : null,
+            'grand_total' => (float) $row->grand_total,
+            'currency' => (string) ($row->currency ?: 'EUR'),
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+            'loyalty_points_awarded' => (int) $row->loyalty_points_awarded,
+            'customer' => ($row->customer_first_name || $row->customer_last_name)
+                ? [
+                    'first_name' => (string) ($row->customer_first_name ?: ''),
+                    'last_name' => (string) ($row->customer_last_name ?: ''),
+                ]
+                : null,
+            'warehouse' => $row->warehouse_id
+                ? [
+                    'id' => (int) $row->warehouse_id,
+                    'name' => (string) $row->warehouse_name,
+                ]
+                : null,
+        ];
     }
 }

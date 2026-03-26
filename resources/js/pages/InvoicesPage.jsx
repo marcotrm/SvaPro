@@ -27,8 +27,8 @@ export default function InvoicesPage() {
       setError('');
       const params = {};
       if (selectedStoreId) params.store_id = selectedStoreId;
-      if (dateFrom) params.from = dateFrom;
-      if (dateTo) params.to = dateTo;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
       const res = await invoices.list(params);
       setList(res.data?.data || []);
     } catch {

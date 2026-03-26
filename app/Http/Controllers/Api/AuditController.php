@@ -57,4 +57,48 @@ class AuditController extends Controller
 
         return response()->json(['data' => $data]);
     }
+
+    public function show(Request $request, int $logId): JsonResponse
+    {
+        $tenantId = $request->attributes->get('tenant_id');
+
+        $row = DB::table('audit_logs')
+            ->leftJoin('users', 'users.id', '=', 'audit_logs.actor_user_id')
+            ->where('audit_logs.tenant_id', $tenantId)
+            ->where('audit_logs.id', $logId)
+            ->select([
+                'audit_logs.*',
+                'users.name as actor_name',
+                'users.email as actor_email',
+            ])
+            ->first();
+
+        if (! $row) {
+            return response()->json(['message' => 'Log non trovato.'], 404);
+        }
+
+        $row->changes_json = $row->changes_json ? json_decode($row->changes_json, true) : null;
+
+        return response()->json(['data' => $row]);
+    }
+
+    public function filters(Request $request): JsonResponse
+    {
+        $tenantId = $request->attributes->get('tenant_id');
+
+        $entityTypes = DB::table('audit_logs')
+            ->where('tenant_id', $tenantId)
+            ->distinct()
+            ->pluck('entity_type');
+
+        $actions = DB::table('audit_logs')
+            ->where('tenant_id', $tenantId)
+            ->distinct()
+            ->pluck('action');
+
+        return response()->json([
+            'entity_types' => $entityTypes,
+            'actions' => $actions,
+        ]);
+    }
 }

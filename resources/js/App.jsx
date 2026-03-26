@@ -7,6 +7,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage.jsx'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'));
 const CatalogPage = lazy(() => import('./pages/CatalogPage.jsx'));
 const OrdersPage = lazy(() => import('./pages/OrdersPage.jsx'));
+const StockAlertsPage = lazy(() => import('./pages/StockAlertsPage.jsx'));
 const InventoryPage = lazy(() => import('./pages/InventoryPage.jsx'));
 const CustomersPage = lazy(() => import('./pages/CustomersPage.jsx'));
 const EmployeesPage = lazy(() => import('./pages/EmployeesPage.jsx'));
@@ -92,6 +93,7 @@ export default function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/catalog" element={<CatalogPage />} />
               <Route path="/orders" element={<OrdersPage />} />
+              <Route path="/orders/stock-alerts" element={<StockAlertsPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
               <Route path="/inventory/smart-reorder" element={<SmartReorderPage />} />
               <Route path="/customers" element={<CustomersPage />} />

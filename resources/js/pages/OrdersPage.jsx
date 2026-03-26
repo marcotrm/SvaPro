@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { orders } from '../api.jsx';
+import { orders, getOfflineSalesQueueSize, onOfflineSalesQueueChanged, syncOfflineSalesNow } from '../api.jsx';
 import { OrdersSkeleton } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import OrderModal from '../components/OrderModal.jsx';
@@ -13,8 +13,25 @@ export default function OrdersPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [offlineQueueSize, setOfflineQueueSize] = useState(getOfflineSalesQueueSize());
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [syncingOffline, setSyncingOffline] = useState(false);
 
   useEffect(() => { fetchOrders(); }, [selectedStoreId]);
+
+  useEffect(() => {
+    const unsubscribe = onOfflineSalesQueueChanged((size) => setOfflineQueueSize(size));
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   const fetchOrders = async () => {
     try {
@@ -29,6 +46,19 @@ export default function OrdersPage() {
   const handleOpenModal = () => { setSelectedOrder(null); setShowModal(true); };
   const handleCloseModal = () => { setShowModal(false); setSelectedOrder(null); };
   const handleSaveOrder = async () => { await fetchOrders(); handleCloseModal(); };
+
+  const handleSyncOffline = async () => {
+    try {
+      setSyncingOffline(true);
+      const result = await syncOfflineSalesNow();
+      setOfflineQueueSize(result.remaining);
+      if (result.synced > 0) {
+        await fetchOrders();
+      }
+    } finally {
+      setSyncingOffline(false);
+    }
+  };
 
   const statusLabel = { paid: 'Pagato', draft: 'Bozza', pending: 'Pendente' };
   const statusBadge = { paid: 'high', draft: 'mid', pending: 'low' };
@@ -55,6 +85,25 @@ export default function OrdersPage() {
       </div>
 
       {error && <ErrorAlert message={error} onRetry={fetchOrders} />}
+
+      {offlineQueueSize > 0 && (
+        <div className="banner banner-warn" style={{ marginBottom: 14 }}>
+          <span className="banner-text">
+            {offlineQueueSize} vendita/e in coda offline.
+            {isOnline ? ' Pronte per la sincronizzazione.' : ' Verranno sincronizzate quando torna la connessione.'}
+          </span>
+          {isOnline && (
+            <button
+              className="btn btn-light"
+              style={{ marginLeft: 'auto' }}
+              onClick={handleSyncOffline}
+              disabled={syncingOffline}
+            >
+              {syncingOffline ? 'Sincronizzazione...' : 'Sincronizza ora'}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Table */}
       <div className="table-card">
@@ -90,8 +139,8 @@ export default function OrdersPage() {
                 <td style={{fontWeight:600,color:'var(--text)'}}>
                   {order.customer?.first_name} {order.customer?.last_name}
                 </td>
-                <td style={{color:'var(--muted2)'}}>{order.warehouse?.name || 'â€”'}</td>
-                <td><span className="mono positive">â‚¬{order.grand_total?.toFixed(2)}</span></td>
+                <td style={{color:'var(--muted2)'}}>{order.warehouse?.name || '—'}</td>
+                <td><span className="mono positive">€{order.grand_total?.toFixed(2)}</span></td>
                 <td style={{color:'var(--amber)',fontFamily:'IBM Plex Mono, monospace',fontSize:13}}>
                   +{order.loyalty_points_awarded || 0} pt
                 </td>

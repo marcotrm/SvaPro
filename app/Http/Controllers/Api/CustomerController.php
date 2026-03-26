@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\AuditLogger;
+use App\Services\CustomerOtpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -130,6 +131,7 @@ class CustomerController extends Controller
             'code' => ['nullable', 'string', 'max:50'],
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
+            'codice_fiscale' => ['nullable', 'string', 'max:16'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'birth_date' => ['nullable', 'date'],
@@ -145,6 +147,7 @@ class CustomerController extends Controller
             'code' => $request->input('code'),
             'first_name' => $request->input('first_name'),
             'last_name' => $request->input('last_name'),
+            'codice_fiscale' => $request->input('codice_fiscale'),
             'email' => $request->input('email'),
             'phone' => $request->input('phone'),
             'birth_date' => $request->input('birth_date'),
@@ -170,6 +173,7 @@ class CustomerController extends Controller
             ->update([
                 'first_name' => $request->input('first_name'),
                 'last_name' => $request->input('last_name'),
+                'codice_fiscale' => $request->input('codice_fiscale'),
                 'email' => $request->input('email'),
                 'phone' => $request->input('phone'),
                 'marketing_consent' => $request->has('marketing_consent') ? (bool) $request->boolean('marketing_consent') : DB::raw('marketing_consent'),
@@ -240,6 +244,45 @@ class CustomerController extends Controller
             ]);
     }
 
+    public function sendOtp(Request $request, int $customerId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'channel' => ['required', 'in:email,sms'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $service = new CustomerOtpService();
+        $result = $service->sendOtp($tenantId, $customerId, (string) $request->input('channel'));
+
+        return response()->json(['message' => $result['message']], $result['success'] ? 200 : 422);
+    }
+
+    public function verifyOtp(Request $request, int $customerId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'channel' => ['required', 'in:email,sms'],
+            'code' => ['required', 'string', 'size:6'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $service = new CustomerOtpService();
+        $result = $service->verifyOtp($tenantId, $customerId, (string) $request->input('channel'), (string) $request->input('code'));
+
+        AuditLogger::log($request, 'verify_otp', 'customer', $customerId, $request->input('channel'));
+
+        return response()->json(['message' => $result['message']], $result['success'] ? 200 : 422);
+    }
+
     private function hydrateCustomers($customers): array
     {
         return collect($customers)
@@ -259,8 +302,11 @@ class CustomerController extends Controller
                     'code' => $customer->code,
                     'first_name' => $customer->first_name,
                     'last_name' => $customer->last_name,
+                    'codice_fiscale' => $customer->codice_fiscale ?? null,
                     'email' => $customer->email,
+                    'email_verified' => (bool) ($customer->email_verified ?? false),
                     'phone' => $customer->phone,
+                    'phone_verified' => (bool) ($customer->phone_verified ?? false),
                     'birth_date' => $customer->birth_date,
                     'marketing_consent' => (bool) $customer->marketing_consent,
                     'city' => $customer->city,
@@ -271,6 +317,9 @@ class CustomerController extends Controller
                     'last_push_sent_at' => $customer->last_push_sent_at,
                     'push_notifications_last_7d' => (int) ($customer->push_notifications_last_7d ?? 0),
                     'paid_orders_count' => $paidOrdersCount,
+                    'total_orders' => (int) ($customer->total_orders ?? $paidOrdersCount),
+                    'total_spent' => round((float) ($customer->total_spent ?? 0), 2),
+                    'avg_days_between_purchases' => $returnFrequencyDays,
                     'last_purchase_at' => $lastPurchaseAt?->toDateTimeString(),
                     'return_frequency_days' => $returnFrequencyDays,
                     'created_at' => $customer->created_at,

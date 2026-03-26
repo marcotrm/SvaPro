@@ -4,6 +4,7 @@ const routeLoaders = {
   '/': () => import('./pages/DashboardPage.jsx'),
   '/catalog': () => import('./pages/CatalogPage.jsx'),
   '/orders': () => import('./pages/OrdersPage.jsx'),
+  '/orders/stock-alerts': () => import('./pages/StockAlertsPage.jsx'),
   '/inventory': () => import('./pages/InventoryPage.jsx'),
   '/inventory/smart-reorder': () => import('./pages/SmartReorderPage.jsx'),
   '/customers': () => import('./pages/CustomersPage.jsx'),
@@ -32,6 +33,9 @@ const routeDataLoaders = {
   },
   '/orders': () => {
     orders.getOrders({});
+  },
+  '/orders/stock-alerts': () => {
+    orders.getStockAlerts({ status: 'unresolved', limit: 80 });
   },
   '/inventory': () => {
     inventory.getStock({ limit: 80 });

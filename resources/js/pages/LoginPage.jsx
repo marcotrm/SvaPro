@@ -1,11 +1,14 @@
 ﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, clearApiCache } from '../api.jsx';
+import { useTranslation } from '../i18n/index.jsx';
 
 export default function LoginPage({ setUser }) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('superadmin@demo.local');
-  const [password, setPassword] = useState('ChangeMe123!');
+  const { t } = useTranslation();
+  const demoLoginEnabled = String(import.meta.env.VITE_ENABLE_DEMO_LOGIN || '').toLowerCase() === 'true';
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -28,7 +31,7 @@ export default function LoginPage({ setUser }) {
       setUser(response.data.user);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login fallito. Controlla email e password.');
+      setError(err.response?.data?.message || t('login_failed_check_credentials'));
     } finally {
       setLoading(false);
     }
@@ -36,7 +39,7 @@ export default function LoginPage({ setUser }) {
 
   return (
     <div className="login-root">
-      {/* â”€â”€ LEFT BRAND PANEL â”€â”€ */}
+      {/* LEFT BRAND PANEL */}
       <div className="login-left">
         <div className="login-orb login-orb-1" />
         <div className="login-orb login-orb-2" />
@@ -62,7 +65,7 @@ export default function LoginPage({ setUser }) {
             Gestionale<br />progettato per<br /><span>chi vende davvero</span>
           </div>
           <div className="login-sub">
-            Catalogo, ordini, loyalty, dipendenti e magazzino intelligente in un'unica interfaccia â€”
+            Catalogo, ordini, loyalty, dipendenti e magazzino intelligente in un'unica interfaccia -
             con reorder automatico basato sullo storico vendite.
           </div>
         </div>
@@ -89,11 +92,11 @@ export default function LoginPage({ setUser }) {
         {/* Footer badge */}
         <div className="login-badge">
           <span className="login-badge-dot" />
-          Seed verificato â€” login reale con API Laravel
+          {demoLoginEnabled ? t('login_seed_verified') : t('login_secure_access')}
         </div>
       </div>
 
-      {/* â”€â”€ RIGHT FORM PANEL â”€â”€ */}
+      {/* RIGHT FORM PANEL */}
       <div className="login-right">
         <div className="login-form-wrap">
           <div className="login-card">
@@ -102,7 +105,7 @@ export default function LoginPage({ setUser }) {
             <div className="login-card-sub">Inserisci le credenziali del tuo account</div>
 
             {/* Demo box */}
-            <div className="login-demo-box">
+            {demoLoginEnabled && <div className="login-demo-box">
               <div className="login-demo-info">
                 <div className="login-demo-label">
                   <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',marginRight:5,verticalAlign:'middle'}}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -130,7 +133,7 @@ export default function LoginPage({ setUser }) {
                   Admin Nord
                 </button>
               </div>
-            </div>
+            </div>}
 
             {/* Error */}
             {error && (
@@ -149,7 +152,7 @@ export default function LoginPage({ setUser }) {
                   <input
                     className="login-input"
                     type="email"
-                    placeholder="nome@azienda.it"
+                    placeholder={t('login_email_placeholder')}
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     required
@@ -165,7 +168,7 @@ export default function LoginPage({ setUser }) {
                   <input
                     className="login-input"
                     type="password"
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder={t('login_password_placeholder')}
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     required
@@ -177,11 +180,11 @@ export default function LoginPage({ setUser }) {
                 {loading ? (
                   <>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{animation:'spin 1s linear infinite'}}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                    Accesso in corso...
+                    {t('login_in_progress')}
                   </>
                 ) : (
                   <>
-                    Accedi
+                    {t('login')}
                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                   </>
                 )}
@@ -195,7 +198,7 @@ export default function LoginPage({ setUser }) {
               </div>
               <div>
                 <div className="login-footer-key">Ambiente</div>
-                <div className="login-footer-val">Demo Tenant</div>
+                <div className="login-footer-val">{String(import.meta.env.MODE || 'development')}</div>
               </div>
             </div>
           </div>

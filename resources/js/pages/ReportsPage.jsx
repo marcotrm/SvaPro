@@ -30,10 +30,15 @@ export default function ReportsPage() {
       const [kpiRes, trendRes, topRes, acqRes] = await Promise.all([
         reports.summary({ ...storeParam, days }).catch(() => ({})),
         reports.revenueTrend({ ...storeParam, period, days }).catch(() => ({})),
-        reports.topProducts({ ...storeParam, by: topBy, limit: 8, days }).catch(() => ({})),
+        reports.topProducts({ ...storeParam, sort: topBy, limit: 8, days }).catch(() => ({})),
         reports.customerAcquisition({ ...storeParam, period, days }).catch(() => ({})),
       ]);
-      setKpi(kpiRes.data?.data || null);
+      const rawKpi = kpiRes.data?.data || null;
+      setKpi(rawKpi ? {
+        ...rawKpi,
+        revenue_delta: rawKpi.revenue_delta ?? rawKpi.delta_revenue ?? null,
+        orders_delta: rawKpi.orders_delta ?? rawKpi.delta_orders ?? null,
+      } : null);
       setTrend((trendRes.data?.data || []).map(d => ({ date: d.label, revenue: parseFloat(d.revenue) || 0 })));
       setTopProds(topRes.data?.data || []);
       setAcquisition((acqRes.data?.data || []).map(d => ({ date: d.label, count: parseInt(d.count) || 0 })));

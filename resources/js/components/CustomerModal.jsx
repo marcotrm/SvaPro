@@ -44,7 +44,7 @@ export default function CustomerModal({ customer, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-screen overflow-y-auto">
+      <div className="bg-white modal-light rounded-lg shadow-xl w-full max-w-md max-h-screen overflow-y-auto">
         <div className="sticky top-0 flex items-center justify-between p-6 border-b border-gray-200 bg-white">
           <h2 className="text-xl font-bold text-gray-900">
             {customer ? 'Modifica Cliente' : 'Nuovo Cliente'}

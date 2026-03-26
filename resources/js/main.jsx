@@ -5,6 +5,9 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { I18nProvider } from './i18n/index.jsx';
+import { initOfflineSalesSync } from './api.jsx';
+
+initOfflineSalesSync();
 
 const root = ReactDOM.createRoot(document.getElementById('app'));
 root.render(
