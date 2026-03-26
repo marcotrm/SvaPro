@@ -41,6 +41,31 @@ const navGroups = [
         label: 'Fatture', href: '/invoices',
         icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-.847.99l-1-.116-.86 1.148a1 1 0 01-1.586 0L11 14.874l-.707.942a1 1 0 01-1.586 0L8 14.874l-.707.942a1 1 0 01-1.586 0L4.847 14.69A1 1 0 014 14V4zm2 2a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd"/></svg>,
       },
+      {
+        label: 'Resi', href: '/returns',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd"/></svg>,
+      },
+      {
+        label: 'POS Cassa', href: '/pos',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/></svg>,
+      },
+    ],
+  },
+  {
+    label: 'Approvvigionamento',
+    items: [
+      {
+        label: 'Fornitori', href: '/suppliers',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/><path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1v-5h2.05a2.5 2.5 0 014.9 0H19a1 1 0 001-1v-2a1 1 0 00-.293-.707l-3-3A1 1 0 0016 3h-3a1 1 0 00-1 1v5H4V5a1 1 0 00-1-1z"/></svg>,
+      },
+      {
+        label: 'Ordini Acquisto', href: '/purchase-orders',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"/></svg>,
+      },
+      {
+        label: 'Fatture Passive', href: '/supplier-invoices',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd"/></svg>,
+      },
     ],
   },
   {
@@ -96,6 +121,11 @@ const pageTitles = {
   '/roles-permissions': 'Ruoli & Permessi',
   '/invoices': 'Fatture',
   '/reports': 'Report & Export',
+  '/suppliers': 'Fornitori',
+  '/purchase-orders': 'Ordini Acquisto',
+  '/returns': 'Resi & Rimborsi',
+  '/supplier-invoices': 'Fatture Passive',
+  '/pos': 'POS Cassa',
 };
 
 const labelToI18nKey = {
@@ -116,6 +146,12 @@ const labelToI18nKey = {
   'Report & Export': 'reports',
   Dipendenti: 'employees',
   'Registro Attività': 'audit_log',
+  Resi: 'returns',
+  'POS Cassa': 'pos',
+  Fornitori: 'suppliers',
+  'Ordini Acquisto': 'purchase_orders',
+  'Fatture Passive': 'supplier_invoices',
+  Approvvigionamento: 'procurement',
 };
 
 export default function Layout({ user, setUser }) {

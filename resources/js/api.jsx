@@ -486,6 +486,52 @@ export const invoices = {
   download: (id) => api.get(`/invoices/${id}/download`, { responseType: 'blob' }),
 };
 
+// Supplier APIs
+export const suppliers = {
+  getAll: (params = {}) => cachedGet('/suppliers', params, 30000, 300000),
+  getOne: (id) => api.get(`/suppliers/${id}`),
+  create: (data) => api.post('/suppliers', data),
+  update: (id, data) => api.put(`/suppliers/${id}`, data),
+  remove: (id) => api.delete(`/suppliers/${id}`),
+};
+
+// Purchase Order APIs
+export const purchaseOrders = {
+  getAll: (params = {}) => cachedGet('/purchase-orders', params, 15000, 120000),
+  getOne: (id) => api.get(`/purchase-orders/${id}`),
+  create: (data) => api.post('/purchase-orders', data),
+  update: (id, data) => api.put(`/purchase-orders/${id}`, data),
+  send: (id) => api.post(`/purchase-orders/${id}/send`),
+  receive: (id) => api.post(`/purchase-orders/${id}/receive`),
+  cancel: (id) => api.post(`/purchase-orders/${id}/cancel`),
+};
+
+// Returns APIs
+export const returns = {
+  getAll: (params = {}) => cachedGet('/returns', params, 15000, 120000),
+  create: (data) => api.post('/returns', data),
+  updateStatus: (id, status) => api.post(`/returns/${id}/status`, { status }),
+  getAnalytics: (params = {}) => cachedGet('/returns/analytics', params, 30000, 300000),
+};
+
+// Supplier Invoice APIs
+export const supplierInvoices = {
+  getAll: (params = {}) => cachedGet('/supplier-invoices', params, 15000, 120000),
+  getOne: (id) => api.get(`/supplier-invoices/${id}`),
+  create: (data) => api.post('/supplier-invoices', data),
+  update: (id, data) => api.put(`/supplier-invoices/${id}`, data),
+  markPaid: (id) => api.post(`/supplier-invoices/${id}/mark-paid`),
+  remove: (id) => api.delete(`/supplier-invoices/${id}`),
+};
+
+// POS APIs
+export const pos = {
+  getActive: () => api.get('/pos/active'),
+  getSessions: (params = {}) => cachedGet('/pos/sessions', params, 10000, 60000),
+  open: (data = {}) => api.post('/pos/open', data),
+  close: (sessionId) => api.post(`/pos/sessions/${sessionId}/close`),
+};
+
 // Report APIs
 export const reports = {
   revenueTrend: (params = {}) => cachedGet('/reports/revenue-trend', params, 30000, 300000),

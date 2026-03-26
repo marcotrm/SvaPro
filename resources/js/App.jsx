@@ -20,6 +20,11 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
 const RolesPermissionsPage = lazy(() => import('./pages/RolesPermissionsPage.jsx'));
 const InvoicesPage = lazy(() => import('./pages/InvoicesPage.jsx'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage.jsx'));
+const SuppliersPage = lazy(() => import('./pages/SuppliersPage.jsx'));
+const PurchaseOrdersPage = lazy(() => import('./pages/PurchaseOrdersPage.jsx'));
+const ReturnsPage = lazy(() => import('./pages/ReturnsPage.jsx'));
+const SupplierInvoicesPage = lazy(() => import('./pages/SupplierInvoicesPage.jsx'));
+const PosPage = lazy(() => import('./pages/PosPage.jsx'));
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -106,6 +111,11 @@ export default function App() {
               <Route path="/roles-permissions" element={<RolesPermissionsPage />} />
               <Route path="/invoices" element={<InvoicesPage />} />
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/suppliers" element={<SuppliersPage />} />
+              <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
+              <Route path="/returns" element={<ReturnsPage />} />
+              <Route path="/supplier-invoices" element={<SupplierInvoicesPage />} />
+              <Route path="/pos" element={<PosPage />} />
             </Route>
           </Route>
 

@@ -14,6 +14,12 @@
   "smart_reorder": "Smart Reorder",
   "loyalty": "Loyalty",
   "push_monitor": "Push Monitor",
+  "returns": "Resi",
+  "pos": "POS Cassa",
+  "suppliers": "Fornitori",
+  "purchase_orders": "Ordini Acquisto",
+  "supplier_invoices": "Fatture Passive",
+  "procurement": "Approvvigionamento",
 
   "total_revenue": "Ricavi Totali",
   "total_orders": "Ordini",
