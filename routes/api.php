@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\CustomerReturnController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExportController;
@@ -38,7 +39,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/tenant-settings', [StoreController::class, 'tenantSettings']);
         Route::put('/tenant-settings', [StoreController::class, 'updateTenantSettings']);
         Route::get('/roles-permissions', [RolesPermissionsController::class, 'matrix']);
-        Route::post('/roles-permissions/toggle', [RolesPermissionsController::class, 'toggle']);
+        Route::post('/roles-permissions/toggle', [RolesPermissionsController::class, 'toggle'])->middleware('permission:roles.manage');
         Route::get('/auth/switchable-users', [AuthController::class, 'switchableUsers']);
         Route::post('/auth/impersonate', [AuthController::class, 'impersonate']);
         Route::get('/stores', [StoreController::class, 'index']);
@@ -53,15 +54,15 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
 
         Route::get('/customers', [CustomerController::class, 'index']);
         Route::get('/customers/analytics/return-frequency', [CustomerController::class, 'returnFrequencyAnalytics']);
-        Route::post('/customers', [CustomerController::class, 'store']);
-        Route::put('/customers/{customerId}', [CustomerController::class, 'update']);
+        Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.manage');
+        Route::put('/customers/{customerId}', [CustomerController::class, 'update'])->middleware('permission:customers.manage');
         Route::post('/customers/{customerId}/otp/send', [CustomerController::class, 'sendOtp']);
         Route::post('/customers/{customerId}/otp/verify', [CustomerController::class, 'verifyOtp']);
 
         Route::get('/employees', [EmployeeController::class, 'index']);
         Route::get('/employees/analytics/top-performers', [EmployeeController::class, 'topPerformers']);
-        Route::post('/employees', [EmployeeController::class, 'store']);
-        Route::put('/employees/{employeeId}', [EmployeeController::class, 'update']);
+        Route::post('/employees', [EmployeeController::class, 'store'])->middleware('permission:employees.manage');
+        Route::put('/employees/{employeeId}', [EmployeeController::class, 'update'])->middleware('permission:employees.manage');
         Route::get('/employees/{employeeId}/notifications', [EmployeeController::class, 'notifications']);
         Route::post('/employees/{employeeId}/notifications/{notificationId}/read', [EmployeeController::class, 'markNotificationRead']);
         Route::post('/employees/{employeeId}/notifications/read-all', [EmployeeController::class, 'markAllNotificationsRead']);
@@ -69,24 +70,24 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // Suppliers
         Route::get('/suppliers', [SupplierController::class, 'index']);
         Route::get('/suppliers/{supplierId}', [SupplierController::class, 'show']);
-        Route::post('/suppliers', [SupplierController::class, 'store']);
-        Route::put('/suppliers/{supplierId}', [SupplierController::class, 'update']);
-        Route::delete('/suppliers/{supplierId}', [SupplierController::class, 'destroy']);
+        Route::post('/suppliers', [SupplierController::class, 'store'])->middleware('permission:suppliers.manage');
+        Route::put('/suppliers/{supplierId}', [SupplierController::class, 'update'])->middleware('permission:suppliers.manage');
+        Route::delete('/suppliers/{supplierId}', [SupplierController::class, 'destroy'])->middleware('permission:suppliers.manage');
 
         // Purchase Orders
         Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
         Route::get('/purchase-orders/{poId}', [PurchaseOrderController::class, 'show']);
-        Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
-        Route::put('/purchase-orders/{poId}', [PurchaseOrderController::class, 'update']);
-        Route::post('/purchase-orders/{poId}/send', [PurchaseOrderController::class, 'send']);
-        Route::post('/purchase-orders/{poId}/receive', [PurchaseOrderController::class, 'receive']);
-        Route::post('/purchase-orders/{poId}/cancel', [PurchaseOrderController::class, 'cancel']);
+        Route::post('/purchase-orders', [PurchaseOrderController::class, 'store'])->middleware('permission:purchase_orders.manage');
+        Route::put('/purchase-orders/{poId}', [PurchaseOrderController::class, 'update'])->middleware('permission:purchase_orders.manage');
+        Route::post('/purchase-orders/{poId}/send', [PurchaseOrderController::class, 'send'])->middleware('permission:purchase_orders.manage');
+        Route::post('/purchase-orders/{poId}/receive', [PurchaseOrderController::class, 'receive'])->middleware('permission:purchase_orders.manage');
+        Route::post('/purchase-orders/{poId}/cancel', [PurchaseOrderController::class, 'cancel'])->middleware('permission:purchase_orders.manage');
 
         Route::get('/shipping/carriers', [ShippingController::class, 'carriers']);
-        Route::post('/shipping/carriers', [ShippingController::class, 'storeCarrier']);
+        Route::post('/shipping/carriers', [ShippingController::class, 'storeCarrier'])->middleware('permission:shipping.manage');
         Route::get('/shipping/shipments', [ShippingController::class, 'shipments']);
-        Route::post('/shipping/shipments', [ShippingController::class, 'createShipment']);
-        Route::put('/shipping/shipments/{shipmentId}', [ShippingController::class, 'updateShipmentStatus']);
+        Route::post('/shipping/shipments', [ShippingController::class, 'createShipment'])->middleware('permission:shipping.manage');
+        Route::put('/shipping/shipments/{shipmentId}', [ShippingController::class, 'updateShipmentStatus'])->middleware('permission:shipping.manage');
 
         Route::post('/inventory/adjust', [InventoryController::class, 'adjust'])->middleware('permission:inventory.manage');
 
@@ -107,22 +108,29 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
 
         // Invoices
         Route::get('/invoices', [InvoiceController::class, 'index']);
-        Route::post('/invoices/generate', [InvoiceController::class, 'generate']);
+        Route::post('/invoices/generate', [InvoiceController::class, 'generate'])->middleware('permission:invoices.manage');
         Route::get('/invoices/{id}/download', [InvoiceController::class, 'download']);
-        Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail']);
-        Route::post('/invoices/{id}/send-sdi', [InvoiceController::class, 'sendToSdi']);
-        Route::post('/invoices/{id}/mark-paid', [InvoiceController::class, 'markPaid']);
+        Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail'])->middleware('permission:invoices.manage');
+        Route::post('/invoices/{id}/send-sdi', [InvoiceController::class, 'sendToSdi'])->middleware('permission:invoices.manage');
+        Route::post('/invoices/{id}/mark-paid', [InvoiceController::class, 'markPaid'])->middleware('permission:invoices.manage');
 
         // Supplier Invoices (Fatture Passive)
         Route::get('/supplier-invoices', [SupplierInvoiceController::class, 'index']);
         Route::get('/supplier-invoices/{id}', [SupplierInvoiceController::class, 'show']);
-        Route::post('/supplier-invoices', [SupplierInvoiceController::class, 'store']);
-        Route::put('/supplier-invoices/{id}', [SupplierInvoiceController::class, 'update']);
-        Route::post('/supplier-invoices/{id}/mark-paid', [SupplierInvoiceController::class, 'markPaid']);
-        Route::delete('/supplier-invoices/{id}', [SupplierInvoiceController::class, 'destroy']);
+        Route::post('/supplier-invoices', [SupplierInvoiceController::class, 'store'])->middleware('permission:invoices.manage');
+        Route::put('/supplier-invoices/{id}', [SupplierInvoiceController::class, 'update'])->middleware('permission:invoices.manage');
+        Route::post('/supplier-invoices/{id}/mark-paid', [SupplierInvoiceController::class, 'markPaid'])->middleware('permission:invoices.manage');
+        Route::delete('/supplier-invoices/{id}', [SupplierInvoiceController::class, 'destroy'])->middleware('permission:invoices.manage');
 
         // Documents
-        Route::post('/documents/generate', [DocumentController::class, 'generate']);
+        Route::post('/documents/generate', [DocumentController::class, 'generate'])->middleware('permission:documents.generate');
+
+        // Customer Returns (Resi)
+        Route::get('/returns', [CustomerReturnController::class, 'index']);
+        Route::get('/returns/analytics', [CustomerReturnController::class, 'analytics']);
+        Route::get('/returns/{id}', [CustomerReturnController::class, 'show']);
+        Route::post('/returns', [CustomerReturnController::class, 'store'])->middleware('permission:orders.manage');
+        Route::post('/returns/{id}/status', [CustomerReturnController::class, 'updateStatus'])->middleware('permission:orders.manage');
 
         // Reports
         Route::get('/reports/revenue-trend', [ReportController::class, 'revenueTrend']);
@@ -144,8 +152,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // POS Sessions
         Route::get('/pos/sessions', [PosSessionController::class, 'index']);
         Route::get('/pos/active', [PosSessionController::class, 'active']);
-        Route::post('/pos/open', [PosSessionController::class, 'open']);
-        Route::post('/pos/sessions/{sessionId}/close', [PosSessionController::class, 'close']);
+        Route::post('/pos/open', [PosSessionController::class, 'open'])->middleware('permission:pos_sessions.manage');
+        Route::post('/pos/sessions/{sessionId}/close', [PosSessionController::class, 'close'])->middleware('permission:pos_sessions.manage');
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente,cliente_finale')->group(function () {

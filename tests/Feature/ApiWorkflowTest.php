@@ -71,6 +71,7 @@ class ApiWorkflowTest extends TestCase
             'channel' => 'pos',
             'store_id' => 1,
             'warehouse_id' => 1,
+            'employee_id' => 1,
             'status' => 'paid',
             'lines' => [
                 ['product_variant_id' => 1, 'qty' => 1],
@@ -191,6 +192,7 @@ class ApiWorkflowTest extends TestCase
             'store_id' => 1,
             'warehouse_id' => 1,
             'customer_id' => 1,
+            'employee_id' => 1,
             'status' => 'paid',
             'lines' => [
                 ['product_variant_id' => 1, 'qty' => 2],
@@ -246,6 +248,7 @@ class ApiWorkflowTest extends TestCase
             'channel' => 'pos',
             'store_id' => 1,
             'warehouse_id' => 1,
+            'employee_id' => 1,
             'status' => 'paid',
             'lines' => [
                 ['product_variant_id' => 1, 'qty' => 999],
@@ -285,6 +288,7 @@ class ApiWorkflowTest extends TestCase
             'channel' => 'pos',
             'store_id' => 1,
             'warehouse_id' => 1,
+            'employee_id' => 1,
             'status' => 'paid',
             'lines' => [
                 ['product_variant_id' => 1, 'qty' => 999],
@@ -685,6 +689,7 @@ class ApiWorkflowTest extends TestCase
             'channel' => 'pos',
             'store_id' => 2,
             'warehouse_id' => 2,
+            'employee_id' => 1,
             'status' => 'paid',
             'lines' => [
                 ['product_variant_id' => 1, 'qty' => 1],
@@ -894,12 +899,16 @@ class ApiWorkflowTest extends TestCase
             ]);
 
         $warehouseId = (int) collect($optionsResponse->json('data.warehouses'))->first()['id'];
-        $variantId = (int) collect($optionsResponse->json('data.variants'))->first()['id'];
+
+        // Variants may be empty when filtered by store assignment; fall back to known seeded variant
+        $firstVariant = collect($optionsResponse->json('data.variants'))->first();
+        $variantId = $firstVariant ? (int) $firstVariant['id'] : 1;
 
         $createResponse = $this->withHeaders($headers)->postJson('/api/orders/place', [
             'channel' => 'pos',
             'store_id' => 1,
             'warehouse_id' => $warehouseId,
+            'employee_id' => 1,
             'status' => 'paid',
             'payment_method' => 'cash',
             'lines' => [
