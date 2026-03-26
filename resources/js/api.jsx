@@ -427,6 +427,8 @@ export const employees = {
   createEmployee: (data) => api.post('/employees', data),
   updateEmployee: (id, data) => api.put(`/employees/${id}`, data),
   getTopPerformers: (params = {}) => cachedGet('/employees/analytics/top-performers', params, 30000, 300000),
+  getKpiDashboard: (params = {}) => cachedGet('/employees/kpi-dashboard', params, 15000, 120000),
+  setKpiTarget: (employeeId, data) => api.post(`/employees/${employeeId}/kpi-target`, data),
 };
 
 // Loyalty APIs
@@ -438,6 +440,14 @@ export const loyalty = {
   getPushMonitoringStats: (params = {}) => cachedGet('/loyalty/monitoring/push-stats', params, 15000, 120000),
   getRedemptionPreview: (customerId, pointsToRedeem) => 
     api.post(`/loyalty/customers/${customerId}/redeem-preview`, { points_to_redeem: pointsToRedeem }),
+  // Tiers
+  getTiers: (params = {}) => cachedGet('/loyalty/tiers', params, 30000, 300000),
+  createTier: (data) => api.post('/loyalty/tiers', data),
+  updateTier: (id, data) => api.put(`/loyalty/tiers/${id}`, data),
+  deleteTier: (id) => api.delete(`/loyalty/tiers/${id}`),
+  // Redemptions
+  redeemPoints: (customerId, points) => api.post(`/loyalty/customers/${customerId}/redeem`, { points }),
+  getRedemptionHistory: (params = {}) => cachedGet('/loyalty/redemptions', params, 15000, 120000),
 };
 
 // Shipping APIs
@@ -530,6 +540,25 @@ export const pos = {
   getSessions: (params = {}) => cachedGet('/pos/sessions', params, 10000, 60000),
   open: (data = {}) => api.post('/pos/open', data),
   close: (sessionId) => api.post(`/pos/sessions/${sessionId}/close`),
+};
+
+// Promotion APIs
+export const promotions = {
+  getAll: (params = {}) => cachedGet('/promotions', params, 15000, 120000),
+  getOne: (id) => api.get(`/promotions/${id}`),
+  create: (data) => api.post('/promotions', data),
+  update: (id, data) => api.put(`/promotions/${id}`, data),
+  toggle: (id) => api.post(`/promotions/${id}/toggle`),
+  remove: (id) => api.delete(`/promotions/${id}`),
+};
+
+// Inventory Count APIs
+export const inventoryCount = {
+  getSessions: (params = {}) => cachedGet('/inventory-counts', params, 10000, 60000),
+  getSessionDetail: (id) => api.get(`/inventory-counts/${id}`),
+  createSession: (data) => api.post('/inventory-counts', data),
+  addCount: (sessionId, data) => api.post(`/inventory-counts/${sessionId}/count`, data),
+  finalize: (sessionId, data = {}) => api.post(`/inventory-counts/${sessionId}/finalize`, data),
 };
 
 // Report APIs

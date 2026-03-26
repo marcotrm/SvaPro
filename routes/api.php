@@ -9,9 +9,11 @@ use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\InventoryCountController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\PromotionController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RolesPermissionsController;
 use App\Http\Controllers\Api\PosSessionController;
@@ -137,6 +139,33 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/reports/top-products', [ReportController::class, 'topProducts']);
         Route::get('/reports/customer-acquisition', [ReportController::class, 'customerAcquisition']);
         Route::get('/reports/summary', [ReportController::class, 'summary']);
+
+        // Promotions & Bundles
+        Route::get('/promotions', [PromotionController::class, 'index']);
+        Route::get('/promotions/{id}', [PromotionController::class, 'show']);
+        Route::post('/promotions', [PromotionController::class, 'store'])->middleware('permission:catalog.manage');
+        Route::put('/promotions/{id}', [PromotionController::class, 'update'])->middleware('permission:catalog.manage');
+        Route::post('/promotions/{id}/toggle', [PromotionController::class, 'toggleActive'])->middleware('permission:catalog.manage');
+        Route::delete('/promotions/{id}', [PromotionController::class, 'destroy'])->middleware('permission:catalog.manage');
+
+        // Inventory Count (Barcode Guided)
+        Route::get('/inventory-counts', [InventoryCountController::class, 'sessions']);
+        Route::get('/inventory-counts/{sessionId}', [InventoryCountController::class, 'sessionDetail']);
+        Route::post('/inventory-counts', [InventoryCountController::class, 'createSession'])->middleware('permission:inventory.manage');
+        Route::post('/inventory-counts/{sessionId}/count', [InventoryCountController::class, 'addCount'])->middleware('permission:inventory.manage');
+        Route::post('/inventory-counts/{sessionId}/finalize', [InventoryCountController::class, 'finalize'])->middleware('permission:inventory.manage');
+
+        // Loyalty Tiers & Redemptions (admin)
+        Route::get('/loyalty/tiers', [LoyaltyController::class, 'tiers']);
+        Route::post('/loyalty/tiers', [LoyaltyController::class, 'storeTier'])->middleware('permission:loyalty.manage');
+        Route::put('/loyalty/tiers/{tierId}', [LoyaltyController::class, 'updateTier'])->middleware('permission:loyalty.manage');
+        Route::delete('/loyalty/tiers/{tierId}', [LoyaltyController::class, 'deleteTier'])->middleware('permission:loyalty.manage');
+        Route::get('/loyalty/redemptions', [LoyaltyController::class, 'redemptionHistory']);
+        Route::post('/loyalty/customers/{customerId}/redeem', [LoyaltyController::class, 'redeemPoints'])->middleware('permission:loyalty.manage');
+
+        // Employee KPI Dashboard
+        Route::get('/employees/kpi-dashboard', [EmployeeController::class, 'kpiDashboard']);
+        Route::post('/employees/{employeeId}/kpi-target', [EmployeeController::class, 'setKpiTarget'])->middleware('permission:employees.manage');
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente')->group(function () {

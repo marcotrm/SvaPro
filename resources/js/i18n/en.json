@@ -20,6 +20,11 @@
   "smart_reorder": "Smart Reorder",
   "loyalty": "Loyalty",
   "push_monitor": "Push Monitor",
+  "shipping": "Shipping",
+  "promotions": "Promotions",
+  "loyalty_tiers": "Loyalty Tiers",
+  "employee_kpi": "Employee KPIs",
+  "inventory_count": "Guided Inventory",
 
   "total_revenue": "Total Revenue",
   "total_orders": "Orders",

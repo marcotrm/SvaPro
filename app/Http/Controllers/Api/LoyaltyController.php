@@ -333,4 +333,209 @@ class LoyaltyController extends Controller
             'monetary_value' => $monetaryValue,
         ]);
     }
+
+    /* ─── Loyalty Tiers ─── */
+
+    public function tiers(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $tiers = DB::table('loyalty_tiers')
+            ->where('tenant_id', $tenantId)
+            ->orderBy('sort_order')
+            ->orderBy('min_points')
+            ->get();
+
+        // Count wallets per tier
+        $walletCounts = DB::table('loyalty_wallets')
+            ->where('tenant_id', $tenantId)
+            ->groupBy('tier_code')
+            ->selectRaw('tier_code, COUNT(*) as cnt')
+            ->pluck('cnt', 'tier_code');
+
+        $tiers = $tiers->map(function ($tier) use ($walletCounts) {
+            $tier->customers_count = (int) ($walletCounts[$tier->code] ?? 0);
+            return $tier;
+        });
+
+        return response()->json(['data' => $tiers]);
+    }
+
+    public function storeTier(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'max:80'],
+            'code' => ['required', 'string', 'max:30'],
+            'min_points' => ['required', 'integer', 'min:0'],
+            'multiplier' => ['required', 'numeric', 'min:1'],
+            'cashback_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'benefits_json' => ['nullable', 'string'],
+            'color' => ['nullable', 'string', 'max:20'],
+            'sort_order' => ['nullable', 'integer'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $exists = DB::table('loyalty_tiers')
+            ->where('tenant_id', $tenantId)
+            ->where('code', $request->input('code'))
+            ->exists();
+
+        if ($exists) {
+            return response()->json(['message' => 'Codice tier già in uso.'], 422);
+        }
+
+        $id = DB::table('loyalty_tiers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => $request->input('name'),
+            'code' => $request->input('code'),
+            'min_points' => $request->integer('min_points'),
+            'multiplier' => $request->input('multiplier', 1),
+            'cashback_percent' => $request->input('cashback_percent', 0),
+            'benefits_json' => $request->input('benefits_json'),
+            'color' => $request->input('color', '#c9a227'),
+            'sort_order' => $request->integer('sort_order', 0),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json(['message' => 'Tier creato.', 'id' => $id], 201);
+    }
+
+    public function updateTier(Request $request, int $tierId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $updated = DB::table('loyalty_tiers')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $tierId)
+            ->update([
+                'name' => $request->input('name'),
+                'min_points' => $request->integer('min_points'),
+                'multiplier' => $request->input('multiplier', 1),
+                'cashback_percent' => $request->input('cashback_percent', 0),
+                'benefits_json' => $request->input('benefits_json'),
+                'color' => $request->input('color'),
+                'sort_order' => $request->integer('sort_order', 0),
+                'updated_at' => now(),
+            ]);
+
+        if (! $updated) {
+            return response()->json(['message' => 'Tier non trovato.'], 404);
+        }
+
+        return response()->json(['message' => 'Tier aggiornato.']);
+    }
+
+    public function deleteTier(Request $request, int $tierId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $deleted = DB::table('loyalty_tiers')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $tierId)
+            ->delete();
+
+        if (! $deleted) {
+            return response()->json(['message' => 'Tier non trovato.'], 404);
+        }
+
+        return response()->json(['message' => 'Tier eliminato.']);
+    }
+
+    public function redeemPoints(Request $request, int $customerId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'points' => ['required', 'integer', 'min:1'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $wallet = DB::table('loyalty_wallets')
+            ->where('tenant_id', $tenantId)
+            ->where('customer_id', $customerId)
+            ->first();
+
+        if (! $wallet) {
+            return response()->json(['message' => 'Wallet loyalty non trovato.'], 404);
+        }
+
+        $requestedPoints = (int) $request->integer('points');
+        $currentBalance = (int) $wallet->points_balance;
+
+        if ($requestedPoints > $currentBalance) {
+            return response()->json(['message' => 'Punti insufficienti.'], 422);
+        }
+
+        $monetaryValue = round($requestedPoints * 0.05, 2);
+
+        DB::table('loyalty_wallets')
+            ->where('tenant_id', $tenantId)
+            ->where('customer_id', $customerId)
+            ->update([
+                'points_balance' => DB::raw("points_balance - {$requestedPoints}"),
+                'updated_at' => now(),
+            ]);
+
+        DB::table('loyalty_ledger')->insert([
+            'tenant_id' => $tenantId,
+            'customer_id' => $customerId,
+            'event_type' => 'redeem',
+            'points_delta' => -$requestedPoints,
+            'monetary_value' => $monetaryValue,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $redemptionId = DB::table('loyalty_redemptions')->insertGetId([
+            'tenant_id' => $tenantId,
+            'customer_id' => $customerId,
+            'points_redeemed' => $requestedPoints,
+            'monetary_value' => $monetaryValue,
+            'status' => 'completed',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Punti riscattati.',
+            'redemption_id' => $redemptionId,
+            'points_redeemed' => $requestedPoints,
+            'monetary_value' => $monetaryValue,
+            'remaining_balance' => $currentBalance - $requestedPoints,
+        ]);
+    }
+
+    public function redemptionHistory(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $redemptions = DB::table('loyalty_redemptions as lr')
+            ->leftJoin('customers as c', function ($j) use ($tenantId) {
+                $j->on('c.id', '=', 'lr.customer_id')->where('c.tenant_id', $tenantId);
+            })
+            ->where('lr.tenant_id', $tenantId)
+            ->select(['lr.*', 'c.first_name', 'c.last_name', 'c.code as customer_code'])
+            ->orderByDesc('lr.id')
+            ->limit(100)
+            ->get();
+
+        $stats = DB::table('loyalty_redemptions')
+            ->where('tenant_id', $tenantId)
+            ->selectRaw('COUNT(*) as total_redemptions, COALESCE(SUM(points_redeemed), 0) as total_points, COALESCE(SUM(monetary_value), 0) as total_value')
+            ->first();
+
+        return response()->json([
+            'data' => $redemptions,
+            'stats' => $stats,
+        ]);
+    }
 }

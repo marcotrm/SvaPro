@@ -25,6 +25,11 @@ const PurchaseOrdersPage = lazy(() => import('./pages/PurchaseOrdersPage.jsx'));
 const ReturnsPage = lazy(() => import('./pages/ReturnsPage.jsx'));
 const SupplierInvoicesPage = lazy(() => import('./pages/SupplierInvoicesPage.jsx'));
 const PosPage = lazy(() => import('./pages/PosPage.jsx'));
+const ShippingPage = lazy(() => import('./pages/ShippingPage.jsx'));
+const PromotionsPage = lazy(() => import('./pages/PromotionsPage.jsx'));
+const LoyaltyTiersPage = lazy(() => import('./pages/LoyaltyTiersPage.jsx'));
+const EmployeeKpiPage = lazy(() => import('./pages/EmployeeKpiPage.jsx'));
+const InventoryCountPage = lazy(() => import('./pages/InventoryCountPage.jsx'));
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -116,6 +121,11 @@ export default function App() {
               <Route path="/returns" element={<ReturnsPage />} />
               <Route path="/supplier-invoices" element={<SupplierInvoicesPage />} />
               <Route path="/pos" element={<PosPage />} />
+              <Route path="/shipping" element={<ShippingPage />} />
+              <Route path="/promotions" element={<PromotionsPage />} />
+              <Route path="/loyalty/tiers" element={<LoyaltyTiersPage />} />
+              <Route path="/employees/kpi" element={<EmployeeKpiPage />} />
+              <Route path="/inventory/count" element={<InventoryCountPage />} />
             </Route>
           </Route>
 

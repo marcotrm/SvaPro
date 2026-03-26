@@ -20,6 +20,10 @@ const navGroups = [
         label: 'Magazzino', href: '/inventory', badge: true,
         icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z"/><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd"/></svg>,
       },
+      {
+        label: 'Inventario Guidato', href: '/inventory/count',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 2V5h1v1H5zM3 12a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm2 2v-1h1v1H5zM11 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1V4zm2 2V5h1v1h-1zM11 12a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-3zm2 2v-1h1v1h-1z" clipRule="evenodd"/></svg>,
+      },
     ],
   },
   {
@@ -48,6 +52,14 @@ const navGroups = [
       {
         label: 'POS Cassa', href: '/pos',
         icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/></svg>,
+      },
+      {
+        label: 'Spedizioni', href: '/shipping',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10V5H4zM13 5v9h-1V5h4l3 3v4h-1.05a2.5 2.5 0 00-4.9 0H13z"/></svg>,
+      },
+      {
+        label: 'Promozioni', href: '/promotions',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 5a3 3 0 015-2.236A3 3 0 0114.83 6H16a2 2 0 110 4h-5V9a1 1 0 10-2 0v1H4a2 2 0 110-4h1.17C5.06 5.687 5 5.35 5 5zm4 1V5a1 1 0 10-1 1h1zm2 0a1 1 0 10-1-1v1h1z" clipRule="evenodd"/><path d="M9 11H3v5a2 2 0 002 2h4v-7zm2 7h4a2 2 0 002-2v-5h-6v7z"/></svg>,
       },
     ],
   },
@@ -80,6 +92,10 @@ const navGroups = [
         icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd"/></svg>,
       },
       {
+        label: 'Loyalty Tiers', href: '/loyalty/tiers',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>,
+      },
+      {
         label: 'Push Monitor', href: '/analytics/loyalty/push-monitor',
         icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a4 4 0 00-4 4v1.268A2 2 0 005 9v5l-1 1v1h12v-1l-1-1V9a2 2 0 00-1-1.732V6a4 4 0 00-4-4zm2 5.1V6a2 2 0 10-4 0v1.1A2 2 0 007 9v5h6V9a2 2 0 00-1-1.9z"/></svg>,
       },
@@ -95,6 +111,10 @@ const navGroups = [
       {
         label: 'Dipendenti', href: '/employees',
         icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v1h8v-1zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-1a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v1h-3zM4.75 14.094A5.973 5.973 0 004 17v1H1v-1a3 3 0 013.75-2.906z"/></svg>,
+      },
+      {
+        label: 'KPI Dipendenti', href: '/employees/kpi',
+        icon: <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>,
       },
       {
         label: 'Registro Attività', href: '/audit-log',
@@ -126,6 +146,11 @@ const pageTitles = {
   '/returns': 'Resi & Rimborsi',
   '/supplier-invoices': 'Fatture Passive',
   '/pos': 'POS Cassa',
+  '/shipping': 'Spedizioni',
+  '/promotions': 'Promozioni',
+  '/loyalty/tiers': 'Loyalty Tiers',
+  '/employees/kpi': 'KPI Dipendenti',
+  '/inventory/count': 'Inventario Guidato',
 };
 
 const labelToI18nKey = {
@@ -152,6 +177,11 @@ const labelToI18nKey = {
   'Ordini Acquisto': 'purchase_orders',
   'Fatture Passive': 'supplier_invoices',
   Approvvigionamento: 'procurement',
+  Spedizioni: 'shipping',
+  Promozioni: 'promotions',
+  'Loyalty Tiers': 'loyalty_tiers',
+  'KPI Dipendenti': 'employee_kpi',
+  'Inventario Guidato': 'inventory_count',
 };
 
 export default function Layout({ user, setUser }) {

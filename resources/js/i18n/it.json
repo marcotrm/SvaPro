@@ -20,6 +20,11 @@
   "purchase_orders": "Ordini Acquisto",
   "supplier_invoices": "Fatture Passive",
   "procurement": "Approvvigionamento",
+  "shipping": "Spedizioni",
+  "promotions": "Promozioni",
+  "loyalty_tiers": "Loyalty Tiers",
+  "employee_kpi": "KPI Dipendenti",
+  "inventory_count": "Inventario Guidato",
 
   "total_revenue": "Ricavi Totali",
   "total_orders": "Ordini",

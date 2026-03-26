@@ -234,4 +234,135 @@ class EmployeeController extends Controller
 
         return response()->json(['message' => $count . ' notifiche segnate come lette.']);
     }
+
+    public function kpiDashboard(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
+        $period = $request->input('period', date('Y-m')); // YYYY-MM
+
+        // Current month boundaries
+        $monthStart = $period . '-01';
+        $monthEnd = date('Y-m-t', strtotime($monthStart));
+
+        // Previous month boundaries
+        $prevMonthStart = date('Y-m-01', strtotime($monthStart . ' -1 month'));
+        $prevMonthEnd = date('Y-m-t', strtotime($prevMonthStart));
+
+        // Build employee query with this month's sales
+        $currentSales = DB::table('employee_sales_facts')
+            ->where('tenant_id', $tenantId)
+            ->whereBetween('sold_at', [$monthStart, $monthEnd . ' 23:59:59'])
+            ->groupBy('employee_id')
+            ->selectRaw('employee_id, COUNT(*) as orders_count, COALESCE(SUM(net_amount), 0) as net_sales, COALESCE(SUM(margin_amount), 0) as margin');
+
+        $prevSales = DB::table('employee_sales_facts')
+            ->where('tenant_id', $tenantId)
+            ->whereBetween('sold_at', [$prevMonthStart, $prevMonthEnd . ' 23:59:59'])
+            ->groupBy('employee_id')
+            ->selectRaw('employee_id, COUNT(*) as orders_count, COALESCE(SUM(net_amount), 0) as net_sales, COALESCE(SUM(margin_amount), 0) as margin');
+
+        $employees = DB::table('employees as e')
+            ->leftJoin('stores as s', 's.id', '=', 'e.store_id')
+            ->leftJoinSub($currentSales, 'cs', fn ($j) => $j->on('cs.employee_id', '=', 'e.id'))
+            ->leftJoinSub($prevSales, 'ps', fn ($j) => $j->on('ps.employee_id', '=', 'e.id'))
+            ->leftJoin('employee_kpi_targets as t', function ($j) use ($period) {
+                $j->on('t.employee_id', '=', 'e.id')->where('t.period', '=', $period);
+            })
+            ->where('e.tenant_id', $tenantId)
+            ->where('e.status', 'active')
+            ->when($storeId, fn ($q) => $q->where('e.store_id', $storeId))
+            ->select([
+                'e.id', 'e.first_name', 'e.last_name', 'e.hire_date',
+                's.name as store_name',
+                DB::raw('COALESCE(cs.orders_count, 0) as current_orders'),
+                DB::raw('COALESCE(cs.net_sales, 0) as current_sales'),
+                DB::raw('COALESCE(cs.margin, 0) as current_margin'),
+                DB::raw('COALESCE(ps.orders_count, 0) as prev_orders'),
+                DB::raw('COALESCE(ps.net_sales, 0) as prev_sales'),
+                DB::raw('COALESCE(ps.margin, 0) as prev_margin'),
+                't.sales_target', 't.orders_target',
+            ])
+            ->get()
+            ->map(function ($e) {
+                $e->current_avg_ticket = $e->current_orders > 0 ? round($e->current_sales / $e->current_orders, 2) : 0;
+                $e->prev_avg_ticket = $e->prev_orders > 0 ? round($e->prev_sales / $e->prev_orders, 2) : 0;
+                $e->sales_growth = $e->prev_sales > 0
+                    ? round((($e->current_sales - $e->prev_sales) / $e->prev_sales) * 100, 1)
+                    : ($e->current_sales > 0 ? 100 : 0);
+                $e->target_progress = ($e->sales_target ?? 0) > 0
+                    ? round(($e->current_sales / $e->sales_target) * 100, 1)
+                    : null;
+                return $e;
+            });
+
+        // Aggregated overview
+        $totalCurrentSales = $employees->sum('current_sales');
+        $totalPrevSales = $employees->sum('prev_sales');
+        $totalCurrentOrders = $employees->sum('current_orders');
+
+        $dailySales = DB::table('employee_sales_facts')
+            ->where('tenant_id', $tenantId)
+            ->whereBetween('sold_at', [$monthStart, $monthEnd . ' 23:59:59'])
+            ->when($storeId, function ($q) use ($storeId, $tenantId) {
+                $q->whereIn('employee_id', function ($sub) use ($storeId, $tenantId) {
+                    $sub->select('id')->from('employees')
+                        ->where('tenant_id', $tenantId)->where('store_id', $storeId);
+                });
+            })
+            ->selectRaw('DATE(sold_at) as day, COUNT(*) as orders, COALESCE(SUM(net_amount), 0) as sales')
+            ->groupByRaw('DATE(sold_at)')
+            ->orderBy('day')
+            ->get();
+
+        return response()->json([
+            'overview' => [
+                'period' => $period,
+                'active_employees' => $employees->count(),
+                'total_orders' => (int) $totalCurrentOrders,
+                'total_sales' => round((float) $totalCurrentSales, 2),
+                'total_prev_sales' => round((float) $totalPrevSales, 2),
+                'sales_growth' => $totalPrevSales > 0
+                    ? round((($totalCurrentSales - $totalPrevSales) / $totalPrevSales) * 100, 1)
+                    : 0,
+                'avg_ticket' => $totalCurrentOrders > 0
+                    ? round($totalCurrentSales / $totalCurrentOrders, 2)
+                    : 0,
+            ],
+            'employees' => $employees->sortByDesc('current_sales')->values(),
+            'daily_trend' => $dailySales,
+        ]);
+    }
+
+    public function setKpiTarget(Request $request, int $employeeId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'period' => ['required', 'regex:/^\d{4}-\d{2}$/'],
+            'sales_target' => ['nullable', 'numeric', 'min:0'],
+            'orders_target' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if (! DB::table('employees')->where('tenant_id', $tenantId)->where('id', $employeeId)->exists()) {
+            return response()->json(['message' => 'Dipendente non trovato.'], 404);
+        }
+
+        DB::table('employee_kpi_targets')->updateOrInsert(
+            ['employee_id' => $employeeId, 'period' => $request->input('period')],
+            [
+                'tenant_id' => $tenantId,
+                'sales_target' => $request->input('sales_target', 0),
+                'orders_target' => $request->integer('orders_target', 0),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+
+        return response()->json(['message' => 'Target KPI impostato.']);
+    }
 }
