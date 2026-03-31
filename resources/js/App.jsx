@@ -26,10 +26,13 @@ const ReturnsPage = lazy(() => import('./pages/ReturnsPage.jsx'));
 const SupplierInvoicesPage = lazy(() => import('./pages/SupplierInvoicesPage.jsx'));
 const PosPage = lazy(() => import('./pages/PosPage.jsx'));
 const ShippingPage = lazy(() => import('./pages/ShippingPage.jsx'));
+const LoyaltyCardPage = lazy(() => import('./pages/LoyaltyCardPage.jsx'));
 const PromotionsPage = lazy(() => import('./pages/PromotionsPage.jsx'));
 const LoyaltyTiersPage = lazy(() => import('./pages/LoyaltyTiersPage.jsx'));
 const EmployeeKpiPage = lazy(() => import('./pages/EmployeeKpiPage.jsx'));
 const InventoryCountPage = lazy(() => import('./pages/InventoryCountPage.jsx'));
+
+const EmployeePurchasesPage = lazy(() => import('./pages/EmployeePurchasesPage.jsx'));
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -108,6 +111,7 @@ export default function App() {
               <Route path="/inventory/smart-reorder" element={<SmartReorderPage />} />
               <Route path="/customers" element={<CustomersPage />} />
               <Route path="/employees" element={<EmployeesPage />} />
+              <Route path="/employee-purchases" element={<EmployeePurchasesPage />} />
               <Route path="/analytics/loyalty" element={<LoyaltyAnalyticsPage />} />
               <Route path="/analytics/loyalty/push-monitor" element={<LoyaltyPushMonitoringPage />} />
               <Route path="/control-tower" element={<ControlTowerPage />} />
@@ -128,6 +132,8 @@ export default function App() {
               <Route path="/inventory/count" element={<InventoryCountPage />} />
             </Route>
           </Route>
+
+          <Route path="/loyalty-card/:uuid" element={<LoyaltyCardPage />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

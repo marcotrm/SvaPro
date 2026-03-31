@@ -9,9 +9,10 @@ use Illuminate\Http\Request;
 
 class SmartInventoryController extends Controller
 {
-    public function __construct(private readonly SmartReorderService $service)
-    {
-    }
+    public function __construct(
+        private readonly SmartReorderService $service,
+        private readonly \App\Services\ForecastingService $forecastService
+    ) {}
 
     public function preview(Request $request): JsonResponse
     {
@@ -81,5 +82,11 @@ class SmartInventoryController extends Controller
         return $sent
             ? response()->json(['message' => 'Email inviata al fornitore.'])
             : response()->json(['message' => 'Impossibile inviare l\'email. Verificare l\'email del fornitore.'], 422);
+    }
+
+    public function forecast(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        return response()->json(['data' => $this->forecastService->getForecastForTenant($tenantId)]);
     }
 }

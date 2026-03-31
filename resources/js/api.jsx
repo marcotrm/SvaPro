@@ -1,3 +1,49 @@
+// Gestione errori personalizzata globale
+const errorMap = [
+  {
+    match: msg => msg.includes('The POST method is not supported for route'),
+    userMessage: 'Operazione non consentita: azione non supportata su questa pagina.'
+  },
+  {
+    match: msg => msg.includes('Unauthenticated'),
+    userMessage: 'Sessione scaduta. Effettua di nuovo il login.'
+  },
+  {
+    match: msg => msg.includes('permission'),
+    userMessage: 'Non hai i permessi necessari per questa operazione.'
+  },
+  {
+    match: msg => msg.includes('Network Error'),
+    userMessage: 'Errore di rete: controlla la connessione internet.'
+  },
+  {
+    match: msg => msg.includes('timeout'),
+    userMessage: 'Timeout della richiesta: il server non ha risposto in tempo.'
+  },
+  {
+    match: msg => msg.includes('404'),
+    userMessage: 'Risorsa non trovata.'
+  },
+  {
+    match: msg => msg.includes('422'),
+    userMessage: 'Dati non validi o mancanti. Controlla i campi e riprova.'
+  },
+  // Aggiungi altri mapping qui...
+];
+
+api.interceptors.response.use(
+  response => response,
+  error => {
+    let msg = error?.response?.data?.message || error?.message || 'Errore sconosciuto.';
+    for (const rule of errorMap) {
+      if (msg && rule.match(msg)) {
+        error.userFriendlyMessage = rule.userMessage;
+        break;
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 import axios from 'axios';
 
 // API configuration
@@ -283,6 +329,10 @@ api.interceptors.request.use((config) => {
   }
   config.headers['X-Tenant-Code'] = tenantCode;
 
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+
   if (selectedStoreId) {
     config.headers['X-Store-Id'] = String(selectedStoreId);
     config.params = {
@@ -376,7 +426,14 @@ export const catalog = {
   getProducts: (params = {}) => cachedGet('/catalog/products', params, 30000, 300000),
   getProduct: (id) => api.get(`/catalog/products/${id}`),
   createProduct: (data) => api.post('/catalog/products', data),
-  updateProduct: (id, data) => api.put(`/catalog/products/${id}`, data),
+  updateProduct: (id, data) => {
+    if (data instanceof FormData) {
+      data.append('_method', 'PUT');
+      return api.post(`/catalog/products/${id}`, data);
+    }
+    return api.put(`/catalog/products/${id}`, data);
+  },
+  importProducts: (formData) => api.post('/catalog/products/import', formData),
   getBrands: () => api.get('/catalog/brands'),
   getCategories: () => api.get('/catalog/categories'),
   getTaxClasses: () => api.get('/catalog/tax-classes'),
@@ -409,6 +466,8 @@ export const inventory = {
   getSmartReorderPreview: (params = {}) => cachedGet('/inventory/smart-reorder/preview', params, 20000, 180000),
   runSmartReorder: (data = {}) => api.post('/inventory/smart-reorder/run', data),
   runSmartReorderAuto: (data = {}) => api.post('/inventory/smart-reorder/run-auto', data),
+  getHealthScan: () => api.get('/health-scan'),
+  getForecast: () => api.get('/inventory/forecast'),
 };
 
 // Customer APIs

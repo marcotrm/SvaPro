@@ -315,16 +315,46 @@ HTML;
         $body = "Gentile {$supplier->name},\n\n";
         $body .= "Di seguito l'elenco dei prodotti da riordinare per {$tenantName}:\n\n";
 
+        $rowsHtml = '';
         foreach ($alerts as $alert) {
             $body .= "- {$alert['product_name']} — Qtà suggerita: {$alert['suggested_qty']} — Costo un.: €" . number_format($alert['unit_cost'], 2, ',', '.') . "\n";
+            $rowsHtml .= '<tr>'
+                . '<td style="padding:3px 6px;border-bottom:1px solid #ddd;">' . htmlspecialchars($alert['store_name'], ENT_QUOTES, 'UTF-8') . '</td>'
+                . '<td style="padding:3px 6px;border-bottom:1px solid #ddd;">' . htmlspecialchars($alert['product_name'], ENT_QUOTES, 'UTF-8') . '</td>'
+                . '<td style="padding:3px 6px;border-bottom:1px solid #ddd;text-align:right;">' . $alert['suggested_qty'] . '</td>'
+                . '<td style="padding:3px 6px;border-bottom:1px solid #ddd;text-align:right;">€ ' . number_format($alert['unit_cost'], 2, ',', '.') . '</td>'
+                . '</tr>';
         }
 
-        $body .= "\nGrazie per la collaborazione.\n{$tenantName}";
+        $body .= "\nSi veda il file PDF allegato per maggiori dettagli.\n\nGrazie per la collaborazione.\n{$tenantName}";
+
+        $date = now()->format('d/m/Y H:i');
+        $htmlCount = $this->count($alerts);
+        $html = <<<HTML
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ordine Fornitore</title></head>
+<body style="font-family:DejaVu Sans,sans-serif;font-size:12px;margin:25px;">
+<h2>{$tenantName} — Richiesta Riordino a {$supplier->name}</h2>
+<p style="color:#666;font-size:11px;">Generato il {$date} — {$htmlCount} prodotti totali</p>
+<table style="width:100%;border-collapse:collapse;margin-top:15px;">
+<thead><tr style="background:#f0f0f0;">
+<th style="padding:5px 6px;text-align:left;border-bottom:2px solid #333;">Negozio</th>
+<th style="padding:5px 6px;text-align:left;border-bottom:2px solid #333;">Prodotto</th>
+<th style="padding:5px 6px;text-align:right;border-bottom:2px solid #333;">Qtà Richiesta</th>
+<th style="padding:5px 6px;text-align:right;border-bottom:2px solid #333;">Costo Un.</th>
+</tr></thead>
+<tbody>{$rowsHtml}</tbody>
+</table></body></html>
+HTML;
+
+        $pdfData = Pdf::loadHTML($html)->setPaper('A4', 'portrait')->output();
 
         try {
-            Mail::raw($body, function ($message) use ($supplier, $tenantName) {
+            Mail::raw($body, function ($message) use ($supplier, $tenantName, $pdfData) {
                 $message->to($supplier->email)
-                    ->subject("Richiesta Riordino — {$tenantName}");
+                    ->subject("Richiesta Riordino — {$tenantName}")
+                    ->attachData($pdfData, 'ordine_riordino.pdf', [
+                        'mime' => 'application/pdf',
+                    ]);
             });
             return true;
         } catch (\Throwable $e) {

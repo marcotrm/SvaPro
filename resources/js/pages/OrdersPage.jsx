@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { orders, getOfflineSalesQueueSize, onOfflineSalesQueueChanged, syncOfflineSalesNow } from '../api.jsx';
 import { OrdersSkeleton } from '../components/Skeleton.jsx';
@@ -13,11 +13,25 @@ export default function OrdersPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [suppliersList, setSuppliersList] = useState([]);
   const [offlineQueueSize, setOfflineQueueSize] = useState(getOfflineSalesQueueSize());
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncingOffline, setSyncingOffline] = useState(false);
 
-  useEffect(() => { fetchOrders(); }, [selectedStoreId]);
+  useEffect(() => { fetchOrders(); }, [selectedStoreId, supplierFilter, typeFilter]);
+
+  useEffect(() => {
+    const fetchSelectData = async () => {
+      try {
+        const { default: api, suppliers } = await import('../api.jsx');
+        const suppRes = await suppliers.getAll();
+        setSuppliersList(suppRes.data?.data || []);
+      } catch (err) { }
+    };
+    fetchSelectData();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onOfflineSalesQueueChanged((size) => setOfflineQueueSize(size));
@@ -36,7 +50,12 @@ export default function OrdersPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true); setError('');
-      const response = await orders.getOrders(selectedStoreId ? { store_id: selectedStoreId } : {});
+      const params = {};
+      if (selectedStoreId) params.store_id = selectedStoreId;
+      if (supplierFilter) params.supplier_id = supplierFilter;
+      if (typeFilter) params.product_type = typeFilter;
+      
+      const response = await orders.getOrders(params);
       setOrdersList(response.data.data || []);
     } catch (err) {
       setError(err.message || 'Errore nel caricamento degli ordini');
@@ -117,6 +136,30 @@ export default function OrdersPage() {
               {s === 'all' ? 'Tutti' : statusLabel[s]}
             </button>
           ))}
+          <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
+            <select 
+              value={supplierFilter} 
+              onChange={e => setSupplierFilter(e.target.value)}
+              className="px-2 py-1 text-sm border border-gray-300 rounded-md outline-none"
+            >
+              <option value="">Tutti i fornitori</option>
+              {suppliersList.map(sup => (
+                <option key={sup.id} value={sup.id}>{sup.name}</option>
+              ))}
+            </select>
+            <select 
+              value={typeFilter} 
+              onChange={e => setTypeFilter(e.target.value)}
+              className="px-2 py-1 text-sm border border-gray-300 rounded-md outline-none"
+            >
+              <option value="">Tutti i tipi</option>
+              <option value="liquid">Liquido</option>
+              <option value="device">Device</option>
+              <option value="accessory">Accessorio</option>
+              <option value="consumable">Consumabile</option>
+              <option value="other">Altro</option>
+            </select>
+          </div>
           <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>
             {filtered.length} risultati
           </span>

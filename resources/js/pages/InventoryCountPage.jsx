@@ -45,7 +45,7 @@ export default function InventoryCountPage() {
       });
       setWarehouses(Array.from(whMap.values()));
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setError(err);
     } finally { setLoading(false); }
   };
 
@@ -64,7 +64,7 @@ export default function InventoryCountPage() {
         await loadSessionDetail(res.data.session_id);
       }
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setError(err);
     } finally { setCreating(false); }
   };
 
@@ -76,7 +76,7 @@ export default function InventoryCountPage() {
       setSessionLines(res.data?.lines || []);
       setTab('counting');
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setError(err);
     }
   };
 
@@ -108,7 +108,7 @@ export default function InventoryCountPage() {
       setTab('sessions');
       await fetchAll();
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setError(err);
     } finally { setFinalizing(false); }
   };
 

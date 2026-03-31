@@ -23,7 +23,13 @@ use App\Http\Controllers\Api\SmartInventoryController;
 use App\Http\Controllers\Api\StoreController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\SupplierInvoiceController;
+use App\Http\Controllers\Api\HealthScanController;
+use App\Http\Controllers\Api\LoyaltyCardController;
+use App\Http\Controllers\Api\WooCommerceWebhookController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/loyalty-card/{uuid}', [LoyaltyCardController::class, 'show']);
+Route::post('/webhooks/woocommerce/order', [WooCommerceWebhookController::class, 'handleOrder']);
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
 
@@ -51,6 +57,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/catalog/brands', [CatalogController::class, 'brands']);
         Route::get('/catalog/categories', [CatalogController::class, 'categories']);
         Route::get('/catalog/tax-classes', [CatalogController::class, 'taxClasses']);
+        Route::post('/catalog/products/import', [CatalogController::class, 'import'])->middleware('permission:catalog.manage');
         Route::post('/catalog/products', [CatalogController::class, 'store'])->middleware('permission:catalog.manage');
         Route::put('/catalog/products/{productId}', [CatalogController::class, 'update'])->middleware('permission:catalog.manage');
 
@@ -99,9 +106,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/inventory/smart-reorder/preview', [SmartInventoryController::class, 'preview']);
         Route::post('/inventory/smart-reorder/run', [SmartInventoryController::class, 'run'])->middleware('permission:inventory.manage');
         Route::post('/inventory/smart-reorder/run-auto', [SmartInventoryController::class, 'runAutoToCentral'])->middleware('permission:inventory.manage');
-        Route::get('/inventory/smart-reorder/export-csv', [SmartInventoryController::class, 'exportCsv']);
         Route::get('/inventory/smart-reorder/export-pdf', [SmartInventoryController::class, 'exportPdf']);
         Route::post('/inventory/smart-reorder/email-supplier', [SmartInventoryController::class, 'emailSupplier']);
+        Route::get('/inventory/forecast', [SmartInventoryController::class, 'forecast']);
+
+        // Health Scan
+        Route::get('/health-scan', [HealthScanController::class, 'index']);
 
         // Exports
         Route::get('/export/orders', [ExportController::class, 'exportOrders']);

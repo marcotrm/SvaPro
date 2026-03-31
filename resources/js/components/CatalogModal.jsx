@@ -49,6 +49,7 @@ const normalizeProduct = (product, storesList, selectedStoreId = '') => {
     sku: product?.sku || '',
     name: product?.name || '',
     product_type: product?.product_type || 'liquid',
+    pli_code: product?.pli_code || '',
     barcode: product?.barcode || '',
     default_supplier_id: product?.default_supplier_id ?? '',
     nicotine_mg: product?.nicotine_mg ?? '',
@@ -57,18 +58,31 @@ const normalizeProduct = (product, storesList, selectedStoreId = '') => {
     min_stock_qty: product?.min_stock_qty ?? 0,
     auto_reorder_enabled: product?.auto_reorder_enabled ?? true,
     store_ids: storeIds.length > 0 ? storeIds : defaultStoreIds,
+    image_url: product?.image_url || null,
+    image: null,
     variants: product?.variants?.length ? product.variants.map(normalizeVariant) : [createEmptyVariant()],
   };
 };
 
-export default function CatalogModal({ product, storesList = [], selectedStoreId = '', onClose, onSave }) {
+export default function CatalogModal({ product, storesList = [], suppliers = [], selectedStoreId = '', onClose, onSave }) {
   const [formData, setFormData] = useState(() => normalizeProduct(product, storesList, selectedStoreId));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // imagePreview state for local file selection
+  const [imagePreview, setImagePreview] = useState(product?.image_url || null);
 
   useEffect(() => {
     setFormData(normalizeProduct(product, storesList, selectedStoreId));
+    setImagePreview(product?.image_url || null);
   }, [product, storesList, selectedStoreId]);
+
+  const handleImageChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setFormData(prev => ({ ...prev, image: file }));
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -111,32 +125,42 @@ export default function CatalogModal({ product, storesList = [], selectedStoreId
     });
   };
 
-  const buildPayload = () => ({
-    sku: formData.sku,
-    name: formData.name,
-    product_type: formData.product_type,
-    barcode: formData.barcode || null,
-    default_supplier_id: formData.default_supplier_id === '' ? null : Number(formData.default_supplier_id),
-    nicotine_mg: formData.nicotine_mg === '' ? null : Number(formData.nicotine_mg),
-    volume_ml: formData.volume_ml === '' ? null : Number(formData.volume_ml),
-    auto_reorder_enabled: Boolean(formData.auto_reorder_enabled),
-    reorder_days: Number(formData.reorder_days || 30),
-    min_stock_qty: Number(formData.min_stock_qty || 0),
-    store_ids: formData.store_ids,
-    variants: formData.variants.map((variant) => ({
-      ...(variant.id ? { id: variant.id } : {}),
-      sale_price: Number(variant.sale_price || 0),
-      cost_price: Number(variant.cost_price || 0),
-      pack_size: Number(variant.pack_size || 1),
-      flavor: variant.flavor || null,
-      resistance_ohm: variant.resistance_ohm || null,
-      tax_class_id: variant.tax_class_id === '' ? null : Number(variant.tax_class_id),
-      excise_profile_code: variant.excise_profile_code || null,
-      excise_unit_amount_override: variant.excise_unit_amount_override === '' ? null : Number(variant.excise_unit_amount_override),
-      prevalenza_code: variant.prevalenza_code || null,
-      prevalenza_label: variant.prevalenza_label || null,
-    })),
-  });
+  const buildPayload = () => {
+    const fd = new FormData();
+    fd.append('sku', formData.sku);
+    fd.append('name', formData.name);
+    fd.append('product_type', formData.product_type);
+    if (formData.pli_code) fd.append('pli_code', formData.pli_code);
+    if (formData.barcode) fd.append('barcode', formData.barcode);
+    if (formData.default_supplier_id !== '') fd.append('default_supplier_id', formData.default_supplier_id);
+    if (formData.nicotine_mg !== '') fd.append('nicotine_mg', formData.nicotine_mg);
+    if (formData.volume_ml !== '') fd.append('volume_ml', formData.volume_ml);
+    fd.append('auto_reorder_enabled', formData.auto_reorder_enabled ? '1' : '0');
+    fd.append('reorder_days', formData.reorder_days || 30);
+    fd.append('min_stock_qty', formData.min_stock_qty || 0);
+
+    formData.store_ids.forEach(id => fd.append('store_ids[]', id));
+
+    formData.variants.forEach((variant, index) => {
+      if (variant.id) fd.append(`variants[${index}][id]`, variant.id);
+      fd.append(`variants[${index}][sale_price]`, Number(variant.sale_price || 0));
+      fd.append(`variants[${index}][cost_price]`, Number(variant.cost_price || 0));
+      fd.append(`variants[${index}][pack_size]`, Number(variant.pack_size || 1));
+      if (variant.flavor) fd.append(`variants[${index}][flavor]`, variant.flavor);
+      if (variant.resistance_ohm) fd.append(`variants[${index}][resistance_ohm]`, variant.resistance_ohm);
+      if (variant.tax_class_id !== '') fd.append(`variants[${index}][tax_class_id]`, variant.tax_class_id);
+      if (variant.excise_profile_code) fd.append(`variants[${index}][excise_profile_code]`, variant.excise_profile_code);
+      if (variant.excise_unit_amount_override !== '') fd.append(`variants[${index}][excise_unit_amount_override]`, variant.excise_unit_amount_override);
+      if (variant.prevalenza_code) fd.append(`variants[${index}][prevalenza_code]`, variant.prevalenza_code);
+      if (variant.prevalenza_label) fd.append(`variants[${index}][prevalenza_label]`, variant.prevalenza_label);
+    });
+
+    if (formData.image) {
+      fd.append('image', formData.image);
+    }
+    
+    return fd;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -191,126 +215,135 @@ export default function CatalogModal({ product, storesList = [], selectedStoreId
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome Prodotto *</label>
               <input
                 type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                 required
               />
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
-              <input
-                type="text"
-                name="sku"
-                value={formData.sku}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo prodotto</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Prodotto</label>
               <select
                 name="product_type"
                 value={formData.product_type}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
               >
                 {PRODUCT_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>{type.label}</option>
                 ))}
               </select>
             </div>
+          </div>
 
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Barcode</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label>
+              <input
+                type="text"
+                name="sku"
+                value={formData.sku}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Codice a Barre (Barcode)</label>
               <input
                 type="text"
                 name="barcode"
                 value={formData.barcode}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder="Scansiona qui..."
               />
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Supplier ID</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">PLI Code</label>
               <input
-                type="number"
-                min="1"
-                name="default_supplier_id"
-                value={formData.default_supplier_id}
+                type="text"
+                name="pli_code"
+                value={formData.pli_code}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Volume ml</label>
-              <input
-                type="number"
-                min="0"
-                name="volume_ml"
-                value={formData.volume_ml}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nicotina mg</label>
-              <input
-                type="number"
-                min="0"
-                name="nicotine_mg"
-                value={formData.nicotine_mg}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Giorni riordino</label>
-              <input
-                type="number"
-                min="1"
-                name="reorder_days"
-                value={formData.reorder_days}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Stock minimo</label>
-              <input
-                type="number"
-                min="0"
-                name="min_stock_qty"
-                value={formData.min_stock_qty}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
               />
             </div>
           </div>
 
-          <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-            <input
-              type="checkbox"
-              name="auto_reorder_enabled"
-              checked={Boolean(formData.auto_reorder_enabled)}
-              onChange={handleChange}
-            />
-            Riordino automatico abilitato
-          </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Immagine Prodotto</label>
+              <div className="mt-1 flex items-center gap-4 p-3 border-2 border-dashed border-gray-200 rounded-xl">
+                {formData.image_url || imagePreview ? (
+                  <img src={imagePreview || formData.image_url} alt="Preview" className="w-16 h-16 object-cover rounded-lg shadow-sm border border-gray-100" />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-50 flex items-center justify-center rounded-lg text-gray-400">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fornitore Predefinito</label>
+                <select name="default_supplier_id" value={formData.default_supplier_id} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none">
+                  <option value="">Nessuno</option>
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="auto_reorder_enabled"
+                  checked={Boolean(formData.auto_reorder_enabled)}
+                  onChange={handleChange}
+                  className="rounded text-indigo-600 focus:ring-indigo-500"
+                />
+                Abilita Riordino Automatico
+              </label>
+            </div>
+          </div>
+
+          <details className="group border-t border-gray-100 pt-4">
+            <summary className="flex items-center justify-between cursor-pointer list-none text-sm font-medium text-indigo-600 hover:text-indigo-700">
+              <span>Caratteristiche Tecniche (Nicotina, Volume, Riordino)</span>
+              <span className="transition group-open:rotate-180">
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 9l-7 7-7-7"/></svg>
+              </span>
+            </summary>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 bg-gray-50 p-4 rounded-xl">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Nicotina (mg)</label>
+                <input type="number" name="nicotine_mg" value={formData.nicotine_mg} onChange={handleChange} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Volume (ml)</label>
+                <input type="number" name="volume_ml" value={formData.volume_ml} onChange={handleChange} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Lead Time (Giorni)</label>
+                <input type="number" name="reorder_days" value={formData.reorder_days} onChange={handleChange} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Min Stock</label>
+                <input type="number" name="min_stock_qty" value={formData.min_stock_qty} onChange={handleChange} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
+              </div>
+            </div>
+          </details>
 
           <div>
             <div className="flex items-center justify-between mb-3">

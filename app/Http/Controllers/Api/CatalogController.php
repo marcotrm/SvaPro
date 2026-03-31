@@ -113,6 +113,93 @@ class CatalogController extends Controller
         return response()->json(['data' => $data]);
     }
 
+    public function import(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'file' => ['required', 'file', 'mimes:csv,txt'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $file = $request->file('file');
+        $handle = fopen($file->getRealPath(), 'r');
+        
+        // Salta l'header
+        fgetcsv($handle, 1000, ',');
+        
+        $importedCount = 0;
+        $now = now();
+        $storeIds = DB::table('stores')->where('tenant_id', $tenantId)->pluck('id');
+
+        while (($data = fgetcsv($handle, 1000, ',')) !== false) {
+            if (count($data) < 4) continue;
+            
+            $sku = trim($data[0] ?? '');
+            $name = trim($data[1] ?? '');
+            $type = trim($data[2] ?? 'liquid');
+            $price = (float) trim($data[3] ?? '0');
+            
+            if (!$sku || !$name) continue;
+            
+            $existingProduct = DB::table('products')->where('tenant_id', $tenantId)->where('sku', $sku)->first();
+            
+            if (!$existingProduct) {
+                // Insert new product
+                $productId = DB::table('products')->insertGetId([
+                    'tenant_id' => $tenantId,
+                    'sku' => $sku,
+                    'name' => $name,
+                    'product_type' => $type,
+                    'auto_reorder_enabled' => true,
+                    'reorder_days' => 30,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+                
+                $variantId = DB::table('product_variants')->insertGetId([
+                    'tenant_id' => $tenantId,
+                    'product_id' => $productId,
+                    'sale_price' => $price,
+                    'pack_size' => 1,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+                
+                $variantStoreRows = [];
+                foreach ($storeIds as $storeId) {
+                    $variantStoreRows[] = [
+                        'tenant_id' => $tenantId,
+                        'store_id' => $storeId,
+                        'product_variant_id' => $variantId,
+                        'is_enabled' => true,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+                
+                if (!empty($variantStoreRows)) {
+                    DB::table('store_product_variants')->insert($variantStoreRows);
+                }
+                $importedCount++;
+            }
+        }
+        fclose($handle);
+
+        try {
+            app(\App\Services\WooCommerceSyncService::class)->syncProductsForTenant($tenantId);
+        } catch (\Throwable $e) {}
+
+        AuditLogger::log($request, 'import', 'product', 0, "Importati {$importedCount} nuovi prodotti da CSV");
+
+        return response()->json(['message' => "Importazione completata con successo. {$importedCount} prodotti nuovi importati."]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
@@ -180,6 +267,8 @@ class CatalogController extends Controller
             'product_type' => ['required', 'string', 'max:50'],
             'pli_code' => ['nullable', 'string', 'max:50'],
             'barcode' => ['nullable', 'string', 'max:100'],
+            'image' => ['nullable', 'image', 'max:2048'],
+            'image_url' => ['nullable', 'string', 'max:255'],
             'brand_id' => ['nullable', 'integer'],
             'category_id' => ['nullable', 'integer'],
             'default_supplier_id' => ['nullable', 'integer'],
@@ -300,6 +389,13 @@ class CatalogController extends Controller
             'updated_at' => $now,
         ];
 
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('products', 'public');
+            $payload['image_url'] = '/storage/' . $path;
+        } elseif ($request->exists('image_url')) {
+            $payload['image_url'] = $request->input('image_url');
+        }
+
         if ($productId === null) {
             $payload['created_at'] = $now;
             $productId = DB::table('products')->insertGetId($payload);
@@ -393,6 +489,13 @@ class CatalogController extends Controller
                     ->delete();
             }
         });
+
+        // Sincronizzazione automatica WooCommerce
+        try {
+            app(\App\Services\WooCommerceSyncService::class)->syncProductsForTenant($tenantId);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Auto-sync failed for product {$productId}: " . $e->getMessage());
+        }
 
         return $productId;
     }

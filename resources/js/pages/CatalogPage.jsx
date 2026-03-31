@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { catalog } from '../api.jsx';
+import { catalog, suppliers } from '../api.jsx';
 import { CatalogSkeleton } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
@@ -13,22 +13,48 @@ export default function CatalogPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [suppliersList, setSuppliersList] = useState([]);
   useEffect(() => { fetchProducts(); }, [selectedStoreId]);
 
   const fetchProducts = async () => {
     try {
-      setLoading(true); setError('');
-      const productsResponse = await catalog.getProducts(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 });
-
-      setProducts(productsResponse.data.data || []);
+      setLoading(true);
+      setError('');
+      const productsRes = await catalog.getProducts(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 });
+      setProducts(productsRes.data.data || []);
+      
+      const suppliersRes = await suppliers.getAll();
+      setSuppliersList(suppliersRes.data.data || []);
     } catch (err) {
-      setError(err.message || 'Errore nel caricamento dei prodotti');
-    } finally { setLoading(false); }
+      setError(err.message || 'Errore nel caricamento dei dati');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOpenModal = (product = null) => { setSelectedProduct(product); setShowModal(true); };
   const handleCloseModal = () => { setShowModal(false); setSelectedProduct(null); };
   const handleSaveProduct = async () => { await fetchProducts(); handleCloseModal(); };
+
+  const handleImportCSV = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      setLoading(true);
+      setError('');
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      await catalog.importProducts(formData);
+      await fetchProducts();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Errore importazione CSV');
+    } finally {
+      setLoading(false);
+      e.target.value = null; // reset input
+    }
+  };
 
   const filtered = products.filter(p =>
     p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -67,10 +93,17 @@ export default function CatalogPage() {
             {products.length} prodotti nel database{selectedStore ? ` - Store: ${selectedStore.name}` : ''}
           </div>
         </div>
-        <button className="btn btn-gold" onClick={() => handleOpenModal()}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nuovo Prodotto
-        </button>
+        <div style={{display:'flex', gap: '8px'}}>
+          <label className="btn btn-light" style={{cursor: 'pointer'}}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Importa CSV
+            <input type="file" accept=".csv" style={{display: 'none'}} onChange={handleImportCSV} />
+          </label>
+          <button className="btn btn-gold" onClick={() => handleOpenModal()}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nuovo Prodotto
+          </button>
+        </div>
       </div>
 
       {error && <ErrorAlert message={error} onRetry={fetchProducts} />}
@@ -94,7 +127,7 @@ export default function CatalogPage() {
           <thead>
             <tr>
               <th>Nome</th>
-              <th>SKU</th>
+              <th>SKU / PLI</th>
               <th>Variante Principale</th>
               <th>Prezzo</th>
               <th>Accise / Prevalenza</th>
@@ -105,8 +138,24 @@ export default function CatalogPage() {
           <tbody>
             {filtered.length > 0 ? filtered.map(product => (
               <tr key={product.id}>
-                <td style={{fontWeight:600,color:'var(--text)'}}>{product.name}</td>
-                <td><span className="mono" style={{color:'var(--muted2)'}}>{product.sku}</span></td>
+                <td style={{fontWeight:600,color:'var(--text)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                    {product.image_url ? (
+                      <img src={product.image_url} alt="img" style={{width:24,height:24,borderRadius:4,objectFit:'cover'}} />
+                    ) : (
+                      <div style={{width:24,height:24,borderRadius:4,backgroundColor:'var(--muted-bg)'}} />
+                    )}
+                    {product.name}
+                  </div>
+                </td>
+                <td>
+                  <span className="mono" style={{color:'var(--muted2)'}}>{product.sku}</span>
+                  {product.pli_code && (
+                    <div style={{fontSize:'0.75rem',marginTop:2,color:'var(--text)',fontWeight:500}}>
+                      PLI: {product.pli_code}
+                    </div>
+                  )}
+                </td>
                 <td style={{color:'var(--muted2)'}}>{getPrimaryVariant(product)?.flavor || getPrimaryVariant(product)?.resistance_ohm || '-'}</td>
                 <td><span className="mono positive">€{Number(getPrimaryVariant(product)?.sale_price || 0).toFixed(2)}</span></td>
                 <td style={{color:'var(--muted2)', maxWidth: 220}}>{getFiscalSummary(product)}</td>
@@ -142,6 +191,7 @@ export default function CatalogPage() {
         <CatalogModal
           product={selectedProduct}
           storesList={storesList}
+          suppliers={suppliersList}
           selectedStoreId={selectedStoreId}
           onClose={handleCloseModal}
           onSave={handleSaveProduct}

@@ -142,11 +142,20 @@ class CustomerReturnController extends Controller
         }
         DB::table('customer_return_lines')->insert($lines);
 
-        AuditLogger::log($tenantId, $request->user()->id, 'customer_return.created', 'customer_returns', $returnId, null, [
+        $pdfUrl = null;
+        try {
+            $html = "<h1>Reso Merci (RMA: {$rma})</h1><p>Totale Rimborso Stimato: EUR " . number_format($refundAmount, 2) . "</p>";
+            $pdfContent = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->output();
+            $path = "returns/{$tenantId}/{$rma}.pdf";
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdfContent);
+            $pdfUrl = '/storage/' . $path;
+        } catch (\Throwable $e) {}
+
+        AuditLogger::log($request, 'customer_return.created', 'customer_returns', $returnId, "RMA {$rma}", [
             'rma_number' => $rma,
             'order_id'   => $data['order_id'],
             'reason'     => $data['reason'],
-        ]);
+        ], $pdfUrl);
 
         return response()->json(['id' => $returnId, 'rma_number' => $rma], 201);
     }
@@ -204,7 +213,7 @@ class CustomerReturnController extends Controller
             $this->restockItems($return, $tenantId);
         }
 
-        AuditLogger::log($tenantId, $request->user()->id, 'customer_return.status_changed', 'customer_returns', $id, ['status' => $return->status], $update);
+        AuditLogger::log($request, 'customer_return.status_changed', 'customer_returns', $id, "RMA Status: {$return->status}", $update);
 
         return response()->json(['message' => 'Stato reso aggiornato.']);
     }

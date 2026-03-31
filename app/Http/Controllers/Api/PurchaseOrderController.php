@@ -18,6 +18,7 @@ class PurchaseOrderController extends Controller
         $validator = Validator::make($request->all(), [
             'status' => ['nullable', 'in:all,draft,sent,partial,received,cancelled'],
             'supplier_id' => ['nullable', 'integer'],
+            'product_type' => ['nullable', 'string', 'max:50'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:500'],
         ]);
 
@@ -36,6 +37,18 @@ class PurchaseOrderController extends Controller
             ->where('po.tenant_id', $tenantId)
             ->when($status !== 'all', fn ($q) => $q->where('po.status', $status))
             ->when($request->filled('supplier_id'), fn ($q) => $q->where('po.supplier_id', (int) $request->integer('supplier_id')))
+            ->when($request->filled('product_type'), function ($query) use ($request, $tenantId) {
+                $productType = (string) $request->input('product_type');
+                $query->whereExists(function ($sub) use ($productType, $tenantId) {
+                    $sub->select(DB::raw(1))
+                        ->from('purchase_order_lines as pol')
+                        ->join('product_variants as pv_t', 'pv_t.id', '=', 'pol.product_variant_id')
+                        ->join('products as p_t', 'p_t.id', '=', 'pv_t.product_id')
+                        ->whereColumn('pol.purchase_order_id', 'po.id')
+                        ->where('p_t.tenant_id', $tenantId)
+                        ->where('p_t.product_type', $productType);
+                });
+            })
             ->select([
                 'po.id',
                 'po.supplier_id',

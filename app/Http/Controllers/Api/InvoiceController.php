@@ -112,7 +112,26 @@ class InvoiceController extends Controller
 
         $invoice = DB::table('invoices')->where('id', $invoiceId)->first();
 
-        AuditLogger::log($request, 'invoice_generated', 'invoice', $invoiceId, $invoiceNumber);
+        $pdfUrl = null;
+        try {
+            $pdf = Pdf::loadView('invoices.template', [
+                'invoice'  => $invoice,
+                'order'    => $order,
+                'customer' => $customer,
+                'lines'    => $lines,
+                'tenant'   => $tenant,
+            ])->setPaper('A4');
+
+            $path = "invoices/{$tenantId}/{$invoiceNumber}.pdf";
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf->output());
+            $pdfUrl = '/storage/' . $path;
+            
+            DB::table('invoices')->where('id', $invoiceId)->update(['pdf_generated_at' => now()]);
+        } catch (\Throwable $e) {
+            Log::error("Failed to generate PDF for invoice {$invoiceId}: " . $e->getMessage());
+        }
+
+        AuditLogger::log($request, 'invoice_generated', 'invoice', $invoiceId, $invoiceNumber, null, $pdfUrl);
 
         return response()->json(['data' => $invoice], 201);
     }

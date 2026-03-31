@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { pos, orders as ordersApi, catalog } from '../api.jsx';
+import { pos, orders as ordersApi, catalog, customers as customersApi, loyalty as loyaltyApi } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 
@@ -21,6 +21,20 @@ export default function PosPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [placingOrder, setPlacingOrder] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
+  
+  // Loyalty & Customer state
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [allCustomers, setAllCustomers] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerPoints, setCustomerPoints] = useState(0);
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  
+  const [options, setOptions] = useState({ employees: [], warehouses: [] });
+  const [soldByEmployeeId, setSoldByEmployeeId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [expandedCats, setExpandedCats] = useState(['Generale']); // For accordions
 
   useEffect(() => { fetchData(); }, [selectedStoreId]);
 
@@ -34,9 +48,20 @@ export default function PosPage() {
       setActiveSession(activeRes.data?.data || null);
       setSessions(sessionsRes.data?.data || []);
 
-      // Load products for quick sale
-      const prodRes = await catalog.getProducts(selectedStoreId ? { store_id: selectedStoreId, limit: 200 } : { limit: 200 });
+      const [prodRes, optRes, custRes] = await Promise.all([
+        catalog.getProducts(selectedStoreId ? { store_id: selectedStoreId, limit: 200 } : { limit: 200 }),
+        ordersApi.getOptions(selectedStoreId ? { store_id: selectedStoreId } : {}),
+        customersApi.getCustomers({ limit: 500 })
+      ]);
       setProducts(prodRes.data?.data || []);
+      setOptions({
+        employees: optRes.data?.data?.employees || [],
+        warehouses: optRes.data?.data?.warehouses || []
+      });
+      setAllCustomers(custRes.data?.data || []);
+      if (optRes.data?.data?.warehouses?.length > 0 && !warehouseId) {
+        setWarehouseId(optRes.data.data.warehouses[0].id);
+      }
     } catch (err) {
       if (err.response?.status !== 404) {
         setError(err.response?.data?.message || err.message || 'Errore nel caricamento');
@@ -49,7 +74,10 @@ export default function PosPage() {
   const handleOpenSession = async () => {
     try {
       setOpening(true); setError('');
-      await pos.open({ opening_amount: parseFloat(openingAmount) || 0 });
+      await pos.open({ 
+        store_id: selectedStoreId,
+        opening_cash: parseFloat(openingAmount) || 0 
+      });
       setOpeningAmount('');
       await fetchData();
     } catch (err) {
@@ -95,21 +123,62 @@ export default function PosPage() {
   };
 
   const cartTotal = cartLines.reduce((sum, l) => sum + l.sale_price * l.qty, 0);
+  
+  const pointsDiscount = usePoints ? Math.floor(pointsToRedeem / 100) * 5 : 0;
+  const finalTotal = Math.max(0, cartTotal - pointsDiscount);
+
+  useEffect(() => {
+    if (selectedCustomer) {
+      loyaltyApi.getWallet(selectedCustomer.id).then(res => {
+        setCustomerPoints(res.data?.data?.points_balance || 0);
+      }).catch(() => setCustomerPoints(0));
+    } else {
+      setCustomerPoints(0);
+      setUsePoints(false);
+      setPointsToRedeem(0);
+    }
+  }, [selectedCustomer]);
+
+  useEffect(() => {
+    // Auto-calculate redeemable points when usePoints is toggled or customer points change
+    if (usePoints && selectedCustomer) {
+      const maxRedeemableByWallet = Math.floor(customerPoints / 100) * 100;
+      const amountNeeded = Math.ceil(cartTotal / 5) * 100;
+      setPointsToRedeem(Math.min(maxRedeemableByWallet, amountNeeded));
+    } else {
+      setPointsToRedeem(0);
+    }
+  }, [usePoints, customerPoints, cartTotal]);
 
   const handlePlaceOrder = async (paymentMethod) => {
     if (!cartLines.length) return;
     try {
+      if (!soldByEmployeeId) {
+        setError('Seleziona il dipendente che sta effettuando la vendita (Venduto da).');
+        return;
+      }
+      if (!warehouseId) {
+        setError('Seleziona un magazzino di scarico.');
+        return;
+      }
+
       setPlacingOrder(true); setError('');
       const res = await ordersApi.place({
         channel: 'pos',
         store_id: selectedStoreId || undefined,
-        warehouse_id: undefined,
+        warehouse_id: Number(warehouseId),
+        employee_id: activeSession?.employee_id, // Who opened the session
+        sold_by_employee_id: Number(soldByEmployeeId), // Who is making the sale
         status: 'paid',
         payment_method: paymentMethod,
+        customer_id: selectedCustomer?.id,
+        points_to_redeem: pointsToRedeem > 0 ? pointsToRedeem : undefined,
         lines: cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
       });
       setLastOrder(res.data);
       setCartLines([]);
+      setSelectedCustomer(null);
+      setUsePoints(false);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Errore nel piazzamento ordine');
     } finally { setPlacingOrder(false); }
@@ -118,10 +187,30 @@ export default function PosPage() {
   const fmtCurrency = v => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
   const fmtDate = v => v ? new Date(v).toLocaleString('it-IT') : '-';
 
-  const filteredProducts = products.filter(p =>
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const categoryGroups = useMemo(() => {
+    const groups = { 'Generale': ['All'] };
+    products.forEach(p => {
+      const type = p.product_type || 'Altro';
+      if (!groups[type]) groups[type] = [];
+      if (!groups[type].includes(type)) groups[type].push(type);
+    });
+    return groups;
+  }, [products]);
+
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCat = activeCategory === 'All' || p.product_type === activeCategory;
+    return matchesSearch && matchesCat;
+  });
+
+  const filteredCustomers = allCustomers.filter(c => {
+    const term = customerSearch.toLowerCase();
+    return c.first_name?.toLowerCase().includes(term) || c.last_name?.toLowerCase().includes(term) || c.email?.toLowerCase().includes(term);
+  });
+
+  const toggleCat = (cat) => {
+    setExpandedCats(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
+  };
 
   if (loading) return <SkeletonTable />;
 
@@ -190,66 +279,253 @@ export default function PosPage() {
                 </div>
               )}
 
-              {/* Quick Sale: Products + Cart */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
-                {/* Product Grid */}
-                <div className="table-card">
-                  <div className="table-toolbar">
-                    <input className="search-input" placeholder="Cerca prodotto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ maxWidth: 280 }} />
-                    <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{filteredProducts.length} prodotti</span>
+              {/* Quick Sale: Professional 3-Column Layout */}
+              <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 380px', gap: 24, height: 'calc(100vh - 280px)', minHeight: 600 }}>
+                
+                {/* Column 1: Categories (Accordions) */}
+                <div className="table-card" style={{ 
+                  background: 'rgba(19, 32, 58, 0.4)', 
+                  backdropFilter: 'blur(10px)', 
+                  border: '1px solid var(--border)',
+                  overflowY: 'auto',
+                  padding: 12
+                }}>
+                  <div style={{ padding: '0 8px 16px', fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.7 }}>
+                    Esplora Catalogo
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8, padding: 12, maxHeight: 480, overflow: 'auto' }}>
+                  
+                  {Object.entries(categoryGroups).map(([group, items]) => (
+                    <div key={group} style={{ marginBottom: 4 }}>
+                      <button 
+                        onClick={() => toggleCat(group)}
+                        style={{ 
+                          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '12px', background: 'var(--surface2)', border: 'none', borderRadius: 8,
+                          color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
+                        }}
+                      >
+                        <span>{group}</span>
+                        <span style={{ fontSize: 10, opacity: 0.5, transform: expandedCats.includes(group) ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+                      </button>
+                      
+                      {expandedCats.includes(group) && (
+                        <div style={{ padding: '4px 0 8px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {items.map(item => (
+                            <button
+                              key={item}
+                              onClick={() => setActiveCategory(item)}
+                              style={{
+                                padding: '8px 12px', background: activeCategory === item ? 'var(--gold-glow)' : 'transparent',
+                                border: 'none', borderRadius: 6, color: activeCategory === item ? 'var(--gold)' : 'var(--muted2)',
+                                textAlign: 'left', fontSize: 12, fontWeight: 500, cursor: 'pointer'
+                              }}
+                            >
+                              • {item}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Column 2: Product Grid (Premium Cards) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="table-card" style={{ padding: '12px 20px', border: 'none', background: 'var(--surface)' }}>
+                    <div className="search-box" style={{ maxWidth: '100%', flex: 1, height: 44, background: 'var(--bg)', borderRadius: 12 }}>
+                      <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style={{ opacity: 0.5 }}><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/></svg>
+                      <input placeholder="Cerca prodottp o scansiona barcode..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ fontSize: 14 }} />
+                    </div>
+                  </div>
+
+                  <div className="table-card" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, padding: 20, overflowY: 'auto', background: 'transparent', border: 'none' }}>
                     {filteredProducts.map(p => {
                       const v = p.variants?.[0];
                       return (
-                        <div key={p.id} onClick={() => addToCart(p)} style={{
-                          padding: '12px 10px', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer',
-                          transition: 'border-color .15s', textAlign: 'center', fontSize: 13,
-                        }} onMouseEnter={e => e.currentTarget.style.borderColor = '#c9a227'} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
-                          <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                          {v?.flavor && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{v.flavor}</div>}
-                          <div style={{ fontWeight: 700, color: '#c9a227', marginTop: 4 }}>{fmtCurrency(v?.sale_price)}</div>
+                        <div key={p.id} onClick={() => addToCart(p)} className="kpi-card" style={{
+                          padding: 16, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12,
+                          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16,
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', position: 'relative'
+                        }} onMouseEnter={e => {
+                          e.currentTarget.style.transform = 'translateY(-4px)';
+                          e.currentTarget.style.borderColor = 'var(--gold-dim)';
+                          e.currentTarget.style.boxShadow = '0 10px 30px rgba(201, 162, 39, 0.1)';
+                        }} onMouseLeave={e => {
+                          e.currentTarget.style.transform = 'none';
+                          e.currentTarget.style.borderColor = 'var(--border)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}>
+                          <div style={{ 
+                            width: '100%', height: 120, background: 'var(--surface2)', borderRadius: 10, 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' 
+                          }}>
+                            {p.image_url ? (
+                              <img src={p.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <div style={{ opacity: 0.2, fontSize: 32 }}>📦</div>
+                            )}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 14, marginBottom: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.name}</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                              <span className="mono" style={{ color: 'var(--gold)', fontWeight: 800, fontSize: 16 }}>{fmtCurrency(v?.sale_price)}</span>
+                              <span style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--surface2)', padding: '2px 6px', borderRadius: 4 }}>{v?.flavor || 'Standard'}</span>
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
-                    {!filteredProducts.length && (
-                      <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 40, color: 'var(--muted)' }}>Nessun prodotto</div>
-                    )}
                   </div>
                 </div>
 
-                {/* Cart */}
-                <div className="table-card" style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div className="table-toolbar"><div className="section-title">Carrello</div></div>
-                  <div style={{ flex: 1, overflow: 'auto', padding: '0 12px' }}>
-                    {cartLines.length > 0 ? cartLines.map(line => (
-                      <div key={line.product_variant_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{line.product_name}</div>
-                          {line.flavor && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{line.flavor}</div>}
-                          <div style={{ fontSize: 12, color: '#c9a227' }}>{fmtCurrency(line.sale_price)} × {line.qty}</div>
+                {/* Column 3: Cart (Glassmorphism Sidebar) */}
+                <div style={{ 
+                  display: 'flex', flexDirection: 'column', 
+                  background: 'rgba(19, 32, 58, 0.6)', backdropFilter: 'blur(20px)',
+                  borderLeft: '1px solid var(--gold-dim)', borderRadius: '24px 0 0 24px',
+                  boxShadow: '-10px 0 30px rgba(0,0,0,0.5)', overflow: 'hidden'
+                }}>
+                  <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(201, 162, 39, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="section-title" style={{ color: 'var(--gold)', letterSpacing: 1 }}>Riepilogo Ordine</div>
+                    <button onClick={() => setCartLines([])} style={{ background: 'transparent', border: 'none', color: 'var(--red)', fontSize: 11, fontWeight: 700, cursor: 'pointer', opacity: 0.7 }}>SVUOTA</button>
+                  </div>
+                  
+                  <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Customer Selection */}
+                    <div style={{ position: 'relative' }}>
+                      <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--muted2)', marginBottom: 6, textTransform: 'uppercase' }}>Cliente</label>
+                      {selectedCustomer ? (
+                        <div style={{ 
+                          background: 'var(--surface2)', borderRadius: 10, padding: '12px 14px', 
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          border: '1px solid var(--gold-dim)'
+                        }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>{selectedCustomer.first_name} {selectedCustomer.last_name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Saldo: <strong>{customerPoints} pt</strong> (≈ {fmtCurrency(customerPoints / 100 * 5)})</div>
+                          </div>
+                          <button onClick={() => setSelectedCustomer(null)} style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 10, fontWeight: 800 }}>X</button>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 14 }} onClick={() => updateCartQty(line.product_variant_id, line.qty - 1)}>−</button>
-                          <span className="mono" style={{ minWidth: 20, textAlign: 'center' }}>{line.qty}</span>
-                          <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 14 }} onClick={() => updateCartQty(line.product_variant_id, line.qty + 1)}>+</button>
+                      ) : (
+                        <>
+                          <div className="search-box" style={{ background: 'var(--bg)', borderRadius: 10, height: 40, border: '1px solid var(--border)' }}>
+                            <input 
+                              placeholder="Cerca cliente..." 
+                              value={customerSearch} 
+                              onChange={e => setCustomerSearch(e.target.value)} 
+                              style={{ fontSize: 13 }} 
+                            />
+                          </div>
+                          {customerSearch.length >= 2 && (
+                            <div style={{ 
+                              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
+                              marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+                            }}>
+                              {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
+                                <div key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(''); }} style={{ 
+                                  padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                                  fontSize: 13, transition: 'background 0.2s'
+                                }} onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  {c.first_name} {c.last_name} <span style={{ opacity: 0.5, fontSize: 11 }}>({c.email || 'no email'})</span>
+                                </div>
+                              )) : (
+                                <div style={{ padding: 10, textAlign: 'center', fontSize: 12, color: 'var(--muted)' }}>Nessun cliente trovato</div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Points Redemption Toggle */}
+                    {selectedCustomer && customerPoints >= 100 && (
+                      <div style={{ 
+                        background: 'rgba(201, 162, 39, 0.05)', borderRadius: 10, padding: '12px 14px',
+                        border: '1px solid' + (usePoints ? ' var(--gold)' : ' var(--border)'),
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: usePoints ? 'var(--gold)' : 'var(--text)' }}>Usa Punti Fidelity</div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>Riscatta {pointsToRedeem} pt / -{fmtCurrency(pointsDiscount)}</div>
+                        </div>
+                        <input 
+                          type="checkbox" 
+                          checked={usePoints} 
+                          onChange={e => setUsePoints(e.target.checked)} 
+                          style={{ width: 20, height: 20, cursor: 'pointer' }}
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--muted2)', marginBottom: 6, textTransform: 'uppercase' }}>Operatore</label>
+                      <select 
+                        value={soldByEmployeeId} 
+                        onChange={e => setSoldByEmployeeId(e.target.value)}
+                        style={{ 
+                          width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', 
+                          borderRadius: 10, padding: '10px 12px', color: 'var(--text)', fontSize: 13 
+                        }}
+                      >
+                        <option value="">Chi sta effettuando la vendita?</option>
+                        {options.employees.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
+                    {cartLines.length > 0 ? cartLines.map(line => (
+                      <div key={line.product_variant_id} style={{ 
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '16px 0', 
+                        borderBottom: '1px solid rgba(255,255,255,0.05)'
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)', marginBottom: 2 }}>{line.product_name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--muted2)' }}>{fmtCurrency(line.sale_price)} × {line.qty}</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg)', borderRadius: 8, padding: 3, border: '1px solid var(--border)' }}>
+                          <button style={{ width: 24, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 16 }} onClick={() => updateCartQty(line.product_variant_id, line.qty - 1)}>−</button>
+                          <span className="mono" style={{ width: 30, textAlign: 'center', fontSize: 13, fontWeight: 700 }}>{line.qty}</span>
+                          <button style={{ width: 24, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 16 }} onClick={() => updateCartQty(line.product_variant_id, line.qty + 1)}>+</button>
                         </div>
                       </div>
                     )) : (
-                      <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: 13 }}>Carrello vuoto</div>
+                      <div style={{ textAlign: 'center', padding: '100px 0', opacity: 0.2 }}>
+                        <div style={{ fontSize: 60, marginBottom: 16 }}>🛒</div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>Inizia ad aggiungere prodotti</div>
+                      </div>
                     )}
                   </div>
-                  <div style={{ borderTop: '2px solid var(--border)', padding: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, fontWeight: 700, fontSize: 18 }}>
-                      <span>Totale</span>
-                      <span style={{ color: '#c9a227' }}>{fmtCurrency(cartTotal)}</span>
+
+                  <div style={{ padding: 24, background: 'rgba(0,0,0,0.2)', borderTop: '1px solid rgba(201, 162, 39, 0.2)' }}>
+                    {usePoints && pointsDiscount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: 'var(--gold)' }}>
+                        <span>Sconto Punti ({pointsToRedeem} pt)</span>
+                        <span>-{fmtCurrency(pointsDiscount)}</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', marginBottom: 24 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted2)' }}>TOTALE DA PAGARE</span>
+                      <span style={{ fontSize: 32, fontWeight: 800, color: 'white', fontFamily: 'Sora', textShadow: '0 0 20px rgba(201,162,39,0.3)' }}>{fmtCurrency(finalTotal)}</span>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <button className="btn btn-gold" disabled={!cartLines.length || placingOrder} onClick={() => handlePlaceOrder('cash')}>
-                        {placingOrder ? '...' : '💵 Contanti'}
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <button 
+                        className="btn btn-gold" 
+                        style={{ height: 64, borderRadius: 12, fontSize: 14, fontWeight: 800, letterSpacing: 1 }} 
+                        disabled={!cartLines.length || placingOrder} 
+                        onClick={() => handlePlaceOrder('cash')}
+                      >
+                        💵 CONTANTI
                       </button>
-                      <button className="btn btn-gold" disabled={!cartLines.length || placingOrder} onClick={() => handlePlaceOrder('card')}>
-                        {placingOrder ? '...' : '💳 Carta'}
+                      <button 
+                        className="btn btn-gold" 
+                        style={{ height: 64, borderRadius: 12, fontSize: 14, fontWeight: 800, letterSpacing: 1 }} 
+                        disabled={!cartLines.length || placingOrder} 
+                        onClick={() => handlePlaceOrder('card')}
+                      >
+                        💳 CARTA
                       </button>
                     </div>
                   </div>

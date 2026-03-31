@@ -22,6 +22,11 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  
+  const [healthInsights, setHealthInsights] = useState([]);
+  const [healthLoading, setHealthLoading] = useState(true);
+  const [forecasts, setForecasts] = useState([]);
+  const [forecastLoading, setForecastLoading] = useState(true);
 
   const fetchDashboardData = useCallback(() => {
     setError('');
@@ -63,7 +68,18 @@ export default function DashboardPage() {
       setEmpCount((eRes.data?.data || []).length);
       setCountsReady(true);
     });
-  }, [selectedStoreId]);
+
+    // Health Scan & Forecast
+    inventory.getHealthScan()
+      .then(res => setHealthInsights(res.data?.insights || []))
+      .catch(() => {})
+      .finally(() => setHealthLoading(false));
+
+    inventory.getForecast()
+      .then(res => setForecasts(res.data?.data || []))
+      .catch(() => {})
+      .finally(() => setForecastLoading(false));
+  }, [selectedStoreId, setLowStockCount]);
 
   useEffect(() => {
     setKpiLoading(true);
@@ -135,16 +151,39 @@ export default function DashboardPage() {
       </div>
       )}
 
-      {/* ── ALERT BANNER ── */}
-      {stockInfo.lowStockItems > 0 && (
-        <div className="alert-banner">
-          <span className="icon">⚠</span>
+      {/* ── HEALTH SCAN INSIGHTS ── */}
+      {healthInsights.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {healthInsights.map((insight, i) => (
+            <div key={`health-${i}`} className={`p-4 rounded-xl border flex gap-4 ${
+              insight.severity === 'high' ? 'bg-red-50 border-red-100 text-red-900' : 
+              insight.severity === 'warning' ? 'bg-amber-50 border-amber-100 text-amber-900' :
+              'bg-blue-50 border-blue-100 text-blue-900'
+            }`}>
+              <div className="text-xl">
+                {insight.severity === 'high' ? '🚨' : insight.severity === 'warning' ? '⚠️' : 'ℹ️'}
+              </div>
+              <div>
+                <div className="font-bold text-sm mb-0.5">{insight.title}</div>
+                <div className="text-xs opacity-90 mb-2">{insight.message}</div>
+                <div className="text-xs font-semibold underline decoration-dotted cursor-help" title={insight.suggestion}>
+                  SvaPro Suggestion: {insight.suggestion}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── AI FORECAST ALERTS ── */}
+      {forecasts.some(f => f.is_critical) && (
+        <div className="alert-banner mb-6" style={{ background: 'var(--amber-bg)', borderColor: 'var(--amber)' }}>
+          <span className="icon">💡</span>
           <span>
-            <strong>{stockInfo.lowStockItems} {stockInfo.lowStockItems === 1 ? 'prodotto' : 'prodotti'}</strong>
-            con stock sotto la soglia di riordino
+            <strong>AI Forecast:</strong> {forecasts.filter(f => f.is_critical).length} prodotti rischiano il sold-out a breve.
           </span>
           <button className="banner-link" onClick={() => navigate('/inventory/smart-reorder')}>
-            Vai a Smart Reorder →
+            Dettagli Previsione →
           </button>
         </div>
       )}

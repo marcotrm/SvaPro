@@ -7,6 +7,7 @@ export default function CustomerModal({ customer, onClose, onSave }) {
     code: customer?.code || '',
     first_name: customer?.first_name || '',
     last_name: customer?.last_name || '',
+    codice_fiscale: customer?.codice_fiscale || '',
     email: customer?.email || '',
     phone: customer?.phone || '',
     birth_date: customer?.birth_date || '',
@@ -96,6 +97,19 @@ export default function CustomerModal({ customer, onClose, onSave }) {
                 required
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Codice Fiscale</label>
+            <input
+              type="text"
+              name="codice_fiscale"
+              value={formData.codice_fiscale}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              maxLength={16}
+              pattern="[A-Z0-9]{0,16}"
+              title="Inserire un codice fiscale valido (16 caratteri, lettere e numeri)"
+            />
           </div>
 
           <div>

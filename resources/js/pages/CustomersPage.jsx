@@ -140,6 +140,7 @@ export default function CustomersPage() {
           <thead>
             <tr>
               <th>Codice</th>
+              <th>Codice Fiscale</th>
               <th>Nome</th>
               <th>Citta</th>
               <th>Ultimo Acquisto</th>
@@ -153,6 +154,7 @@ export default function CustomersPage() {
         renderRow={(customer) => (
           <tr key={customer.id}>
             <td><span className="mono" style={{color:'var(--gold)'}}>{customer.code}</span></td>
+            <td><span className="mono" style={{color:'var(--muted2)'}}>{customer.codice_fiscale || '-'}</span></td>
             <td>
               <div className="avatar-cell">
                 <div className="avatar-sm">{initials(customer)}</div>

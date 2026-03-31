@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class AuditLogger
 {
-    public static function log(Request $request, string $action, string $entityType, ?int $entityId = null, ?string $entityLabel = null, ?array $changes = null): void
+    public static function log(Request $request, string $action, string $entityType, ?int $entityId = null, ?string $entityLabel = null, ?array $changes = null, ?string $attachmentUrl = null): void
     {
         $tenantId = $request->attributes->get('tenant_id');
 
@@ -26,6 +26,7 @@ class AuditLogger
             'entity_id'     => $entityId,
             'entity_label'  => $entityLabel ? mb_substr($entityLabel, 0, 255) : null,
             'changes_json'  => $changes ? json_encode($changes) : null,
+            'attachment_url'=> $attachmentUrl,
             'ip'            => $request->ip(),
             'performed_at'  => now(),
             'created_at'    => now(),
