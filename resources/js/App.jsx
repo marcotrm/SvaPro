@@ -26,7 +26,7 @@ const ReturnsPage = lazy(() => import('./pages/ReturnsPage.jsx'));
 const SupplierInvoicesPage = lazy(() => import('./pages/SupplierInvoicesPage.jsx'));
 const PosPage = lazy(() => import('./pages/PosPage.jsx'));
 const ShippingPage = lazy(() => import('./pages/ShippingPage.jsx'));
-const LoyaltyCardPage = lazy(() => import('./pages/LoyaltyCardPage.jsx'));
+import LoyaltyCardPage from './pages/LoyaltyCardPage.jsx';
 const PromotionsPage = lazy(() => import('./pages/PromotionsPage.jsx'));
 const LoyaltyTiersPage = lazy(() => import('./pages/LoyaltyTiersPage.jsx'));
 const EmployeeKpiPage = lazy(() => import('./pages/EmployeeKpiPage.jsx'));
@@ -94,6 +94,8 @@ export default function App() {
       </div>
     );
   }
+
+  console.log('React Router Path:', window.location.pathname);
 
   return (
     <Router>

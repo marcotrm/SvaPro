@@ -206,11 +206,10 @@ export default function Layout({ user, setUser }) {
   const [storesList, setStoresList] = useState([]);
   const [storesReady, setStoresReady] = useState(false);
   const [tenantsLoaded, setTenantsLoaded] = useState(false);
+
   const [selectedTenantCode, setSelectedTenantCode] = useState(localStorage.getItem('tenantCode') || user?.tenant_code || 'DEMO');
   const [selectedStoreId, setSelectedStoreId] = useState(localStorage.getItem('selectedStoreId') || '');
   const isSuperAdmin = (user?.roles || []).includes('superadmin');
-  // Sidebar UI state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [openAccordion, setOpenAccordion] = useState(navGroups[0]?.label || '');
 
   const loadStores = async () => {
@@ -405,7 +404,29 @@ export default function Layout({ user, setUser }) {
             </div>
             {!isSidebarCollapsed && <div className="logo-text">Sva<span>Pro</span></div>}
           </a>
-          <button className="sidebar-toggle" onClick={toggleSidebar}>
+          <button 
+            className="sidebar-toggle" 
+            onClick={toggleSidebar}
+            style={{
+              position: 'absolute',
+              right: '-14px',
+              top: '18px',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              backgroundColor: '#c9a227',
+              border: '2px solid #0e1726',
+              color: '#0e1726',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
+          >
             {isSidebarCollapsed ? '→' : '←'}
           </button>
         </header>
