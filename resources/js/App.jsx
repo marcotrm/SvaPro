@@ -101,6 +101,7 @@ export default function App() {
     <Router>
       <Suspense fallback={routeFallback}>
         <Routes>
+          <Route path="/loyalty-card/:uuid" element={<LoyaltyCardPage />} />
           <Route path="/login" element={<LoginPage setUser={setUser} />} />
           
           <Route element={<ProtectedRoute user={user} />}>
@@ -134,8 +135,6 @@ export default function App() {
               <Route path="/inventory/count" element={<InventoryCountPage />} />
             </Route>
           </Route>
-
-          <Route path="/loyalty-card/:uuid" element={<LoyaltyCardPage />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -185,6 +185,7 @@ const labelToI18nKey = {
 };
 
 export default function Layout({ user, setUser }) {
+  console.log('Layout Component Loading...');
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -397,34 +398,35 @@ export default function Layout({ user, setUser }) {
 
       {/* SIDEBAR */}
       <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-        <header className="sidebar-header">
-          <a className="logo" href="/" onClick={e => { e.preventDefault(); navigate('/'); }}>
-            <div className="logo-icon">
-              <img src="/brand-mark.svg" alt="SvaPro" className="logo-mark" />
+        <header className="sidebar-header" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px 0 10px', height: '64px', borderBottom: '1px solid var(--border)' }}>
+          <a className="logo" href="/" onClick={e => { e.preventDefault(); navigate('/'); }} style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+            <div className="logo-icon" style={{ width: '34px', height: '34px', backgroundColor: '#c9a227', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="/brand-mark.svg" alt="SvaPro" className="logo-mark" style={{ width: '20px', height: '20px' }} />
             </div>
-            {!isSidebarCollapsed && <div className="logo-text">Sva<span>Pro</span></div>}
+            {!isSidebarCollapsed && <div className="logo-text" style={{ fontSize: '18px', fontWeight: 'bold' }}>Sva<span style={{ color: '#c9a227' }}>Pro</span></div>}
           </a>
           <button 
             className="sidebar-toggle" 
             onClick={toggleSidebar}
+            title="Mostra/Nascondi Sidebar"
             style={{
               position: 'absolute',
               right: '-14px',
               top: '18px',
-              zIndex: 9999,
+              zIndex: 999999,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: '28px',
-              height: '28px',
+              width: '32px',
+              height: '32px',
               borderRadius: '50%',
               backgroundColor: '#c9a227',
-              border: '2px solid #0e1726',
-              color: '#0e1726',
+              border: '3px solid #080d18',
+              color: '#080d18',
               cursor: 'pointer',
               fontWeight: 'bold',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+              boxShadow: '0 4px 15px rgba(0,0,0,0.6)',
+              padding: 0
             }}
           >
             {isSidebarCollapsed ? '→' : '←'}
