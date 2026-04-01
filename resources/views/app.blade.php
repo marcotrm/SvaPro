@@ -13,17 +13,6 @@
     @vite(['resources/css/app.css', 'resources/js/main.jsx'])
 </head>
 <body>
-    <script>
-        window.onerror = function(msg, url, line, col, error) {
-            console.error('DIAGNOSTIC ERROR:', msg, url, line, col, error);
-            alert('CRITICAL ERROR:\n' + msg + '\nin ' + url + ' @ ' + line + ':' + col + '\nSee console for details.');
-            document.body.innerHTML = '<div style="padding: 20px; color: red; font-family: sans-serif;">' +
-                '<h1>CRITICAL JS ERROR</h1>' +
-                '<p>' + msg + '</p>' +
-                '<code>' + url + ':' + line + '</code>' +
-                '</div>';
-        };
-    </script>
-    <div id="app"><div style="display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; color:#7b8ba5;">Inizializzazione SvaPro...</div></div>
+    <div id="app"></div>
 </body>
 </html>
