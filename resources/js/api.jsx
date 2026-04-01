@@ -1,3 +1,18 @@
+import axios from 'axios';
+
+// API configuration
+const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
+export const API_URL = configuredApiUrl || '/api';
+
+// Create axios instance with default config
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+});
+
 // Gestione errori personalizzata globale
 const errorMap = [
   {
@@ -28,7 +43,6 @@ const errorMap = [
     match: msg => msg.includes('422'),
     userMessage: 'Dati non validi o mancanti. Controlla i campi e riprova.'
   },
-  // Aggiungi altri mapping qui...
 ];
 
 api.interceptors.response.use(
@@ -44,20 +58,7 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-import axios from 'axios';
 
-// API configuration
-const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
-export const API_URL = configuredApiUrl || '/api';
-
-// Create axios instance with default config
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
-});
 
 const responseCache = new Map();
 

@@ -39,7 +39,6 @@ import Layout from './components/Layout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 export default function App() {
-  // Use cached user for instant first render — no spinner
   const [user, setUser] = useState(() => {
     try {
       const token = localStorage.getItem('authToken');
@@ -49,13 +48,12 @@ export default function App() {
     return null;
   });
   const [loading, setLoading] = useState(() => {
-    // If we have a cached user, skip the loading spinner entirely
     return !(localStorage.getItem('authToken') && localStorage.getItem('user'));
   });
 
   const routeFallback = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 240 }}>
-      <div style={{ width: 28, height: 28, border: '3px solid #243450', borderTopColor: '#c9a227', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+      <div style={{ width: 28, height: 28, border: '3px solid #0e1726', borderTopColor: '#c9a227', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
     </div>
   );
 
@@ -86,16 +84,14 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          <p className="mt-4 text-gray-600 font-medium">Caricamento...</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#080d18' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 44, height: 44, border: '3px solid #243450', borderTopColor: '#c9a227', borderRadius: '50%', animation: 'spin .7s linear infinite', margin: '0 auto 16px' }} />
+          <p style={{ color: '#7b8ba5', fontSize: 14 }}>Inizializzazione...</p>
         </div>
       </div>
     );
   }
-
-  console.log('React Router Path:', window.location.pathname);
 
   return (
     <Router>
