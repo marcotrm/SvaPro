@@ -32,18 +32,18 @@ export default function LoyaltyCardPage() {
     );
   }
 
-  if (error || !data) {
+  if (error || !data || typeof data !== 'object') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f172a] text-white p-6">
         <div className="bg-red-500/10 border border-red-500/50 p-6 rounded-2xl text-center max-w-md">
           <p className="text-red-400 font-medium mb-2">Ops! Qualcosa è andato storto</p>
-          <p className="text-gray-400 text-sm">{error}</p>
+          <p className="text-gray-400 text-sm">{error || 'Impossibile visualizzare la carta fedeltà.'}</p>
         </div>
       </div>
     );
   }
 
-  const { customer, wallet, history } = data;
+  const { customer = {}, wallet = { points_balance: 0, tier_code: 'base' }, history = [] } = data;
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white font-sans selection:bg-[#c9a227]/30">
