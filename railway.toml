@@ -1,0 +1,11 @@
+# Railway configuration for SvaPro
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "bash /app/start.sh"
+restartPolicyType = "always"
+restartPolicyMaxRetries = 10
+
+[variables]
+PORT = "8000"

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, CreditCard, Banknote, Printer, FileText, Gift } from 'lucide-react';
+import { X, CreditCard, Banknote, Printer, FileText, Gift, Zap, ArrowLeftRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+
+const QUICK_AMOUNTS = [5, 10, 20, 50, 100];
 
 export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
   const [discountType, setDiscountType] = useState('none'); // 'none', 'value', 'percent', 'total_override'
@@ -163,48 +165,105 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
           <div style={{ width: 1, background: 'var(--color-border)' }}></div>
 
           {/* Right panel: Payment methods */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 24 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: -16 }}>Metodi di Pagamento</div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* Split payment indicator */}
+            {(parseFloat(cashAmount) > 0 && parseFloat(cardAmount) > 0) && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px', borderRadius: 8,
+                background: 'linear-gradient(135deg, #eff6ff, #f0fdf4)',
+                border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 700, color: '#1d4ed8'
+              }}>
+                <ArrowLeftRight size={14} />
+                Pagamento Misto Attivo
+              </div>
+            )}
+
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Metodi di Pagamento</div>
             
             {/* Contanti */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--color-bg)', padding: '16px', borderRadius: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 20, background: '#10B98120', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981' }}>
-                <Banknote size={20} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 4 }}>Contanti</div>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 12, top: 12, fontSize: 16, fontWeight: 600, color: 'var(--color-text-tertiary)' }}>€</span>
-                  <input 
-                    type="number"
-                    className="sp-input"
-                    value={cashAmount}
-                    onChange={e => setCashAmount(e.target.value)}
-                    onFocus={() => handlePaymentFocus('cash')}
-                    style={{ fontSize: 20, fontWeight: 700, paddingLeft: 32, background: '#fff' }}
-                  />
+            <div style={{ background: 'var(--color-bg)', padding: '16px', borderRadius: 12, border: '1px solid transparent', transition: 'border-color 0.15s', ...(parseFloat(cashAmount) > 0 ? { borderColor: '#86efac' } : {}) }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 18, background: '#10B98120', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981' }}>
+                  <Banknote size={18} />
                 </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Contanti</div>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 12, top: 12, fontSize: 15, fontWeight: 600, color: 'var(--color-text-tertiary)' }}>€</span>
+                    <input 
+                      type="number"
+                      className="sp-input"
+                      value={cashAmount}
+                      onChange={e => setCashAmount(e.target.value)}
+                      onFocus={() => handlePaymentFocus('cash')}
+                      style={{ fontSize: 18, fontWeight: 700, paddingLeft: 30, background: '#fff' }}
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setCashAmount(Math.max(0, finalTotal - (parseFloat(cardAmount) || 0)).toFixed(2)); }}
+                  style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, background: '#10B98115', color: '#10B981', border: '1px solid #10B98130', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  title="Autofill contanti"
+                >
+                  <Zap size={12} />
+                </button>
+              </div>
+              {/* Quick amounts */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {QUICK_AMOUNTS.map(amt => (
+                  <button
+                    key={amt}
+                    onClick={() => setCashAmount(amt.toFixed(2))}
+                    style={{
+                      padding: '4px 10px', fontSize: 11, fontWeight: 700,
+                      background: parseFloat(cashAmount) === amt ? '#10B981' : 'var(--color-surface)',
+                      color: parseFloat(cashAmount) === amt ? '#fff' : 'var(--color-text-secondary)',
+                      border: '1px solid var(--color-border)', borderRadius: 20, cursor: 'pointer',
+                      transition: 'all 0.12s'
+                    }}
+                  >
+                    €{amt}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCashAmount(Math.ceil(finalTotal / 5) * 5 + '.00')}
+                  style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, background: 'var(--color-surface)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', borderRadius: 20, cursor: 'pointer' }}
+                  title="Arrotonda all'importo superiore (banconota)"
+                >
+                  ↑ Arrot.
+                </button>
               </div>
             </div>
 
             {/* Carta */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--color-bg)', padding: '16px', borderRadius: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 20, background: '#3B82F620', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
-                <CreditCard size={20} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 4 }}>POS / Carta / Satispay</div>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 12, top: 12, fontSize: 16, fontWeight: 600, color: 'var(--color-text-tertiary)' }}>€</span>
-                  <input 
-                    type="number"
-                    className="sp-input"
-                    value={cardAmount}
-                    onChange={e => setCardAmount(e.target.value)}
-                    onFocus={() => handlePaymentFocus('card')}
-                    style={{ fontSize: 20, fontWeight: 700, paddingLeft: 32, background: '#fff' }}
-                  />
+            <div style={{ background: 'var(--color-bg)', padding: '16px', borderRadius: 12, border: '1px solid transparent', transition: 'border-color 0.15s', ...(parseFloat(cardAmount) > 0 ? { borderColor: '#93c5fd' } : {}) }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 18, background: '#3B82F620', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+                  <CreditCard size={18} />
                 </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 6 }}>POS / Carta / Satispay</div>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 12, top: 12, fontSize: 15, fontWeight: 600, color: 'var(--color-text-tertiary)' }}>€</span>
+                    <input 
+                      type="number"
+                      className="sp-input"
+                      value={cardAmount}
+                      onChange={e => setCardAmount(e.target.value)}
+                      onFocus={() => handlePaymentFocus('card')}
+                      style={{ fontSize: 18, fontWeight: 700, paddingLeft: 30, background: '#fff' }}
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setCardAmount(Math.max(0, finalTotal - (parseFloat(cashAmount) || 0)).toFixed(2)); }}
+                  style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, background: '#3B82F615', color: '#3B82F6', border: '1px solid #3B82F630', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  title="Autofill carta"
+                >
+                  <Zap size={12} />
+                </button>
               </div>
             </div>
 
@@ -245,3 +304,4 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
     </div>
   );
 }
+

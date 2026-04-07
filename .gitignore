@@ -25,3 +25,9 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Keep .env.railway tracked (it's a template, no real secrets)
+!.env.railway
+
+# Local SQLite database — each environment has its own
+database/database.sqlite

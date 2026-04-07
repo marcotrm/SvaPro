@@ -406,24 +406,46 @@ export default function PosPage() {
               style={{ fontSize: 12 }}
             />
           )}
-          {/* Sezione Cross-Selling Base */}
-          {cartLines.length > 0 && products.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 6 }}>Potrebbe interessare:</div>
-              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
-                {products.slice(0, 3).map(cp => (
-                  <button 
-                    key={cp.id} 
-                    className="sp-chip" 
-                    style={{ fontSize: 11, whiteSpace: 'nowrap' }}
-                    onClick={() => addToCart(cp)}
-                  >
-                    + {cp.name}
-                  </button>
-                ))}
+          {/* Sezione Cross-Selling Intelligente */}
+          {cartLines.length > 0 && products.length > 0 && (() => {
+            // Get last added item's product
+            const lastLine = cartLines[cartLines.length - 1];
+            const lastProduct = products.find(p => p.variants?.[0]?.id === lastLine?.product_variant_id);
+            const catId = lastProduct?.category_id;
+            // Cart variant IDs to exclude
+            const cartIds = new Set(cartLines.map(l => l.product_variant_id));
+            // Related: same category, not in cart
+            let related = catId 
+              ? products.filter(p => p.category_id === catId && !cartIds.has(p.variants?.[0]?.id)).slice(0, 4)
+              : [];
+            // Fallback: any product not in cart
+            if (related.length === 0) {
+              related = products.filter(p => !cartIds.has(p.variants?.[0]?.id)).slice(0, 4);
+            }
+            if (related.length === 0) return null;
+            return (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  ✦ Potrebbe interessare
+                  {catId && <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>— stessa categoria</span>}
+                </div>
+                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
+                  {related.map(cp => (
+                    <button 
+                      key={cp.id} 
+                      className="sp-chip" 
+                      style={{ fontSize: 11, whiteSpace: 'nowrap', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                      onClick={() => addToCart(cp)}
+                      title={`+ ${cp.name} — ${new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(parseFloat(cp.variants?.[0]?.sale_price) || 0)}`}
+                    >
+                      + {cp.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
+
         </div>
 
         {/* Footer with total and payment */}

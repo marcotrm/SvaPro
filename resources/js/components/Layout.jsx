@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
 import { 
   BarChart3, Package, Warehouse, ClipboardList, ShoppingBag,
-  Users, Monitor, Truck, Settings, LogOut, Search, Bell,
+  Users, Monitor, Truck, Settings, LogOut, Bell,
   FileText, RotateCcw, Gift, Shield, Activity, ChevronDown,
-  Receipt, Star, ArrowRightLeft, MapPin
+  Receipt, Star, ArrowRightLeft, MapPin, ChevronLeft, ChevronRight,
+  PanelLeftClose, PanelLeftOpen, Link
 } from 'lucide-react';
 
 const allNavigation = [
@@ -48,20 +49,24 @@ export default function Layout({ user, setUser }) {
   const [selectedStoreId, setSelectedStoreId] = useState(localStorage.getItem('selectedStoreId') || '');
   const [displayMode, setDisplayMode] = useState(localStorage.getItem('displayMode') || 'name');
 
+  // Sidebar state
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
+  const [openSections, setOpenSections] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sidebarOpenSections');
+      return saved ? JSON.parse(saved) : { 'Principale': true, 'Gestione': true, 'Supply Chain': true, 'Analisi': true, 'Amministrazione': true };
+    } catch { return { 'Principale': true, 'Gestione': true, 'Supply Chain': true, 'Analisi': true, 'Amministrazione': true }; }
+  });
+
   const userRoles = useMemo(() => user?.roles || [], [user]);
 
-  useEffect(() => {
-    eagerPrefetchAll();
-    loadStores();
-  }, []);
+  useEffect(() => { eagerPrefetchAll(); loadStores(); }, []);
 
   const loadStores = async () => {
     try {
       const response = await stores.getStores();
       setStoresList(response.data?.data || []);
-    } catch (err) {
-      console.error('Failed to load stores');
-    }
+    } catch (err) { console.error('Failed to load stores'); }
   };
 
   const handleStoreChange = (id) => {
@@ -83,13 +88,28 @@ export default function Layout({ user, setUser }) {
     navigate('/login');
   };
 
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebarCollapsed', String(next));
+      return next;
+    });
+  }, []);
+
+  const toggleSection = useCallback((sectionName) => {
+    if (collapsed) return; // no accordion when collapsed
+    setOpenSections(prev => {
+      const next = { ...prev, [sectionName]: !prev[sectionName] };
+      localStorage.setItem('sidebarOpenSections', JSON.stringify(next));
+      return next;
+    });
+  }, [collapsed]);
+
   // Filter navigation by user roles
   const filteredNav = useMemo(() => {
     return allNavigation.map(section => ({
       ...section,
-      items: section.items.filter(item => 
-        item.roles.some(r => userRoles.includes(r))
-      )
+      items: section.items.filter(item => item.roles.some(r => userRoles.includes(r)))
     })).filter(section => section.items.length > 0);
   }, [userRoles]);
 
@@ -97,6 +117,20 @@ export default function Layout({ user, setUser }) {
     if (href === '/') return location.pathname === '/';
     return location.pathname === href || location.pathname.startsWith(href + '/');
   };
+
+  // Auto-open section of active item
+  useEffect(() => {
+    for (const section of filteredNav) {
+      if (section.items.some(item => isActive(item.href))) {
+        setOpenSections(prev => {
+          if (prev[section.section]) return prev;
+          const next = { ...prev, [section.section]: true };
+          localStorage.setItem('sidebarOpenSections', JSON.stringify(next));
+          return next;
+        });
+      }
+    }
+  }, [location.pathname]);
 
   const activePageLabel = useMemo(() => {
     for (const section of allNavigation) {
@@ -112,53 +146,119 @@ export default function Layout({ user, setUser }) {
     return storesList.find(s => String(s.id) === String(selectedStoreId)) || null;
   }, [selectedStoreId, storesList]);
 
+  const sidebarWidth = collapsed ? 72 : 240;
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
 
       {/* SIDEBAR */}
-      <aside className="sp-sidebar">
-        <div className="sp-sidebar-brand">
-          <h1>Sva<span>Pro</span></h1>
-          <div className="sp-brand-sub">Point of Sale System</div>
+      <aside
+        className={`sp-sidebar ${collapsed ? 'sp-sidebar-collapsed' : ''}`}
+        style={{ width: sidebarWidth, transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)' }}
+      >
+        {/* Brand + Toggle */}
+        <div className="sp-sidebar-brand" style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: collapsed ? '20px 0' : '20px 16px 20px 20px' }}>
+          {!collapsed && (
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', margin: 0 }}>Sva<span style={{ color: 'var(--color-accent)' }}>Pro</span></h1>
+              <div className="sp-brand-sub">Point of Sale System</div>
+            </div>
+          )}
+          <button
+            onClick={toggleCollapsed}
+            className="sp-sidebar-toggle"
+            title={collapsed ? 'Espandi sidebar' : 'Nascondi sidebar'}
+          >
+            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
         </div>
 
-        <nav className="sp-sidebar-nav">
-          {filteredNav.map((section) => (
-            <div key={section.section} className="sp-nav-section">
-              <div className="sp-nav-section-title">{section.section}</div>
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                return (
+        {/* Nav */}
+        <nav className="sp-sidebar-nav" style={{ padding: collapsed ? '8px 0' : '12px 10px' }}>
+          {filteredNav.map((section) => {
+            const isOpen = collapsed || openSections[section.section] !== false;
+            return (
+              <div key={section.section} className="sp-nav-section">
+                {/* Section Header (accordion trigger) */}
+                {!collapsed ? (
                   <button
-                    key={item.href}
-                    onClick={() => navigate(item.href)}
-                    className={`sp-nav-item ${isActive(item.href) ? 'active' : ''}`}
+                    className="sp-nav-section-header"
+                    onClick={() => toggleSection(section.section)}
+                    aria-expanded={isOpen}
                   >
-                    <Icon size={18} className="sp-nav-icon" />
-                    <span>{item.label}</span>
+                    <span className="sp-nav-section-title" style={{ marginBottom: 0, padding: 0 }}>
+                      {section.section}
+                    </span>
+                    <ChevronDown
+                      size={12}
+                      className="sp-nav-section-chevron"
+                      style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }}
+                    />
                   </button>
-                );
-              })}
-            </div>
-          ))}
+                ) : (
+                  <div className="sp-nav-section-divider" />
+                )}
+
+                {/* Items */}
+                <div
+                  className="sp-nav-section-items"
+                  style={{
+                    maxHeight: isOpen ? '500px' : '0px',
+                    overflow: 'hidden',
+                    transition: 'max-height 0.25s cubic-bezier(0.4,0,0.2,1)',
+                  }}
+                >
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+                    return (
+                      <button
+                        key={item.href}
+                        onClick={() => navigate(item.href)}
+                        className={`sp-nav-item ${active ? 'active' : ''} ${collapsed ? 'sp-nav-item-collapsed' : ''}`}
+                        title={collapsed ? item.label : undefined}
+                        style={collapsed ? { justifyContent: 'center', padding: '10px 0', width: '100%' } : {}}
+                      >
+                        <Icon size={18} className="sp-nav-icon" />
+                        {!collapsed && <span>{item.label}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </nav>
 
-        <div className="sp-sidebar-footer">
-          <div className="sp-user-card" onClick={handleLogout} title="Logout">
-            <div className="sp-user-avatar">
+        {/* Footer */}
+        <div className="sp-sidebar-footer" style={{ padding: collapsed ? '12px 4px' : '16px' }}>
+          <div
+            className="sp-user-card"
+            onClick={handleLogout}
+            title={collapsed ? `${user?.name || 'Utente'} — Logout` : 'Logout'}
+            style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : {}}
+          >
+            <div className="sp-user-avatar" style={{ flexShrink: 0 }}>
               {user?.name?.[0]?.toUpperCase() || 'U'}
             </div>
-            <div className="sp-user-info">
-              <div className="sp-user-name">{user?.name || 'Utente'}</div>
-              <div className="sp-user-role">{userRoles[0] || 'operator'}</div>
-            </div>
-            <LogOut size={16} style={{ color: '#666', flexShrink: 0 }} />
+            {!collapsed && (
+              <>
+                <div className="sp-user-info">
+                  <div className="sp-user-name">{user?.name || 'Utente'}</div>
+                  <div className="sp-user-role">{userRoles[0] || 'operator'}</div>
+                </div>
+                <LogOut size={16} style={{ color: '#666', flexShrink: 0 }} />
+              </>
+            )}
           </div>
         </div>
       </aside>
 
       {/* MAIN */}
-      <main className="sp-main">
+      <main
+        className="sp-main"
+        style={{ marginLeft: sidebarWidth, transition: 'margin-left 0.25s cubic-bezier(0.4,0,0.2,1)' }}
+      >
         <header className="sp-topbar">
           <div className="sp-topbar-title">{activePageLabel}</div>
           <div className="sp-topbar-actions">
