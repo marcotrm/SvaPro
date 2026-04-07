@@ -3,7 +3,9 @@ FROM php:8.3-cli
 
 # --- System dependencies ---
 RUN apt-get update && apt-get install -y \
-    unzip git curl libzip-dev libonig-dev libxml2-dev \
+    unzip git curl \
+    libzip-dev libonig-dev libxml2-dev \
+    libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # --- PHP extensions needed by Laravel ---
