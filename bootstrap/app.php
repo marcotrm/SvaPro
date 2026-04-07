@@ -19,6 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RequireRole::class,
             'permission' => CheckPermission::class,
         ]);
+
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

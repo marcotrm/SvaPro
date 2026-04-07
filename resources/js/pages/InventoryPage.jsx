@@ -1,10 +1,8 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { inventory } from '../api.jsx';
-import { InventorySkeleton } from '../components/Skeleton.jsx';
-import VirtualTable from '../components/VirtualTable.jsx';
-import ErrorAlert from '../components/ErrorAlert.jsx';
 import InventoryMovementModal from '../components/InventoryMovementModal.jsx';
+import { Search, Plus, AlertTriangle, MapPin, Filter } from 'lucide-react';
 
 export default function InventoryPage() {
   const { user, selectedStoreId, selectedStore } = useOutletContext();
@@ -14,238 +12,227 @@ export default function InventoryPage() {
   const [error, setError] = useState('');
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [movementTypeFilter, setMovementTypeFilter] = useState('');
-  const [warehouseFilter, setWarehouseFilter] = useState('');
-  const [dateFromFilter, setDateFromFilter] = useState('');
-  const [dateToFilter, setDateToFilter] = useState('');
   const [showMovementModal, setShowMovementModal] = useState(false);
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('stock');
 
-  useEffect(() => { fetchStockAndMovements(); }, [selectedStoreId]);
-  useEffect(() => {
-    const timeoutId = setTimeout(() => setDebouncedSearchTerm(searchTerm), 220);
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
-  useEffect(() => { fetchMovements(); }, [debouncedSearchTerm, movementTypeFilter, warehouseFilter, dateFromFilter, dateToFilter, selectedStoreId]);
+  useEffect(() => { fetchData(); }, [selectedStoreId]);
 
-  const fetchStockAndMovements = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true); setError('');
-      const [stockResponse, movementsResponse] = await Promise.all([
-        inventory.getStock(selectedStoreId ? { store_id: selectedStoreId, limit: 80 } : { limit: 80 }),
-        inventory.getMovements(selectedStoreId ? { store_id: selectedStoreId, limit: 80 } : { limit: 80 }),
+      const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
+      const [stockRes, movRes] = await Promise.all([
+        inventory.getStock({ ...sp, limit: 200 }),
+        inventory.getMovements({ ...sp, limit: 100 }),
       ]);
-      setStock(stockResponse.data.data || []);
-      setMovements(movementsResponse.data.data || []);
+      setStock(stockRes.data?.data || []);
+      setMovements(movRes.data?.data || []);
     } catch (err) {
-      setError(err.message || 'Errore nel caricamento dello stock');
+      setError(err.message || 'Errore nel caricamento');
     } finally { setLoading(false); }
   };
 
-  const fetchMovements = async () => {
-    try {
-      const response = await inventory.getMovements({
-        store_id: selectedStoreId || undefined,
-        q: debouncedSearchTerm || undefined,
-        movement_type: movementTypeFilter || undefined,
-        warehouse_id: warehouseFilter || undefined,
-        date_from: dateFromFilter || undefined,
-        date_to: dateToFilter || undefined,
-        limit: 80,
-      });
-      setMovements(response.data.data || []);
-    } catch (err) {
-      setError(err.message || 'Errore nel caricamento dei movimenti');
-    }
-  };
-
-  const lowCount = stock.filter(i => i.on_hand < i.reorder_point).length;
-  const filtered = filterLowStock ? stock.filter(i => i.on_hand < i.reorder_point) : stock;
-  const warehouses = Array.from(new Map(stock.map(item => [item.warehouse_id, { id: item.warehouse_id, name: item.warehouse_name }])).values());
-  const movementTypes = Array.from(new Set(movements.map(item => item.movement_type))).filter(Boolean).sort();
-
-  const formatDateTime = value => value ? new Date(value).toLocaleString('it-IT') : '-';
   const userRoles = user?.roles || [];
-  const canAdjustInventory = userRoles.includes('superadmin') || userRoles.includes('admin_cliente');
+  const canAdjust = userRoles.includes('superadmin') || userRoles.includes('admin_cliente');
 
-  const handleSavedMovement = async () => {
-    await fetchStockAndMovements();
-    setShowMovementModal(false);
-  };
+  const lowCount = stock.filter(i => i.on_hand < (i.reorder_point || 5)).length;
+  const outCount = stock.filter(i => i.on_hand <= 0).length;
 
-  if (loading) return <InventorySkeleton />;
+  const filtered = stock.filter(i => {
+    if (filterLowStock && i.on_hand >= (i.reorder_point || 5)) return false;
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      return i.product_name?.toLowerCase().includes(s) || i.sku?.toLowerCase().includes(s);
+    }
+    return true;
+  });
+
+  const fmt = (v) => v ? new Date(v).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+      <div style={{ width: 32, height: 32, border: '3px solid var(--color-border)', borderTopColor: 'var(--color-accent)', borderRadius: '50%' }} className="sp-spin" />
+    </div>
+  );
 
   return (
-    <>
+    <div className="sp-animate-in">
       {/* Page header */}
-      <div className="page-head">
+      <div className="sp-page-header">
         <div>
-          <div className="page-head-title">Magazzino</div>
-          <div className="page-head-sub">
-            {stock.length} referenze - {lowCount} in stock basso{selectedStore ? ` - Store: ${selectedStore.name}` : ''}
-          </div>
+          <h1 className="sp-page-title">Magazzino</h1>
+          <p className="sp-page-subtitle">
+            {stock.length} referenze{selectedStore ? ` — ${selectedStore.name}` : ''}
+          </p>
         </div>
-        <button
-          className={`filter-chip${filterLowStock ? ' active' : ''}`}
-          onClick={() => setFilterLowStock(v => !v)}
-          style={{cursor:'pointer'}}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          Solo stock basso
-        </button>
-        {canAdjustInventory && (
-          <button className="btn btn-gold" onClick={() => setShowMovementModal(true)}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Nuovo Movimento
-          </button>
-        )}
+        <div className="sp-page-actions">
+          {canAdjust && (
+            <button className="sp-btn sp-btn-primary" onClick={() => setShowMovementModal(true)}>
+              <Plus size={16} /> Nuovo Movimento
+            </button>
+          )}
+        </div>
       </div>
 
-      {error && <ErrorAlert message={error} onRetry={fetchStockAndMovements} />}
-
-      {/* Low stock banner */}
-      {lowCount > 0 && (
-        <div className="banner banner-warn">
-          <svg className="banner-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <div className="banner-text">
-            <strong>Stock basso rilevato:</strong> {lowCount} articolo/i sotto il punto di riordino
-          </div>
+      {/* Error */}
+      {error && (
+        <div className="sp-alert sp-alert-error">
+          <AlertTriangle size={16} />
+          <span>{error}</span>
+          <button className="sp-btn sp-btn-ghost sp-btn-sm" onClick={fetchData} style={{ marginLeft: 'auto' }}>Riprova</button>
         </div>
       )}
 
-      {/* Table */}
-      <div className="table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>Prodotto</th>
-              <th>Magazzino</th>
-              <th>Disponibile</th>
-              <th>Riservato</th>
-              <th>Punto Riordino</th>
-              <th>Stato</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length > 0 ? filtered.map(item => {
-              const isLow = item.on_hand < item.reorder_point;
-              const pct = item.reorder_point > 0 ? Math.min(item.on_hand / item.reorder_point, 1) : 1;
-              return (
-                <tr key={item.id}>
-                  <td style={{fontWeight:600,color:'var(--text)'}}>
-                    {item.product_name}
-                    {item.flavor && (
-                      <span style={{color:'var(--muted2)',fontWeight:400}}> - {item.flavor}</span>
-                    )}
-                  </td>
-                  <td style={{color:'var(--muted2)'}}>{item.warehouse_name}</td>
-                  <td>
-                    <div style={{display:'flex',alignItems:'center',gap:10}}>
-                      <span className={`mono ${isLow ? 'negative' : 'positive'}`}>{item.available}</span>
-                      <div style={{width:48,height:3,background:'var(--border)',borderRadius:2,overflow:'hidden'}}>
-                        <div style={{width:`${pct*100}%`,height:'100%',background: isLow ? 'var(--red)' : 'var(--green)',borderRadius:2}} />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="mono" style={{color:'var(--muted2)'}}>{item.reserved}</td>
-                  <td className="mono" style={{color:'var(--muted2)'}}>{item.reorder_point}</td>
-                  <td>
-                    <span className={`badge ${isLow ? 'low' : 'high'}`}>
-                      <span className="badge-dot" />
-                      {isLow ? 'Stock Basso' : 'OK'}
-                    </span>
-                  </td>
-                </tr>
-              );
-            }) : (
-              <tr>
-                <td colSpan="6" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
-                  {filterLowStock ? 'Nessun articolo in stock basso' : 'Nessun articolo trovato'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      {/* Stats */}
+      <div className="sp-stats-grid">
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">Totale Referenze</div>
+          <div className="sp-stat-value">{stock.length}</div>
+        </div>
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">Stock Basso</div>
+          <div className="sp-stat-value" style={{ color: lowCount > 0 ? 'var(--color-warning)' : 'inherit' }}>{lowCount}</div>
+        </div>
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">Esaurito</div>
+          <div className="sp-stat-value" style={{ color: outCount > 0 ? 'var(--color-error)' : 'inherit' }}>{outCount}</div>
+        </div>
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">Movimenti Recenti</div>
+          <div className="sp-stat-value">{movements.length}</div>
+        </div>
       </div>
 
-      <VirtualTable
-        items={movements}
-        maxVisible={10}
-        rowHeight={48}
-        toolbar={
-          <div className="table-toolbar" style={{gap: 10, flexWrap: 'wrap'}}>
-            <div className="search-box" style={{minWidth: 240}}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color:'var(--muted)',flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input
-                placeholder="Cerca per prodotto, SKU o causale..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
+      {/* Tabs */}
+      <div className="sp-tabs">
+        <button className={`sp-tab ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}>
+          Giacenze
+        </button>
+        <button className={`sp-tab ${activeTab === 'movements' ? 'active' : ''}`} onClick={() => setActiveTab('movements')}>
+          Movimenti
+        </button>
+      </div>
+
+      {/* Stock Tab */}
+      {activeTab === 'stock' && (
+        <div className="sp-table-wrap">
+          <div className="sp-table-toolbar">
+            <div className="sp-search-box" style={{ flex: 1, maxWidth: 300 }}>
+              <Search size={14} />
+              <input className="sp-input" placeholder="Cerca prodotto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
-
-            <select className="form-select" style={{maxWidth: 200}} value={movementTypeFilter} onChange={e => setMovementTypeFilter(e.target.value)}>
-              <option value="">Tutte le causali</option>
-              {movementTypes.map(type => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
-
-            <select className="form-select" style={{maxWidth: 220}} value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)}>
-              <option value="">Tutti i magazzini</option>
-              {warehouses.map(warehouse => (
-                <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>
-              ))}
-            </select>
-
-            <input className="form-select" type="date" value={dateFromFilter} onChange={e => setDateFromFilter(e.target.value)} style={{maxWidth: 170}} />
-            <input className="form-select" type="date" value={dateToFilter} onChange={e => setDateToFilter(e.target.value)} style={{maxWidth: 170}} />
-
-            <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>{movements.length} movimenti</span>
+            <button 
+              className={`sp-chip ${filterLowStock ? 'active' : ''}`}
+              onClick={() => setFilterLowStock(v => !v)}
+            >
+              <AlertTriangle size={12} /> Solo stock basso
+            </button>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+              {filtered.length} risultati
+            </span>
           </div>
-        }
-        headers={
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Prodotto</th>
-              <th>Magazzino</th>
-              <th>Causale</th>
-              <th>Quantita</th>
-              <th>Operatore</th>
-              <th>Riferimento</th>
-            </tr>
-          </thead>
-        }
-        renderRow={(item) => (
-          <tr key={item.id}>
-            <td style={{color:'var(--muted2)'}}>{formatDateTime(item.occurred_at)}</td>
-            <td style={{fontWeight:600,color:'var(--text)'}}>
-              {item.product_name}
-              {item.flavor ? <span style={{color:'var(--muted2)',fontWeight:400}}> - {item.flavor}</span> : null}
-            </td>
-            <td style={{color:'var(--muted2)'}}>{item.warehouse_name}</td>
-            <td><span className="badge mid"><span className="badge-dot" />{item.movement_type}</span></td>
-            <td><span className={`mono ${item.qty < 0 ? 'negative' : 'positive'}`}>{item.qty > 0 ? `+${item.qty}` : item.qty}</span></td>
-            <td style={{color:'var(--muted2)'}}>{item.actor_name || 'Sistema'}</td>
-            <td className="mono" style={{color:'var(--muted2)'}}>{item.reference_type ? `${item.reference_type}:${item.reference_id || '-'}` : '-'}</td>
-          </tr>
-        )}
-        emptyNode={
-          <tr>
-            <td colSpan="7" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
-              Nessun movimento trovato con i filtri selezionati
-            </td>
-          </tr>
-        }
-      />
+          <table className="sp-table">
+            <thead>
+              <tr>
+                <th>Prodotto</th>
+                <th>Magazzino</th>
+                <th>Ubicazione</th>
+                <th>Disponibile</th>
+                <th>Riservato</th>
+                <th>Pt. Riordino</th>
+                <th>Stato</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length > 0 ? filtered.map(item => {
+                const isLow = item.on_hand < (item.reorder_point || 5);
+                const isOut = item.on_hand <= 0;
+                return (
+                  <tr key={item.id}>
+                    <td>
+                      <span className="sp-cell-primary">{item.product_name}</span>
+                      {item.flavor && <span className="sp-cell-secondary" style={{ marginLeft: 6 }}>— {item.flavor}</span>}
+                    </td>
+                    <td className="sp-cell-secondary">{item.warehouse_name}</td>
+                    <td>
+                      {item.location ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                          <MapPin size={12} /> {item.location}
+                        </span>
+                      ) : <span className="sp-cell-secondary">—</span>}
+                    </td>
+                    <td>
+                      <span style={{ fontWeight: 700, color: isOut ? 'var(--color-error)' : isLow ? 'var(--color-warning)' : 'var(--color-success)' }}>
+                        {item.available ?? item.on_hand}
+                      </span>
+                    </td>
+                    <td className="sp-cell-secondary sp-font-mono">{item.reserved || 0}</td>
+                    <td className="sp-cell-secondary sp-font-mono">{item.reorder_point || '—'}</td>
+                    <td>
+                      {isOut ? (
+                        <span className="sp-badge sp-badge-error"><span className="sp-badge-dot" /> Esaurito</span>
+                      ) : isLow ? (
+                        <span className="sp-badge sp-badge-warning"><span className="sp-badge-dot" /> Basso</span>
+                      ) : (
+                        <span className="sp-badge sp-badge-success"><span className="sp-badge-dot" /> OK</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              }) : (
+                <tr><td colSpan="7" className="sp-table-empty">Nessun articolo trovato</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Movements Tab */}
+      {activeTab === 'movements' && (
+        <div className="sp-table-wrap">
+          <table className="sp-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Prodotto</th>
+                <th>Magazzino</th>
+                <th>Causale</th>
+                <th>Quantità</th>
+                <th>Operatore</th>
+              </tr>
+            </thead>
+            <tbody>
+              {movements.length > 0 ? movements.map(item => (
+                <tr key={item.id}>
+                  <td className="sp-cell-secondary">{fmt(item.occurred_at)}</td>
+                  <td className="sp-cell-primary">
+                    {item.product_name}
+                    {item.flavor && <span className="sp-cell-secondary"> — {item.flavor}</span>}
+                  </td>
+                  <td className="sp-cell-secondary">{item.warehouse_name}</td>
+                  <td><span className="sp-badge sp-badge-neutral">{item.movement_type}</span></td>
+                  <td>
+                    <span className="sp-font-mono" style={{ fontWeight: 700, color: item.qty < 0 ? 'var(--color-error)' : 'var(--color-success)' }}>
+                      {item.qty > 0 ? `+${item.qty}` : item.qty}
+                    </span>
+                  </td>
+                  <td className="sp-cell-secondary">{item.actor_name || 'Sistema'}</td>
+                </tr>
+              )) : (
+                <tr><td colSpan="6" className="sp-table-empty">Nessun movimento trovato</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {showMovementModal && (
         <InventoryMovementModal
           stock={stock}
           onClose={() => setShowMovementModal(false)}
-          onSaved={handleSavedMovement}
+          onSaved={async () => { await fetchData(); setShowMovementModal(false); }}
         />
       )}
-    </>
+    </div>
   );
 }

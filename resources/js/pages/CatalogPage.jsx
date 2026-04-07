@@ -1,187 +1,191 @@
 import React, { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { catalog, suppliers } from '../api.jsx';
-import { CatalogSkeleton } from '../components/Skeleton.jsx';
-import ErrorAlert from '../components/ErrorAlert.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
+import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3 } from 'lucide-react';
 
 export default function CatalogPage() {
-  const { selectedStoreId, selectedStore, storesList } = useOutletContext();
+  const navigate = useNavigate();
+  const { selectedStoreId, displayMode, selectedStore } = useOutletContext();
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [suppliersList, setSuppliersList] = useState([]);
-  useEffect(() => { fetchProducts(); }, [selectedStoreId]);
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
-  const fetchProducts = async () => {
+  useEffect(() => { fetchData(); }, [selectedStoreId]);
+
+  const fetchData = async () => {
     try {
-      setLoading(true);
-      setError('');
-      const productsRes = await catalog.getProducts(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 });
-      setProducts(productsRes.data.data || []);
-      
-      const suppliersRes = await suppliers.getAll();
-      setSuppliersList(suppliersRes.data.data || []);
+      setLoading(true); setError('');
+      const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
+      const [pRes, sRes, cRes] = await Promise.all([
+        catalog.getProducts({ ...sp, limit: 200 }),
+        suppliers.getAll().catch(() => ({ data: { data: [] } })),
+        catalog.getCategories()
+      ]);
+      setProducts(pRes.data?.data || []);
+      setSuppliersList(sRes.data?.data || []);
+      setCategories(cRes.data?.data || []);
     } catch (err) {
-      setError(err.message || 'Errore nel caricamento dei dati');
-    } finally {
-      setLoading(false);
-    }
+      setError(err.message || 'Errore caricamento dati');
+    } finally { setLoading(false); }
   };
 
-  const handleOpenModal = (product = null) => { setSelectedProduct(product); setShowModal(true); };
-  const handleCloseModal = () => { setShowModal(false); setSelectedProduct(null); };
-  const handleSaveProduct = async () => { await fetchProducts(); handleCloseModal(); };
+  const filtered = products.filter(p => {
+    const s = searchTerm.toLowerCase();
+    const matchSearch = !s || p.name?.toLowerCase().includes(s) || p.sku?.toLowerCase().includes(s);
+    const matchCat = categoryFilter === 'all' || p.category_id === parseInt(categoryFilter);
+    return matchSearch && matchCat;
+  });
 
-  const handleImportCSV = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    try {
-      setLoading(true);
-      setError('');
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      await catalog.importProducts(formData);
-      await fetchProducts();
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Errore importazione CSV');
-    } finally {
-      setLoading(false);
-      e.target.value = null; // reset input
-    }
-  };
+  const lowStockCount = products.filter(p => {
+    const qty = p.variants?.[0]?.stock_quantity ?? 0;
+    return qty > 0 && qty < 5;
+  }).length;
+  const outOfStockCount = products.filter(p => (p.variants?.[0]?.stock_quantity ?? 0) <= 0).length;
 
-  const filtered = products.filter(p =>
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+  const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+      <div style={{ width: 32, height: 32, border: '3px solid var(--color-border)', borderTopColor: 'var(--color-accent)', borderRadius: '50%' }} className="sp-spin" />
+    </div>
   );
 
-  const getPrimaryVariant = product => product.variants?.[0] || null;
-  const getStoresLabel = product => {
-    if (!product.store_count) return 'Nessuno store';
-    if (product.store_count === 1) return '1 store';
-    return `${product.store_count} store`;
-  };
-  const getFiscalSummary = product => {
-    const variant = getPrimaryVariant(product);
-    if (!variant) return 'Regime standard';
-
-    const parts = [];
-    if (variant.excise_profile_code) parts.push(`Accisa ${variant.excise_profile_code}`);
-    if (variant.excise_unit_amount_override !== null && variant.excise_unit_amount_override !== undefined) {
-      parts.push(`Override €${Number(variant.excise_unit_amount_override).toFixed(2)}`);
-    }
-    if (variant.prevalenza_code) parts.push(`Prev. ${variant.prevalenza_code}`);
-
-    return parts.length ? parts.join(' • ') : 'Regime standard';
-  };
-
-  if (loading) return <CatalogSkeleton />;
-
   return (
-    <>
-      {/* Page header */}
-      <div className="page-head">
+    <div className="sp-animate-in">
+      {/* Header */}
+      <div className="sp-page-header">
         <div>
-          <div className="page-head-title">Catalogo Prodotti</div>
-          <div className="page-head-sub">
-            {products.length} prodotti nel database{selectedStore ? ` - Store: ${selectedStore.name}` : ''}
-          </div>
+          <h1 className="sp-page-title">Catalogo Prodotti</h1>
+          <p className="sp-page-subtitle">
+            <Package size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+            {products.length} referenze{selectedStore ? ` — ${selectedStore.name}` : ''}
+          </p>
         </div>
-        <div style={{display:'flex', gap: '8px'}}>
-          <label className="btn btn-light" style={{cursor: 'pointer'}}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Importa CSV
-            <input type="file" accept=".csv" style={{display: 'none'}} onChange={handleImportCSV} />
-          </label>
-          <button className="btn btn-gold" onClick={() => handleOpenModal()}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Nuovo Prodotto
+        <div className="sp-page-actions">
+          <button className="sp-btn sp-btn-secondary" onClick={() => navigate('/catalog/categories')}>
+            <Layers size={16} /> Categorie
+          </button>
+          <button className="sp-btn sp-btn-primary" onClick={() => { setSelectedProduct(null); setShowModal(true); }}>
+            <Plus size={16} /> Nuovo Prodotto
           </button>
         </div>
       </div>
 
-      {error && <ErrorAlert message={error} onRetry={fetchProducts} />}
+      {error && (
+        <div className="sp-alert sp-alert-error">
+          <AlertTriangle size={16} /> {error}
+          <button className="sp-btn sp-btn-ghost sp-btn-sm" onClick={fetchData} style={{ marginLeft: 'auto' }}>Riprova</button>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="sp-stats-grid">
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">Totale Prodotti</div>
+          <div className="sp-stat-value">{products.length}</div>
+        </div>
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">Categorie</div>
+          <div className="sp-stat-value">{categories.filter(c => !c.parent_id).length}</div>
+        </div>
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">Stock Basso</div>
+          <div className="sp-stat-value" style={{ color: lowStockCount > 0 ? 'var(--color-warning)' : 'inherit' }}>{lowStockCount}</div>
+        </div>
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">Esaurito</div>
+          <div className="sp-stat-value" style={{ color: outOfStockCount > 0 ? 'var(--color-error)' : 'inherit' }}>{outOfStockCount}</div>
+        </div>
+      </div>
 
       {/* Table */}
-      <div className="table-card">
-        <div className="table-toolbar">
-          <div className="search-box">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color:'var(--muted)',flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input
-              placeholder="Cerca per nome o SKU..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
+      <div className="sp-table-wrap">
+        <div className="sp-table-toolbar">
+          <div className="sp-search-box" style={{ flex: 1, maxWidth: 300 }}>
+            <Search size={14} />
+            <input className="sp-input" placeholder="Cerca prodotto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
-          <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>
+          <select className="sp-select" style={{ maxWidth: 200 }} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+            <option value="all">Tutte le categorie</option>
+            {categories.filter(c => !c.parent_id).map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
             {filtered.length} risultati
           </span>
         </div>
-        <table>
+        <table className="sp-table">
           <thead>
             <tr>
-              <th>Nome</th>
-              <th>SKU / PLI</th>
-              <th>Variante Principale</th>
+              <th>Prodotto</th>
+              <th>SKU</th>
+              <th>Categoria</th>
+              <th>Ubicazione</th>
               <th>Prezzo</th>
-              <th>Accise / Prevalenza</th>
-              <th>Store Abilitati</th>
-              <th style={{textAlign:'right'}}>Azioni</th>
+              <th>Stock</th>
+              <th>Stato</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            {filtered.length > 0 ? filtered.map(product => (
-              <tr key={product.id}>
-                <td style={{fontWeight:600,color:'var(--text)'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                    {product.image_url ? (
-                      <img src={product.image_url} alt="img" style={{width:24,height:24,borderRadius:4,objectFit:'cover'}} />
+            {filtered.length > 0 ? filtered.map(product => {
+              const variant = product.variants?.[0];
+              const price = parseFloat(variant?.sale_price) || 0;
+              const stock = variant?.stock_quantity ?? 0;
+              const category = categories.find(c => c.id === product.category_id);
+              const location = variant?.location;
+
+              return (
+                <tr key={product.id}>
+                  <td className="sp-cell-primary">{product.name}</td>
+                  <td className="sp-cell-secondary sp-font-mono">{product.sku || '—'}</td>
+                  <td>
+                    {category ? (
+                      <span className="sp-badge sp-badge-neutral">{category.name}</span>
+                    ) : <span className="sp-cell-secondary">—</span>}
+                  </td>
+                  <td>
+                    {location ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                        <MapPin size={12} /> {location}
+                      </span>
+                    ) : <span className="sp-cell-secondary">—</span>}
+                  </td>
+                  <td style={{ fontWeight: 600 }}>{fmt(price)}</td>
+                  <td>
+                    <span className="sp-font-mono" style={{ fontWeight: 600, color: stock <= 0 ? 'var(--color-error)' : stock < 5 ? 'var(--color-warning)' : 'var(--color-text)' }}>
+                      {stock}
+                    </span>
+                  </td>
+                  <td>
+                    {stock <= 0 ? (
+                      <span className="sp-badge sp-badge-error"><span className="sp-badge-dot" /> Esaurito</span>
+                    ) : stock < 5 ? (
+                      <span className="sp-badge sp-badge-warning"><span className="sp-badge-dot" /> Basso</span>
                     ) : (
-                      <div style={{width:24,height:24,borderRadius:4,backgroundColor:'var(--muted-bg)'}} />
+                      <span className="sp-badge sp-badge-success"><span className="sp-badge-dot" /> Disponibile</span>
                     )}
-                    {product.name}
-                  </div>
-                </td>
-                <td>
-                  <span className="mono" style={{color:'var(--muted2)'}}>{product.sku}</span>
-                  {product.pli_code && (
-                    <div style={{fontSize:'0.75rem',marginTop:2,color:'var(--text)',fontWeight:500}}>
-                      PLI: {product.pli_code}
-                    </div>
-                  )}
-                </td>
-                <td style={{color:'var(--muted2)'}}>{getPrimaryVariant(product)?.flavor || getPrimaryVariant(product)?.resistance_ohm || '-'}</td>
-                <td><span className="mono positive">€{Number(getPrimaryVariant(product)?.sale_price || 0).toFixed(2)}</span></td>
-                <td style={{color:'var(--muted2)', maxWidth: 220}}>{getFiscalSummary(product)}</td>
-                <td>
-                  <span className={`badge ${product.store_count > 1 ? 'high' : 'mid'}`}>
-                    <span className="badge-dot" />
-                    {getStoresLabel(product)}
-                  </span>
-                </td>
-                <td>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}}>
-                    <button className="icon-action edit" onClick={() => handleOpenModal(product)} title="Modifica">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </td>
+                  <td>
+                    <button 
+                      className="sp-btn sp-btn-ghost sp-btn-sm"
+                      onClick={() => { setSelectedProduct(product); setShowModal(true); }}
+                    >
+                      <Edit3 size={14} />
                     </button>
-                    <button className="icon-action danger" title="Elimina">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            )) : (
-              <tr>
-                <td colSpan="7" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
-                  Nessun prodotto trovato
-                </td>
-              </tr>
+                  </td>
+                </tr>
+              );
+            }) : (
+              <tr><td colSpan="8" className="sp-table-empty">Nessun prodotto trovato</td></tr>
             )}
           </tbody>
         </table>
@@ -190,13 +194,12 @@ export default function CatalogPage() {
       {showModal && (
         <CatalogModal
           product={selectedProduct}
-          storesList={storesList}
+          categories={categories}
           suppliers={suppliersList}
-          selectedStoreId={selectedStoreId}
-          onClose={handleCloseModal}
-          onSave={handleSaveProduct}
+          onClose={() => { setShowModal(false); setSelectedProduct(null); }}
+          onSaved={() => { setShowModal(false); setSelectedProduct(null); fetchData(); }}
         />
       )}
-    </>
+    </div>
   );
 }

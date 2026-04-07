@@ -2,9 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { auth, stores, clearApiCache } from '../api.jsx';
 import { useTranslation } from '../i18n/index.jsx';
+import { 
+  User, Settings, Globe, Shield, Save, 
+  Lock, Mail, Building2, Landmark, Clock, 
+  Layout, Eye, Smartphone, AlertCircle, CheckCircle2
+} from 'lucide-react';
 
 export default function SettingsPage() {
-  const { user, setUser } = useOutletContext();
+  const { user, setUser, displayMode, setDisplayMode } = useOutletContext();
   const { lang, setLang, t } = useTranslation();
   const isSuperAdmin = (user?.roles || []).includes('superadmin');
   const isAdmin = isSuperAdmin || (user?.roles || []).includes('admin_cliente');
@@ -89,113 +94,257 @@ export default function SettingsPage() {
   };
 
   return (
-    <>
-      <div className="page-head">
+    <div className="animate-v3 space-y-12 px-2 pb-20">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <div className="page-head-title">Impostazioni</div>
-          <div className="page-head-sub">Profilo utente e configurazione tenant</div>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">Impostazioni Sistema</h1>
+          <p className="text-slate-400 font-bold flex items-center gap-2">
+            <Settings size={16} className="text-indigo-500" />
+            Configurazione globale e preferenze profilo
+          </p>
         </div>
       </div>
 
-      {/* ── Profile Card ── */}
-      <div className="table-card" style={{ padding: 24, marginBottom: 20 }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>
-          Profilo Utente
-        </h3>
-        <form onSubmit={handleSaveProfile} style={{ display: 'grid', gap: 14, maxWidth: 480 }}>
-          <div className="form-group">
-            <label className="form-label">Nome</label>
-            <input className="form-input" value={name} onChange={e => setName(e.target.value)} required />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Email</label>
-            <input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-          </div>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-12">
+        {/* Left Column: Forms */}
+        <div className="xl:col-span-8 space-y-10">
+          
+          {/* Profile Card */}
+          <section className="card-v3 overflow-hidden shadow-xl shadow-indigo-900/5">
+             <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex items-center gap-4">
+                <div className="w-10 h-10 bg-white shadow-sm rounded-xl flex items-center justify-center text-indigo-500">
+                   <User size={20} />
+                </div>
+                <div>
+                   <h3 className="font-black text-slate-900 tracking-tight text-lg">Profilo Personale</h3>
+                   <p className="text-xs font-bold text-slate-400">Identità utente e credenziali di accesso</p>
+                </div>
+             </div>
+             
+             <div className="p-8">
+               <form onSubmit={handleSaveProfile} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
+                        <div className="relative group">
+                           <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                           <input 
+                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                             value={name} onChange={e => setName(e.target.value)} required 
+                           />
+                        </div>
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Aziendale</label>
+                        <div className="relative group">
+                           <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                           <input 
+                             type="email"
+                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                             value={email} onChange={e => setEmail(e.target.value)} required 
+                           />
+                        </div>
+                     </div>
+                  </div>
 
-          <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0', paddingTop: 12 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted2)' }}>Cambia Password (opzionale)</span>
-          </div>
+                  <div className="pt-6 border-t border-slate-100">
+                    <div className="flex items-center gap-2 mb-6">
+                       <Lock size={14} className="text-amber-500" />
+                       <span className="text-xs font-black text-slate-800 uppercase tracking-widest">Sicurezza Account</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password Corrente</label>
+                          <input 
+                            type="password"
+                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                            value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}
+                          />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nuova Password</label>
+                          <input 
+                            type="password"
+                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                            value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                          />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Conferma Nuova</label>
+                          <input 
+                            type="password"
+                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                            value={newPasswordConfirmation} onChange={e => setNewPasswordConfirmation(e.target.value)}
+                          />
+                       </div>
+                    </div>
+                  </div>
 
-          <div className="form-group">
-            <label className="form-label">Password Attuale</label>
-            <input className="form-input" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} autoComplete="current-password" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Nuova Password</label>
-            <input className="form-input" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} minLength={8} autoComplete="new-password" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Conferma Nuova Password</label>
-            <input className="form-input" type="password" value={newPasswordConfirmation} onChange={e => setNewPasswordConfirmation(e.target.value)} autoComplete="new-password" />
-          </div>
+                  {profileMsg && <div className="p-4 bg-emerald-50 text-emerald-600 rounded-xl font-bold flex items-center gap-2"><CheckCircle2 size={16} /> {profileMsg}</div>}
+                  {profileErr && <div className="p-4 bg-red-50 text-red-600 rounded-xl font-bold flex items-center gap-2"><AlertCircle size={16} /> {profileErr}</div>}
 
-          {profileMsg && <div style={{ color: 'var(--green)', fontSize: 13, fontWeight: 500 }}>{profileMsg}</div>}
-          {profileErr && <div style={{ color: 'var(--red)', fontSize: 13, fontWeight: 500 }}>{profileErr}</div>}
+                  <button className="btn-v3-primary px-8 py-4 rounded-2xl shadow-lg shadow-indigo-100 flex items-center gap-2" type="submit" disabled={savingProfile}>
+                    <Save size={18} /> {savingProfile ? 'Sincronizzazione...' : 'Salva Profilo'}
+                  </button>
+               </form>
+             </div>
+          </section>
 
-          <button className="btn btn-gold" type="submit" disabled={savingProfile} style={{ justifyContent: 'center', width: 'fit-content' }}>
-            {savingProfile ? 'Salvataggio...' : 'Salva Profilo'}
-          </button>
-        </form>
-      </div>
+          {/* Tenant Settings Card */}
+          {isAdmin && (
+            <section className="card-v3 overflow-hidden shadow-xl shadow-indigo-900/5">
+               <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex items-center gap-4">
+                  <div className="w-10 h-10 bg-white shadow-sm rounded-xl flex items-center justify-center text-indigo-500">
+                     <Building2 size={20} />
+                  </div>
+                  <div>
+                     <h3 className="font-black text-slate-900 tracking-tight text-lg">Configurazione Aziendale</h3>
+                     <p className="text-xs font-bold text-slate-400">Dati fiscali e impostazioni regionali</p>
+                  </div>
+               </div>
 
-      {/* ── Language Card ── */}
-      <div className="table-card" style={{ padding: 24, marginBottom: 20 }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>
-          {t('language')}
-        </h3>
-        <div style={{ display: 'flex', gap: 10, maxWidth: 480 }}>
-          <button
-            className={`btn ${lang === 'it' ? 'btn-gold' : 'btn-ghost'}`}
-            onClick={() => setLang('it')}
-            style={{ flex: 1, justifyContent: 'center' }}
-          >
-            🇮🇹 {t('italian')}
-          </button>
-          <button
-            className={`btn ${lang === 'en' ? 'btn-gold' : 'btn-ghost'}`}
-            onClick={() => setLang('en')}
-            style={{ flex: 1, justifyContent: 'center' }}
-          >
-            🇬🇧 {t('english')}
-          </button>
+               <div className="p-8">
+                 <form onSubmit={handleSaveTenant} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ragione Sociale</label>
+                          <div className="relative group">
+                             <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                             <input 
+                               className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                               value={tenantName} onChange={e => setTenantName(e.target.value)} required 
+                             />
+                          </div>
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Partita IVA / Tax ID</label>
+                          <div className="relative group">
+                             <Landmark className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                             <input 
+                               className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                               value={tenantVat} onChange={e => setTenantVat(e.target.value)}
+                             />
+                          </div>
+                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Fuso Orario Locale</label>
+                       <div className="relative group max-w-sm">
+                          <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                          <select 
+                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-10 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none appearance-none cursor-pointer"
+                            value={tenantTimezone} onChange={e => setTenantTimezone(e.target.value)}
+                          >
+                             <option value="Europe/Rome">Europe/Rome (Italia)</option>
+                             <option value="Europe/London">Europe/London (UK)</option>
+                             <option value="UTC">UTC (Universal)</option>
+                          </select>
+                       </div>
+                    </div>
+
+                    {tenantMsg && <div className="p-4 bg-emerald-50 text-emerald-600 rounded-xl font-bold flex items-center gap-2"><CheckCircle2 size={16} /> {tenantMsg}</div>}
+                    {tenantErr && <div className="p-4 bg-red-50 text-red-600 rounded-xl font-bold flex items-center gap-2"><AlertCircle size={16} /> {tenantErr}</div>}
+
+                    <button className="btn-v3-primary px-8 py-4 rounded-2xl shadow-lg shadow-indigo-100 flex items-center gap-2" type="submit" disabled={savingTenant}>
+                       <Save size={18} /> {savingTenant ? 'Salvataggio...' : 'Salva Impostazioni Azienda'}
+                    </button>
+                 </form>
+               </div>
+            </section>
+          )}
+        </div>
+
+        {/* Right Column: Preferences & UI */}
+        <div className="xl:col-span-4 space-y-10">
+          
+          {/* Display Mode Card (REQUESTED) */}
+          <section className="card-v3 p-8 space-y-6 bg-gradient-to-br from-white to-slate-50 border-slate-100">
+             <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center">
+                   <Layout size={20} />
+                </div>
+                <div>
+                   <h3 className="font-black text-slate-900 tracking-tight">Visualizzazione</h3>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Interface Preferences</p>
+                </div>
+             </div>
+
+             <div className="space-y-4">
+                <button 
+                  onClick={() => setDisplayMode('name')}
+                  className={`w-full p-6 rounded-2xl border-2 flex items-center gap-6 transition-all group ${displayMode === 'name' ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-100'}`}
+                >
+                   <Eye size={24} className={displayMode === 'name' ? 'text-white' : 'text-slate-300 group-hover:text-indigo-400'} />
+                   <div className="text-left">
+                      <div className="font-black tracking-tight uppercase text-xs">Visualizza Nomi</div>
+                      <div className={`text-[10px] font-bold ${displayMode === 'name' ? 'text-indigo-100' : 'text-slate-400'}`}>Mostra i nomi completi dei prodotti nelle liste</div>
+                   </div>
+                   {displayMode === 'name' && <CheckCircle2 size={18} className="ml-auto" />}
+                </button>
+
+                <button 
+                  onClick={() => setDisplayMode('sku')}
+                  className={`w-full p-6 rounded-2xl border-2 flex items-center gap-6 transition-all group ${displayMode === 'sku' ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-100'}`}
+                >
+                   <Smartphone size={24} className={displayMode === 'sku' ? 'text-white' : 'text-slate-300 group-hover:text-indigo-400'} />
+                   <div className="text-left">
+                      <div className="font-black tracking-tight uppercase text-xs">Visualizza SKU</div>
+                      <div className={`text-[10px] font-bold ${displayMode === 'sku' ? 'text-indigo-100' : 'text-slate-400'}`}>Mostra i codici identificativi per un uso tattico veloce</div>
+                   </div>
+                   {displayMode === 'sku' && <CheckCircle2 size={18} className="ml-auto" />}
+                </button>
+             </div>
+          </section>
+
+          {/* Localization Card */}
+          <section className="card-v3 p-8 space-y-6 border-slate-100">
+             <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center">
+                   <Globe size={20} />
+                </div>
+                <div>
+                   <h3 className="font-black text-slate-900 tracking-tight">Localizzazione</h3>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Language & Region</p>
+                </div>
+             </div>
+
+             <div className="grid grid-cols-2 gap-4">
+                <button 
+                   className={`p-4 rounded-xl border-2 font-black text-xs transition-all ${lang === 'it' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-50 text-slate-400 hover:border-slate-100'}`}
+                   onClick={() => setLang('it')}
+                >
+                  ITALIANO
+                </button>
+                <button 
+                   className={`p-4 rounded-xl border-2 font-black text-xs transition-all ${lang === 'en' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-50 text-slate-400 hover:border-slate-100'}`}
+                   onClick={() => setLang('en')}
+                >
+                  ENGLISH
+                </button>
+             </div>
+          </section>
+
+          {/* Support / Info */}
+          <section className="p-8 bg-indigo-900 rounded-[32px] text-white shadow-2xl shadow-indigo-900/40 relative overflow-hidden">
+             <div className="relative z-10">
+                <Shield size={32} className="text-indigo-400 mb-4" />
+                <h4 className="text-xl font-black tracking-tight mb-2">Sistema Sicuro</h4>
+                <p className="text-indigo-200 text-xs font-bold leading-relaxed mb-6">
+                   Tutte le modifiche alle impostazioni tenant vengono registrate negli audit log. Ogni azione è crittografata e monitorata.
+                </p>
+                <button className="w-full py-4 bg-white/10 hover:bg-white/20 transition-all rounded-2xl text-xs font-black uppercase tracking-widest backdrop-blur-md border border-white/10">
+                   Contatta Assistenza
+                </button>
+             </div>
+             {/* Decorative Background Orbs */}
+             <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl" />
+             <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-400/10 rounded-full blur-3xl" />
+          </section>
         </div>
       </div>
-
-      {/* ── Tenant Settings Card ── */}
-      {isAdmin && (
-        <div className="table-card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>
-            Impostazioni Tenant
-          </h3>
-          <form onSubmit={handleSaveTenant} style={{ display: 'grid', gap: 14, maxWidth: 480 }}>
-            <div className="form-group">
-              <label className="form-label">Nome Azienda</label>
-              <input className="form-input" value={tenantName} onChange={e => setTenantName(e.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Partita IVA</label>
-              <input className="form-input" value={tenantVat} onChange={e => setTenantVat(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Fuso orario</label>
-              <select className="form-select" value={tenantTimezone} onChange={e => setTenantTimezone(e.target.value)}>
-                <option value="Europe/Rome">Europe/Rome</option>
-                <option value="Europe/London">Europe/London</option>
-                <option value="Europe/Paris">Europe/Paris</option>
-                <option value="Europe/Berlin">Europe/Berlin</option>
-                <option value="UTC">UTC</option>
-              </select>
-            </div>
-
-            {tenantMsg && <div style={{ color: 'var(--green)', fontSize: 13, fontWeight: 500 }}>{tenantMsg}</div>}
-            {tenantErr && <div style={{ color: 'var(--red)', fontSize: 13, fontWeight: 500 }}>{tenantErr}</div>}
-
-            <button className="btn btn-gold" type="submit" disabled={savingTenant} style={{ justifyContent: 'center', width: 'fit-content' }}>
-              {savingTenant ? 'Salvataggio...' : 'Salva Impostazioni'}
-            </button>
-          </form>
-        </div>
-      )}
-    </>
+    </div>
   );
 }

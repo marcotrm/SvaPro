@@ -30,22 +30,21 @@ class ResolveTenant
 
         $isSuperAdmin = in_array('superadmin', $roleCodes, true);
 
-        $tenantId = (int) $user->tenant_id;
-
+        // For superadmin: allow switching tenant via X-Tenant-Code header
         if ($isSuperAdmin && $requestedTenantCode) {
             $tenantId = (int) DB::table('tenants')->where('code', $requestedTenantCode)->value('id');
 
             if (! $tenantId) {
                 return response()->json(['message' => 'Tenant non trovato.'], 404);
             }
+
+            $request->attributes->set('tenant_id', $tenantId);
+            return $next($request);
         }
 
-        if (! $isSuperAdmin && $requestedTenantCode) {
-            $userTenantCode = DB::table('tenants')->where('id', $user->tenant_id)->value('code');
-            if ($requestedTenantCode !== $userTenantCode) {
-                return response()->json(['message' => 'Accesso tenant non consentito.'], 403);
-            }
-        }
+        // For regular users: always use their own tenant_id (ignore X-Tenant-Code)
+        // This prevents 403 loops caused by stale localStorage tenant codes
+        $tenantId = (int) $user->tenant_id;
 
         if (! $tenantId) {
             return response()->json(['message' => 'Tenant non assegnato all\'utente.'], 422);

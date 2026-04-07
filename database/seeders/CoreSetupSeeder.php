@@ -324,6 +324,7 @@ class CoreSetupSeeder extends Seeder
 
         $customerId = DB::table('customers')->insertGetId([
             'tenant_id' => $tenantId,
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
             'code' => 'CUST-0001',
             'first_name' => 'Mario',
             'last_name' => 'Rossi',

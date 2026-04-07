@@ -31,6 +31,7 @@ const PromotionsPage = lazy(() => import('./pages/PromotionsPage.jsx'));
 const LoyaltyTiersPage = lazy(() => import('./pages/LoyaltyTiersPage.jsx'));
 const EmployeeKpiPage = lazy(() => import('./pages/EmployeeKpiPage.jsx'));
 const InventoryCountPage = lazy(() => import('./pages/InventoryCountPage.jsx'));
+const CategoryPage = lazy(() => import('./pages/CategoryPage.jsx'));
 
 const EmployeePurchasesPage = lazy(() => import('./pages/EmployeePurchasesPage.jsx'));
 
@@ -62,18 +63,31 @@ export default function App() {
       const token = localStorage.getItem('authToken');
       if (token) {
         try {
+          // Timeout di 8 secondi per evitare caricamento infinito via tunnel
+          const controller = new AbortController();
+          const timerId = setTimeout(() => controller.abort(), 8000);
+          
           const response = await auth.me();
+          clearTimeout(timerId);
           setUser(response.data);
           localStorage.setItem('user', JSON.stringify(response.data));
           if (response.data?.tenant_code) {
             localStorage.setItem('tenantCode', response.data.tenant_code);
           }
         } catch (error) {
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
-          localStorage.removeItem('tenantCode');
-          localStorage.removeItem('selectedStoreId');
-          setUser(null);
+          // Se è un timeout o errore di rete, prova a usare l'utente salvato in cache
+          const cachedUser = localStorage.getItem('user');
+          if (cachedUser && error.name !== 'AuthenticationError') {
+            try {
+              setUser(JSON.parse(cachedUser));
+            } catch {}
+          } else {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            localStorage.removeItem('tenantCode');
+            localStorage.removeItem('selectedStoreId');
+            setUser(null);
+          }
         }
       }
       setLoading(false);
@@ -84,10 +98,10 @@ export default function App() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#080d18' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--color-bg, #F5F5F7)' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 44, height: 44, border: '3px solid #243450', borderTopColor: '#c9a227', borderRadius: '50%', animation: 'spin .7s linear infinite', margin: '0 auto 16px' }} />
-          <p style={{ color: '#7b8ba5', fontSize: 14 }}>Inizializzazione...</p>
+          <div style={{ width: 44, height: 44, border: '3px solid #E5E7EB', borderTopColor: '#0066FF', borderRadius: '50%', animation: 'spin .7s linear infinite', margin: '0 auto 16px' }} />
+          <p style={{ color: '#6B7280', fontSize: 14, fontFamily: 'Inter, sans-serif' }}>Caricamento SvaPro...</p>
         </div>
       </div>
     );
@@ -102,8 +116,10 @@ export default function App() {
           
           <Route element={<ProtectedRoute user={user} />}>
             <Route element={<Layout user={user} setUser={setUser} />}>
-              <Route path="/" element={<DashboardPage />} />
+              <Route path="/" element={<PosPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/catalog" element={<CatalogPage />} />
+              <Route path="/catalog/categories" element={<CategoryPage />} />
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/orders/stock-alerts" element={<StockAlertsPage />} />
               <Route path="/inventory" element={<InventoryPage />} />

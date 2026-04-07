@@ -1,13 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { X, Loader } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { X, Loader, Plus, Trash2, Barcode, MapPin, Package, Tag, DollarSign, Settings2, AlertTriangle } from 'lucide-react';
 import { catalog } from '../api.jsx';
 
 const PRODUCT_TYPES = [
-  { value: 'liquid', label: 'Liquido' },
-  { value: 'device', label: 'Device' },
-  { value: 'accessory', label: 'Accessorio' },
-  { value: 'consumable', label: 'Consumabile' },
-  { value: 'other', label: 'Altro' },
+  { value: 'liquid', label: '💧 Liquido' },
+  { value: 'device', label: '🔋 Device/Hardware' },
+  { value: 'accessory', label: '🔌 Accessorio' },
+  { value: 'consumable', label: '🔄 Consumabile (Coil/Cotton)' },
+  { value: 'other', label: '📦 Altro' },
+];
+
+const TAX_CLASSES = [
+  { value: '', label: 'Seleziona IVA...' },
+  { value: '1', label: '22% — Standard' },
+  { value: '2', label: '10% — Ridotta' },
+  { value: '3', label: '4% — Agevolata' },
 ];
 
 const createEmptyVariant = () => ({
@@ -16,6 +23,11 @@ const createEmptyVariant = () => ({
   pack_size: 1,
   flavor: '',
   resistance_ohm: '',
+  nicotine_strength: '',
+  volume_ml: '',
+  color: '',
+  barcode: '',
+  location: '',
   tax_class_id: '',
   excise_profile_code: '',
   excise_unit_amount_override: '',
@@ -23,443 +35,430 @@ const createEmptyVariant = () => ({
   prevalenza_label: '',
 });
 
-const normalizeVariant = (variant = {}) => ({
-  id: variant.id,
-  sale_price: variant.sale_price ?? '',
-  cost_price: variant.cost_price ?? '',
-  pack_size: variant.pack_size ?? 1,
-  flavor: variant.flavor ?? '',
-  resistance_ohm: variant.resistance_ohm ?? '',
-  tax_class_id: variant.tax_class_id ?? '',
-  excise_profile_code: variant.excise_profile_code ?? '',
-  excise_unit_amount_override: variant.excise_unit_amount_override ?? '',
-  prevalenza_code: variant.prevalenza_code ?? '',
-  prevalenza_label: variant.prevalenza_label ?? '',
+const normalizeVariant = (v = {}) => ({
+  id: v.id,
+  sale_price: v.sale_price ?? '',
+  cost_price: v.cost_price ?? '',
+  pack_size: v.pack_size ?? 1,
+  flavor: v.flavor ?? '',
+  resistance_ohm: v.resistance_ohm ?? '',
+  nicotine_strength: v.nicotine_strength ?? '',
+  volume_ml: v.volume_ml ?? '',
+  color: v.color ?? '',
+  barcode: v.barcode ?? '',
+  location: v.location ?? '',
+  tax_class_id: v.tax_class_id ?? '',
+  excise_profile_code: v.excise_profile_code ?? '',
+  excise_unit_amount_override: v.excise_unit_amount_override ?? '',
+  prevalenza_code: v.prevalenza_code ?? '',
+  prevalenza_label: v.prevalenza_label ?? '',
 });
 
 const normalizeProduct = (product, storesList, selectedStoreId = '') => {
-  const storeIds = Array.from(new Set((product?.variants || []).flatMap((variant) =>
-    (variant.assigned_stores || []).map((store) => Number(store.store_id))
+  const storeIds = Array.from(new Set((product?.variants || []).flatMap((v) =>
+    (v.assigned_stores || []).map((s) => Number(s.store_id))
   )));
-
   const selectedStoreNumericId = selectedStoreId ? Number(selectedStoreId) : null;
-  const defaultStoreIds = selectedStoreNumericId ? [selectedStoreNumericId] : storesList.map((store) => Number(store.id));
+  const defaultStoreIds = selectedStoreNumericId ? [selectedStoreNumericId] : storesList.map((s) => Number(s.id));
 
   return {
     sku: product?.sku || '',
     name: product?.name || '',
     product_type: product?.product_type || 'liquid',
-    pli_code: product?.pli_code || '',
+    category_id: product?.category_id ?? '',
     barcode: product?.barcode || '',
+    pli_code: product?.pli_code || '',
     default_supplier_id: product?.default_supplier_id ?? '',
     nicotine_mg: product?.nicotine_mg ?? '',
     volume_ml: product?.volume_ml ?? '',
     reorder_days: product?.reorder_days ?? 30,
     min_stock_qty: product?.min_stock_qty ?? 0,
     auto_reorder_enabled: product?.auto_reorder_enabled ?? true,
+    description: product?.description || '',
     store_ids: storeIds.length > 0 ? storeIds : defaultStoreIds,
-    image_url: product?.image_url || null,
-    image: null,
     variants: product?.variants?.length ? product.variants.map(normalizeVariant) : [createEmptyVariant()],
   };
 };
 
-export default function CatalogModal({ product, storesList = [], suppliers = [], selectedStoreId = '', onClose, onSave }) {
+export default function CatalogModal({ product, storesList = [], suppliers = [], categories = [], selectedStoreId = '', onClose, onSave }) {
   const [formData, setFormData] = useState(() => normalizeProduct(product, storesList, selectedStoreId));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  // imagePreview state for local file selection
-  const [imagePreview, setImagePreview] = useState(product?.image_url || null);
+  const [activeTab, setActiveTab] = useState('info'); // 'info' | 'variants' | 'fiscal' | 'inventory'
 
   useEffect(() => {
     setFormData(normalizeProduct(product, storesList, selectedStoreId));
-    setImagePreview(product?.image_url || null);
   }, [product, storesList, selectedStoreId]);
-
-  const handleImageChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setFormData(prev => ({ ...prev, image: file }));
-      setImagePreview(URL.createObjectURL(file));
-    }
-  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    const nextValue = type === 'checkbox' ? checked : value;
-    setFormData(prev => ({ ...prev, [name]: nextValue }));
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleVariantChange = (index, field, value) => {
     setFormData((prev) => ({
       ...prev,
-      variants: prev.variants.map((variant, variantIndex) => (
-        variantIndex === index ? { ...variant, [field]: value } : variant
-      )),
+      variants: prev.variants.map((v, i) => i === index ? { ...v, [field]: value } : v),
     }));
   };
 
-  const handleAddVariant = () => {
-    setFormData((prev) => ({
-      ...prev,
-      variants: [...prev.variants, createEmptyVariant()],
-    }));
-  };
-
-  const handleRemoveVariant = (index) => {
-    setFormData((prev) => ({
-      ...prev,
-      variants: prev.variants.filter((_, variantIndex) => variantIndex !== index),
-    }));
-  };
-
-  const handleStoreToggle = (storeId) => {
-    setFormData((prev) => {
-      const exists = prev.store_ids.includes(storeId);
-      return {
-        ...prev,
-        store_ids: exists
-          ? prev.store_ids.filter((currentId) => currentId !== storeId)
-          : [...prev.store_ids, storeId],
-      };
-    });
-  };
-
-  const buildPayload = () => {
-    const fd = new FormData();
-    fd.append('sku', formData.sku);
-    fd.append('name', formData.name);
-    fd.append('product_type', formData.product_type);
-    if (formData.pli_code) fd.append('pli_code', formData.pli_code);
-    if (formData.barcode) fd.append('barcode', formData.barcode);
-    if (formData.default_supplier_id !== '') fd.append('default_supplier_id', formData.default_supplier_id);
-    if (formData.nicotine_mg !== '') fd.append('nicotine_mg', formData.nicotine_mg);
-    if (formData.volume_ml !== '') fd.append('volume_ml', formData.volume_ml);
-    fd.append('auto_reorder_enabled', formData.auto_reorder_enabled ? '1' : '0');
-    fd.append('reorder_days', formData.reorder_days || 30);
-    fd.append('min_stock_qty', formData.min_stock_qty || 0);
-
-    formData.store_ids.forEach(id => fd.append('store_ids[]', id));
-
-    formData.variants.forEach((variant, index) => {
-      if (variant.id) fd.append(`variants[${index}][id]`, variant.id);
-      fd.append(`variants[${index}][sale_price]`, Number(variant.sale_price || 0));
-      fd.append(`variants[${index}][cost_price]`, Number(variant.cost_price || 0));
-      fd.append(`variants[${index}][pack_size]`, Number(variant.pack_size || 1));
-      if (variant.flavor) fd.append(`variants[${index}][flavor]`, variant.flavor);
-      if (variant.resistance_ohm) fd.append(`variants[${index}][resistance_ohm]`, variant.resistance_ohm);
-      if (variant.tax_class_id !== '') fd.append(`variants[${index}][tax_class_id]`, variant.tax_class_id);
-      if (variant.excise_profile_code) fd.append(`variants[${index}][excise_profile_code]`, variant.excise_profile_code);
-      if (variant.excise_unit_amount_override !== '') fd.append(`variants[${index}][excise_unit_amount_override]`, variant.excise_unit_amount_override);
-      if (variant.prevalenza_code) fd.append(`variants[${index}][prevalenza_code]`, variant.prevalenza_code);
-      if (variant.prevalenza_label) fd.append(`variants[${index}][prevalenza_label]`, variant.prevalenza_label);
-    });
-
-    if (formData.image) {
-      fd.append('image', formData.image);
-    }
-    
-    return fd;
-  };
+  const addVariant = () => setFormData(p => ({ ...p, variants: [...p.variants, createEmptyVariant()] }));
+  const removeVariant = (idx) => setFormData(p => ({ ...p, variants: p.variants.filter((_, i) => i !== idx) }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
       setError('');
-      if (formData.store_ids.length === 0) {
-        setError('Seleziona almeno uno store abilitato.');
-        setLoading(false);
-        return;
-      }
+      const fd = new FormData();
+      Object.entries(formData).forEach(([k, v]) => {
+        if (k === 'variants') {
+          v.forEach((variant, index) => {
+            Object.entries(variant).forEach(([vk, vv]) => {
+              if (vv !== null && vv !== '') fd.append(`variants[${index}][${vk}]`, vv);
+            });
+          });
+        } else if (k === 'store_ids') {
+          v.forEach(id => fd.append('store_ids[]', id));
+        } else if (v !== null && v !== '') {
+          fd.append(k, v);
+        }
+      });
 
-      if (formData.variants.length === 0) {
-        setError('Inserisci almeno una variante.');
-        setLoading(false);
-        return;
-      }
-
-      const payload = buildPayload();
-      
       if (product?.id) {
-        await catalog.updateProduct(product.id, payload);
+        fd.append('_method', 'PUT');
+        await catalog.updateProduct(product.id, fd);
       } else {
-        await catalog.createProduct(payload);
+        await catalog.createProduct(fd);
       }
       onSave();
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.errors?.sku?.[0] || err.message);
+      setError(err.response?.data?.message || JSON.stringify(err.response?.data?.errors) || 'Errore salvataggio');
     } finally {
       setLoading(false);
     }
   };
 
+  const categoryOptions = useMemo(() => {
+    const mains = categories.filter(c => !c.parent_id);
+    const options = [];
+    mains.forEach(m => {
+      options.push(m);
+      categories.filter(c => c.parent_id === m.id).forEach(s => {
+        options.push({ ...s, name: `└─ ${s.name}` });
+      });
+    });
+    return options;
+  }, [categories]);
+
+  const TABS = [
+    { id: 'info', label: 'Informazioni', icon: <Package size={14} /> },
+    { id: 'variants', label: 'Varianti & Prezzi', icon: <Tag size={14} /> },
+    { id: 'fiscal', label: 'Fiscale & Accise', icon: <DollarSign size={14} /> },
+    { id: 'inventory', label: 'Inventario', icon: <Settings2 size={14} /> },
+  ];
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white modal-light rounded-lg shadow-xl w-full max-w-5xl max-h-screen overflow-y-auto">
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 2000,
+      background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 16,
+    }}>
+      <div style={{
+        background: 'var(--color-surface)', borderRadius: 16, width: '100%',
+        maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.15)', border: '1px solid var(--color-border)',
+      }}>
+
         {/* Header */}
-        <div className="sticky top-0 flex items-center justify-between p-6 border-b border-gray-200 bg-white">
-          <h2 className="text-xl font-bold text-gray-900">
-            {product ? 'Modifica Prodotto' : 'Nuovo Prodotto'}
-          </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={24} />
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>
+              {product ? 'Modifica Prodotto' : 'Nuovo Prodotto'}
+            </h2>
+            <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
+              {product ? `ID: ${product.id} — SKU: ${product.sku}` : 'Aggiungi un nuovo prodotto al catalogo'}
+            </p>
+          </div>
+          <button onClick={onClose} style={{
+            background: 'var(--color-bg)', border: 'none', borderRadius: 10,
+            width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: 'var(--color-text-secondary)',
+          }}>
+            <X size={18} />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', padding: '0 24px', flexShrink: 0, overflowX: 'auto' }}>
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '14px 16px',
+                fontSize: 13, fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer',
+                borderBottom: activeTab === t.id ? '2px solid var(--color-accent)' : '2px solid transparent',
+                color: activeTab === t.id ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <form onSubmit={handleSubmit} style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+            <div style={{ padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid #fca5a5', borderRadius: 8, color: 'var(--color-error)', fontSize: 13, marginBottom: 20, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome Prodotto *</label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Prodotto</label>
-              <select
-                name="product_type"
-                value={formData.product_type}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-              >
-                {PRODUCT_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label>
-              <input
-                type="text"
-                name="sku"
-                value={formData.sku}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Codice a Barre (Barcode)</label>
-              <input
-                type="text"
-                name="barcode"
-                value={formData.barcode}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                placeholder="Scansiona qui..."
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">PLI Code</label>
-              <input
-                type="text"
-                name="pli_code"
-                value={formData.pli_code}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Immagine Prodotto</label>
-              <div className="mt-1 flex items-center gap-4 p-3 border-2 border-dashed border-gray-200 rounded-xl">
-                {formData.image_url || imagePreview ? (
-                  <img src={imagePreview || formData.image_url} alt="Preview" className="w-16 h-16 object-cover rounded-lg shadow-sm border border-gray-100" />
-                ) : (
-                  <div className="w-16 h-16 bg-gray-50 flex items-center justify-center rounded-lg text-gray-400">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                  </div>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                />
+          {/* TAB: INFO */}
+          {activeTab === 'info' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label className="sp-label">Nome Prodotto *</label>
+                <input className="sp-input" name="name" value={formData.name} onChange={handleChange} required placeholder="Es: Liquido 10ml Menta Ghiaccio" />
               </div>
-            </div>
-            
-            <div className="grid grid-cols-1 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fornitore Predefinito</label>
-                <select name="default_supplier_id" value={formData.default_supplier_id} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none">
-                  <option value="">Nessuno</option>
+                <label className="sp-label">SKU Master *</label>
+                <input className="sp-input" name="sku" value={formData.sku} onChange={handleChange} required placeholder="Es: LIQ-MENTA-10ML" />
+              </div>
+              <div>
+                <label className="sp-label">Barcode Prodotto (EAN / GTIN)</label>
+                <div style={{ position: 'relative' }}>
+                  <Barcode size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
+                  <input className="sp-input" name="barcode" value={formData.barcode} onChange={handleChange} placeholder="Es: 8001234567890" style={{ paddingLeft: 36 }} />
+                </div>
+              </div>
+              <div>
+                <label className="sp-label">Tipo Prodotto *</label>
+                <select className="sp-select" name="product_type" value={formData.product_type} onChange={handleChange}>
+                  {PRODUCT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="sp-label">Categoria</label>
+                <select className="sp-select" name="category_id" value={formData.category_id} onChange={handleChange}>
+                  <option value="">— Nessuna Categoria —</option>
+                  {categoryOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="sp-label">Fornitore Predefinito</label>
+                <select className="sp-select" name="default_supplier_id" value={formData.default_supplier_id} onChange={handleChange}>
+                  <option value="">— Seleziona Fornitore —</option>
                   {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="auto_reorder_enabled"
-                  checked={Boolean(formData.auto_reorder_enabled)}
-                  onChange={handleChange}
-                  className="rounded text-indigo-600 focus:ring-indigo-500"
-                />
-                Abilita Riordino Automatico
-              </label>
+              <div>
+                <label className="sp-label">Codice PLI (Accise)</label>
+                <input className="sp-input" name="pli_code" value={formData.pli_code} onChange={handleChange} placeholder="Es: 9041" />
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label className="sp-label">Descrizione</label>
+                <textarea className="sp-input" name="description" value={formData.description} onChange={handleChange} placeholder="Descrizione breve del prodotto..." rows={3} style={{ resize: 'vertical' }} />
+              </div>
+              {/* Stores assignment */}
+              {storesList.length > 1 && (
+                <div style={{ gridColumn: '1/-1' }}>
+                  <label className="sp-label">Negozi assegnati</label>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
+                    {storesList.map(store => (
+                      <label key={store.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={formData.store_ids.includes(Number(store.id))}
+                          onChange={e => {
+                            const id = Number(store.id);
+                            setFormData(p => ({
+                              ...p,
+                              store_ids: e.target.checked
+                                ? [...p.store_ids, id]
+                                : p.store_ids.filter(s => s !== id)
+                            }));
+                          }}
+                        />
+                        {store.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
-          <details className="group border-t border-gray-100 pt-4">
-            <summary className="flex items-center justify-between cursor-pointer list-none text-sm font-medium text-indigo-600 hover:text-indigo-700">
-              <span>Caratteristiche Tecniche (Nicotina, Volume, Riordino)</span>
-              <span className="transition group-open:rotate-180">
-                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 9l-7 7-7-7"/></svg>
-              </span>
-            </summary>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 bg-gray-50 p-4 rounded-xl">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Nicotina (mg)</label>
-                <input type="number" name="nicotine_mg" value={formData.nicotine_mg} onChange={handleChange} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
+          {/* TAB: VARIANTI */}
+          {activeTab === 'variants' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Varianti Prodotto</h3>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>Ogni variante ha prezzi, barcode e ubicazione propri</p>
+                </div>
+                <button type="button" className="sp-btn sp-btn-secondary sp-btn-sm" onClick={addVariant}>
+                  <Plus size={14} /> Aggiungi Variante
+                </button>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Volume (ml)</label>
-                <input type="number" name="volume_ml" value={formData.volume_ml} onChange={handleChange} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Lead Time (Giorni)</label>
-                <input type="number" name="reorder_days" value={formData.reorder_days} onChange={handleChange} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Min Stock</label>
-                <input type="number" name="min_stock_qty" value={formData.min_stock_qty} onChange={handleChange} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
-              </div>
-            </div>
-          </details>
 
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-sm font-medium text-gray-700">Store abilitati</label>
-              <span className="text-xs text-gray-500">{formData.store_ids.length} selezionati</span>
-            </div>
-            <div className="grid gap-2 md:grid-cols-3">
-              {storesList.map((store) => (
-                <label key={store.id} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={formData.store_ids.includes(Number(store.id))}
-                    onChange={() => handleStoreToggle(Number(store.id))}
-                  />
-                  <span>{store.name}</span>
-                </label>
+              {formData.variants.map((v, idx) => (
+                <div key={idx} style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 20, marginBottom: 16, border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)' }}>Variante #{idx + 1}</span>
+                    {formData.variants.length > 1 && (
+                      <button type="button" onClick={() => removeVariant(idx)} style={{ color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', gap: 4, alignItems: 'center', fontSize: 12 }}>
+                        <Trash2 size={12} /> Rimuovi
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                    <div>
+                      <label className="sp-label">Gusto / Flavor</label>
+                      <input className="sp-input" value={v.flavor} onChange={e => handleVariantChange(idx, 'flavor', e.target.value)} placeholder="Es: Menta Ghiaccio" />
+                    </div>
+                    <div>
+                      <label className="sp-label">Colore</label>
+                      <input className="sp-input" value={v.color} onChange={e => handleVariantChange(idx, 'color', e.target.value)} placeholder="Es: Nero" />
+                    </div>
+                    <div>
+                      <label className="sp-label">Nicotina (mg/ml)</label>
+                      <input className="sp-input" type="number" step="0.1" value={v.nicotine_strength} onChange={e => handleVariantChange(idx, 'nicotine_strength', e.target.value)} placeholder="Es: 3" />
+                    </div>
+                    <div>
+                      <label className="sp-label">Volume (ml)</label>
+                      <input className="sp-input" type="number" step="1" value={v.volume_ml} onChange={e => handleVariantChange(idx, 'volume_ml', e.target.value)} placeholder="Es: 10" />
+                    </div>
+                    <div>
+                      <label className="sp-label">Resistenza (Ohm)</label>
+                      <input className="sp-input" type="number" step="0.01" value={v.resistance_ohm} onChange={e => handleVariantChange(idx, 'resistance_ohm', e.target.value)} placeholder="Es: 0.8" />
+                    </div>
+                    <div>
+                      <label className="sp-label">Pezzi per Pacco</label>
+                      <input className="sp-input" type="number" min="1" value={v.pack_size} onChange={e => handleVariantChange(idx, 'pack_size', e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="sp-label">Prezzo Vendita (€) *</label>
+                      <input className="sp-input" type="number" step="0.01" value={v.sale_price} onChange={e => handleVariantChange(idx, 'sale_price', e.target.value)} placeholder="0.00" style={{ fontWeight: 700 }} />
+                    </div>
+                    <div>
+                      <label className="sp-label">Costo (€)</label>
+                      <input className="sp-input" type="number" step="0.01" value={v.cost_price} onChange={e => handleVariantChange(idx, 'cost_price', e.target.value)} placeholder="0.00" />
+                    </div>
+                    <div>
+                      <label className="sp-label">Barcode Variante (EAN)</label>
+                      <div style={{ position: 'relative' }}>
+                        <Barcode size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
+                        <input className="sp-input" value={v.barcode} onChange={e => handleVariantChange(idx, 'barcode', e.target.value)} placeholder="Scansiona o inserisci..." style={{ paddingLeft: 34 }} />
+                      </div>
+                    </div>
+                    <div style={{ gridColumn: '1/-1' }}>
+                      <label className="sp-label">Ubicazione in Magazzino</label>
+                      <div style={{ position: 'relative' }}>
+                        <MapPin size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
+                        <input className="sp-input" value={v.location} onChange={e => handleVariantChange(idx, 'location', e.target.value)} placeholder="Es: Scaffale A3 - Ripiano 2" style={{ paddingLeft: 34 }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
+          )}
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          {/* TAB: FISCALE */}
+          {activeTab === 'fiscal' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               <div>
-                <div className="text-sm font-medium text-gray-700">Varianti</div>
-                <div className="text-xs text-gray-500">Prezzi, accise e metadati prevalenza</div>
+                <label className="sp-label">Nicotina Prodotto (mg)</label>
+                <input className="sp-input" type="number" step="0.1" name="nicotine_mg" value={formData.nicotine_mg} onChange={handleChange} placeholder="Es: 3" />
               </div>
-              <button
-                type="button"
-                onClick={handleAddVariant}
-                className="px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50"
-              >
-                Aggiungi variante
-              </button>
+              <div>
+                <label className="sp-label">Volume Prodotto (ml)</label>
+                <input className="sp-input" type="number" step="1" name="volume_ml" value={formData.volume_ml} onChange={handleChange} placeholder="Es: 10" />
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <h4 style={{ fontSize: 13, fontWeight: 700, margin: '8px 0 16px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Accise per Variante</h4>
+              </div>
+              {formData.variants.map((v, idx) => (
+                <React.Fragment key={idx}>
+                  <div style={{ gridColumn: '1/-1', background: 'var(--color-bg)', borderRadius: 10, padding: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 12 }}>Variante #{idx + 1} {v.flavor ? `— ${v.flavor}` : ''}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                      <div>
+                        <label className="sp-label">Classe IVA</label>
+                        <select className="sp-select" value={v.tax_class_id} onChange={e => handleVariantChange(idx, 'tax_class_id', e.target.value)}>
+                          {TAX_CLASSES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="sp-label">Codice Accisa</label>
+                        <input className="sp-input" value={v.excise_profile_code} onChange={e => handleVariantChange(idx, 'excise_profile_code', e.target.value)} placeholder="Es: E1" />
+                      </div>
+                      <div>
+                        <label className="sp-label">Accisa Unitaria Override (€)</label>
+                        <input className="sp-input" type="number" step="0.001" value={v.excise_unit_amount_override} onChange={e => handleVariantChange(idx, 'excise_unit_amount_override', e.target.value)} placeholder="Auto da regole" />
+                      </div>
+                      <div>
+                        <label className="sp-label">Codice Prevalenza</label>
+                        <input className="sp-input" value={v.prevalenza_code} onChange={e => handleVariantChange(idx, 'prevalenza_code', e.target.value)} placeholder="Es: PREVALENZA_1" />
+                      </div>
+                      <div style={{ gridColumn: '2/-1' }}>
+                        <label className="sp-label">Label Prevalenza</label>
+                        <input className="sp-input" value={v.prevalenza_label} onChange={e => handleVariantChange(idx, 'prevalenza_label', e.target.value)} placeholder="Es: Tabacco prevalente" />
+                      </div>
+                    </div>
+                  </div>
+                </React.Fragment>
+              ))}
             </div>
+          )}
 
-            {formData.variants.map((variant, index) => (
-              <div key={variant.id || index} className="rounded-xl border border-gray-200 p-4 space-y-4 bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-gray-800">Variante {index + 1}</div>
-                  {formData.variants.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveVariant(index)}
-                      className="text-sm text-red-600 hover:text-red-700"
-                    >
-                      Rimuovi
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Prezzo vendita</label>
-                    <input type="number" min="0" step="0.01" value={variant.sale_price} onChange={(e) => handleVariantChange(index, 'sale_price', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Costo</label>
-                    <input type="number" min="0" step="0.01" value={variant.cost_price} onChange={(e) => handleVariantChange(index, 'cost_price', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pack size</label>
-                    <input type="number" min="1" value={variant.pack_size} onChange={(e) => handleVariantChange(index, 'pack_size', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Flavor</label>
-                    <input type="text" value={variant.flavor} onChange={(e) => handleVariantChange(index, 'flavor', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Resistenza ohm</label>
-                    <input type="text" value={variant.resistance_ohm} onChange={(e) => handleVariantChange(index, 'resistance_ohm', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tax class ID</label>
-                    <input type="number" min="1" value={variant.tax_class_id} onChange={(e) => handleVariantChange(index, 'tax_class_id', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Profilo accisa</label>
-                    <input type="text" value={variant.excise_profile_code} onChange={(e) => handleVariantChange(index, 'excise_profile_code', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="LIQUID-IT" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Override accisa unitario</label>
-                    <input type="number" min="0" step="0.01" value={variant.excise_unit_amount_override} onChange={(e) => handleVariantChange(index, 'excise_unit_amount_override', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="0.50" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Codice prevalenza</label>
-                    <input type="text" value={variant.prevalenza_code} onChange={(e) => handleVariantChange(index, 'prevalenza_code', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="PV-LIQ" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Descrizione prevalenza</label>
-                  <input type="text" value={variant.prevalenza_label} onChange={(e) => handleVariantChange(index, 'prevalenza_label', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Liquidi pronta vendita" />
-                </div>
+          {/* TAB: INVENTARIO */}
+          {activeTab === 'inventory' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div>
+                <label className="sp-label">Stock Minimo (Soglia Alert)</label>
+                <input className="sp-input" type="number" min="0" name="min_stock_qty" value={formData.min_stock_qty} onChange={handleChange} />
+                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Sotto questa quantità scatta l'alert di riordino</p>
               </div>
-            ))}
-          </div>
-
-          {/* Buttons */}
-          <div className="flex gap-3 justify-end pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-            >
-              Annulla
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
-            >
-              {loading && <Loader size={18} className="animate-spin" />}
-              {loading ? 'Salvataggio...' : 'Salva'}
-            </button>
-          </div>
+              <div>
+                <label className="sp-label">Giorni Riordino</label>
+                <input className="sp-input" type="number" min="1" name="reorder_days" value={formData.reorder_days} onChange={handleChange} />
+                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Tempo medio di approvvigionamento dal fornitore</p>
+              </div>
+              <div>
+                <label className="sp-label" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    name="auto_reorder_enabled"
+                    checked={!!formData.auto_reorder_enabled}
+                    onChange={handleChange}
+                    style={{ width: 16, height: 16 }}
+                  />
+                  Riordino Automatico Abilitato
+                </label>
+                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>Il sistema proporrà automaticamente l'ordine fornitore quando lo stock scende sotto la soglia</p>
+              </div>
+            </div>
+          )}
         </form>
+
+        {/* Footer */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: 12, flexShrink: 0, background: 'var(--color-surface)' }}>
+          <button type="button" className="sp-btn sp-btn-ghost" onClick={onClose}>Annulla</button>
+          <button
+            className="sp-btn sp-btn-primary"
+            style={{ minWidth: 160 }}
+            onClick={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? <><Loader size={14} className="sp-spin" /> Salvataggio...</> : `${product ? 'Aggiorna' : 'Crea'} Prodotto`}
+          </button>
+        </div>
       </div>
     </div>
   );

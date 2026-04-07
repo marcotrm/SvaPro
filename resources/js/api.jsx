@@ -437,6 +437,8 @@ export const catalog = {
   importProducts: (formData) => api.post('/catalog/products/import', formData),
   getBrands: () => api.get('/catalog/brands'),
   getCategories: () => api.get('/catalog/categories'),
+  createCategory: (data) => api.post('/catalog/categories', data),
+  deleteCategory: (id) => api.delete(`/catalog/categories/${id}`),
   getTaxClasses: () => api.get('/catalog/tax-classes'),
 };
 

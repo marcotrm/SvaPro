@@ -26,13 +26,15 @@ class OrderController extends Controller
             'lines.*.qty' => ['required', 'integer', 'min:1'],
             'lines.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             'lines.*.discount' => ['nullable', 'numeric', 'min:0'],
+            'order_discount_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        return response()->json($this->buildQuote($tenantId, (array) $request->input('lines')));
+        $orderDiscount = (float) $request->input('order_discount_amount', 0);
+        return response()->json($this->buildQuote($tenantId, (array) $request->input('lines'), $orderDiscount));
     }
     
     public function index(Request $request): JsonResponse
@@ -297,12 +299,17 @@ class OrderController extends Controller
             'sold_by_employee_id' => ['nullable', 'integer'],
             'warehouse_id' => ['required', 'integer'],
             'payment_method' => ['nullable', 'string', 'max:50'],
+            'payments' => ['nullable', 'array'],
+            'payments.*.method' => ['required', 'string', 'max:50'],
+            'payments.*.amount' => ['required', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:2000'],
             'status' => ['nullable', 'in:draft,paid'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.product_variant_id' => ['required', 'integer'],
             'lines.*.qty' => ['required', 'integer', 'min:1'],
             'lines.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             'lines.*.discount' => ['nullable', 'numeric', 'min:0'],
+            'order_discount_amount' => ['nullable', 'numeric', 'min:0'],
             'is_employee_purchase' => ['nullable', 'boolean'],
             'points_to_redeem' => ['nullable', 'integer', 'min:0'],
         ]);
@@ -315,7 +322,8 @@ class OrderController extends Controller
             return response()->json(['message' => 'Store, magazzino, cliente o dipendente non validi per il tenant.'], 422);
         }
 
-        $quote = $this->buildQuote($tenantId, (array) $request->input('lines'));
+        $orderDiscount = (float) $request->input('order_discount_amount', 0);
+        $quote = $this->buildQuote($tenantId, (array) $request->input('lines'), $orderDiscount);
         $status = (string) ($request->input('status') ?: 'paid');
         $now = now();
         $stockAlerts = [];
@@ -351,7 +359,7 @@ class OrderController extends Controller
             );
         }
 
-        $orderId = DB::transaction(function () use ($request, $tenantId, $quote, $status, $now, $stockAlerts): int {
+        $orderId = DB::transaction(function () use ($request, $tenantId, $quote, $status, $now, $stockAlerts, $pointsToRedeem, $pointsDiscount): int {
             $orderId = DB::table('sales_orders')->insertGetId([
                 'tenant_id' => $tenantId,
                 'store_id' => $request->input('store_id'),
@@ -370,6 +378,7 @@ class OrderController extends Controller
                 'stock_alert_reason' => ! empty($stockAlerts)
                     ? 'Stock insufficiente su una o piu varianti. Verificare giacenza.'
                     : null,
+                'notes' => $request->input('notes'),
                 'paid_at' => $status === 'paid' ? $now : null,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -454,16 +463,32 @@ class OrderController extends Controller
             }
 
             if ($status === 'paid') {
-                DB::table('payments')->insert([
-                    'tenant_id' => $tenantId,
-                    'sales_order_id' => $orderId,
-                    'method' => (string) ($request->input('payment_method') ?: 'cash'),
-                    'amount' => $quote['totals']['grand_total'],
-                    'status' => 'paid',
-                    'paid_at' => $now,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
+                $requestedPayments = $request->input('payments');
+                if (!empty($requestedPayments)) {
+                    foreach ($requestedPayments as $p) {
+                        DB::table('payments')->insert([
+                            'tenant_id' => $tenantId,
+                            'sales_order_id' => $orderId,
+                            'method' => (string) ($p['method'] ?? 'cash'),
+                            'amount' => (float) $p['amount'],
+                            'status' => 'paid',
+                            'paid_at' => $now,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ]);
+                    }
+                } else {
+                    DB::table('payments')->insert([
+                        'tenant_id' => $tenantId,
+                        'sales_order_id' => $orderId,
+                        'method' => (string) ($request->input('payment_method') ?: 'cash'),
+                        'amount' => $quote['totals']['grand_total'],
+                        'status' => 'paid',
+                        'paid_at' => $now,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
 
                 if ($request->filled('customer_id')) {
                     $customerId = (int) $request->input('customer_id');
@@ -732,7 +757,7 @@ class OrderController extends Controller
         return response()->json(['message' => 'Alert risolto con successo.']);
     }
 
-    private function buildQuote(int $tenantId, array $lines): array
+    private function buildQuote(int $tenantId, array $lines, float $globalDiscount = 0.0): array
     {
         $subtotal = 0.0;
         $discountTotal = 0.0;
@@ -742,6 +767,10 @@ class OrderController extends Controller
 
         $linePayload = [];
         $invalidLines = 0;
+
+        // First pass: Calculate initial nets to distribute global discount
+        $totalInitialNet = 0.0;
+        $processedLines = [];
 
         foreach ($lines as $line) {
             $variant = DB::table('product_variants as pv')
@@ -771,10 +800,36 @@ class OrderController extends Controller
 
             $qty = (int) $line['qty'];
             $unitPrice = isset($line['unit_price']) ? (float) $line['unit_price'] : (float) $variant->sale_price;
-            $discount = isset($line['discount']) ? (float) $line['discount'] : 0.0;
-
+            $lineDiscount = isset($line['discount']) ? (float) $line['discount'] : 0.0;
+            
             $lineSubtotal = $qty * $unitPrice;
-            $lineNet = max(0.0, $lineSubtotal - $discount);
+            $initialLineNet = max(0.0, $lineSubtotal - $lineDiscount);
+            $totalInitialNet += $initialLineNet;
+
+            $processedLines[] = [
+                'variant' => $variant,
+                'qty' => $qty,
+                'unitPrice' => $unitPrice,
+                'lineDiscount' => $lineDiscount,
+                'lineSubtotal' => $lineSubtotal,
+                'initialLineNet' => $initialLineNet,
+            ];
+        }
+
+        // Safety cap for global discount
+        $globalDiscount = min($globalDiscount, $totalInitialNet);
+
+        // Second pass: distribute global discount and calculate taxes
+        foreach ($processedLines as $pl) {
+            $variant = $pl['variant'];
+            $qty = $pl['qty'];
+            
+            // Distribute global discount proportionally based on initial net
+            $proportion = $totalInitialNet > 0 ? ($pl['initialLineNet'] / $totalInitialNet) : 0;
+            $allocatedGlobalDiscount = $proportion * $globalDiscount;
+            
+            $totalLineDiscount = $pl['lineDiscount'] + $allocatedGlobalDiscount;
+            $lineNet = max(0.0, $pl['lineSubtotal'] - $totalLineDiscount);
 
             $vatRate = $this->resolveVatRate($tenantId, $variant->tax_class_id);
             $taxAmount = round($lineNet * ($vatRate / 100), 2);
@@ -790,10 +845,10 @@ class OrderController extends Controller
             );
 
             $lineTotal = round($lineNet + $taxAmount + $exciseAmount, 2);
-            $lineMargin = round(($unitPrice - (float) $variant->cost_price) * $qty, 2);
+            $lineMargin = round(($pl['unitPrice'] - (float) $variant->cost_price) * $qty, 2);
 
-            $subtotal += $lineSubtotal;
-            $discountTotal += $discount;
+            $subtotal += $pl['lineSubtotal'];
+            $discountTotal += $totalLineDiscount;
             $taxTotal += $taxAmount;
             $exciseTotal += $exciseAmount;
             $marginTotal += $lineMargin;
@@ -801,8 +856,8 @@ class OrderController extends Controller
             $linePayload[] = [
                 'product_variant_id' => (int) $variant->id,
                 'qty' => $qty,
-                'unit_price' => round($unitPrice, 2),
-                'discount_amount' => round($discount, 2),
+                'unit_price' => round($pl['unitPrice'], 2),
+                'discount_amount' => round($totalLineDiscount, 2),
                 'tax_amount' => $taxAmount,
                 'excise_amount' => $exciseAmount,
                 'line_total' => $lineTotal,

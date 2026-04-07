@@ -1,210 +1,124 @@
-﻿import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { auth, clearApiCache } from '../api.jsx';
-import { useTranslation } from '../i18n/index.jsx';
+import React, { useState, useEffect } from 'react';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { auth } from '../api.jsx';
 
 export default function LoginPage({ setUser }) {
-  const navigate = useNavigate();
-  const { t } = useTranslation();
-  const demoLoginEnabled = String(import.meta.env.VITE_ENABLE_DEMO_LOGIN || '').toLowerCase() === 'true';
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
-  const applyDemoAccess = (nextEmail = 'superadmin@demo.local') => {
-    setEmail(nextEmail);
-    setPassword('ChangeMe123!');
-    setError('');
-  };
+    // Auto-login for development
+    useEffect(() => {
+        const autoLogin = async () => {
+            try {
+                setLoading(true);
+                const response = await auth.login('admin@demo.local', 'ChangeMe123!');
+                if (response.data.token) {
+                    localStorage.setItem('authToken', response.data.token);
+                    localStorage.setItem('user', JSON.stringify(response.data.user));
+                    if (response.data.user?.tenant_code) {
+                        localStorage.setItem('tenantCode', response.data.user.tenant_code);
+                    }
+                    setUser(response.data.user);
+                    window.location.href = '/';
+                }
+            } catch (err) {
+                console.error("AutoLogin failed:", err);
+                setLoading(false);
+            }
+        };
+        autoLogin();
+    }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const response = await auth.login(email, password);
-      clearApiCache();
-      localStorage.setItem('authToken', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      localStorage.setItem('tenantCode', response.data.user.tenant_code || 'DEMO');
-      setUser(response.data.user);
-      navigate('/');
-    } catch (err) {
-      setError(err.response?.data?.message || t('login_failed_check_credentials'));
-    } finally {
-      setLoading(false);
-    }
-  };
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            setLoading(true);
+            setError('');
+            const response = await auth.login(email, password);
+            
+            if (response.data.token) {
+                localStorage.setItem('authToken', response.data.token);
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+                if (response.data.user?.tenant_code) {
+                    localStorage.setItem('tenantCode', response.data.user.tenant_code);
+                }
+                setUser(response.data.user);
+                window.location.href = '/';
+            } else {
+                setError('Credenziali non valide');
+            }
+        } catch (err) {
+            setError(err.response?.data?.message || 'Errore durante il login');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  return (
-    <div className="login-root">
-      {/* LEFT BRAND PANEL */}
-      <div className="login-left">
-        <div className="login-orb login-orb-1" />
-        <div className="login-orb login-orb-2" />
-
-        {/* Logo */}
-        <div className="login-brand">
-          <div className="login-brand-icon">
-            <img src="/brand-mark.svg" alt="SvaPro" />
-          </div>
-          <div>
-            <div className="login-brand-name">Sva<span>Pro</span></div>
-            <div className="login-brand-sub">Retail Intelligence Suite</div>
-          </div>
-        </div>
-
-        {/* Hero copy */}
-        <div className="login-hero">
-          <div className="login-pill">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            Pannello operativo multi-store
-          </div>
-          <div className="login-headline">
-            Gestionale<br />progettato per<br /><span>chi vende davvero</span>
-          </div>
-          <div className="login-sub">
-            Catalogo, ordini, loyalty, dipendenti e magazzino intelligente in un'unica interfaccia -
-            con reorder automatico basato sullo storico vendite.
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="login-stats">
-          <div className="login-stat">
-            <div className="login-stat-label">Store</div>
-            <div className="login-stat-value">2</div>
-            <div className="login-stat-desc">Roma e Milano con stock demo</div>
-          </div>
-          <div className="login-stat">
-            <div className="login-stat-label">Ruoli</div>
-            <div className="login-stat-value">4</div>
-            <div className="login-stat-desc">Superadmin, admin, dipendente, cliente</div>
-          </div>
-          <div className="login-stat">
-            <div className="login-stat-label">Tenant</div>
-            <div className="login-stat-value">2</div>
-            <div className="login-stat-desc">DEMO e NORD pronti per switch</div>
-          </div>
-        </div>
-
-        {/* Footer badge */}
-        <div className="login-badge">
-          <span className="login-badge-dot" />
-          {demoLoginEnabled ? t('login_seed_verified') : t('login_secure_access')}
-        </div>
-      </div>
-
-      {/* RIGHT FORM PANEL */}
-      <div className="login-right">
-        <div className="login-form-wrap">
-          <div className="login-card">
-            <div className="login-card-eyebrow">Accesso Operatore</div>
-            <div className="login-card-title">Entra in SvaPro</div>
-            <div className="login-card-sub">Inserisci le credenziali del tuo account</div>
-
-            {/* Demo box */}
-            {demoLoginEnabled && <div className="login-demo-box">
-              <div className="login-demo-info">
-                <div className="login-demo-label">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',marginRight:5,verticalAlign:'middle'}}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                  Credenziali Demo
+    return (
+        <div className="sp-login-root">
+            <div className="sp-login-card sp-animate-in">
+                <div className="sp-login-logo">
+                    <h1>Sva<span>Pro</span></h1>
+                    <p>Accedi al tuo gestionale</p>
                 </div>
-                <div className="login-demo-creds">
-                  <div>
-                    <div className="login-demo-cred-label">Email</div>
-                    <div className="login-demo-cred-value">superadmin@demo.local</div>
-                  </div>
-                  <div>
-                    <div className="login-demo-cred-label">Password</div>
-                    <div className="login-demo-cred-value">ChangeMe123!</div>
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <button className="login-submit-ghost" onClick={() => applyDemoAccess('superadmin@demo.local')} type="button">
-                  Superadmin
-                </button>
-                <button className="login-submit-ghost" onClick={() => applyDemoAccess('admin@demo.local')} type="button">
-                  Admin Demo
-                </button>
-                <button className="login-submit-ghost" onClick={() => applyDemoAccess('admin@nord.local')} type="button">
-                  Admin Nord
-                </button>
-              </div>
-            </div>}
 
-            {/* Error */}
-            {error && (
-              <div className="banner banner-error" style={{marginBottom: 16}}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <span className="banner-text">{error}</span>
-              </div>
-            )}
+                <form onSubmit={handleSubmit}>
+                    {error && (
+                        <div className="sp-alert sp-alert-error sp-mb-4" style={{ borderRadius: 'var(--radius-sm)' }}>
+                            <AlertCircle size={16} />
+                            <span>{error}</span>
+                        </div>
+                    )}
 
-            <form onSubmit={handleSubmit}>
-              {/* Email */}
-              <div className="login-input-wrap">
-                <label className="login-label">Email</label>
-                <div style={{position:'relative'}}>
-                  <svg className="login-input-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-                  <input
-                    className="login-input"
-                    type="email"
-                    placeholder={t('login_email_placeholder')}
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
+                    <div className="sp-form-group">
+                        <label className="sp-label">Email</label>
+                        <input
+                            type="email"
+                            className="sp-input sp-input-lg"
+                            placeholder="nome@azienda.it"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                            disabled={loading}
+                        />
+                    </div>
 
-              {/* Password */}
-              <div className="login-input-wrap">
-                <label className="login-label">Password</label>
-                <div style={{position:'relative'}}>
-                  <svg className="login-input-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                  <input
-                    className="login-input"
-                    type="password"
-                    placeholder={t('login_password_placeholder')}
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
+                    <div className="sp-form-group">
+                        <label className="sp-label">Password</label>
+                        <input
+                            type="password"
+                            className="sp-input sp-input-lg"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            disabled={loading}
+                        />
+                    </div>
 
-              <button className="login-submit" type="submit" disabled={loading}>
-                {loading ? (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{animation:'spin 1s linear infinite'}}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                    {t('login_in_progress')}
-                  </>
-                ) : (
-                  <>
-                    {t('login')}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                  </>
-                )}
-              </button>
-            </form>
+                    <button
+                        type="submit"
+                        className="sp-btn sp-btn-primary sp-btn-lg sp-btn-block"
+                        disabled={loading}
+                        style={{ marginTop: 8 }}
+                    >
+                        {loading ? (
+                            <Loader2 size={20} className="sp-spin" />
+                        ) : (
+                            'Accedi'
+                        )}
+                    </button>
+                </form>
 
-            <div className="login-footer-grid">
-              <div>
-                <div className="login-footer-key">Versione</div>
-                <div className="login-footer-val">Laravel 11 + React</div>
-              </div>
-              <div>
-                <div className="login-footer-key">Ambiente</div>
-                <div className="login-footer-val">{String(import.meta.env.MODE || 'development')}</div>
-              </div>
+                <p style={{ 
+                    textAlign: 'center', marginTop: 24,
+                    fontSize: 11, color: 'var(--color-text-tertiary)' 
+                }}>
+                    © 2026 SvaPro — Tutti i diritti riservati
+                </p>
             </div>
-          </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
-

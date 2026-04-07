@@ -1,407 +1,222 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { orders, inventory, customers, employees, reports } from '../api.jsx';
-import { SkeletonKpi, SkeletonTable } from '../components/Skeleton.jsx';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { orders as ordersApi, inventory, customers, reports } from '../api.jsx';
+import { 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
+  AreaChart, Area, CartesianGrid
+} from 'recharts';
+import { 
+  ArrowUpRight, ArrowDownRight, Users, TrendingUp, 
+  ShoppingCart, Package, DollarSign, AlertTriangle
+} from 'lucide-react';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { setLowStockCount, selectedStoreId } = useOutletContext();
+  const { selectedStoreId } = useOutletContext();
 
-  /* ── Progressive state: each section has its own loading ── */
   const [kpi, setKpi] = useState(null);
-  const [kpiLoading, setKpiLoading] = useState(true);
   const [revenueChart, setRevenueChart] = useState([]);
-  const [chartLoading, setChartLoading] = useState(true);
   const [recentOrders, setRecentOrders] = useState([]);
-  const [ordersLoading, setOrdersLoading] = useState(true);
-  const [stockInfo, setStockInfo] = useState({ lowStockItems: 0, total: 0 });
   const [custCount, setCustCount] = useState(0);
-  const [empCount, setEmpCount] = useState(0);
-  const [countsReady, setCountsReady] = useState(false);
-  const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  
-  const [healthInsights, setHealthInsights] = useState([]);
-  const [healthLoading, setHealthLoading] = useState(true);
-  const [forecasts, setForecasts] = useState([]);
-  const [forecastLoading, setForecastLoading] = useState(true);
+  const [stockStats, setStockStats] = useState({ low: 0, out: 0, total: 0 });
+  const [loading, setLoading] = useState(true);
 
-  const fetchDashboardData = useCallback(() => {
-    setError('');
-    const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
 
-    /* Each fetch is independent — UI updates as data arrives */
-    reports.summary(sp)
-      .then(res => { const d = res.data?.data; if (d) setKpi(d); })
-      .catch(() => {})
-      .finally(() => setKpiLoading(false));
+      const [resSummary, resTrend, resOrders, resStock, resCust] = await Promise.all([
+        reports.summary(sp),
+        reports.revenueTrend({ ...sp, period: 'daily', days: 14 }),
+        ordersApi.getOrders({ ...sp, limit: 8 }),
+        inventory.getStock({ ...sp, limit: 1000 }),
+        customers.getCustomers({ ...sp, limit: 1 })
+      ]);
 
-    reports.revenueTrend({ ...sp, period: 'daily', days: 14 })
-      .then(res => {
-        const arr = res.data?.data || [];
-        setRevenueChart(arr.map(d => ({ date: d.label, revenue: parseFloat(d.revenue) || 0 })));
-      })
-      .catch(() => {})
-      .finally(() => setChartLoading(false));
+      setKpi(resSummary.data?.data || null);
+      
+      const trendData = (resTrend.data?.data || []).map(d => ({ 
+        label: d.label, 
+        revenue: parseFloat(d.revenue) || 0,
+        orders: parseInt(d.orders_count) || 0
+      }));
+      setRevenueChart(trendData);
+      setRecentOrders(resOrders.data?.data || []);
+      setCustCount(resCust.data?.meta?.total || 0);
 
-    orders.getOrders({ ...sp, limit: 20 })
-      .then(res => setRecentOrders(res.data?.data || []))
-      .catch(() => setRecentOrders([]))
-      .finally(() => setOrdersLoading(false));
+      const stockList = resStock.data?.data || [];
+      const low = stockList.filter(i => i.on_hand > 0 && i.on_hand < (i.reorder_point || 10)).length;
+      const out = stockList.filter(i => i.on_hand <= 0).length;
+      setStockStats({ low, out, total: stockList.length });
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+    } finally { setLoading(false); }
+  }, [selectedStoreId]);
 
-    inventory.getStock({ ...sp, limit: 80 })
-      .then(res => {
-        const list = res.data?.data || [];
-        const low = list.filter(i => i.on_hand < i.reorder_point).length;
-        setStockInfo({ lowStockItems: low, total: list.length });
-        setLowStockCount(low);
-      })
-      .catch(() => {});
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-    Promise.all([
-      customers.getCustomers({ ...sp, limit: 50 }).catch(() => ({})),
-      employees.getEmployees({ ...sp, limit: 50 }).catch(() => ({})),
-    ]).then(([cRes, eRes]) => {
-      setCustCount((cRes.data?.data || []).length);
-      setEmpCount((eRes.data?.data || []).length);
-      setCountsReady(true);
-    });
+  const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+  const fmtDate = (v) => v ? new Date(v).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : '—';
 
-    // Health Scan & Forecast
-    inventory.getHealthScan()
-      .then(res => setHealthInsights(res.data?.insights || []))
-      .catch(() => {})
-      .finally(() => setHealthLoading(false));
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+      <div style={{ width: 36, height: 36, border: '3px solid var(--color-border)', borderTopColor: 'var(--color-accent)', borderRadius: '50%' }} className="sp-spin" />
+    </div>
+  );
 
-    inventory.getForecast()
-      .then(res => setForecasts(res.data?.data || []))
-      .catch(() => {})
-      .finally(() => setForecastLoading(false));
-  }, [selectedStoreId, setLowStockCount]);
-
-  useEffect(() => {
-    setKpiLoading(true);
-    setChartLoading(true);
-    setOrdersLoading(true);
-    fetchDashboardData();
-  }, [fetchDashboardData]);
-
-  /* ── Derived ── */
-  const totalRevenue = recentOrders.reduce((sum, o) => sum + (o.grand_total || 0), 0);
-
-  const filteredOrders = recentOrders.filter(order => {
-    const matchSearch =
-      !search ||
-      String(order.id).includes(search) ||
-      `${order.customer?.first_name} ${order.customer?.last_name}`.toLowerCase().includes(search.toLowerCase());
-    const matchStatus =
-      statusFilter === 'all' || order.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
-
-  const statusBadge = (status) => {
-    if (status === 'paid')    return <span className="badge high"><span className="badge-dot"></span>Pagato</span>;
-    if (status === 'draft')   return <span className="badge mid"><span className="badge-dot"></span>Bozza</span>;
-    return                           <span className="badge low"><span className="badge-dot"></span>Pendente</span>;
-  };
-  const revenueDelta = kpi?.delta_revenue ?? kpi?.revenue_delta;
-  const ordersDelta = kpi?.delta_orders ?? kpi?.orders_delta;
   return (
-    <>
-      {/* ── KPI GRID ── */}
-      {kpiLoading ? <SkeletonKpi /> : (
-      <div className="kpi-grid">
-        <div className="kpi-card">
-          <div className="kpi-label">Ricavi Totali</div>
-          <div className="kpi-value gold">
-            €{(kpi?.revenue ?? totalRevenue).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-          {revenueDelta != null
-            ? <span className={`kpi-delta ${revenueDelta >= 0 ? 'up' : 'down'}`}>
-                {revenueDelta >= 0 ? '↑' : '↓'} {Math.abs(revenueDelta).toFixed(1)}%
-              </span>
-            : <span className="kpi-delta up">↑ live</span>}
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-label">Ordini</div>
-          <div className="kpi-value">{kpi?.orders ?? recentOrders.length}</div>
-          {ordersDelta != null
-            ? <span className={`kpi-delta ${ordersDelta >= 0 ? 'up' : 'down'}`}>
-                {ordersDelta >= 0 ? '↑' : '↓'} {Math.abs(ordersDelta).toFixed(1)}%
-              </span>
-            : <span className="kpi-delta up">Totale</span>}
-        </div>
-
-        <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/inventory')}>
-          <div className="kpi-label">Stock Basso</div>
-          <div className={`kpi-value${stockInfo.lowStockItems > 0 ? ' red' : ''}`}>{stockInfo.lowStockItems}</div>
-          {stockInfo.lowStockItems > 0
-            ? <span className="kpi-delta warn">⚠ da riordinare</span>
-            : <span className="kpi-delta up">✓ ok</span>}
-        </div>
-
-        <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/customers')}>
-          <div className="kpi-label">Clienti</div>
-          <div className="kpi-value">{custCount}</div>
-          <span className="kpi-delta up">Registrati</span>
+    <div className="sp-animate-in">
+      <div className="sp-page-header sp-mb-6">
+        <div>
+          <h1 className="sp-page-title">Dashboard</h1>
+          <p className="sp-page-subtitle">Panoramica attività</p>
         </div>
       </div>
-      )}
 
-      {/* ── HEALTH SCAN INSIGHTS ── */}
-      {healthInsights.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {healthInsights.map((insight, i) => (
-            <div key={`health-${i}`} className={`p-4 rounded-xl border flex gap-4 ${
-              insight.severity === 'high' ? 'bg-red-50 border-red-100 text-red-900' : 
-              insight.severity === 'warning' ? 'bg-amber-50 border-amber-100 text-amber-900' :
-              'bg-blue-50 border-blue-100 text-blue-900'
-            }`}>
-              <div className="text-xl">
-                {insight.severity === 'high' ? '🚨' : insight.severity === 'warning' ? '⚠️' : 'ℹ️'}
-              </div>
-              <div>
-                <div className="font-bold text-sm mb-0.5">{insight.title}</div>
-                <div className="text-xs opacity-90 mb-2">{insight.message}</div>
-                <div className="text-xs font-semibold underline decoration-dotted cursor-help" title={insight.suggestion}>
-                  SvaPro Suggestion: {insight.suggestion}
-                </div>
-              </div>
+      {/* KPI Cards */}
+      <div className="sp-stats-grid sp-mb-6">
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">
+            <DollarSign size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+            Fatturato
+          </div>
+          <div className="sp-stat-value">{fmt(kpi?.revenue_total)}</div>
+          {kpi?.revenue_trend != null && (
+            <div className={`sp-stat-trend ${kpi.revenue_trend >= 0 ? 'up' : 'down'}`}>
+              {kpi.revenue_trend >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+              {Math.abs(kpi.revenue_trend || 0).toFixed(1)}% vs periodo prec.
             </div>
-          ))}
+          )}
         </div>
-      )}
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">
+            <ShoppingCart size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+            Ordini
+          </div>
+          <div className="sp-stat-value">{kpi?.orders_count || 0}</div>
+        </div>
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">
+            <Users size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+            Clienti
+          </div>
+          <div className="sp-stat-value">{custCount}</div>
+        </div>
+        <div className="sp-stat-card">
+          <div className="sp-stat-label">
+            <AlertTriangle size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+            Alerti Stock
+          </div>
+          <div className="sp-stat-value" style={{ color: (stockStats.low + stockStats.out) > 0 ? 'var(--color-warning)' : 'inherit' }}>
+            {stockStats.low + stockStats.out}
+          </div>
+        </div>
+      </div>
 
-      {/* ── AI FORECAST ALERTS ── */}
-      {forecasts.some(f => f.is_critical) && (
-        <div className="alert-banner mb-6" style={{ background: 'var(--amber-bg)', borderColor: 'var(--amber)' }}>
-          <span className="icon">💡</span>
-          <span>
-            <strong>AI Forecast:</strong> {forecasts.filter(f => f.is_critical).length} prodotti rischiano il sold-out a breve.
-          </span>
-          <button className="banner-link" onClick={() => navigate('/inventory/smart-reorder')}>
-            Dettagli Previsione →
+      {/* Charts row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 24 }}>
+        {/* Revenue Chart */}
+        <div className="sp-card">
+          <div className="sp-card-header">
+            <span className="sp-card-title">Andamento Fatturato (14g)</span>
+          </div>
+          <div className="sp-card-body" style={{ height: 280 }}>
+            {revenueChart.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={revenueChart}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0066FF" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#0066FF" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(0)}k`} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: 8, border: '1px solid #E5E7EB', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 12 }}
+                    formatter={(v) => [fmt(v), 'Fatturato']}
+                  />
+                  <Area type="monotone" dataKey="revenue" stroke="#0066FF" strokeWidth={2} fill="url(#colorRevenue)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-tertiary)' }}>
+                Nessun dato disponibile
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Stock summary */}
+        <div className="sp-card">
+          <div className="sp-card-header">
+            <span className="sp-card-title">Stato Magazzino</span>
+          </div>
+          <div className="sp-card-body">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Referenze totali</span>
+                <span style={{ fontSize: 20, fontWeight: 800 }}>{stockStats.total}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: 'var(--color-warning)' }}>⚠ Stock basso</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-warning)' }}>{stockStats.low}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: 'var(--color-error)' }}>✕ Esauriti</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-error)' }}>{stockStats.out}</span>
+              </div>
+              <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+              <button className="sp-btn sp-btn-secondary sp-btn-block" onClick={() => navigate('/inventory')}>
+                Vai al Magazzino
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent orders */}
+      <div className="sp-table-wrap">
+        <div className="sp-table-toolbar">
+          <span style={{ fontWeight: 700, fontSize: 14 }}>Ordini Recenti</span>
+          <button className="sp-btn sp-btn-ghost sp-btn-sm" onClick={() => navigate('/orders')} style={{ marginLeft: 'auto' }}>
+            Vedi tutti →
           </button>
         </div>
-      )}
-
-      {/* ── ERROR ── */}
-      {error && (
-        <div className="alert-banner" style={{ borderColor: 'rgba(230,76,60,.4)' }}>
-          <span className="icon">✕</span>
-          <span><strong>Errore:</strong> {error}</span>
-          <button className="banner-link" onClick={fetchDashboardData}>Riprova →</button>
-        </div>
-      )}
-
-      {/* ── REVENUE CHART ── */}
-      {chartLoading ? null : revenueChart.length > 0 && (
-        <div className="table-card" style={{ padding: '20px 16px' }}>
-          <div className="section-title" style={{ marginBottom: 16 }}>
-            Andamento Ricavi
-            <span className="section-subtitle"> — ultimi 14 giorni</span>
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={revenueChart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
-              <XAxis dataKey="date" tick={{ fill: '#8a8fa8', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#8a8fa8', fontSize: 11 }} axisLine={false} tickLine={false}
-                tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
-              <Tooltip
-                contentStyle={{ background: '#0e1726', border: '1px solid rgba(201,162,39,.25)', borderRadius: 8, color: '#e8edf5', fontSize: 12 }}
-                formatter={v => [`€${Number(v).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, 'Ricavi']}
-                labelStyle={{ color: '#c9a227' }}
-              />
-              <Bar dataKey="revenue" fill="#c9a227" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* ── RECENT ORDERS ── */}
-      {ordersLoading ? <SkeletonTable /> : (
-      <div>
-        <div className="section-header">
-          <div className="section-title">
-            Ordini Recenti
-            <span className="section-subtitle"> — ultimi {recentOrders.length}</span>
-          </div>
-          <button className="btn btn-ghost" onClick={() => navigate('/orders')}>Vedi tutti</button>
-          <button className="btn btn-gold" onClick={() => navigate('/orders')}>
-            <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd"/></svg>
-            Nuovo Ordine
-          </button>
-        </div>
-
-        <div className="table-card">
-          <div className="table-toolbar">
-            <div className="search-box">
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style={{ color: 'var(--muted)', flexShrink: 0 }}>
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
-              </svg>
-              <input
-                placeholder="Cerca per ID o cliente…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-            <button
-              className={`filter-chip${statusFilter === 'all' ? ' active' : ''}`}
-              onClick={() => setStatusFilter('all')}
-            >Tutti</button>
-            <button
-              className={`filter-chip${statusFilter === 'paid' ? ' active' : ''}`}
-              onClick={() => setStatusFilter('paid')}
-            >Pagati</button>
-            <button
-              className={`filter-chip${statusFilter === 'draft' ? ' active' : ''}`}
-              onClick={() => setStatusFilter('draft')}
-            >Bozze</button>
-            <button
-              className={`filter-chip${statusFilter === 'pending' ? ' active' : ''}`}
-              onClick={() => setStatusFilter('pending')}
-            >Pendenti</button>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Cliente</th>
-                <th>Totale</th>
-                <th>Stato</th>
-                <th></th>
+        <table className="sp-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Data</th>
+              <th>Cliente</th>
+              <th>Totale</th>
+              <th>Stato</th>
+              <th>Pagamento</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentOrders.length > 0 ? recentOrders.map(order => (
+              <tr key={order.id}>
+                <td className="sp-font-mono sp-cell-secondary">#{order.id}</td>
+                <td className="sp-cell-secondary">{fmtDate(order.created_at)}</td>
+                <td className="sp-cell-primary">{order.customer_name || 'Walk-in'}</td>
+                <td style={{ fontWeight: 700 }}>{fmt(order.total)}</td>
+                <td>
+                  <span className={`sp-badge ${order.status === 'paid' ? 'sp-badge-success' : order.status === 'cancelled' ? 'sp-badge-error' : 'sp-badge-warning'}`}>
+                    <span className="sp-badge-dot" />
+                    {order.status === 'paid' ? 'Pagato' : order.status === 'cancelled' ? 'Annullato' : order.status}
+                  </span>
+                </td>
+                <td className="sp-cell-secondary" style={{ textTransform: 'capitalize' }}>{order.payment_method || '—'}</td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.length > 0 ? filteredOrders.map(order => (
-                <tr key={order.id}>
-                  <td><span className="mono">#{String(order.id).padStart(4, '0')}</span></td>
-                  <td style={{ color: 'var(--text)', fontWeight: 500 }}>
-                    {order.customer
-                      ? `${order.customer.first_name} ${order.customer.last_name}`
-                      : <span style={{ color: 'var(--muted)' }}>—</span>}
-                  </td>
-                  <td>
-                    <span className="mono positive">
-                      €{(order.grand_total || 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </td>
-                  <td>{statusBadge(order.status)}</td>
-                  <td>
-                    <button
-                      className="btn btn-ghost"
-                      style={{ padding: '5px 10px', fontSize: 12 }}
-                      onClick={() => navigate('/orders')}
-                    >
-                      Apri
-                    </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--muted)' }}>
-                    {search || statusFilter !== 'all' ? 'Nessun risultato per i filtri applicati' : 'Nessun ordine trovato'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            )) : (
+              <tr><td colSpan="6" className="sp-table-empty">Nessun ordine recente</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
-      )}
-
-      {/* ── BOTTOM GRID ── */}
-      <div className="bottom-grid">
-
-        {/* Quick Actions */}
-        <div className="mini-card">
-          <div className="mini-card-title">Azioni Rapide</div>
-
-          <a className="quick-action" href="/orders" onClick={e => { e.preventDefault(); navigate('/orders'); }}>
-            <div className="quick-action-icon" style={{ background: 'var(--blue-bg)' }}>
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="var(--blue)"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3z"/></svg>
-            </div>
-            <div>
-              <div className="quick-action-label">Nuovo Ordine</div>
-              <div className="quick-action-sub">Aggiungi un ordine di vendita</div>
-            </div>
-          </a>
-
-          <a className="quick-action" href="/inventory/smart-reorder" onClick={e => { e.preventDefault(); navigate('/inventory/smart-reorder'); }}>
-            <div className="quick-action-icon" style={{ background: 'var(--amber-bg)' }}>
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="var(--amber)"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
-            </div>
-            <div>
-              <div className="quick-action-label">Smart Reorder</div>
-              <div className="quick-action-sub">Riordino automatico AI</div>
-            </div>
-          </a>
-
-          <a className="quick-action" href="/catalog" onClick={e => { e.preventDefault(); navigate('/catalog'); }}>
-            <div className="quick-action-icon" style={{ background: 'var(--gold-glow)' }}>
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="var(--gold)"><path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4z" clipRule="evenodd"/></svg>
-            </div>
-            <div>
-              <div className="quick-action-label">Aggiungi Prodotto</div>
-              <div className="quick-action-sub">Gestisci il catalogo</div>
-            </div>
-          </a>
-
-          <a className="quick-action" href="/customers" onClick={e => { e.preventDefault(); navigate('/customers'); }}>
-            <div className="quick-action-icon" style={{ background: 'var(--green-bg)' }}>
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="var(--green)"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
-            </div>
-            <div>
-              <div className="quick-action-label">Nuovo Cliente</div>
-              <div className="quick-action-sub">Registra un cliente</div>
-            </div>
-          </a>
-        </div>
-
-        {/* Riepilogo */}
-        <div className="mini-card">
-          <div className="mini-card-title">Riepilogo <span>aggiornato ora</span></div>
-
-          <div className="activity-item">
-            <div className="activity-dot" style={{ background: 'var(--gold)' }}></div>
-            <div className="activity-text">Ricavi totali</div>
-            <span className="mono positive">
-              €{totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
-
-          <div className="activity-item">
-            <div className="activity-dot" style={{ background: 'var(--blue)' }}></div>
-            <div className="activity-text">Ordini registrati</div>
-            <span className="mono" style={{ color: 'var(--text)' }}>{recentOrders.length}</span>
-          </div>
-
-          <div className="activity-item">
-            <div className="activity-dot" style={{ background: 'var(--green)' }}></div>
-            <div className="activity-text">Clienti attivi</div>
-            <span className="mono" style={{ color: 'var(--text)' }}>{custCount}</span>
-          </div>
-
-          <div className="activity-item">
-            <div className="activity-dot" style={{ background: 'var(--muted2)' }}></div>
-            <div className="activity-text">Dipendenti</div>
-            <span className="mono" style={{ color: 'var(--text)' }}>{empCount}</span>
-          </div>
-
-          <div className="activity-item">
-            <div className="activity-dot" style={{ background: stockInfo.lowStockItems > 0 ? 'var(--red)' : 'var(--green)' }}></div>
-            <div className="activity-text">Prodotti sotto soglia</div>
-            <span className={`mono${stockInfo.lowStockItems > 0 ? ' negative' : ' positive'}`}>
-              {stockInfo.lowStockItems}
-            </span>
-          </div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
-

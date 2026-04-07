@@ -4,6 +4,17 @@ import { orders, getOfflineSalesQueueSize, onOfflineSalesQueueChanged, syncOffli
 import { OrdersSkeleton } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import OrderModal from '../components/OrderModal.jsx';
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  RefreshCw, 
+  TrendingUp, 
+  ShoppingCart, 
+  CreditCard,
+  ChevronRight,
+  MoreHorizontal
+} from 'lucide-react';
 
 export default function OrdersPage() {
   const { selectedStoreId, selectedStore } = useOutletContext();
@@ -25,7 +36,7 @@ export default function OrdersPage() {
   useEffect(() => {
     const fetchSelectData = async () => {
       try {
-        const { default: api, suppliers } = await import('../api.jsx');
+        const { suppliers } = await import('../api.jsx');
         const suppRes = await suppliers.getAll();
         setSuppliersList(suppRes.data?.data || []);
       } catch (err) { }
@@ -79,130 +90,176 @@ export default function OrdersPage() {
     }
   };
 
-  const statusLabel = { paid: 'Pagato', draft: 'Bozza', pending: 'Pendente' };
-  const statusBadge = { paid: 'high', draft: 'mid', pending: 'low' };
+  const statusLabel = { paid: 'Completato', draft: 'Bozza', pending: 'In Attesa' };
+  const statusClass = { paid: 'badge-v3-success', draft: 'badge-v3-neutral', pending: 'badge-v3-warning' };
 
   const filtered = statusFilter === 'all' ? ordersList
     : ordersList.filter(o => o.status === statusFilter);
 
+  const totalRevenue = ordersList.reduce((acc, curr) => acc + (curr.grand_total || 0), 0);
+  const avgOrder = ordersList.length > 0 ? (totalRevenue / ordersList.length).toFixed(2) : 0;
+
   if (loading) return <OrdersSkeleton />;
 
   return (
-    <>
-      {/* Page header */}
-      <div className="page-head">
+    <div className="space-y-10 animate-v3 pb-20">
+      {/* ── Header ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <div className="page-head-title">Ordini</div>
-          <div className="page-head-sub">
-            {ordersList.length} ordini totali{selectedStore ? ` - Store: ${selectedStore.name}` : ''}
-          </div>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter">Cronologia Ordini</h1>
+          <p className="text-sm font-bold text-slate-400 mt-1">Gestione flussi di vendita e terminali</p>
         </div>
-        <button className="btn btn-gold" onClick={handleOpenModal}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nuovo Ordine
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+             <div className="w-2 h-2 rounded-full bg-green animate-pulse" />
+             <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{selectedStore?.name || 'Global Terminal'}</span>
+          </div>
+          <button className="btn-v3-primary" onClick={handleOpenModal}>
+            <Plus size={20} strokeWidth={3} />
+            <span>Nuovo Ordine</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── KPI Widgets ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="card-v3 metric-card-v3 bg-charcoal text-white">
+          <div className="flex items-center justify-between mb-4">
+             <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-accent"><TrendingUp size={20} /></div>
+             <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Revenue</span>
+          </div>
+          <div className="text-3xl font-black">€{totalRevenue.toLocaleString()}</div>
+          <p className="text-[10px] font-bold text-emerald-400 mt-2 uppercase tracking-widest">+12.4% vs last week</p>
+        </div>
+
+        <div className="card-v3 metric-card-v3">
+          <div className="flex items-center justify-between mb-4">
+             <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><ShoppingCart size={20} /></div>
+             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Volume</span>
+          </div>
+          <div className="text-3xl font-black text-slate-900">{ordersList.length}</div>
+          <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest">Active transactions</p>
+        </div>
+
+        <div className="card-v3 metric-card-v3">
+          <div className="flex items-center justify-between mb-4">
+             <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><CreditCard size={20} /></div>
+             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">AOV</span>
+          </div>
+          <div className="text-3xl font-black text-slate-900">€{avgOrder}</div>
+          <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest">Average Order Value</p>
+        </div>
       </div>
 
       {error && <ErrorAlert message={error} onRetry={fetchOrders} />}
 
       {offlineQueueSize > 0 && (
-        <div className="banner banner-warn" style={{ marginBottom: 14 }}>
-          <span className="banner-text">
-            {offlineQueueSize} vendita/e in coda offline.
-            {isOnline ? ' Pronte per la sincronizzazione.' : ' Verranno sincronizzate quando torna la connessione.'}
-          </span>
+        <div className="card-v3 !p-6 bg-amber-50 border-amber-100 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+             <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600"><RefreshCw className={syncingOffline ? 'animate-spin' : ''} size={20} /></div>
+             <div>
+                <p className="text-sm font-black text-amber-900">{offlineQueueSize} vendita/e in coda offline.</p>
+                <p className="text-xs font-bold text-amber-700/60 uppercase racking-widest">
+                   {isOnline ? 'Pronti per la sincronizzazione istantanea.' : 'In attesa di connessione stabile...'}
+                </p>
+             </div>
+          </div>
           {isOnline && (
-            <button
-              className="btn btn-light"
-              style={{ marginLeft: 'auto' }}
-              onClick={handleSyncOffline}
-              disabled={syncingOffline}
-            >
-              {syncingOffline ? 'Sincronizzazione...' : 'Sincronizza ora'}
+            <button className="btn-v3-primary !bg-amber-600 !shadow-amber-600/20" onClick={handleSyncOffline} disabled={syncingOffline}>
+              {syncingOffline ? 'Syncing...' : 'Sincronizza Ora'}
             </button>
           )}
         </div>
       )}
 
-      {/* Table */}
-      <div className="table-card">
-        <div className="table-toolbar">
-          {['all','paid','draft','pending'].map(s => (
-            <button
-              key={s}
-              className={`filter-chip${statusFilter === s ? ' active' : ''}`}
-              onClick={() => setStatusFilter(s)}
-            >
-              {s === 'all' ? 'Tutti' : statusLabel[s]}
-            </button>
-          ))}
-          <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
-            <select 
-              value={supplierFilter} 
-              onChange={e => setSupplierFilter(e.target.value)}
-              className="px-2 py-1 text-sm border border-gray-300 rounded-md outline-none"
-            >
-              <option value="">Tutti i fornitori</option>
-              {suppliersList.map(sup => (
-                <option key={sup.id} value={sup.id}>{sup.name}</option>
+      {/* ── Main Order Table ── */}
+      <div className="card-v3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-10">
+           <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0 no-scrollbar">
+              {['all','paid','draft','pending'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap 
+                    ${statusFilter === s ? 'bg-charcoal text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                >
+                  {s === 'all' ? 'Tutti gli Ordini' : statusLabel[s]}
+                </button>
               ))}
-            </select>
-            <select 
-              value={typeFilter} 
-              onChange={e => setTypeFilter(e.target.value)}
-              className="px-2 py-1 text-sm border border-gray-300 rounded-md outline-none"
-            >
-              <option value="">Tutti i tipi</option>
-              <option value="liquid">Liquido</option>
-              <option value="device">Device</option>
-              <option value="accessory">Accessorio</option>
-              <option value="consumable">Consumabile</option>
-              <option value="other">Altro</option>
-            </select>
-          </div>
-          <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>
-            {filtered.length} risultati
-          </span>
+           </div>
+           
+           <div className="flex items-center gap-3">
+              <div className="relative group">
+                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" />
+                 <input type="text" placeholder="Cerca ordine or cliente..." className="input-v3 !py-2.5 !pl-10 !text-xs !w-64" />
+              </div>
+              <button className="w-11 h-11 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 hover:text-indigo-500 transition-all"><Filter size={18} /></button>
+           </div>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Cliente</th>
-              <th>Magazzino</th>
-              <th>Totale</th>
-              <th>Loyalty</th>
-              <th>Stato</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length > 0 ? filtered.map(order => (
-              <tr key={order.id}>
-                <td><span className="mono" style={{color:'var(--muted2)'}}>#{order.id}</span></td>
-                <td style={{fontWeight:600,color:'var(--text)'}}>
-                  {order.customer?.first_name} {order.customer?.last_name}
-                </td>
-                <td style={{color:'var(--muted2)'}}>{order.warehouse?.name || '—'}</td>
-                <td><span className="mono positive">€{order.grand_total?.toFixed(2)}</span></td>
-                <td style={{color:'var(--amber)',fontFamily:'IBM Plex Mono, monospace',fontSize:13}}>
-                  +{order.loyalty_points_awarded || 0} pt
-                </td>
-                <td>
-                  <span className={`badge ${statusBadge[order.status] || 'mid'}`}>
-                    <span className="badge-dot" />
-                    {statusLabel[order.status] || order.status}
-                  </span>
-                </td>
-              </tr>
-            )) : (
+
+        <div className="table-v3-container">
+          <table className="table-v3">
+            <thead>
               <tr>
-                <td colSpan="6" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
-                  Nessun ordine trovato
-                </td>
+                <th>ID Ordine</th>
+                <th>Operatore/Cliente</th>
+                <th>Magazzino</th>
+                <th>Data Acquisizione</th>
+                <th>Punti Loyalty</th>
+                <th>Totale</th>
+                <th>Stato</th>
+                <th />
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.length > 0 ? filtered.map(order => (
+                <tr key={order.id} onClick={() => { setSelectedOrder(order); setShowModal(true); }} className="cursor-pointer">
+                  <td>
+                    <div className="flex items-center gap-3">
+                       <span className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-400">#</span>
+                       <span className="text-sm font-black text-slate-900">{order.id}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex flex-col">
+                       <span className="text-sm font-black text-slate-900">{order.customer?.first_name} {order.customer?.last_name || 'Generic Client'}</span>
+                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{order.employee?.name || 'Main POS Terminal'}</span>
+                    </div>
+                  </td>
+                  <td><span className="text-xs font-bold text-slate-500">{order.warehouse?.name || '—'}</span></td>
+                  <td><span className="text-xs font-bold text-slate-500">{new Date(order.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'})}</span></td>
+                  <td>
+                    <div className="flex items-center gap-2 text-indigo-500 font-black text-xs">
+                       <TrendingUp size={14} />
+                       +{order.loyalty_points_awarded || 0} pts
+                    </div>
+                  </td>
+                  <td><span className="text-sm font-black text-slate-900">€{order.grand_total?.toFixed(2)}</span></td>
+                  <td>
+                    <span className={`badge-v3 ${statusClass[order.status] || 'badge-v3-neutral'}`}>
+                      {statusLabel[order.status] || order.status}
+                    </span>
+                  </td>
+                  <td className="text-right">
+                    <button className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-300 hover:text-slate-900 transition-all">
+                       <MoreHorizontal size={18} />
+                    </button>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="8" className="!py-20 text-center">
+                    <div className="flex flex-col items-center">
+                       <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 mb-4"><ShoppingCart size={32} /></div>
+                       <p className="text-sm font-black text-slate-400 uppercase tracking-[2px]">Nessun ordine presente nel database</p>
+                       <p className="text-xs font-bold text-slate-300 mt-1">Modifica i filtri o crea una nuova transazione.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showModal && (
@@ -213,7 +270,7 @@ export default function OrdersPage() {
           onSave={handleSaveOrder}
         />
       )}
-    </>
+    </div>
   );
 }
 

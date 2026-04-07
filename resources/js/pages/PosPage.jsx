@@ -1,586 +1,522 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { pos, orders as ordersApi, catalog, customers as customersApi, loyalty as loyaltyApi } from '../api.jsx';
-import { SkeletonTable } from '../components/Skeleton.jsx';
-import ErrorAlert from '../components/ErrorAlert.jsx';
+import { orders as ordersApi, catalog, customers as customersApi, inventory } from '../api.jsx';
+import { 
+  Search, Plus, Minus, Trash2, CreditCard, Banknote, 
+  ShoppingCart, X, User, MapPin, ChevronDown, ListRestart
+} from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import PosCheckoutModal from '../components/PosCheckoutModal.jsx';
 
 export default function PosPage() {
-  const { selectedStoreId, selectedStore, storesList } = useOutletContext();
-  const [activeSession, setActiveSession] = useState(null);
-  const [sessions, setSessions] = useState([]);
+  const { selectedStoreId, displayMode, user } = useOutletContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState('cassa'); // 'cassa' | 'sessioni'
-  const [opening, setOpening] = useState(false);
-  const [closing, setClosing] = useState(false);
-  const [openingAmount, setOpeningAmount] = useState('');
-
-  // Quick sale state
-  const [products, setProducts] = useState([]);
-  const [cartLines, setCartLines] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [placingOrder, setPlacingOrder] = useState(false);
-  const [lastOrder, setLastOrder] = useState(null);
   
-  // Loyalty & Customer state
-  const [customerSearch, setCustomerSearch] = useState('');
+  // Products & categories
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Cart
+  const [cartLines, setCartLines] = useState([]);
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  // Options
+  const [stockMap, setStockMap] = useState({});
+  const [warehouseId, setWarehouseId] = useState('');
+  const [soldByEmployeeId, setSoldByEmployeeId] = useState('');
+  const [employees, setEmployees] = useState([]);
+  const [note, setNote] = useState('');
+
+  // Customer
   const [allCustomers, setAllCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [customerPoints, setCustomerPoints] = useState(0);
-  const [usePoints, setUsePoints] = useState(false);
-  const [pointsToRedeem, setPointsToRedeem] = useState(0);
-  
-  const [options, setOptions] = useState({ employees: [], warehouses: [] });
-  const [soldByEmployeeId, setSoldByEmployeeId] = useState('');
-  const [warehouseId, setWarehouseId] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [expandedCats, setExpandedCats] = useState(['Generale']); // For accordions
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerPicker, setShowCustomerPicker] = useState(false);
 
   useEffect(() => { fetchData(); }, [selectedStoreId]);
 
   const fetchData = async () => {
     try {
       setLoading(true); setError('');
-      const [activeRes, sessionsRes] = await Promise.all([
-        pos.getActive(),
-        pos.getSessions({ limit: 50 }),
+      const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
+      const [pRes, cRes, aRes, oRes, stRes] = await Promise.all([
+        catalog.getProducts({ ...sp, limit: 500 }),
+        catalog.getCategories(),
+        customersApi.getCustomers({ limit: 1000 }),
+        ordersApi.getOptions(sp),
+        inventory.getStock({ ...sp, limit: 2000 })
       ]);
-      setActiveSession(activeRes.data?.data || null);
-      setSessions(sessionsRes.data?.data || []);
 
-      const [prodRes, optRes, custRes] = await Promise.all([
-        catalog.getProducts(selectedStoreId ? { store_id: selectedStoreId, limit: 200 } : { limit: 200 }),
-        ordersApi.getOptions(selectedStoreId ? { store_id: selectedStoreId } : {}),
-        customersApi.getCustomers({ limit: 500 })
-      ]);
-      setProducts(prodRes.data?.data || []);
-      setOptions({
-        employees: optRes.data?.data?.employees || [],
-        warehouses: optRes.data?.data?.warehouses || []
-      });
-      setAllCustomers(custRes.data?.data || []);
-      if (optRes.data?.data?.warehouses?.length > 0 && !warehouseId) {
-        setWarehouseId(optRes.data.data.warehouses[0].id);
-      }
+      setProducts(pRes.data?.data || []);
+
+      const allCats = cRes.data?.data || [];
+      setCategories(allCats.filter(c => !c.parent_id));
+      setSubCategories(allCats.filter(c => c.parent_id));
+
+      setAllCustomers(aRes.data?.data || []);
+      setEmployees(oRes.data?.data?.employees || []);
+      
+      const warehouses = oRes.data?.data?.warehouses || [];
+      if (warehouses.length > 0) setWarehouseId(warehouses[0].id);
+
+      const smap = {};
+      (stRes.data?.data || []).forEach(si => { smap[si.product_variant_id] = si; });
+      setStockMap(smap);
+
     } catch (err) {
-      if (err.response?.status !== 404) {
-        setError(err.response?.data?.message || err.message || 'Errore nel caricamento');
-      } else {
-        setActiveSession(null);
-      }
+      setError('Errore caricamento dati POS');
+      console.error(err);
     } finally { setLoading(false); }
-  };
-
-  const handleOpenSession = async () => {
-    try {
-      setOpening(true); setError('');
-      await pos.open({ 
-        store_id: selectedStoreId,
-        opening_cash: parseFloat(openingAmount) || 0 
-      });
-      setOpeningAmount('');
-      await fetchData();
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Errore nell\'apertura');
-    } finally { setOpening(false); }
-  };
-
-  const handleCloseSession = async () => {
-    if (!activeSession) return;
-    if (!confirm('Chiudere la sessione POS corrente?')) return;
-    try {
-      setClosing(true); setError('');
-      await pos.close(activeSession.id);
-      await fetchData();
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Errore nella chiusura');
-    } finally { setClosing(false); }
   };
 
   const addToCart = (product) => {
     const variant = product.variants?.[0];
     if (!variant) return;
+    
     const existing = cartLines.find(l => l.product_variant_id === variant.id);
+
     if (existing) {
-      setCartLines(cartLines.map(l => l.product_variant_id === variant.id ? { ...l, qty: l.qty + 1 } : l));
+      setCartLines(cartLines.map(l => 
+        l.product_variant_id === variant.id ? { ...l, qty: l.qty + 1 } : l
+      ));
     } else {
-      setCartLines([...cartLines, {
-        product_variant_id: variant.id,
-        product_name: product.name,
-        flavor: variant.flavor || '',
-        sale_price: parseFloat(variant.sale_price) || 0,
+      setCartLines([...cartLines, { 
+        product_variant_id: variant.id, 
+        name: product.name, 
+        sku: product.sku,
+        price: parseFloat(variant.sale_price) || 0, 
         qty: 1,
+        location: variant.location || '',
       }]);
     }
+    toast.success(`${product.name} aggiunto`, { duration: 1000 });
   };
 
-  const updateCartQty = (variantId, qty) => {
-    if (qty <= 0) {
-      setCartLines(cartLines.filter(l => l.product_variant_id !== variantId));
-    } else {
-      setCartLines(cartLines.map(l => l.product_variant_id === variantId ? { ...l, qty } : l));
-    }
+  const updateQty = (variantId, delta) => {
+    setCartLines(cartLines.map(l => {
+      if (l.product_variant_id !== variantId) return l;
+      const newQty = l.qty + delta;
+      return newQty <= 0 ? null : { ...l, qty: newQty };
+    }).filter(Boolean));
   };
 
-  const cartTotal = cartLines.reduce((sum, l) => sum + l.sale_price * l.qty, 0);
-  
-  const pointsDiscount = usePoints ? Math.floor(pointsToRedeem / 100) * 5 : 0;
-  const finalTotal = Math.max(0, cartTotal - pointsDiscount);
+  const removeFromCart = (variantId) => {
+    setCartLines(cartLines.filter(l => l.product_variant_id !== variantId));
+  };
 
-  useEffect(() => {
-    if (selectedCustomer) {
-      loyaltyApi.getWallet(selectedCustomer.id).then(res => {
-        setCustomerPoints(res.data?.data?.points_balance || 0);
-      }).catch(() => setCustomerPoints(0));
-    } else {
-      setCustomerPoints(0);
-      setUsePoints(false);
-      setPointsToRedeem(0);
-    }
-  }, [selectedCustomer]);
+  const cartTotal = useMemo(() => {
+    return cartLines.reduce((sum, l) => sum + l.price * l.qty, 0);
+  }, [cartLines]);
 
-  useEffect(() => {
-    // Auto-calculate redeemable points when usePoints is toggled or customer points change
-    if (usePoints && selectedCustomer) {
-      const maxRedeemableByWallet = Math.floor(customerPoints / 100) * 100;
-      const amountNeeded = Math.ceil(cartTotal / 5) * 100;
-      setPointsToRedeem(Math.min(maxRedeemableByWallet, amountNeeded));
-    } else {
-      setPointsToRedeem(0);
-    }
-  }, [usePoints, customerPoints, cartTotal]);
+  const cartCount = useMemo(() => {
+    return cartLines.reduce((sum, l) => sum + l.qty, 0);
+  }, [cartLines]);
 
-  const handlePlaceOrder = async (paymentMethod) => {
-    if (!cartLines.length) return;
+  const [showProductInfo, setShowProductInfo] = useState(null);
+
+  const handleAdvancedCheckout = async (payload) => {
+    if (!cartLines.length) return toast.error('Carrello vuoto');
+    if (!soldByEmployeeId) return toast.error('Seleziona un operatore');
+    
     try {
-      if (!soldByEmployeeId) {
-        setError('Seleziona il dipendente che sta effettuando la vendita (Venduto da).');
-        return;
-      }
-      if (!warehouseId) {
-        setError('Seleziona un magazzino di scarico.');
-        return;
-      }
-
-      setPlacingOrder(true); setError('');
-      const res = await ordersApi.place({
+      setPlacingOrder(true);
+      await ordersApi.place({
         channel: 'pos',
-        store_id: selectedStoreId || undefined,
+        store_id: selectedStoreId,
         warehouse_id: Number(warehouseId),
-        employee_id: activeSession?.employee_id, // Who opened the session
-        sold_by_employee_id: Number(soldByEmployeeId), // Who is making the sale
-        status: 'paid',
-        payment_method: paymentMethod,
+        sold_by_employee_id: Number(soldByEmployeeId),
         customer_id: selectedCustomer?.id,
-        points_to_redeem: pointsToRedeem > 0 ? pointsToRedeem : undefined,
-        lines: cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
+        lines: cartLines.map(l => ({ 
+          product_variant_id: l.product_variant_id, 
+          qty: l.qty 
+        })),
+        notes: note + (payload.receipt_type ? ` [Stampa: ${payload.receipt_type}]` : ''),
+        status: 'paid',
+        payments: payload.payments,
+        order_discount_amount: payload.order_discount_amount
       });
-      setLastOrder(res.data);
+      toast.success('Vendita completata con successo!');
       setCartLines([]);
       setSelectedCustomer(null);
-      setUsePoints(false);
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Errore nel piazzamento ordine');
+      setNote('');
+      setShowCheckoutModal(false);
+      fetchData();
+    } catch (err) { 
+      toast.error(err.response?.data?.message || 'Errore durante il pagamento');
     } finally { setPlacingOrder(false); }
   };
 
-  const fmtCurrency = v => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
-  const fmtDate = v => v ? new Date(v).toLocaleString('it-IT') : '-';
-
-  const categoryGroups = useMemo(() => {
-    const groups = { 'Generale': ['All'] };
-    products.forEach(p => {
-      const type = p.product_type || 'Altro';
-      if (!groups[type]) groups[type] = [];
-      if (!groups[type].includes(type)) groups[type].push(type);
-    });
-    return groups;
-  }, [products]);
-
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCat = activeCategory === 'All' || p.product_type === activeCategory;
-    return matchesSearch && matchesCat;
-  });
-
-  const filteredCustomers = allCustomers.filter(c => {
-    const term = customerSearch.toLowerCase();
-    return c.first_name?.toLowerCase().includes(term) || c.last_name?.toLowerCase().includes(term) || c.email?.toLowerCase().includes(term);
-  });
-
-  const toggleCat = (cat) => {
-    setExpandedCats(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
+  const clearSession = (level) => {
+    setCartLines([]);
+    if (level === 'all') {
+      setSelectedCustomer(null);
+      setNote('');
+    }
+    setShowClearConfirm(false);
   };
 
-  if (loading) return <SkeletonTable />;
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const s = searchTerm.toLowerCase();
+      const matchSearch = !s || p.name?.toLowerCase().includes(s) || p.sku?.toLowerCase().includes(s);
+      const matchCat = !activeCategory || p.category_id === activeCategory;
+      return matchSearch && matchCat;
+    });
+  }, [products, searchTerm, activeCategory]);
+
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch) return allCustomers.slice(0, 10);
+    const s = customerSearch.toLowerCase();
+    return allCustomers.filter(c => 
+      c.name?.toLowerCase().includes(s) || c.email?.toLowerCase().includes(s)
+    ).slice(0, 10);
+  }, [allCustomers, customerSearch]);
+
+  const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 36, height: 36, border: '3px solid var(--color-border)', borderTopColor: 'var(--color-accent)', borderRadius: '50%' }} className="sp-spin" />
+        <p style={{ marginTop: 12, fontSize: 13, color: 'var(--color-text-secondary)' }}>Caricamento POS...</p>
+      </div>
+    </div>
+  );
 
   return (
-    <>
-      <div className="page-head">
-        <div>
-          <div className="page-head-title">Punto Cassa (POS)</div>
-          <div className="page-head-sub">
-            {activeSession ? `Sessione attiva #${activeSession.id}` : 'Nessuna sessione attiva'}
-            {selectedStore ? ` - ${selectedStore.name}` : ''}
-          </div>
+    <div className="sp-pos-layout">
+      {/* LEFT — Products */}
+      <div className="sp-pos-products">
+        {/* Search */}
+        <div className="sp-search-box sp-mb-4">
+          <Search size={16} />
+          <input 
+            className="sp-input" 
+            placeholder="Cerca prodotto per nome o SKU..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className={`btn ${tab === 'cassa' ? 'btn-gold' : 'btn-ghost'}`} onClick={() => setTab('cassa')}>Cassa</button>
-          <button className={`btn ${tab === 'sessioni' ? 'btn-gold' : 'btn-ghost'}`} onClick={() => setTab('sessioni')}>Sessioni</button>
+
+        {/* Category chips */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+          <button 
+            className={`sp-chip ${!activeCategory ? 'active' : ''}`}
+            onClick={() => setActiveCategory(null)}
+          >
+            Tutti
+          </button>
+          {categories.map(cat => (
+            <button 
+              key={cat.id}
+              className={`sp-chip ${activeCategory === cat.id ? 'active' : ''}`}
+              onClick={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Product grid */}
+        <div className="sp-pos-product-grid">
+          {filteredProducts.map(product => {
+            const variant = product.variants?.[0];
+            const price = parseFloat(variant?.sale_price) || 0;
+            const stockInfo = variant ? stockMap[variant.id] : null;
+            const onHand = stockInfo?.on_hand ?? '—';
+            const location = variant?.location;
+            
+            return (
+              <div 
+                key={product.id} 
+                className="sp-pos-product-card"
+                onClick={() => addToCart(product)}
+              >
+                <div className="sp-pos-product-name">
+                  {displayMode === 'sku' ? (product.sku || product.name) : product.name}
+                </div>
+                <div className="sp-pos-product-price">{fmt(price)}</div>
+                <div className="sp-pos-product-stock">
+                  Disp: {onHand}
+                </div>
+                {location && (
+                  <div className="sp-pos-product-location">
+                    <MapPin size={8} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />
+                    {location}
+                  </div>
+                )}
+                <button 
+                  style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,0.8)', border: 'none', borderRadius: 12, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--color-primary)' }}
+                  onClick={(e) => { e.stopPropagation(); setShowProductInfo(product); }}
+                >
+                  <Search size={12} strokeWidth={3} />
+                </button>
+              </div>
+            );
+          })}
+          {filteredProducts.length === 0 && (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 40, color: 'var(--color-text-tertiary)' }}>
+              Nessun prodotto trovato
+            </div>
+          )}
         </div>
       </div>
 
-      {error && <ErrorAlert message={error} onRetry={fetchData} />}
+      {/* RIGHT — Cart */}
+      <div className="sp-pos-cart">
+        <div className="sp-pos-cart-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShoppingCart size={18} />
+            <span style={{ fontWeight: 700, fontSize: 14 }}>Carrello</span>
+            {cartCount > 0 && (
+              <span className="sp-badge sp-badge-info" style={{ marginLeft: 4 }}>{cartCount}</span>
+            )}
+          </div>
+          {cartLines.length > 0 && (
+            <button className="sp-btn sp-btn-ghost sp-btn-sm" onClick={() => setShowClearConfirm(true)}>
+              <Trash2 size={14} /> Svuota
+            </button>
+          )}
+        </div>
 
-      {tab === 'cassa' && (
-        <>
-          {/* Session Controls */}
-          {!activeSession ? (
-            <div className="table-card" style={{ padding: 24, textAlign: 'center' }}>
-              <p style={{ marginBottom: 16, color: 'var(--muted)' }}>Nessuna sessione POS aperta. Apri una sessione per iniziare a vendere.</p>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', alignItems: 'center' }}>
-                <input className="field-input" type="number" step="0.01" placeholder="Fondo cassa €" value={openingAmount} onChange={e => setOpeningAmount(e.target.value)} style={{ width: 140 }} />
-                <button className="btn btn-gold" disabled={opening} onClick={handleOpenSession}>
-                  {opening ? 'Apertura...' : 'Apri Sessione'}
-                </button>
+        {showClearConfirm && (
+          <div style={{ padding: '12px 20px', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: 8 }}>
+            <span style={{ fontSize: 13, alignSelf: 'center', fontWeight: 600 }}>Svuota:</span>
+            <button className="sp-btn sp-btn-secondary sp-btn-sm" onClick={() => clearSession('cart')}>Solo carrello</button>
+            <button className="sp-btn sp-btn-secondary sp-btn-sm" onClick={() => clearSession('all')}>Tutto (anche cliente)</button>
+            <button className="sp-btn sp-btn-ghost sp-btn-sm" onClick={() => setShowClearConfirm(false)}><X size={14}/></button>
+          </div>
+        )}
+
+        {/* Operator selector */}
+        <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--color-border-light)' }}>
+          <select 
+            className="sp-select" 
+            value={soldByEmployeeId} 
+            onChange={(e) => setSoldByEmployeeId(e.target.value)}
+            style={{ fontSize: 12 }}
+          >
+            <option value="">Seleziona operatore...</option>
+            {employees.map(emp => (
+              <option key={emp.id} value={emp.id}>{emp.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Customer selector */}
+        <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--color-border-light)' }}>
+          {selectedCustomer ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <User size={14} style={{ color: 'var(--color-accent)' }} />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{selectedCustomer.name}</span>
               </div>
+              <button className="sp-btn sp-btn-ghost sp-btn-sm" onClick={() => setSelectedCustomer(null)}>
+                <X size={14} />
+              </button>
             </div>
           ) : (
-            <>
-              {/* Active Session Info */}
-              <div className="kpi-grid" style={{ marginBottom: 16 }}>
-                <div className="kpi-card">
-                  <div className="kpi-label">Sessione</div>
-                  <div className="kpi-value">#{activeSession.id}</div>
-                </div>
-                <div className="kpi-card">
-                  <div className="kpi-label">Fondo Cassa</div>
-                  <div className="kpi-value">{fmtCurrency(activeSession.opening_amount)}</div>
-                </div>
-                <div className="kpi-card">
-                  <div className="kpi-label">Vendite</div>
-                  <div className="kpi-value gold">{activeSession.orders_count || 0}</div>
-                </div>
-                <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={handleCloseSession}>
-                  <div className="kpi-label">Azione</div>
-                  <div className="kpi-value red" style={{ fontSize: 14 }}>{closing ? 'Chiusura...' : 'Chiudi Cassa'}</div>
-                </div>
-              </div>
-
-              {/* Last order confirmation */}
-              {lastOrder && (
-                <div className="banner banner-success" style={{ marginBottom: 16 }}>
-                  <span className="banner-icon">✓</span>
-                  <div className="banner-text">
-                    Ordine <strong>#{lastOrder.order_id}</strong> registrato — {fmtCurrency(lastOrder.totals?.grand_total)}
-                    {lastOrder.has_stock_alert && <span style={{ color: '#ef4444', marginLeft: 8 }}>⚠ Alert stock generato</span>}
-                  </div>
-                  <button className="banner-action" onClick={() => setLastOrder(null)}>Chiudi</button>
+            <div style={{ position: 'relative' }}>
+              <input 
+                className="sp-input"
+                placeholder="Cerca cliente..."
+                value={customerSearch}
+                onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerPicker(true); }}
+                onFocus={() => setShowCustomerPicker(true)}
+                style={{ fontSize: 12 }}
+              />
+              {showCustomerPicker && customerSearch && (
+                <div style={{ 
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                  background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-md)', maxHeight: 200, overflowY: 'auto'
+                }}>
+                  {filteredCustomers.map(c => (
+                    <button 
+                      key={c.id} 
+                      style={{ display: 'block', width: '100%', padding: '8px 12px', textAlign: 'left', fontSize: 12, borderBottom: '1px solid var(--color-border-light)' }}
+                      onClick={() => { setSelectedCustomer(c); setCustomerSearch(''); setShowCustomerPicker(false); }}
+                    >
+                      <strong>{c.name}</strong> <span style={{ color: 'var(--color-text-tertiary)' }}>{c.email}</span>
+                    </button>
+                  ))}
+                  {filteredCustomers.length === 0 && (
+                    <div style={{ padding: '12px', fontSize: 12, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>
+                      Nessun cliente trovato
+                    </div>
+                  )}
                 </div>
               )}
-
-              {/* Quick Sale: Professional 3-Column Layout */}
-              <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 380px', gap: 24, height: 'calc(100vh - 280px)', minHeight: 600 }}>
-                
-                {/* Column 1: Categories (Accordions) */}
-                <div className="table-card" style={{ 
-                  background: 'rgba(19, 32, 58, 0.4)', 
-                  backdropFilter: 'blur(10px)', 
-                  border: '1px solid var(--border)',
-                  overflowY: 'auto',
-                  padding: 12
-                }}>
-                  <div style={{ padding: '0 8px 16px', fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.7 }}>
-                    Esplora Catalogo
-                  </div>
-                  
-                  {Object.entries(categoryGroups).map(([group, items]) => (
-                    <div key={group} style={{ marginBottom: 4 }}>
-                      <button 
-                        onClick={() => toggleCat(group)}
-                        style={{ 
-                          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '12px', background: 'var(--surface2)', border: 'none', borderRadius: 8,
-                          color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
-                        }}
-                      >
-                        <span>{group}</span>
-                        <span style={{ fontSize: 10, opacity: 0.5, transform: expandedCats.includes(group) ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
-                      </button>
-                      
-                      {expandedCats.includes(group) && (
-                        <div style={{ padding: '4px 0 8px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          {items.map(item => (
-                            <button
-                              key={item}
-                              onClick={() => setActiveCategory(item)}
-                              style={{
-                                padding: '8px 12px', background: activeCategory === item ? 'var(--gold-glow)' : 'transparent',
-                                border: 'none', borderRadius: 6, color: activeCategory === item ? 'var(--gold)' : 'var(--muted2)',
-                                textAlign: 'left', fontSize: 12, fontWeight: 500, cursor: 'pointer'
-                              }}
-                            >
-                              • {item}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Column 2: Product Grid (Premium Cards) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div className="table-card" style={{ padding: '12px 20px', border: 'none', background: 'var(--surface)' }}>
-                    <div className="search-box" style={{ maxWidth: '100%', flex: 1, height: 44, background: 'var(--bg)', borderRadius: 12 }}>
-                      <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style={{ opacity: 0.5 }}><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/></svg>
-                      <input placeholder="Cerca prodottp o scansiona barcode..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ fontSize: 14 }} />
-                    </div>
-                  </div>
-
-                  <div className="table-card" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, padding: 20, overflowY: 'auto', background: 'transparent', border: 'none' }}>
-                    {filteredProducts.map(p => {
-                      const v = p.variants?.[0];
-                      return (
-                        <div key={p.id} onClick={() => addToCart(p)} className="kpi-card" style={{
-                          padding: 16, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12,
-                          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16,
-                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', position: 'relative'
-                        }} onMouseEnter={e => {
-                          e.currentTarget.style.transform = 'translateY(-4px)';
-                          e.currentTarget.style.borderColor = 'var(--gold-dim)';
-                          e.currentTarget.style.boxShadow = '0 10px 30px rgba(201, 162, 39, 0.1)';
-                        }} onMouseLeave={e => {
-                          e.currentTarget.style.transform = 'none';
-                          e.currentTarget.style.borderColor = 'var(--border)';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}>
-                          <div style={{ 
-                            width: '100%', height: 120, background: 'var(--surface2)', borderRadius: 10, 
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' 
-                          }}>
-                            {p.image_url ? (
-                              <img src={p.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <div style={{ opacity: 0.2, fontSize: 32 }}>📦</div>
-                            )}
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 14, marginBottom: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.name}</div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                              <span className="mono" style={{ color: 'var(--gold)', fontWeight: 800, fontSize: 16 }}>{fmtCurrency(v?.sale_price)}</span>
-                              <span style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--surface2)', padding: '2px 6px', borderRadius: 4 }}>{v?.flavor || 'Standard'}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Column 3: Cart (Glassmorphism Sidebar) */}
-                <div style={{ 
-                  display: 'flex', flexDirection: 'column', 
-                  background: 'rgba(19, 32, 58, 0.6)', backdropFilter: 'blur(20px)',
-                  borderLeft: '1px solid var(--gold-dim)', borderRadius: '24px 0 0 24px',
-                  boxShadow: '-10px 0 30px rgba(0,0,0,0.5)', overflow: 'hidden'
-                }}>
-                  <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(201, 162, 39, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div className="section-title" style={{ color: 'var(--gold)', letterSpacing: 1 }}>Riepilogo Ordine</div>
-                    <button onClick={() => setCartLines([])} style={{ background: 'transparent', border: 'none', color: 'var(--red)', fontSize: 11, fontWeight: 700, cursor: 'pointer', opacity: 0.7 }}>SVUOTA</button>
-                  </div>
-                  
-                  <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* Customer Selection */}
-                    <div style={{ position: 'relative' }}>
-                      <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--muted2)', marginBottom: 6, textTransform: 'uppercase' }}>Cliente</label>
-                      {selectedCustomer ? (
-                        <div style={{ 
-                          background: 'var(--surface2)', borderRadius: 10, padding: '12px 14px', 
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          border: '1px solid var(--gold-dim)'
-                        }}>
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>{selectedCustomer.first_name} {selectedCustomer.last_name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Saldo: <strong>{customerPoints} pt</strong> (≈ {fmtCurrency(customerPoints / 100 * 5)})</div>
-                          </div>
-                          <button onClick={() => setSelectedCustomer(null)} style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 10, fontWeight: 800 }}>X</button>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="search-box" style={{ background: 'var(--bg)', borderRadius: 10, height: 40, border: '1px solid var(--border)' }}>
-                            <input 
-                              placeholder="Cerca cliente..." 
-                              value={customerSearch} 
-                              onChange={e => setCustomerSearch(e.target.value)} 
-                              style={{ fontSize: 13 }} 
-                            />
-                          </div>
-                          {customerSearch.length >= 2 && (
-                            <div style={{ 
-                              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
-                              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
-                              marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
-                            }}>
-                              {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
-                                <div key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(''); }} style={{ 
-                                  padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer',
-                                  fontSize: 13, transition: 'background 0.2s'
-                                }} onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                  {c.first_name} {c.last_name} <span style={{ opacity: 0.5, fontSize: 11 }}>({c.email || 'no email'})</span>
-                                </div>
-                              )) : (
-                                <div style={{ padding: 10, textAlign: 'center', fontSize: 12, color: 'var(--muted)' }}>Nessun cliente trovato</div>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    {/* Points Redemption Toggle */}
-                    {selectedCustomer && customerPoints >= 100 && (
-                      <div style={{ 
-                        background: 'rgba(201, 162, 39, 0.05)', borderRadius: 10, padding: '12px 14px',
-                        border: '1px solid' + (usePoints ? ' var(--gold)' : ' var(--border)'),
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                      }}>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: usePoints ? 'var(--gold)' : 'var(--text)' }}>Usa Punti Fidelity</div>
-                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>Riscatta {pointsToRedeem} pt / -{fmtCurrency(pointsDiscount)}</div>
-                        </div>
-                        <input 
-                          type="checkbox" 
-                          checked={usePoints} 
-                          onChange={e => setUsePoints(e.target.checked)} 
-                          style={{ width: 20, height: 20, cursor: 'pointer' }}
-                        />
-                      </div>
-                    )}
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--muted2)', marginBottom: 6, textTransform: 'uppercase' }}>Operatore</label>
-                      <select 
-                        value={soldByEmployeeId} 
-                        onChange={e => setSoldByEmployeeId(e.target.value)}
-                        style={{ 
-                          width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', 
-                          borderRadius: 10, padding: '10px 12px', color: 'var(--text)', fontSize: 13 
-                        }}
-                      >
-                        <option value="">Chi sta effettuando la vendita?</option>
-                        {options.employees.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
-                    {cartLines.length > 0 ? cartLines.map(line => (
-                      <div key={line.product_variant_id} style={{ 
-                        display: 'flex', alignItems: 'center', gap: 12, padding: '16px 0', 
-                        borderBottom: '1px solid rgba(255,255,255,0.05)'
-                      }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)', marginBottom: 2 }}>{line.product_name}</div>
-                          <div style={{ fontSize: 12, color: 'var(--muted2)' }}>{fmtCurrency(line.sale_price)} × {line.qty}</div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg)', borderRadius: 8, padding: 3, border: '1px solid var(--border)' }}>
-                          <button style={{ width: 24, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 16 }} onClick={() => updateCartQty(line.product_variant_id, line.qty - 1)}>−</button>
-                          <span className="mono" style={{ width: 30, textAlign: 'center', fontSize: 13, fontWeight: 700 }}>{line.qty}</span>
-                          <button style={{ width: 24, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 16 }} onClick={() => updateCartQty(line.product_variant_id, line.qty + 1)}>+</button>
-                        </div>
-                      </div>
-                    )) : (
-                      <div style={{ textAlign: 'center', padding: '100px 0', opacity: 0.2 }}>
-                        <div style={{ fontSize: 60, marginBottom: 16 }}>🛒</div>
-                        <div style={{ fontSize: 14, fontWeight: 600 }}>Inizia ad aggiungere prodotti</div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ padding: 24, background: 'rgba(0,0,0,0.2)', borderTop: '1px solid rgba(201, 162, 39, 0.2)' }}>
-                    {usePoints && pointsDiscount > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: 'var(--gold)' }}>
-                        <span>Sconto Punti ({pointsToRedeem} pt)</span>
-                        <span>-{fmtCurrency(pointsDiscount)}</span>
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', marginBottom: 24 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted2)' }}>TOTALE DA PAGARE</span>
-                      <span style={{ fontSize: 32, fontWeight: 800, color: 'white', fontFamily: 'Sora', textShadow: '0 0 20px rgba(201,162,39,0.3)' }}>{fmtCurrency(finalTotal)}</span>
-                    </div>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                      <button 
-                        className="btn btn-gold" 
-                        style={{ height: 64, borderRadius: 12, fontSize: 14, fontWeight: 800, letterSpacing: 1 }} 
-                        disabled={!cartLines.length || placingOrder} 
-                        onClick={() => handlePlaceOrder('cash')}
-                      >
-                        💵 CONTANTI
-                      </button>
-                      <button 
-                        className="btn btn-gold" 
-                        style={{ height: 64, borderRadius: 12, fontSize: 14, fontWeight: 800, letterSpacing: 1 }} 
-                        disabled={!cartLines.length || placingOrder} 
-                        onClick={() => handlePlaceOrder('card')}
-                      >
-                        💳 CARTA
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
+            </div>
           )}
-        </>
+        </div>
+
+        {/* Cart items */}
+        <div className="sp-pos-cart-items">
+          {cartLines.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
+              <ShoppingCart size={32} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+              <p>Il carrello è vuoto</p>
+              <p style={{ fontSize: 11, marginTop: 4 }}>Clicca su un prodotto per aggiungerlo</p>
+            </div>
+          ) : (
+            cartLines.map(line => (
+              <div key={line.product_variant_id} className="sp-pos-cart-item">
+                <div className="sp-pos-cart-item-info">
+                  <div className="sp-pos-cart-item-name">{line.name}</div>
+                  <div className="sp-pos-cart-item-price">{fmt(line.price)} cad.</div>
+                </div>
+                <div className="sp-pos-cart-qty">
+                  <button onClick={() => updateQty(line.product_variant_id, -1)}>
+                    <Minus size={14} />
+                  </button>
+                  <span>{line.qty}</span>
+                  <button onClick={() => updateQty(line.product_variant_id, 1)}>
+                    <Plus size={14} />
+                  </button>
+                </div>
+                <div style={{ minWidth: 65, textAlign: 'right', fontWeight: 700, fontSize: 13 }}>
+                  {fmt(line.price * line.qty)}
+                </div>
+                <button 
+                  onClick={() => removeFromCart(line.product_variant_id)}
+                  style={{ color: 'var(--color-error)', padding: 4 }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Note e Cross-selling */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--color-border-light)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {cartLines.length > 0 && (
+            <input 
+              className="sp-input" 
+              placeholder="Note ordine..." 
+              value={note} 
+              onChange={(e) => setNote(e.target.value)}
+              style={{ fontSize: 12 }}
+            />
+          )}
+          {/* Sezione Cross-Selling Base */}
+          {cartLines.length > 0 && products.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 6 }}>Potrebbe interessare:</div>
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
+                {products.slice(0, 3).map(cp => (
+                  <button 
+                    key={cp.id} 
+                    className="sp-chip" 
+                    style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                    onClick={() => addToCart(cp)}
+                  >
+                    + {cp.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer with total and payment */}
+        <div className="sp-pos-cart-footer">
+          <div className="sp-pos-total-row">
+            <span className="sp-pos-total-label">Totale</span>
+            <span className="sp-pos-total-value">{fmt(cartTotal)}</span>
+          </div>
+          <div className="sp-pos-payment-btns">
+            <button 
+              className="sp-btn sp-btn-primary sp-btn-lg"
+              style={{ width: '100%', display: 'flex', justifyContent: 'center', height: 64, fontSize: 18 }}
+              onClick={() => setShowCheckoutModal(true)}
+              disabled={placingOrder || !cartLines.length}
+            >
+              Cassa e Pagamento
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showCheckoutModal && (
+        <PosCheckoutModal 
+          cartTotal={cartTotal}
+          onComplete={handleAdvancedCheckout}
+          onCancel={() => setShowCheckoutModal(false)}
+        />
       )}
 
-      {/* Sessions History */}
-      {tab === 'sessioni' && (
-        <div className="table-card">
-          <div className="table-toolbar">
-            <div className="section-title">Storico Sessioni</div>
-            <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{sessions.length} sessioni</span>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Operatore</th>
-                <th>Store</th>
-                <th>Fondo</th>
-                <th>Vendite</th>
-                <th>Incasso</th>
-                <th>Stato</th>
-                <th>Aperta</th>
-                <th>Chiusa</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.length > 0 ? sessions.map(s => (
-                <tr key={s.id}>
-                  <td className="mono">#{s.id}</td>
-                  <td style={{ fontWeight: 600, color: 'var(--text)' }}>{s.user_name || '-'}</td>
-                  <td>{s.store_name || '-'}</td>
-                  <td className="mono">{fmtCurrency(s.opening_amount)}</td>
-                  <td className="mono">{s.orders_count || 0}</td>
-                  <td className="mono positive">{fmtCurrency(s.total_revenue)}</td>
-                  <td>
-                    <span className={`badge ${s.closed_at ? 'high' : 'mid'}`}>
-                      <span className="badge-dot" />{s.closed_at ? 'Chiusa' : 'Aperta'}
-                    </span>
-                  </td>
-                  <td style={{ color: 'var(--muted2)' }}>{fmtDate(s.opened_at || s.created_at)}</td>
-                  <td style={{ color: 'var(--muted2)' }}>{fmtDate(s.closed_at)}</td>
-                </tr>
-              )) : (
-                <tr><td colSpan="9" style={{ textAlign: 'center', padding: '36px 0', color: 'var(--muted)' }}>Nessuna sessione trovata</td></tr>
+      {/* Info Prodotto Modal */}
+      {showProductInfo && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }} onClick={() => setShowProductInfo(null)}>
+          <div style={{
+            background: 'var(--color-surface)', width: '100%', maxWidth: 400,
+            borderRadius: 12, padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+          }} className="sp-animate-in" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{showProductInfo.name}</h3>
+              <button 
+                onClick={() => setShowProductInfo(null)} 
+                style={{ background: 'var(--color-bg)', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--color-text-secondary)' }}>SKU</span>
+                <span className="sp-font-mono">{showProductInfo.sku || 'N/A'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--color-text-secondary)' }}>Tipo</span>
+                <span>{showProductInfo.product_type}</span>
+              </div>
+              
+              {showProductInfo.variants?.[0] && (
+                <>
+                  <div style={{ width: '100%', height: 1, background: 'var(--color-border-light)' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Prezzo Vendita</span>
+                    <span style={{ fontWeight: 700 }}>{fmt(showProductInfo.variants[0].sale_price)}</span>
+                  </div>
+                  {showProductInfo.variants[0].flavor && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>Aroma</span>
+                      <span>{showProductInfo.variants[0].flavor}</span>
+                    </div>
+                  )}
+                  {showProductInfo.variants[0].resistance_ohm && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>Resistenza (Ohm)</span>
+                      <span>{showProductInfo.variants[0].resistance_ohm}</span>
+                    </div>
+                  )}
+                </>
               )}
-            </tbody>
-          </table>
+            </div>
+
+            <button 
+              className="sp-btn sp-btn-primary sp-btn-block" 
+              style={{ marginTop: 24 }}
+              onClick={() => { addToCart(showProductInfo); setShowProductInfo(null); }}
+            >
+              <Plus size={14} /> Aggiungi al Carrello
+            </button>
+          </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

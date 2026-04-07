@@ -30,7 +30,7 @@ class CatalogController extends Controller
         $rows = DB::table('categories')
             ->where('tenant_id', $tenantId)
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'parent_id']);
 
         return response()->json(['data' => $rows]);
     }

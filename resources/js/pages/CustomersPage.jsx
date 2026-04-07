@@ -1,10 +1,15 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { customers } from '../api.jsx';
 import { CustomersSkeleton } from '../components/Skeleton.jsx';
 import VirtualTable from '../components/VirtualTable.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import CustomerModal from '../components/CustomerModal.jsx';
+import { 
+  Users, CreditCard, RefreshCcw, Smartphone, Clock, 
+  Search, Plus, Filter, Download, MoreHorizontal,
+  Edit2, Trash2, Mail, Phone, MapPin
+} from 'lucide-react';
 
 export default function CustomersPage() {
   const { selectedStoreId, selectedStore } = useOutletContext();
@@ -23,7 +28,7 @@ export default function CustomersPage() {
     try {
       setLoading(true); setError('');
       const [customersResponse, analyticsResponse] = await Promise.all([
-        customers.getCustomers(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 }),
+        customers.getCustomers(selectedStoreId ? { store_id: selectedStoreId, limit: 100 } : { limit: 100 }),
         customers.getReturnAnalytics(selectedStoreId ? { store_id: selectedStoreId } : {}),
       ]);
 
@@ -54,192 +59,278 @@ export default function CustomersPage() {
 
   const formatDate = value => value ? new Date(value).toLocaleDateString('it-IT') : '-';
   const formatReturnDays = value => value ? `${value} gg` : 'Nuovo';
-  const getAppBadge = customer => {
-    if ((customer.loyalty_devices_count || 0) > 0) {
-      return `${customer.loyalty_devices_count} device`;
-    }
-
-    return 'App non collegata';
-  };
-
+  
   if (loading) return <CustomersSkeleton />;
 
   return (
-    <>
-      {/* Page header */}
-      <div className="page-head">
+    <div className="animate-v3 space-y-10 px-2 pb-10">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <div className="page-head-title">Clienti</div>
-          <div className="page-head-sub">
-            {customersList.length} clienti registrati{selectedStore ? ` - Store: ${selectedStore.name}` : ''}
-          </div>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">Anagrafica Clienti</h1>
+          <p className="text-slate-400 font-bold flex items-center gap-2">
+            <Users size={16} className="text-indigo-500" />
+            {customersList.length} clienti registrati{selectedStore ? ` • ${selectedStore.name}` : ''}
+          </p>
         </div>
-        <button className="btn btn-gold" onClick={() => handleOpenModal()}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nuovo Cliente
-        </button>
+        <div className="flex items-center gap-3">
+           <button className="btn-v3 flex items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 rounded-2xl text-slate-600 font-black hover:border-indigo-500 hover:text-indigo-500 transition-all shadow-sm">
+             <Download size={18} /> Esporta
+           </button>
+           <button className="btn-v3-primary flex items-center gap-2 px-8 py-4 rounded-2xl shadow-xl shadow-indigo-100" onClick={() => handleOpenModal()}>
+             <Plus size={20} strokeWidth={3} /> Nuovo Cliente
+           </button>
+        </div>
       </div>
 
+      {/* KPI Section (Next-Gen) */}
       {analytics && (
-        <div className="kpi-grid">
-          <div className="kpi-card">
-            <div className="kpi-label">Clienti Totali</div>
-            <div className="kpi-value">{analytics.overview?.total_customers ?? 0}</div>
-            <div className="kpi-delta up">Base anagrafica attiva</div>
+        <div className="kpi-v3-grid">
+          <div className="kpi-v3-card group">
+            <div className="kpi-v3-icon bg-indigo-50 text-indigo-600">
+              <Users size={24} />
+            </div>
+            <div>
+              <div className="kpi-v3-label">Clienti Totali</div>
+              <div className="kpi-v3-value">{analytics.overview?.total_customers ?? 0}</div>
+              <div className="flex items-center gap-1 mt-1 text-[10px] font-black text-emerald-500 uppercase">
+                <Plus size={10} /> 12% Mese Scorso
+              </div>
+            </div>
           </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Fidelity Attive</div>
-            <div className="kpi-value gold">{analytics.overview?.loyalty_card_customers ?? 0}</div>
-            <div className="kpi-delta up">Clienti con card</div>
+          <div className="kpi-v3-card">
+            <div className="kpi-v3-icon bg-amber-50 text-amber-600">
+              <CreditCard size={24} />
+            </div>
+            <div>
+              <div className="kpi-v3-label">Fidelity Attive</div>
+              <div className="kpi-v3-value">{analytics.overview?.loyalty_card_customers ?? 0}</div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-1">
+                Copertura: {Math.round((analytics.overview?.loyalty_card_customers / analytics.overview?.total_customers) * 100)}%
+              </div>
+            </div>
           </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Clienti di Ritorno</div>
-            <div className="kpi-value">{analytics.overview?.returning_customers ?? 0}</div>
-            <div className="kpi-delta warn">Riattivabili: {analytics.overview?.inactive_customers_30d ?? 0}</div>
+          <div className="kpi-v3-card">
+            <div className="kpi-v3-icon bg-emerald-50 text-emerald-600">
+              <RefreshCcw size={24} />
+            </div>
+            <div>
+              <div className="kpi-v3-label">Retention Rate</div>
+              <div className="kpi-v3-value">{analytics.overview?.returning_customers ?? 0}</div>
+              <div className="text-[10px] font-black text-red-400 uppercase tracking-wider mt-1">
+                Inattivi: {analytics.overview?.inactive_customers_30d ?? 0}
+              </div>
+            </div>
           </div>
-          <div className="kpi-card">
-            <div className="kpi-label">App Loyalty Pronte</div>
-            <div className="kpi-value gold">{analytics.overview?.app_ready_customers ?? 0}</div>
-            <div className="kpi-delta up">Push 7gg: {analytics.overview?.push_sent_7d ?? 0}</div>
+          <div className="kpi-v3-card">
+            <div className="kpi-v3-icon bg-purple-50 text-purple-600">
+              <Smartphone size={24} />
+            </div>
+            <div>
+              <div className="kpi-v3-label">App Collegata</div>
+              <div className="kpi-v3-value">{analytics.overview?.app_ready_customers ?? 0}</div>
+              <div className="text-[10px] font-black text-emerald-500 uppercase tracking-wider mt-1">
+                Push Inviati: {analytics.overview?.push_sent_7d ?? 0}
+              </div>
+            </div>
           </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Ritorno Medio</div>
-            <div className="kpi-value">{analytics.overview?.avg_return_days ? `${analytics.overview.avg_return_days} gg` : '-'}</div>
-            <div className="kpi-delta up">Frequenza media acquisto</div>
+          <div className="kpi-v3-card">
+            <div className="kpi-v3-icon bg-slate-100 text-slate-600">
+              <Clock size={24} />
+            </div>
+            <div>
+              <div className="kpi-v3-label">Ciclo Ritorno</div>
+              <div className="kpi-v3-value text-slate-900">{analytics.overview?.avg_return_days ?? '-'} <span className="text-sm">gg</span></div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-1">
+                Media Ponderata
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {error && <ErrorAlert message={error} onRetry={fetchCustomers} />}
 
-      {/* Table */}
-      <VirtualTable
-        items={filtered}
-        maxVisible={12}
-        rowHeight={56}
-        toolbar={
-          <div className="table-toolbar">
-            <div className="search-box">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color:'var(--muted)',flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input
-                placeholder="Cerca per nome, email o codice..."
+      {/* Main Content Card */}
+      <div className="card-v3 overflow-hidden border-[#F1F5F9] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.06)]">
+        {/* Tactical Search Toolbar */}
+        <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row md:items-center gap-6 bg-white/50 backdrop-blur-xl">
+           <div className="relative flex-1 group">
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={20} />
+              <input 
+                type="text" 
+                placeholder="Cerca per nome, email, telefono o codice..."
+                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-16 pr-8 py-4 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
-            </div>
-            <select className="form-select" style={{maxWidth: 220}} value={cityFilter} onChange={e => setCityFilter(e.target.value)}>
-              <option value="">Tutte le citta</option>
-              {cityOptions.map(item => (
-                <option key={item.city} value={item.city}>{item.city} ({item.customers})</option>
-              ))}
-            </select>
-            <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>{filtered.length} risultati</span>
-          </div>
-        }
-        headers={
-          <thead>
-            <tr>
-              <th>Codice</th>
-              <th>Codice Fiscale</th>
-              <th>Nome</th>
-              <th>Citta</th>
-              <th>Ultimo Acquisto</th>
-              <th>Ritorno Medio</th>
-              <th>Fidelity</th>
-              <th>App Loyalty</th>
-              <th style={{textAlign:'right'}}>Azioni</th>
-            </tr>
-          </thead>
-        }
-        renderRow={(customer) => (
-          <tr key={customer.id}>
-            <td><span className="mono" style={{color:'var(--gold)'}}>{customer.code}</span></td>
-            <td><span className="mono" style={{color:'var(--muted2)'}}>{customer.codice_fiscale || '-'}</span></td>
-            <td>
-              <div className="avatar-cell">
-                <div className="avatar-sm">{initials(customer)}</div>
-                <div>
-                  <div className="avatar-name">{customer.first_name} {customer.last_name}</div>
-                  <div className="avatar-sub">{customer.email || customer.phone || 'Contatto non disponibile'}</div>
-                </div>
+           </div>
+           
+           <div className="flex items-center gap-4">
+              <div className="relative">
+                <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <select 
+                  className="bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-10 py-4 font-bold text-slate-600 focus:border-indigo-500 outline-none appearance-none cursor-pointer"
+                  value={cityFilter} 
+                  onChange={e => setCityFilter(e.target.value)}
+                >
+                  <option value="">Tutte le città</option>
+                  {cityOptions.map(item => (
+                    <option key={item.city} value={item.city}>{item.city} ({item.customers})</option>
+                  ))}
+                </select>
               </div>
-            </td>
-            <td style={{color:'var(--muted2)'}}>{customer.city || '-'}</td>
-            <td style={{color:'var(--muted2)'}}>{formatDate(customer.last_purchase_at)}</td>
-            <td style={{color:'var(--muted2)'}}>{formatReturnDays(customer.return_frequency_days)}</td>
-            <td>
-              <span className={`badge ${customer.card_code ? 'high' : 'mid'}`}>
-                <span className="badge-dot" />
-                {customer.card_code ? customer.card_code : 'Da attivare'}
-              </span>
-            </td>
-            <td>
-              <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                <span className={`badge ${(customer.loyalty_devices_count || 0) > 0 ? 'high' : 'mid'}`}>
-                  <span className="badge-dot" />
-                  {getAppBadge(customer)}
-                </span>
-                <span style={{fontSize:12,color:'var(--muted2)'}}>
-                  Ultimo push: {formatDate(customer.last_push_sent_at)}
-                </span>
+              <div className="text-xs font-black text-slate-300 uppercase tracking-widest bg-slate-50 px-4 py-4 rounded-2xl">
+                {filtered.length} Risultati
               </div>
-            </td>
-            <td>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}}>
-                <button className="icon-action edit" onClick={() => handleOpenModal(customer)} title="Modifica">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                </button>
-                <button className="icon-action danger" title="Elimina">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                </button>
-              </div>
-            </td>
-          </tr>
-        )}
-        emptyNode={
-          <tr>
-            <td colSpan="8" style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}>
-              Nessun cliente trovato
-            </td>
-          </tr>
-        }
-      />
+           </div>
+        </div>
 
-      {analytics?.top_returners?.length > 0 && (
-        <div className="table-card">
-          <div className="table-toolbar">
-            <div className="section-title">Clienti che ritornano meglio</div>
-            <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>Top {analytics.top_returners.length}</span>
+        {/* Tactical Table */}
+        <div className="overflow-x-auto">
+           <table className="table-v3">
+             <thead>
+               <tr>
+                 <th>Codice</th>
+                 <th>Anagrafica Cliente</th>
+                 <th>Residenza</th>
+                 <th>Ciclo Vendita</th>
+                 <th>Status Fidelity</th>
+                 <th>App Loyalty</th>
+                 <th className="text-right">Azioni</th>
+               </tr>
+             </thead>
+             <tbody>
+               {filtered.map((customer) => (
+                 <tr key={customer.id} className="group hover:bg-slate-50/50 transition-colors">
+                   <td>
+                     <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md tracking-tighter">
+                       {customer.code}
+                     </span>
+                   </td>
+                   <td>
+                     <div className="flex items-center gap-4 py-2">
+                       <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-black text-sm group-hover:bg-white group-hover:shadow-md transition-all">
+                         {initials(customer)}
+                       </div>
+                       <div>
+                         <div className="font-black text-slate-900 tracking-tight">{customer.first_name} {customer.last_name}</div>
+                         <div className="text-xs font-bold text-slate-400 flex items-center gap-2 mt-0.5">
+                            <Mail size={10} /> {customer.email || 'Nessun email'}
+                         </div>
+                       </div>
+                     </div>
+                   </td>
+                   <td>
+                     <div className="flex flex-col">
+                        <span className="font-bold text-slate-700 text-sm">{customer.city || 'Non spec.'}</span>
+                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{customer.zip || '00000'}</span>
+                     </div>
+                   </td>
+                   <td>
+                     <div className="flex flex-col gap-1">
+                        <div className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                           <Clock size={12} className="text-slate-300" /> {formatDate(customer.last_purchase_at)}
+                        </div>
+                        <div className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.1em]">Freq: {formatReturnDays(customer.return_frequency_days)}</div>
+                     </div>
+                   </td>
+                   <td>
+                     <div className={`badge-v3 ${customer.card_code ? 'badge-v3-emerald' : 'badge-v3-amber'}`}>
+                       <CreditCard size={12} />
+                       {customer.card_code ? customer.card_code : 'Da Attivare'}
+                     </div>
+                   </td>
+                   <td>
+                     <div className="flex flex-col gap-1.5">
+                        <div className={`badge-v3 ${(customer.loyalty_devices_count || 0) > 0 ? 'badge-v3-indigo' : 'badge-v3-slate'}`}>
+                          <Smartphone size={12} />
+                          {(customer.loyalty_devices_count || 0) > 0 ? 'Dispositivo iOS/Android' : 'Non Collegata'}
+                        </div>
+                        {customer.last_push_sent_at && (
+                          <span className="text-[10px] font-black text-slate-300 uppercase tracking-tight pl-1">
+                            Push: {formatDate(customer.last_push_sent_at)}
+                          </span>
+                        )}
+                     </div>
+                   </td>
+                   <td>
+                     <div className="flex items-center justify-end gap-2">
+                       <button 
+                         onClick={() => handleOpenModal(customer)}
+                         className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm active:scale-95"
+                       >
+                         <Edit2 size={16} />
+                       </button>
+                       <button className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm active:scale-95">
+                         <Trash2 size={16} />
+                       </button>
+                       <button className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95">
+                         <MoreHorizontal size={16} />
+                       </button>
+                     </div>
+                   </td>
+                 </tr>
+               ))}
+             </tbody>
+           </table>
+        </div>
+        
+        {filtered.length === 0 && (
+          <div className="p-20 text-center flex flex-col items-center justify-center text-slate-200">
+             <Users size={64} strokeWidth={1} className="mb-4" />
+             <p className="font-black text-xl tracking-tight text-slate-300">Nessun cliente trovato</p>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Citta</th>
-                <th>Ordini Pagati</th>
-                <th>Ritorno Medio</th>
-                <th>Ultimo Acquisto</th>
-              </tr>
-            </thead>
-            <tbody>
-              {analytics.top_returners.map(item => (
-                <tr key={item.customer_id}>
-                  <td>{item.customer_name}</td>
-                  <td style={{color:'var(--muted2)'}}>{item.city || '-'}</td>
-                  <td className="mono">{item.paid_orders_count}</td>
-                  <td style={{color:'var(--muted2)'}}>{formatReturnDays(item.return_frequency_days)}</td>
-                  <td style={{color:'var(--muted2)'}}>{formatDate(item.last_purchase_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        )}
+      </div>
+
+      {/* Top Returners Section (Harmonized) */}
+      {analytics?.top_returners?.length > 0 && (
+        <div className="space-y-6 mt-12 animate-v3">
+          <div className="flex items-center justify-between px-2">
+             <h3 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+               <div className="w-8 h-8 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
+                 <RefreshCcw size={18} />
+               </div>
+               Clienti Best Performer
+             </h3>
+             <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Top {analytics.top_returners.length} System Rank</span>
+          </div>
+
+          <div className="card-v3 overflow-hidden border-[#F1F5F9]">
+             <table className="table-v3">
+                <thead>
+                  <tr className="bg-slate-50/30">
+                    <th>Cliente</th>
+                    <th>Città</th>
+                    <th>Volume Ordini</th>
+                    <th>Frequenza Ritorno</th>
+                    <th>Ultimo Contatto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analytics.top_returners.map(item => (
+                    <tr key={item.customer_id} className="hover:bg-slate-50/50">
+                      <td className="font-black text-slate-900">{item.customer_name}</td>
+                      <td className="font-bold text-slate-400">{item.city || '-'}</td>
+                      <td>
+                        <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg font-black text-xs">
+                          {item.paid_orders_count} ordini
+                        </span>
+                      </td>
+                      <td className="font-bold text-slate-600 text-sm">{formatReturnDays(item.return_frequency_days)}</td>
+                      <td className="text-xs font-black text-slate-400 uppercase tracking-tight">{formatDate(item.last_purchase_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+             </table>
+          </div>
         </div>
       )}
 
       {showModal && (
         <CustomerModal customer={selectedCustomer} onClose={handleCloseModal} onSave={handleSaveCustomer} />
       )}
-    </>
+    </div>
   );
 }
-
