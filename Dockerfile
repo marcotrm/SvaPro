@@ -1,16 +1,16 @@
 FROM php:8.3-cli
 
-# --- System deps (libsqlite3-dev serve per pdo_sqlite) ---
-RUN apt-get update && apt-get install -y \
-    unzip git curl \
-    libzip-dev libonig-dev \
-    libsqlite3-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Cache busting argument - increment to force fresh build
+ARG CACHEBUST=2
 
-# --- PHP extensions ---
-# pdo è già nel base image, non va reinstallato
-# pdo_sqlite richiede libsqlite3-dev
-RUN docker-php-ext-install pdo_sqlite zip bcmath opcache
+# --- System deps + SQLite dev headers ---
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+    unzip git curl \
+    libzip-dev \
+    libonig-dev \
+    libsqlite3-dev \
+    && docker-php-ext-install pdo_sqlite zip bcmath opcache \
+    && rm -rf /var/lib/apt/lists/*
 
 # --- Node.js 20 ---
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
@@ -27,7 +27,7 @@ COPY . .
 RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction
 
 # --- Build frontend ---
-RUN npm ci --silent && npm run build
+RUN npm ci && npm run build
 
 # --- Permessi ---
 RUN chmod +x start.sh \
