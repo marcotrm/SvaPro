@@ -1,40 +1,38 @@
-# Base: PHP 8.3 CLI (leggero, senza Apache)
 FROM php:8.3-cli
 
-# --- System dependencies ---
+# --- System deps (libsqlite3-dev serve per pdo_sqlite) ---
 RUN apt-get update && apt-get install -y \
     unzip git curl \
-    libzip-dev libonig-dev libxml2-dev \
+    libzip-dev libonig-dev \
     libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# --- PHP extensions needed by Laravel ---
-RUN docker-php-ext-install pdo pdo_sqlite zip mbstring xml bcmath opcache
+# --- PHP extensions ---
+# pdo è già nel base image, non va reinstallato
+# pdo_sqlite richiede libsqlite3-dev
+RUN docker-php-ext-install pdo_sqlite zip bcmath opcache
 
-# --- Install Node.js 20 ---
+# --- Node.js 20 ---
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Install Composer ---
+# --- Composer ---
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
-
-# --- Copy project files ---
 COPY . .
 
-# --- PHP dependencies (production, no dev) ---
+# --- PHP deps ---
 RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction
 
-# --- Frontend build ---
+# --- Build frontend ---
 RUN npm ci --silent && npm run build
 
-# --- Permissions ---
+# --- Permessi ---
 RUN chmod +x start.sh \
-    && chmod -R 775 storage bootstrap/cache \
-    && mkdir -p storage/framework/{cache,sessions,views} storage/logs
+    && mkdir -p storage/framework/{cache,sessions,views} storage/logs \
+    && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 8000
-
 CMD ["bash", "start.sh"]
