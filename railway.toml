@@ -1,6 +1,7 @@
 # Railway configuration for SvaPro
 [build]
-builder = "nixpacks"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 startCommand = "bash /app/start.sh"
