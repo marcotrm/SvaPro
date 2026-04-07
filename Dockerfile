@@ -1,13 +1,9 @@
 FROM php:8.3-cli
 
-# Cache busting argument - increment to force fresh build
-ARG CACHEBUST=2
-
 # --- System deps + SQLite dev headers ---
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     unzip git curl \
-    libzip-dev \
-    libonig-dev \
+    libzip-dev libonig-dev \
     libsqlite3-dev \
     && docker-php-ext-install pdo_sqlite zip bcmath opcache \
     && rm -rf /var/lib/apt/lists/*
@@ -29,10 +25,22 @@ RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interactio
 # --- Build frontend ---
 RUN npm ci && npm run build
 
-# --- Permessi ---
-RUN chmod +x start.sh \
-    && mkdir -p storage/framework/{cache,sessions,views} storage/logs \
-    && chmod -R 775 storage bootstrap/cache
+# --- Setup e migrate AL BUILD TIME ---
+# DB è in /app/storage/database.sqlite (NON in /app/database che è il mount del volume)
+RUN mkdir -p /app/storage/framework/{cache,sessions,views} \
+    /app/storage/logs /app/bootstrap/cache \
+    && chmod -R 777 /app/storage /app/bootstrap/cache \
+    && cp /app/.env.railway /app/.env \
+    && sed -i 's|DB_DATABASE=.*|DB_DATABASE=/app/storage/database.sqlite|g' /app/.env \
+    && touch /app/storage/database.sqlite \
+    && chmod 666 /app/storage/database.sqlite \
+    && php artisan key:generate --force \
+    && php artisan migrate --force \
+    && php artisan db:seed --force \
+    && echo "=== Build DB OK ===" \
+    && ls -la /app/storage/database.sqlite
+
+RUN chmod +x start.sh
 
 EXPOSE 8000
 CMD ["bash", "start.sh"]
