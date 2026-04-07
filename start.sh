@@ -2,17 +2,17 @@
 set -e
 
 echo "=== SvaPro Railway Startup ==="
-echo "Port: ${PORT:-8000}"
-echo "Working dir: $(pwd)"
+echo "PORT: ${PORT:-8000}"
+echo "DB_DATABASE: ${DB_DATABASE:-/app/database/database.sqlite}"
 
-# --- 1. Imposta path corretti ---
 APP_DIR="/app"
-# Il Volume Railway è montato in /app/database (come configurato su Railway)
 DB_PATH="${DB_DATABASE:-/app/database/database.sqlite}"
+DB_DIR="$(dirname "$DB_PATH")"
 
-# --- 2. Crea le directory necessarie ---
+# 1. Crea directory necessarie
+echo ">>> Creazione directory..."
 mkdir -p \
-    "$(dirname "$DB_PATH")" \
+    "$DB_DIR" \
     "$APP_DIR/storage/app/public" \
     "$APP_DIR/storage/framework/cache" \
     "$APP_DIR/storage/framework/sessions" \
@@ -20,50 +20,40 @@ mkdir -p \
     "$APP_DIR/storage/logs" \
     "$APP_DIR/bootstrap/cache"
 
-# --- 3. Crea il file SQLite se non esiste ---
-if [ ! -f "$DB_PATH" ]; then
-    echo ">>> Creazione database SQLite: $DB_PATH"
-    touch "$DB_PATH"
-fi
+# 2. Crea file SQLite
+echo ">>> Database path: $DB_PATH"
+touch "$DB_PATH"
+echo ">>> DB file exists: $(ls -la $DB_PATH)"
 
-# --- 4. Prepara .env dal template Railway ---
-if [ ! -f "$APP_DIR/.env" ]; then
-    echo ">>> Creazione .env da .env.railway"
-    cp "$APP_DIR/.env.railway" "$APP_DIR/.env"
-    # Imposta il path del DB corretto
-    sed -i "s|DB_DATABASE=.*|DB_DATABASE=$DB_PATH|g" "$APP_DIR/.env"
-fi
+# 3. Permessi
+chmod -R 777 "$APP_DIR/storage" "$APP_DIR/bootstrap/cache" "$DB_DIR" 2>/dev/null || true
 
-# --- 5. Genera APP_KEY se manca ---
-if ! grep -q "APP_KEY=base64:" "$APP_DIR/.env" 2>/dev/null; then
-    echo ">>> Generazione APP_KEY..."
-    php artisan key:generate --force
-fi
+# 4. Crea .env (sempre, per sicurezza)
+echo ">>> Creazione .env..."
+cp "$APP_DIR/.env.railway" "$APP_DIR/.env"
+sed -i "s|DB_DATABASE=.*|DB_DATABASE=$DB_PATH|g" "$APP_DIR/.env"
+echo ">>> DB_DATABASE in .env: $(grep DB_DATABASE $APP_DIR/.env)"
 
-# --- 6. Fix permessi ---
-chmod -R 775 \
-    "$APP_DIR/storage" \
-    "$APP_DIR/bootstrap/cache" \
-    "$APP_DIR/database" 2>/dev/null || true
-
-# --- 7. Pulizia cache e migrate ---
+# 5. Svuota cache (importante: prima di tutto)
 echo ">>> Pulizia cache..."
-php artisan config:clear --no-interaction 2>/dev/null || true
-php artisan cache:clear --no-interaction 2>/dev/null || true
+php artisan config:clear --no-interaction
+php artisan cache:clear --no-interaction
+php artisan route:clear --no-interaction
+php artisan view:clear --no-interaction
 
-echo ">>> Esecuzione migrazioni..."
-php artisan migrate --force --no-interaction 2>/dev/null || {
-    echo "WARN: migrate fallito, continuo..."
-}
+# 6. Esegui migrate con output visibile
+echo ">>> Esecuzione migrate..."
+php artisan migrate --force --no-interaction
+echo ">>> Migrate completato con successo!"
 
-# --- 8. Seed (admin + tenant setup) ---
-echo ">>> Seeding database..."
-php artisan db:seed --class=DatabaseSeeder --force --no-interaction 2>/dev/null || true
-php artisan db:seed --class=AdminUserSeeder --force --no-interaction 2>/dev/null || true
+# 7. Seed con output visibile
+echo ">>> Seeding..."
+php artisan db:seed --force --no-interaction || true
+echo ">>> Seed completato!"
 
-# --- 9. Cache config per performance ---
-echo ">>> Cache configurazione..."
-php artisan config:cache --no-interaction 2>/dev/null || true
+# 8. Config cache finale
+echo ">>> Cache config..."
+php artisan config:cache --no-interaction
 
 echo "=== Avvio server su 0.0.0.0:${PORT:-8000} ==="
 exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"
