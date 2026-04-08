@@ -287,6 +287,13 @@ export default function PosPage() {
                 className="sp-pos-product-card"
                 onClick={() => addToCart(product)}
               >
+                {/* Foto prodotto */}
+                {product.image_url && (
+                  <div style={{ width: '100%', height: 72, borderRadius: '8px 8px 0 0', overflow: 'hidden', marginBottom: 6, margin: '-4px -4px 6px -4px' }}>
+                    <img src={product.image_url} alt={product.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                )}
                 <div className="sp-pos-product-name">
                   {displayMode === 'sku' ? (product.sku || product.name) : product.name}
                 </div>

@@ -282,8 +282,15 @@ class CatalogController extends Controller
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.sale_price' => ['required', 'numeric', 'min:0'],
             'variants.*.cost_price' => ['nullable', 'numeric', 'min:0'],
+            'variants.*.price_list_2' => ['nullable', 'numeric', 'min:0'],
+            'variants.*.price_list_3' => ['nullable', 'numeric', 'min:0'],
             'variants.*.pack_size' => ['nullable', 'integer', 'min:1'],
             'variants.*.flavor' => ['nullable', 'string', 'max:120'],
+            'variants.*.nicotine_strength' => ['nullable', 'numeric', 'min:0'],
+            'variants.*.volume_ml' => ['nullable', 'numeric', 'min:0'],
+            'variants.*.color' => ['nullable', 'string', 'max:80'],
+            'variants.*.barcode' => ['nullable', 'string', 'max:100'],
+            'variants.*.location' => ['nullable', 'string', 'max:120'],
             'variants.*.resistance_ohm' => ['nullable', 'string', 'max:50'],
             'variants.*.tax_class_id' => ['nullable', 'integer'],
             'variants.*.excise_profile_code' => ['nullable', 'string', 'max:50'],
@@ -391,7 +398,8 @@ class CatalogController extends Controller
 
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('products', 'public');
-            $payload['image_url'] = '/storage/' . $path;
+            $payload['image_path'] = $path;
+            $payload['image_url']  = '/storage/' . $path;
         } elseif ($request->exists('image_url')) {
             $payload['image_url'] = $request->input('image_url');
         }
@@ -419,9 +427,16 @@ class CatalogController extends Controller
                     'product_id' => $productId,
                     'flavor' => $variant['flavor'] ?? null,
                     'resistance_ohm' => $variant['resistance_ohm'] ?? null,
+                    'nicotine_strength' => $variant['nicotine_strength'] ?? null,
+                    'volume_ml' => isset($variant['volume_ml']) && $variant['volume_ml'] !== '' ? (float) $variant['volume_ml'] : null,
+                    'color' => $variant['color'] ?? null,
+                    'barcode' => $variant['barcode'] ?? null,
+                    'location' => $variant['location'] ?? null,
                     'pack_size' => (int) ($variant['pack_size'] ?? 1),
-                    'cost_price' => (float) ($variant['cost_price'] ?? 0),
+                    'cost_price' => isset($variant['cost_price']) && $variant['cost_price'] !== '' ? (float) $variant['cost_price'] : 0,
                     'sale_price' => (float) $variant['sale_price'],
+                    'price_list_2' => isset($variant['price_list_2']) && $variant['price_list_2'] !== '' ? (float) $variant['price_list_2'] : null,
+                    'price_list_3' => isset($variant['price_list_3']) && $variant['price_list_3'] !== '' ? (float) $variant['price_list_3'] : null,
                     'tax_class_id' => $variant['tax_class_id'] ?? null,
                     'excise_profile_code' => $variant['excise_profile_code'] ?? null,
                     'excise_unit_amount_override' => $variant['excise_unit_amount_override'] ?? null,
@@ -467,6 +482,36 @@ class CatalogController extends Controller
 
                 if ($variantStoreRows !== []) {
                     DB::table('store_product_variants')->insert($variantStoreRows);
+                }
+
+                // Auto-crea inventory_stock con on_hand=0 per nuove varianti
+                // così il prodotto appare subito in magazzino
+                if (!$existingVariantId) {
+                    $defaultWarehouse = DB::table('warehouses')
+                        ->where('tenant_id', $tenantId)
+                        ->orderBy('id')
+                        ->value('id');
+
+                    if ($defaultWarehouse) {
+                        $alreadyExists = DB::table('inventory_stock')
+                            ->where('tenant_id', $tenantId)
+                            ->where('product_variant_id', $variantId)
+                            ->where('warehouse_id', $defaultWarehouse)
+                            ->exists();
+
+                        if (!$alreadyExists) {
+                            DB::table('inventory_stock')->insert([
+                                'tenant_id'          => $tenantId,
+                                'warehouse_id'       => $defaultWarehouse,
+                                'product_variant_id' => $variantId,
+                                'on_hand'            => 0,
+                                'reserved'           => 0,
+                                'on_order'           => 0,
+                                'created_at'         => $now,
+                                'updated_at'         => $now,
+                            ]);
+                        }
+                    }
                 }
             }
 

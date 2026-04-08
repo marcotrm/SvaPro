@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { catalog, suppliers } from '../api.jsx';
+import { catalog, suppliers, inventory } from '../api.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
-import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3 } from 'lucide-react';
+import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, PackagePlus } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 export default function CatalogPage() {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function CatalogPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [suppliersList, setSuppliersList] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [stockPopover, setStockPopover] = useState(null); // { productId, variantId, qty: '' }
 
   useEffect(() => { fetchData(); }, [selectedStoreId]);
 
@@ -50,6 +52,18 @@ export default function CatalogPage() {
   const outOfStockCount = products.filter(p => (p.variants?.[0]?.stock_quantity ?? 0) <= 0).length;
 
   const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+
+  const handleQuickStock = async (variantId, qty) => {
+    if (!qty || isNaN(parseInt(qty)) || parseInt(qty) === 0) return;
+    try {
+      await inventory.adjustStock({ product_variant_id: variantId, delta: parseInt(qty), reason: 'Rettifica manuale da catalogo' });
+      toast.success(`Quantità aggiornata (+${qty})`);
+      setStockPopover(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Errore aggiornamento stock');
+    }
+  };
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
@@ -145,7 +159,17 @@ export default function CatalogPage() {
 
               return (
                 <tr key={product.id}>
-                  <td className="sp-cell-primary">{product.name}</td>
+                  <td className="sp-cell-primary" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {product.image_url ? (
+                      <img src={product.image_url} alt={product.name}
+                        style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)' }} />
+                    ) : (
+                      <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--color-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid var(--color-border)' }}>
+                        <Package size={16} style={{ opacity: 0.3 }} />
+                      </div>
+                    )}
+                    <span>{product.name}</span>
+                  </td>
                   <td className="sp-cell-secondary sp-font-mono">{product.sku || '—'}</td>
                   <td>
                     {category ? (
@@ -175,12 +199,46 @@ export default function CatalogPage() {
                     )}
                   </td>
                   <td>
-                    <button 
-                      className="sp-btn sp-btn-ghost sp-btn-sm"
-                      onClick={() => { setSelectedProduct(product); setShowModal(true); }}
-                    >
-                      <Edit3 size={14} />
-                    </button>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', position: 'relative' }}>
+                      <button 
+                        className="sp-btn sp-btn-ghost sp-btn-sm"
+                        onClick={() => { setSelectedProduct(product); setShowModal(true); }}
+                        title="Modifica prodotto"
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      {/* Quick stock button */}
+                      <button
+                        className="sp-btn sp-btn-ghost sp-btn-sm"
+                        title="Aggiungi quantità"
+                        onClick={() => setStockPopover(stockPopover?.variantId === variant?.id ? null : { variantId: variant?.id, productName: product.name, qty: '' })}
+                      >
+                        <PackagePlus size={14} />
+                      </button>
+                      {/* Popover stock */}
+                      {stockPopover?.variantId === variant?.id && (
+                        <div style={{
+                          position: 'absolute', right: 0, top: '100%', zIndex: 100, marginTop: 4,
+                          background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                          borderRadius: 12, padding: 14, boxShadow: 'var(--shadow-md)', minWidth: 200,
+                        }}>
+                          <p style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--color-text)' }}>Aggiungi pezzi a magazzino</p>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <input
+                              autoFocus
+                              type="number" min="1"
+                              className="sp-input"
+                              style={{ fontSize: 13, width: 80 }}
+                              placeholder="Q.tà"
+                              value={stockPopover.qty}
+                              onChange={e => setStockPopover(p => ({ ...p, qty: e.target.value }))}
+                              onKeyDown={e => { if (e.key === 'Enter') handleQuickStock(variant.id, stockPopover.qty); if (e.key === 'Escape') setStockPopover(null); }}
+                            />
+                            <button className="sp-btn sp-btn-primary sp-btn-sm" onClick={() => handleQuickStock(variant.id, stockPopover.qty)}>OK</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

@@ -8,8 +8,12 @@ function ProductImageUpload({ currentImageUrl, onFileChange }) {
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef();
 
+  // Aggiorna preview se arriva un prodotto esistente con foto
+  useEffect(() => { setPreview(currentImageUrl || null); }, [currentImageUrl]);
+
   const handleFile = (file) => {
     if (!file || !file.type.startsWith('image/')) return;
+    if (file.size > 2 * 1024 * 1024) { alert('Foto troppo grande. Massimo 2MB.'); return; }
     const url = URL.createObjectURL(file);
     setPreview(url);
     onFileChange(file);
@@ -20,7 +24,8 @@ function ProductImageUpload({ currentImageUrl, onFileChange }) {
     handleFile(e.dataTransfer.files[0]);
   };
 
-  const handleRemove = () => {
+  const handleRemove = (e) => {
+    e.stopPropagation();
     setPreview(null);
     onFileChange(null);
     if (inputRef.current) inputRef.current.value = '';
@@ -31,17 +36,22 @@ function ProductImageUpload({ currentImageUrl, onFileChange }) {
       <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }}
         onChange={e => handleFile(e.target.files[0])} />
       {preview ? (
-        <div style={{ position: 'relative', display: 'inline-block' }}>
-          <img src={preview} alt="Anteprima prodotto"
-            style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 12, border: '1px solid var(--color-border)' }} />
-          <button type="button" onClick={handleRemove}
-            style={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24, borderRadius: '50%', background: 'var(--color-error)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ×
-          </button>
-          <button type="button" onClick={() => inputRef.current?.click()}
-            style={{ display: 'block', marginTop: 6, fontSize: 11, color: 'var(--color-accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
-            Cambia foto
-          </button>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <img src={preview} alt="Anteprima prodotto"
+              style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 12, border: '2px solid var(--color-border)', display: 'block' }} />
+            <button type="button" onClick={handleRemove}
+              style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%', background: '#EF4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+              ×
+            </button>
+          </div>
+          <div style={{ paddingTop: 8 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>Foto caricata ✓</p>
+            <button type="button" onClick={() => inputRef.current?.click()}
+              style={{ fontSize: 12, color: 'var(--color-accent)', background: 'none', border: '1px solid var(--color-accent)', borderRadius: 8, padding: '4px 12px', cursor: 'pointer' }}>
+              Cambia foto
+            </button>
+          </div>
         </div>
       ) : (
         <div
@@ -49,12 +59,14 @@ function ProductImageUpload({ currentImageUrl, onFileChange }) {
           onClick={() => inputRef.current?.click()}
           style={{
             border: `2px dashed ${dragging ? 'var(--color-accent)' : 'var(--color-border)'}`,
-            borderRadius: 12, padding: '24px 16px', textAlign: 'center', cursor: 'pointer',
-            background: dragging ? 'rgba(155,143,212,0.05)' : 'var(--color-bg)', transition: 'all 0.15s',
+            borderRadius: 12, padding: '20px 16px', textAlign: 'center', cursor: 'pointer',
+            background: dragging ? 'rgba(155,143,212,0.08)' : 'var(--color-bg)',
+            transition: 'all 0.15s', minHeight: 100, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: 6,
           }}>
-          <ImageIcon size={28} style={{ color: 'var(--color-text-tertiary)', marginBottom: 8 }} />
+          <ImageIcon size={28} style={{ color: 'var(--color-text-tertiary)' }} />
           <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: 0 }}>Trascina una foto o <span style={{ color: 'var(--color-accent)', fontWeight: 600 }}>clicca per caricare</span></p>
-          <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>PNG, JPG, WebP — max 2MB</p>
+          <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: 0 }}>PNG, JPG, WebP — max 2MB</p>
         </div>
       )}
     </div>
@@ -73,6 +85,8 @@ const TAX_CLASSES = [
 const createEmptyVariant = () => ({
   sale_price: '',
   cost_price: '',
+  price_list_2: '',
+  price_list_3: '',
   pack_size: 1,
   flavor: '',
   resistance_ohm: '',
@@ -92,6 +106,8 @@ const normalizeVariant = (v = {}) => ({
   id: v.id,
   sale_price: v.sale_price ?? '',
   cost_price: v.cost_price ?? '',
+  price_list_2: v.price_list_2 ?? '',
+  price_list_3: v.price_list_3 ?? '',
   pack_size: v.pack_size ?? 1,
   flavor: v.flavor ?? '',
   resistance_ohm: v.resistance_ohm ?? '',
@@ -217,15 +233,35 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
       const serverErrors = err.response?.data?.errors;
       if (serverErrors) {
         setFieldErrors(serverErrors);
-        const msgs = Object.values(serverErrors).flat().join(' | ');
-        setError('Controlla i campi: ' + msgs);
+        // Vai sul tab con il primo errore
+        const firstKey = Object.keys(serverErrors)[0];
+        if (firstKey?.startsWith('variants')) setActiveTab('variants');
+        else setActiveTab('info');
+        setError('Controlla i campi evidenziati in rosso.');
       } else {
-        setError(err.response?.data?.message || err.userFriendlyMessage || err.message || 'Errore salvataggio');
+        setError(err.response?.data?.message || err.message || 'Errore salvataggio');
       }
     } finally {
       setLoading(false);
     }
   };
+
+  // Helper: errore per campo prodotto
+  const fe = (field) => {
+    const e = fieldErrors[field];
+    return Array.isArray(e) ? e[0] : e || null;
+  };
+
+  // Helper: stile input con errore
+  const inputStyle = (field) => fe(field) ? { borderColor: 'var(--color-error)', boxShadow: '0 0 0 2px rgba(239,68,68,0.15)' } : {};
+
+  // Helper: errore per variante
+  const fv = (idx, field) => {
+    const k = `variants.${idx}.${field}`;
+    const e = fieldErrors[k];
+    return Array.isArray(e) ? e[0] : e || null;
+  };
+  const inputStyleV = (idx, field) => fv(idx, field) ? { borderColor: 'var(--color-error)', boxShadow: '0 0 0 2px rgba(239,68,68,0.15)' } : {};
 
 
   // Categorie padre (senza parent_id)
@@ -330,11 +366,13 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               <div style={{ gridColumn: '1/-1' }}>
                 <label className="sp-label">Nome Prodotto *</label>
-                <input className="sp-input" name="name" value={formData.name} onChange={handleChange} required placeholder="Es: Liquido 10ml Menta Ghiaccio" />
+                <input className="sp-input" name="name" value={formData.name} onChange={handleChange} required placeholder="Es: Liquido 10ml Menta Ghiaccio" style={inputStyle('name')} />
+                {fe('name') && <p style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 4 }}>{fe('name')}</p>}
               </div>
               <div>
                 <label className="sp-label">SKU Master *</label>
-                <input className="sp-input" name="sku" value={formData.sku} onChange={handleChange} required placeholder="Es: LIQ-MENTA-10ML" />
+                <input className="sp-input" name="sku" value={formData.sku} onChange={handleChange} required placeholder="Es: LIQ-MENTA-10ML" style={inputStyle('sku')} />
+                {fe('sku') && <p style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 4 }}>{fe('sku')}</p>}
               </div>
               <div>
                 <label className="sp-label">Barcode Prodotto (EAN / GTIN)</label>
@@ -463,8 +501,23 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                       <input className="sp-input" type="number" min="1" value={v.pack_size} onChange={e => handleVariantChange(idx, 'pack_size', e.target.value)} />
                     </div>
                     <div>
-                      <label className="sp-label">Prezzo Vendita (€) *</label>
-                      <input className="sp-input" type="number" step="0.01" value={v.sale_price} onChange={e => handleVariantChange(idx, 'sale_price', e.target.value)} placeholder="0.00" style={{ fontWeight: 700 }} />
+                      <label className="sp-label">💰 Listino 1 — Prezzo Vendita (€) *</label>
+                      <input className="sp-input" type="number" step="0.01" value={v.sale_price}
+                        onChange={e => handleVariantChange(idx, 'sale_price', e.target.value)}
+                        placeholder="0.00" style={{ fontWeight: 700, ...inputStyleV(idx, 'sale_price') }} />
+                      {fv(idx, 'sale_price') && <p style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{fv(idx, 'sale_price')}</p>}
+                    </div>
+                    <div>
+                      <label className="sp-label">💰 Listino 2 (es. Ingrosso) (€)</label>
+                      <input className="sp-input" type="number" step="0.01" value={v.price_list_2}
+                        onChange={e => handleVariantChange(idx, 'price_list_2', e.target.value)}
+                        placeholder="0.00" />
+                    </div>
+                    <div>
+                      <label className="sp-label">💰 Listino 3 (es. Promo/Staff) (€)</label>
+                      <input className="sp-input" type="number" step="0.01" value={v.price_list_3}
+                        onChange={e => handleVariantChange(idx, 'price_list_3', e.target.value)}
+                        placeholder="0.00" />
                     </div>
                     <div>
                       <label className="sp-label">Costo (€)</label>
