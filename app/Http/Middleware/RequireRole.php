@@ -12,7 +12,7 @@ class RequireRole
     /**
      * Handle an incoming request.
      */
-    public function handle(Request $request, Closure $next, string $rolesCsv): Response
+    public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         $user = $request->user();
 
@@ -20,7 +20,15 @@ class RequireRole
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        $requiredRoles = array_map('trim', explode(',', $rolesCsv));
+        // Support both comma-separated and variadic args
+        $requiredRoles = [];
+        foreach ($roles as $r) {
+            foreach (array_map('trim', explode(',', $r)) as $role) {
+                if ($role !== '') {
+                    $requiredRoles[] = $role;
+                }
+            }
+        }
 
         $userRoles = DB::table('user_roles')
             ->join('roles', 'roles.id', '=', 'user_roles.role_id')

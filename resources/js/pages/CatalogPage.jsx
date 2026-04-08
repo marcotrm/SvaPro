@@ -194,10 +194,11 @@ export default function CatalogPage() {
       {showModal && (
         <CatalogModal
           product={selectedProduct}
+          storesList={[]}
           categories={categories}
           suppliers={suppliersList}
           onClose={() => { setShowModal(false); setSelectedProduct(null); }}
-          onSaved={() => { setShowModal(false); setSelectedProduct(null); fetchData(); }}
+          onSave={() => { setShowModal(false); setSelectedProduct(null); fetchData(); }}
         />
       )}
     </div>

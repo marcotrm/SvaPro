@@ -26,6 +26,7 @@ export default function OrderModal({ order, selectedStoreId = '', onClose, onSav
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [options, setOptions] = useState({
     customers: [],
@@ -138,6 +139,7 @@ export default function OrderModal({ order, selectedStoreId = '', onClose, onSav
       setLoading(true);
       setError('');
       setSuccessMessage('');
+      setFieldErrors({});
 
       const payload = buildPayload();
 
@@ -160,7 +162,13 @@ export default function OrderModal({ order, selectedStoreId = '', onClose, onSav
 
       await onSave();
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Errore creazione ordine');
+      const serverErrors = err.response?.data?.errors;
+      if (serverErrors) {
+        setFieldErrors(serverErrors);
+        setError('Controlla i campi: ' + Object.values(serverErrors).flat().join(' | '));
+      } else {
+        setError(err.response?.data?.message || err.userFriendlyMessage || err.message || 'Errore creazione ordine');
+      }
     } finally {
       setLoading(false);
     }

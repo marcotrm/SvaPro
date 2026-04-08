@@ -73,7 +73,12 @@ export default function InventoryMovementModal({ stock = [], onClose, onSaved })
 
       onSaved();
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      const serverErrors = err.response?.data?.errors;
+      if (serverErrors) {
+        setError('Errore validazione: ' + Object.values(serverErrors).flat().join(' | '));
+      } else {
+        setError(err.response?.data?.message || err.userFriendlyMessage || err.message || 'Errore sconosciuto.');
+      }
     } finally {
       setLoading(false);
     }

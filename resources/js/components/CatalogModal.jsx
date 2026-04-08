@@ -84,11 +84,13 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
   const [formData, setFormData] = useState(() => normalizeProduct(product, storesList, selectedStoreId));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [activeTab, setActiveTab] = useState('info'); // 'info' | 'variants' | 'fiscal' | 'inventory'
 
   useEffect(() => {
     setFormData(normalizeProduct(product, storesList, selectedStoreId));
-  }, [product, storesList, selectedStoreId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id, selectedStoreId]); // deliberately exclude storesList to avoid infinite loop when parent passes a new [] literal each render
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -110,18 +112,29 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
     try {
       setLoading(true);
       setError('');
+      setFieldErrors({});
       const fd = new FormData();
+
+      const appendValue = (fd, key, value) => {
+        if (value === null || value === undefined || value === '') return;
+        if (typeof value === 'boolean') {
+          fd.append(key, value ? '1' : '0');
+        } else {
+          fd.append(key, value);
+        }
+      };
+
       Object.entries(formData).forEach(([k, v]) => {
         if (k === 'variants') {
           v.forEach((variant, index) => {
             Object.entries(variant).forEach(([vk, vv]) => {
-              if (vv !== null && vv !== '') fd.append(`variants[${index}][${vk}]`, vv);
+              appendValue(fd, `variants[${index}][${vk}]`, vv);
             });
           });
         } else if (k === 'store_ids') {
           v.forEach(id => fd.append('store_ids[]', id));
-        } else if (v !== null && v !== '') {
-          fd.append(k, v);
+        } else {
+          appendValue(fd, k, v);
         }
       });
 
@@ -133,11 +146,19 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
       }
       onSave();
     } catch (err) {
-      setError(err.response?.data?.message || JSON.stringify(err.response?.data?.errors) || 'Errore salvataggio');
+      const serverErrors = err.response?.data?.errors;
+      if (serverErrors) {
+        setFieldErrors(serverErrors);
+        const msgs = Object.values(serverErrors).flat().join(' | ');
+        setError('Controlla i campi: ' + msgs);
+      } else {
+        setError(err.response?.data?.message || err.userFriendlyMessage || err.message || 'Errore salvataggio');
+      }
     } finally {
       setLoading(false);
     }
   };
+
 
   const categoryOptions = useMemo(() => {
     const mains = categories.filter(c => !c.parent_id);

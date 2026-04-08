@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { X, Loader } from 'lucide-react';
+import { X, Loader, Shield } from 'lucide-react';
 import { employees } from '../api.jsx';
+
+const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition";
+const labelClass = "block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide";
 
 export default function EmployeeModal({ employee, storesList = [], selectedStoreId = '', onClose, onSave }) {
   const [formData, setFormData] = useState({
@@ -12,6 +15,7 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   useEffect(() => {
     setFormData({
@@ -21,11 +25,14 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       hire_date: employee?.hire_date || '',
       status: employee?.status || 'active',
     });
+    setFieldErrors({});
+    setError('');
   }, [employee, selectedStoreId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (fieldErrors[name]) setFieldErrors(prev => ({ ...prev, [name]: null }));
   };
 
   const handleSubmit = async (e) => {
@@ -33,7 +40,8 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
     try {
       setLoading(true);
       setError('');
-      
+      setFieldErrors({});
+
       if (employee?.id) {
         await employees.updateEmployee(employee.id, formData);
       } else {
@@ -41,38 +49,47 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       }
       onSave();
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      const serverErrors = err.response?.data?.errors;
+      if (serverErrors) {
+        setFieldErrors(serverErrors);
+        setError('Controlla i campi evidenziati.');
+      } else {
+        setError(err.response?.data?.message || err.userFriendlyMessage || err.message || 'Errore sconosciuto.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const fe = (field) => fieldErrors[field]?.[0];
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white modal-light rounded-lg shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-900">
             {employee ? 'Modifica Dipendente' : 'Nuovo Dipendente'}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={24} />
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
+            <X size={20} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 flex items-center gap-2">
+              <Shield size={16} className="shrink-0" />
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Magazzino</label>
+            <label className={labelClass}>Store *</label>
             <select
               name="store_id"
               value={formData.store_id}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={`${inputClass} ${fe('store_id') ? 'border-red-400' : ''}`}
               required
             >
               <option value="">Seleziona store</option>
@@ -80,73 +97,76 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
                 <option key={store.id} value={store.id}>{store.name}</option>
               ))}
             </select>
+            {fe('store_id') && <p className="mt-1 text-xs text-red-500">{fe('store_id')}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+              <label className={labelClass}>Nome *</label>
               <input
                 type="text"
                 name="first_name"
                 value={formData.first_name}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`${inputClass} ${fe('first_name') ? 'border-red-400' : ''}`}
                 required
               />
+              {fe('first_name') && <p className="mt-1 text-xs text-red-500">{fe('first_name')}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cognome</label>
+              <label className={labelClass}>Cognome *</label>
               <input
                 type="text"
                 name="last_name"
                 value={formData.last_name}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`${inputClass} ${fe('last_name') ? 'border-red-400' : ''}`}
                 required
               />
+              {fe('last_name') && <p className="mt-1 text-xs text-red-500">{fe('last_name')}</p>}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Data Assunzione</label>
+            <label className={labelClass}>Data Assunzione <span className="text-gray-400 font-normal normal-case">(opzionale)</span></label>
             <input
               type="date"
               name="hire_date"
               value={formData.hire_date}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              required
+              className={`${inputClass} ${fe('hire_date') ? 'border-red-400' : ''}`}
             />
+            {fe('hire_date') && <p className="mt-1 text-xs text-red-500">{fe('hire_date')}</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Stato</label>
+            <label className={labelClass}>Stato</label>
             <select
               name="status"
               value={formData.status}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={inputClass}
             >
               <option value="active">Attivo</option>
               <option value="inactive">Inattivo</option>
             </select>
           </div>
 
-          <div className="flex gap-3 justify-end pt-4">
+          <div className="flex gap-3 justify-end pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50 transition"
             >
               Annulla
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
+              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition disabled:opacity-50 shadow-sm"
             >
-              {loading && <Loader size={18} className="animate-spin" />}
-              Salva
+              {loading && <Loader size={16} className="animate-spin" />}
+              {employee ? 'Salva Modifiche' : 'Crea Dipendente'}
             </button>
           </div>
         </form>

@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
@@ -22,24 +23,64 @@ class CustomerController extends Controller
             return response()->json(['message' => 'Store non valido per il tenant.'], 422);
         }
 
-        $customers = $this->customerBaseQuery($tenantId, $storeId)
-            ->when($storeId !== null, fn ($query) => $query->whereNotNull('order_stats.customer_id'))
+        $orderStats = DB::table('sales_orders')
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'paid')
+            ->when($storeId !== null, fn ($q) => $q->where('store_id', $storeId))
+            ->whereNotNull('customer_id')
+            ->groupBy('customer_id')
+            ->selectRaw('customer_id, COUNT(*) as paid_orders_count, MAX(paid_at) as last_purchase_at, MIN(paid_at) as first_purchase_at');
+
+        $deviceStats = DB::table('loyalty_device_tokens')
+            ->where('tenant_id', $tenantId)
+            ->where('notifications_enabled', true)
+            ->groupBy('customer_id')
+            ->selectRaw('customer_id, COUNT(*) as loyalty_devices_count, MAX(last_seen_at) as loyalty_last_seen_at');
+
+        $pushStats = DB::table('loyalty_push_notifications')
+            ->where('tenant_id', $tenantId)
+            ->groupBy('customer_id')
+            ->selectRaw("customer_id, MAX(sent_at) as last_push_sent_at, SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as push_notifications_last_7d", [now()->subDays(7)]);
+
+        $query = DB::table('customers as c')
+            ->leftJoinSub($orderStats, 'order_stats', fn ($j) => $j->on('order_stats.customer_id', '=', 'c.id'))
+            ->leftJoinSub($deviceStats, 'device_stats', fn ($j) => $j->on('device_stats.customer_id', '=', 'c.id'))
+            ->leftJoinSub($pushStats, 'push_stats', fn ($j) => $j->on('push_stats.customer_id', '=', 'c.id'))
+            ->leftJoin('loyalty_cards as lc', function ($join) use ($tenantId) {
+                $join->on('lc.customer_id', '=', 'c.id')
+                    ->where('lc.tenant_id', '=', $tenantId);
+            })
+            ->where('c.tenant_id', $tenantId)
+            ->when($storeId !== null, fn ($q) => $q->whereNotNull('order_stats.customer_id'))
             ->when($request->filled('q'), function ($query) use ($request) {
                 $term = trim((string) $request->input('q'));
                 $query->where(function ($inner) use ($term) {
                     $inner->where('c.first_name', 'like', '%'.$term.'%')
                         ->orWhere('c.last_name', 'like', '%'.$term.'%')
+                        ->orWhere('c.company_name', 'like', '%'.$term.'%')
                         ->orWhere('c.email', 'like', '%'.$term.'%')
                         ->orWhere('c.code', 'like', '%'.$term.'%')
-                        ->orWhere('ca.city', 'like', '%'.$term.'%');
+                        ->orWhere('c.city', 'like', '%'.$term.'%');
                 });
             })
-            ->when($request->filled('city'), function ($query) use ($request) {
-                $query->where('ca.city', $request->input('city'));
-            })
-            ->orderByDesc('id')
-            ->limit((int) $request->input('limit', 100))
-            ->get();
+            ->when($request->filled('city'), fn ($q) => $q->where('c.city', $request->input('city')))
+            ->when($request->filled('customer_type'), fn ($q) => $q->where('c.customer_type', $request->input('customer_type')))
+            ->select([
+                'c.*',
+                'order_stats.paid_orders_count',
+                'order_stats.last_purchase_at as last_purchase_at_db',
+                'order_stats.first_purchase_at',
+                'lc.card_code',
+                'lc.status as loyalty_status',
+                'device_stats.loyalty_devices_count',
+                'device_stats.loyalty_last_seen_at',
+                'push_stats.last_push_sent_at',
+                'push_stats.push_notifications_last_7d',
+            ])
+            ->orderByDesc('c.id')
+            ->limit((int) $request->input('limit', 100));
+
+        $customers = $query->get();
 
         return response()->json(['data' => $this->hydrateCustomers($customers)]);
     }
@@ -53,9 +94,23 @@ class CustomerController extends Controller
             return response()->json(['message' => 'Store non valido per il tenant.'], 422);
         }
 
+        $orderStats = DB::table('sales_orders')
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'paid')
+            ->when($storeId !== null, fn ($q) => $q->where('store_id', $storeId))
+            ->whereNotNull('customer_id')
+            ->groupBy('customer_id')
+            ->selectRaw('customer_id, COUNT(*) as paid_orders_count, MAX(paid_at) as last_purchase_at, MIN(paid_at) as first_purchase_at');
+
         $customers = $this->hydrateCustomers(
-            $this->customerBaseQuery($tenantId, $storeId)
-                ->when($storeId !== null, fn ($query) => $query->whereNotNull('order_stats.customer_id'))
+            DB::table('customers as c')
+                ->leftJoinSub($orderStats, 'order_stats', fn ($j) => $j->on('order_stats.customer_id', '=', 'c.id'))
+                ->leftJoin('loyalty_cards as lc', function ($join) use ($tenantId) {
+                    $join->on('lc.customer_id', '=', 'c.id')->where('lc.tenant_id', '=', $tenantId);
+                })
+                ->where('c.tenant_id', $tenantId)
+                ->when($storeId !== null, fn ($q) => $q->whereNotNull('order_stats.customer_id'))
+                ->select(['c.*', 'order_stats.paid_orders_count', 'order_stats.last_purchase_at as last_purchase_at_db', 'order_stats.first_purchase_at', 'lc.card_code', 'lc.status as loyalty_status'])
                 ->get()
         );
 
@@ -127,36 +182,77 @@ class CustomerController extends Controller
     public function store(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
-        $validator = Validator::make($request->all(), [
+
+        $customerType = $request->input('customer_type', 'privato');
+
+        $rules = [
+            'customer_type' => ['nullable', 'in:privato,azienda'],
             'code' => ['nullable', 'string', 'max:50'],
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
-            'codice_fiscale' => ['nullable', 'string', 'max:16'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
-            'birth_date' => ['nullable', 'date'],
             'marketing_consent' => ['nullable', 'boolean'],
-        ]);
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'province' => ['nullable', 'string', 'max:3'],
+            'zip_code' => ['nullable', 'string', 'max:10'],
+            'country' => ['nullable', 'string', 'max:2'],
+        ];
+
+        if ($customerType === 'azienda') {
+            $rules['company_name'] = ['required', 'string', 'max:255'];
+            $rules['vat_number'] = ['nullable', 'string', 'max:30'];
+            $rules['sdi_code'] = ['nullable', 'string', 'max:10'];
+            $rules['pec_email'] = ['nullable', 'email', 'max:255'];
+            $rules['contact_person'] = ['nullable', 'string', 'max:200'];
+        } else {
+            $rules['first_name'] = ['required', 'string', 'max:100'];
+            $rules['last_name'] = ['required', 'string', 'max:100'];
+            $rules['codice_fiscale'] = ['nullable', 'string', 'max:16'];
+            $rules['birth_date'] = ['nullable', 'date'];
+        }
+
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        $isAzienda = $customerType === 'azienda';
+
         $id = DB::table('customers')->insertGetId([
             'tenant_id' => $tenantId,
-            'code' => $request->input('code'),
-            'first_name' => $request->input('first_name'),
-            'last_name' => $request->input('last_name'),
-            'codice_fiscale' => $request->input('codice_fiscale'),
+            'customer_type' => $customerType,
+            'code' => $request->input('code') ?: null,
+            'first_name' => $isAzienda ? ($request->input('contact_person') ?: '') : $request->input('first_name'),
+            'last_name' => $isAzienda ? '' : $request->input('last_name'),
+            'company_name' => $isAzienda ? $request->input('company_name') : null,
+            'vat_number' => $isAzienda ? $request->input('vat_number') : null,
+            'sdi_code' => $isAzienda ? $request->input('sdi_code') : null,
+            'pec_email' => $isAzienda ? $request->input('pec_email') : null,
+            'contact_person' => $isAzienda ? $request->input('contact_person') : null,
+            'codice_fiscale' => ! $isAzienda ? $request->input('codice_fiscale') : null,
             'email' => $request->input('email'),
             'phone' => $request->input('phone'),
-            'birth_date' => $request->input('birth_date'),
+            'birth_date' => ! $isAzienda ? $request->input('birth_date') : null,
+            'address' => $request->input('address'),
+            'city' => $request->input('city'),
+            'province' => $request->input('province'),
+            'zip_code' => $request->input('zip_code'),
+            'country' => $request->input('country', 'IT'),
             'marketing_consent' => (bool) $request->boolean('marketing_consent'),
+            'total_orders' => 0,
+            'total_spent' => 0,
+            'avg_days_between_purchases' => null,
+            'uuid' => (string) Str::uuid(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
-        AuditLogger::log($request, 'create', 'customer', $id, $request->input('first_name') . ' ' . $request->input('last_name'));
+        $displayName = $isAzienda
+            ? $request->input('company_name')
+            : $request->input('first_name').' '.$request->input('last_name');
+
+        AuditLogger::log($request, 'create', 'customer', $id, $displayName);
 
         return response()->json(['message' => 'Cliente creato.', 'customer_id' => $id], 201);
     }
@@ -167,81 +263,43 @@ class CustomerController extends Controller
 
         $old = DB::table('customers')->where('tenant_id', $tenantId)->where('id', $customerId)->first();
 
+        if (! $old) {
+            return response()->json(['message' => 'Cliente non trovato.'], 404);
+        }
+
+        $customerType = $request->input('customer_type', $old->customer_type ?? 'privato');
+        $isAzienda = $customerType === 'azienda';
+
         $updated = DB::table('customers')
             ->where('tenant_id', $tenantId)
             ->where('id', $customerId)
             ->update([
-                'first_name' => $request->input('first_name'),
-                'last_name' => $request->input('last_name'),
-                'codice_fiscale' => $request->input('codice_fiscale'),
-                'email' => $request->input('email'),
-                'phone' => $request->input('phone'),
-                'marketing_consent' => $request->has('marketing_consent') ? (bool) $request->boolean('marketing_consent') : DB::raw('marketing_consent'),
+                'customer_type' => $customerType,
+                'first_name' => $isAzienda ? ($request->input('contact_person') ?: $old->first_name) : ($request->input('first_name') ?? $old->first_name),
+                'last_name' => $isAzienda ? '' : ($request->input('last_name') ?? $old->last_name),
+                'company_name' => $isAzienda ? $request->input('company_name', $old->company_name) : null,
+                'vat_number' => $isAzienda ? $request->input('vat_number', $old->vat_number) : null,
+                'sdi_code' => $isAzienda ? $request->input('sdi_code', $old->sdi_code) : null,
+                'pec_email' => $isAzienda ? $request->input('pec_email', $old->pec_email) : null,
+                'contact_person' => $isAzienda ? $request->input('contact_person', $old->contact_person) : null,
+                'codice_fiscale' => ! $isAzienda ? $request->input('codice_fiscale', $old->codice_fiscale) : null,
+                'email' => $request->input('email', $old->email),
+                'phone' => $request->input('phone', $old->phone),
+                'birth_date' => ! $isAzienda ? $request->input('birth_date', $old->birth_date) : null,
+                'address' => $request->input('address', $old->address),
+                'city' => $request->input('city', $old->city),
+                'province' => $request->input('province', $old->province),
+                'zip_code' => $request->input('zip_code', $old->zip_code),
+                'country' => $request->input('country', $old->country ?? 'IT'),
+                'marketing_consent' => $request->has('marketing_consent')
+                    ? (bool) $request->boolean('marketing_consent')
+                    : (bool) ($old->marketing_consent ?? false),
                 'updated_at' => now(),
             ]);
 
-        if (! $updated) {
-            return response()->json(['message' => 'Cliente non trovato.'], 404);
-        }
-
-        AuditLogger::log($request, 'update', 'customer', $customerId, ($old->first_name ?? '') . ' ' . ($old->last_name ?? ''));
+        AuditLogger::log($request, 'update', 'customer', $customerId, ($old->company_name ?? $old->first_name.' '.$old->last_name));
 
         return response()->json(['message' => 'Cliente aggiornato.']);
-    }
-
-    private function customerBaseQuery(int $tenantId, ?int $storeId = null)
-    {
-        $orderStats = DB::table('sales_orders')
-            ->where('tenant_id', $tenantId)
-            ->where('status', 'paid')
-            ->when($storeId !== null, fn ($query) => $query->where('store_id', $storeId))
-            ->whereNotNull('customer_id')
-            ->groupBy('customer_id')
-            ->selectRaw('customer_id, COUNT(*) as paid_orders_count, MAX(paid_at) as last_purchase_at, MIN(paid_at) as first_purchase_at');
-
-        $deviceStats = DB::table('loyalty_device_tokens')
-            ->where('tenant_id', $tenantId)
-            ->where('notifications_enabled', true)
-            ->groupBy('customer_id')
-            ->selectRaw('customer_id, COUNT(*) as loyalty_devices_count, MAX(last_seen_at) as loyalty_last_seen_at');
-
-        $pushStats = DB::table('loyalty_push_notifications')
-            ->where('tenant_id', $tenantId)
-            ->groupBy('customer_id')
-            ->selectRaw("customer_id, MAX(sent_at) as last_push_sent_at, SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as push_notifications_last_7d", [now()->subDays(7)]);
-
-        return DB::table('customers as c')
-            ->leftJoin('customer_addresses as ca', function ($join) {
-                $join->on('ca.customer_id', '=', 'c.id')
-                    ->where('ca.is_default', true);
-            })
-            ->leftJoinSub($orderStats, 'order_stats', function ($join) {
-                $join->on('order_stats.customer_id', '=', 'c.id');
-            })
-            ->leftJoinSub($deviceStats, 'device_stats', function ($join) {
-                $join->on('device_stats.customer_id', '=', 'c.id');
-            })
-            ->leftJoinSub($pushStats, 'push_stats', function ($join) {
-                $join->on('push_stats.customer_id', '=', 'c.id');
-            })
-            ->leftJoin('loyalty_cards as lc', function ($join) use ($tenantId) {
-                $join->on('lc.customer_id', '=', 'c.id')
-                    ->where('lc.tenant_id', '=', $tenantId);
-            })
-            ->where('c.tenant_id', $tenantId)
-            ->select([
-                'c.*',
-                'ca.city',
-                'order_stats.paid_orders_count',
-                'order_stats.last_purchase_at',
-                'order_stats.first_purchase_at',
-                'lc.card_code',
-                'lc.status as loyalty_status',
-                'device_stats.loyalty_devices_count',
-                'device_stats.loyalty_last_seen_at',
-                'push_stats.last_push_sent_at',
-                'push_stats.push_notifications_last_7d',
-            ]);
     }
 
     public function sendOtp(Request $request, int $customerId): JsonResponse
@@ -289,7 +347,8 @@ class CustomerController extends Controller
             ->map(function ($customer) {
                 $paidOrdersCount = (int) ($customer->paid_orders_count ?? 0);
                 $firstPurchaseAt = $customer->first_purchase_at ? Carbon::parse($customer->first_purchase_at) : null;
-                $lastPurchaseAt = $customer->last_purchase_at ? Carbon::parse($customer->last_purchase_at) : null;
+                $lastPurchaseAtRaw = $customer->last_purchase_at_db ?? ($customer->last_purchase_at ?? null);
+                $lastPurchaseAt = $lastPurchaseAtRaw ? Carbon::parse($lastPurchaseAtRaw) : null;
 
                 $returnFrequencyDays = null;
                 if ($paidOrdersCount > 1 && $firstPurchaseAt && $lastPurchaseAt) {
@@ -297,25 +356,43 @@ class CustomerController extends Controller
                     $returnFrequencyDays = round($totalDays / ($paidOrdersCount - 1), 1);
                 }
 
+                $customerType = $customer->customer_type ?? 'privato';
+
                 return [
                     'id' => (int) $customer->id,
+                    'customer_type' => $customerType,
                     'code' => $customer->code,
+                    // Privato
                     'first_name' => $customer->first_name,
                     'last_name' => $customer->last_name,
                     'codice_fiscale' => $customer->codice_fiscale ?? null,
+                    'birth_date' => $customer->birth_date,
+                    // Azienda
+                    'company_name' => $customer->company_name ?? null,
+                    'vat_number' => $customer->vat_number ?? null,
+                    'sdi_code' => $customer->sdi_code ?? null,
+                    'pec_email' => $customer->pec_email ?? null,
+                    'contact_person' => $customer->contact_person ?? null,
+                    // Comuni
                     'email' => $customer->email,
                     'email_verified' => (bool) ($customer->email_verified ?? false),
                     'phone' => $customer->phone,
                     'phone_verified' => (bool) ($customer->phone_verified ?? false),
-                    'birth_date' => $customer->birth_date,
                     'marketing_consent' => (bool) $customer->marketing_consent,
-                    'city' => $customer->city,
+                    // Indirizzo
+                    'address' => $customer->address ?? null,
+                    'city' => $customer->city ?? null,
+                    'province' => $customer->province ?? null,
+                    'zip_code' => $customer->zip_code ?? null,
+                    'country' => $customer->country ?? 'IT',
+                    // Loyalty
                     'card_code' => $customer->card_code,
                     'loyalty_status' => $customer->loyalty_status,
                     'loyalty_devices_count' => (int) ($customer->loyalty_devices_count ?? 0),
-                    'loyalty_last_seen_at' => $customer->loyalty_last_seen_at,
-                    'last_push_sent_at' => $customer->last_push_sent_at,
+                    'loyalty_last_seen_at' => $customer->loyalty_last_seen_at ?? null,
+                    'last_push_sent_at' => $customer->last_push_sent_at ?? null,
                     'push_notifications_last_7d' => (int) ($customer->push_notifications_last_7d ?? 0),
+                    // Statistiche
                     'paid_orders_count' => $paidOrdersCount,
                     'total_orders' => (int) ($customer->total_orders ?? $paidOrdersCount),
                     'total_spent' => round((float) ($customer->total_spent ?? 0), 2),
