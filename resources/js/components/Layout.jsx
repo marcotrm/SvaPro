@@ -7,7 +7,7 @@ import {
   Users, Monitor, Truck, Settings, LogOut, Bell,
   FileText, RotateCcw, Gift, Shield, Activity, ChevronDown,
   Receipt, Star, ArrowRightLeft, MapPin, ChevronLeft, ChevronRight,
-  PanelLeftClose, PanelLeftOpen, Link, Fingerprint
+  PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store
 } from 'lucide-react';
 
 const allNavigation = [
@@ -35,6 +35,7 @@ const allNavigation = [
     { label: 'Promozioni', href: '/promotions', icon: Gift, roles: ['superadmin','admin_cliente'] },
   ]},
   { section: 'Amministrazione', items: [
+    { label: 'Negozi', href: '/stores', icon: Store, roles: ['superadmin','admin_cliente'] },
     { label: 'Dipendenti', href: '/employees', icon: Users, roles: ['superadmin','admin_cliente'] },
     { label: 'Impostazioni', href: '/settings', icon: Settings, roles: ['superadmin','admin_cliente'] },
     { label: 'Ruoli & Permessi', href: '/roles-permissions', icon: Shield, roles: ['superadmin'] },

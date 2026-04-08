@@ -446,6 +446,10 @@ export const stores = {
   getTenants: () => cachedGet('/tenants', {}, 60000, 600000),
   getTenantHealth: () => cachedGet('/tenants/health', {}, 20000, 120000),
   getStores: () => cachedGet('/stores', {}, 60000, 600000),
+  getStore: (id) => api.get(`/stores/${id}`),
+  createStore: (data) => api.post('/stores', data),
+  updateStore: (id, data) => api.put(`/stores/${id}`, data),
+  deleteStore: (id) => api.delete(`/stores/${id}`),
   getTenantSettings: () => cachedGet('/tenant-settings', {}, 30000, 300000),
   updateTenantSettings: (data) => api.put('/tenant-settings', data),
 };

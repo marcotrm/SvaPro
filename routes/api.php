@@ -51,7 +51,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/roles-permissions/toggle', [RolesPermissionsController::class, 'toggle'])->middleware('permission:roles.manage');
         Route::get('/auth/switchable-users', [AuthController::class, 'switchableUsers']);
         Route::post('/auth/impersonate', [AuthController::class, 'impersonate']);
+        // Stores CRUD
         Route::get('/stores', [StoreController::class, 'index']);
+        Route::get('/stores/{storeId}', [StoreController::class, 'show']);
+        Route::post('/stores', [StoreController::class, 'store'])->middleware('permission:stores.manage');
+        Route::put('/stores/{storeId}', [StoreController::class, 'update'])->middleware('permission:stores.manage');
+        Route::delete('/stores/{storeId}', [StoreController::class, 'destroy'])->middleware('permission:stores.manage');
         Route::get('/loyalty/monitoring/push-stats', [LoyaltyController::class, 'pushMonitoringStats']);
 
         Route::get('/catalog/products', [CatalogController::class, 'index']);
