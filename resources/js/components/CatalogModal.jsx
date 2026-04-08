@@ -1,15 +1,15 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { X, Loader, Plus, Trash2, Barcode, MapPin, Package, Tag, DollarSign, Settings2, AlertTriangle, Upload, ImageIcon } from 'lucide-react';
-import { catalog } from '../api.jsx';
+import { catalog, getImageUrl } from '../api.jsx';
 
 /* ─── Componente Upload Foto Prodotto ─────────────────────── */
 function ProductImageUpload({ currentImageUrl, onFileChange }) {
-  const [preview, setPreview] = useState(currentImageUrl || null);
+  const [preview, setPreview] = useState(currentImageUrl ? getImageUrl(currentImageUrl) : null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef();
 
   // Aggiorna preview se arriva un prodotto esistente con foto
-  useEffect(() => { setPreview(currentImageUrl || null); }, [currentImageUrl]);
+  useEffect(() => { setPreview(currentImageUrl ? getImageUrl(currentImageUrl) : null); }, [currentImageUrl]);
 
   const handleFile = (file) => {
     if (!file || !file.type.startsWith('image/')) return;

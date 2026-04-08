@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { orders as ordersApi, catalog, customers as customersApi, inventory } from '../api.jsx';
+import { orders as ordersApi, catalog, customers as customersApi, inventory, getImageUrl } from '../api.jsx';
 import { 
   Search, Plus, Minus, Trash2, CreditCard, Banknote, 
   ShoppingCart, X, User, MapPin, ChevronDown, ListRestart
@@ -290,7 +290,7 @@ export default function PosPage() {
                 {/* Foto prodotto */}
                 {product.image_url && (
                   <div style={{ width: '100%', height: 72, borderRadius: '8px 8px 0 0', overflow: 'hidden', marginBottom: 6, margin: '-4px -4px 6px -4px' }}>
-                    <img src={product.image_url} alt={product.name}
+                    <img src={getImageUrl(product.image_url)} alt={product.name}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                 )}

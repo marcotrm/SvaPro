@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { catalog, suppliers, inventory } from '../api.jsx';
+import { catalog, suppliers, inventory, stores as storesApi } from '../api.jsx';
+import { getImageUrl } from '../api.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
 import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, PackagePlus } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -17,7 +18,8 @@ export default function CatalogPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [suppliersList, setSuppliersList] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [stockPopover, setStockPopover] = useState(null); // { productId, variantId, qty: '' }
+  const [stockPopover, setStockPopover] = useState(null);
+  const [warehousesList, setWarehousesList] = useState([]);
 
   useEffect(() => { fetchData(); }, [selectedStoreId]);
 
@@ -33,6 +35,13 @@ export default function CatalogPage() {
       setProducts(pRes.data?.data || []);
       setSuppliersList(sRes.data?.data || []);
       setCategories(cRes.data?.data || []);
+      // Carica magazzini (per adjust stock)
+      try {
+        const wRes = await inventory.getStock({ limit: 1 });
+        // Recupera l'ID del primo magazzino dall'inventario esistente oppure fallback
+        const firstWarehouseId = wRes.data?.data?.[0]?.warehouse_id || null;
+        if (firstWarehouseId) setWarehousesList([{ id: firstWarehouseId }]);
+      } catch {}
     } catch (err) {
       setError(err.message || 'Errore caricamento dati');
     } finally { setLoading(false); }
@@ -54,14 +63,30 @@ export default function CatalogPage() {
   const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
   const handleQuickStock = async (variantId, qty) => {
-    if (!qty || isNaN(parseInt(qty)) || parseInt(qty) === 0) return;
+    if (!qty || isNaN(parseInt(qty)) || parseInt(qty) === 0) {
+      toast.error('Inserisci una quantità valida');
+      return;
+    }
+    const warehouseId = warehousesList[0]?.id;
+    if (!warehouseId) {
+      toast.error('Nessun magazzino configurato. Vai in Magazzino per crearne uno.');
+      return;
+    }
     try {
-      await inventory.adjustStock({ product_variant_id: variantId, delta: parseInt(qty), reason: 'Rettifica manuale da catalogo' });
+      await inventory.adjustStock({
+        warehouse_id: warehouseId,
+        product_variant_id: variantId,
+        qty: parseInt(qty),
+        movement_type: 'adjustment',
+      });
       toast.success(`Quantità aggiornata (+${qty})`);
       setStockPopover(null);
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Errore aggiornamento stock');
+      const msgs = err.response?.data?.errors
+        ? Object.values(err.response.data.errors).flat().join(' • ')
+        : err.response?.data?.message || 'Errore aggiornamento stock';
+      toast.error(msgs);
     }
   };
 
@@ -161,7 +186,7 @@ export default function CatalogPage() {
                 <tr key={product.id}>
                   <td className="sp-cell-primary" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {product.image_url ? (
-                      <img src={product.image_url} alt={product.name}
+                      <img src={getImageUrl(product.image_url)} alt={product.name}
                         style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)' }} />
                     ) : (
                       <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--color-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid var(--color-border)' }}>

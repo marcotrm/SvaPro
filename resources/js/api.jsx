@@ -4,6 +4,14 @@ import axios from 'axios';
 const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
 export const API_URL = configuredApiUrl || '/api';
 
+// Risolve i path /storage/... con l'URL base del backend (Railway ha backend e frontend separati)
+export const BACKEND_URL = configuredApiUrl ? configuredApiUrl.replace('/api', '').replace(/\/$/, '') : '';
+export const getImageUrl = (path) => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  return BACKEND_URL ? `${BACKEND_URL}${path}` : path;
+};
+
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_URL,
