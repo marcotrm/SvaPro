@@ -264,7 +264,7 @@ class CatalogController extends Controller
         return [
             'sku' => ['required', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
-            'product_type' => ['required', 'string', 'max:50'],
+            'product_type' => ['nullable', 'string', 'max:50'],
             'pli_code' => ['nullable', 'string', 'max:50'],
             'barcode' => ['nullable', 'string', 'max:100'],
             'image' => ['nullable', 'image', 'max:2048'],
@@ -375,7 +375,7 @@ class CatalogController extends Controller
             'sku' => (string) $request->input('sku'),
             'barcode' => $request->input('barcode'),
             'name' => (string) $request->input('name'),
-            'product_type' => (string) $request->input('product_type'),
+            'product_type' => (string) ($request->input('product_type') ?: 'other'),
             'pli_code' => $request->input('pli_code'),
             'brand_id' => $request->input('brand_id'),
             'category_id' => $request->input('category_id'),

@@ -2,13 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { X, Loader, Plus, Trash2, Barcode, MapPin, Package, Tag, DollarSign, Settings2, AlertTriangle } from 'lucide-react';
 import { catalog } from '../api.jsx';
 
-const PRODUCT_TYPES = [
-  { value: 'liquid', label: '💧 Liquido' },
-  { value: 'device', label: '🔋 Device/Hardware' },
-  { value: 'accessory', label: '🔌 Accessorio' },
-  { value: 'consumable', label: '🔄 Consumabile (Coil/Cotton)' },
-  { value: 'other', label: '📦 Altro' },
-];
+// product_type viene derivato automaticamente dalla categoria, non esposto all'utente
 
 const TAX_CLASSES = [
   { value: '', label: 'Seleziona IVA...' },
@@ -64,8 +58,9 @@ const normalizeProduct = (product, storesList, selectedStoreId = '') => {
   return {
     sku: product?.sku || '',
     name: product?.name || '',
-    product_type: product?.product_type || 'liquid',
+    product_type: product?.product_type || 'other',
     category_id: product?.category_id ?? '',
+    subcategory_id: '',
     barcode: product?.barcode || '',
     pli_code: product?.pli_code || '',
     default_supplier_id: product?.default_supplier_id ?? '',
@@ -125,6 +120,14 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
       };
 
       Object.entries(formData).forEach(([k, v]) => {
+        // subcategory_id non è un campo backend: lo usiamo per sovrascrivere category_id se valorizzato
+        if (k === 'subcategory_id') return;
+        if (k === 'category_id') {
+          // Se l'utente ha scelto una sottocategoria, quella vince
+          const finalCatId = formData.subcategory_id || v;
+          appendValue(fd, 'category_id', finalCatId);
+          return;
+        }
         if (k === 'variants') {
           v.forEach((variant, index) => {
             Object.entries(variant).forEach(([vk, vv]) => {
@@ -160,17 +163,35 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
   };
 
 
-  const categoryOptions = useMemo(() => {
-    const mains = categories.filter(c => !c.parent_id);
-    const options = [];
-    mains.forEach(m => {
-      options.push(m);
-      categories.filter(c => c.parent_id === m.id).forEach(s => {
-        options.push({ ...s, name: `└─ ${s.name}` });
-      });
-    });
-    return options;
-  }, [categories]);
+  // Categorie padre (senza parent_id)
+  const parentCategories = useMemo(() => categories.filter(c => !c.parent_id), [categories]);
+
+  // Sottocategorie filtrate in base alla categoria padre selezionata
+  const subCategories = useMemo(() => {
+    if (!formData.category_id) return [];
+    return categories.filter(c => c.parent_id === Number(formData.category_id));
+  }, [categories, formData.category_id]);
+
+  // Quando l'utente cambia la categoria padre, resetta la sottocategoria
+  const handleCategoryChange = (e) => {
+    const catId = e.target.value;
+    // Deriva product_type dal nome della categoria (fallback 'other')
+    const cat = categories.find(c => String(c.id) === String(catId));
+    const derivedType = cat
+      ? (cat.name.toLowerCase().includes('liquid') || cat.name.toLowerCase().includes('liquid') ? 'liquid'
+        : cat.name.toLowerCase().includes('device') || cat.name.toLowerCase().includes('disposit') ? 'device'
+        : cat.name.toLowerCase().includes('access') ? 'accessory'
+        : cat.name.toLowerCase().includes('coil') || cat.name.toLowerCase().includes('cotton') ? 'consumable'
+        : 'other')
+      : 'other';
+    setFormData(prev => ({ ...prev, category_id: catId, subcategory_id: '', product_type: derivedType }));
+  };
+
+  const handleSubCategoryChange = (e) => {
+    const subId = e.target.value;
+    // La sottocategoria diventa il category_id finale inviato al backend
+    setFormData(prev => ({ ...prev, subcategory_id: subId }));
+  };
 
   const TABS = [
     { id: 'info', label: 'Informazioni', icon: <Package size={14} /> },
@@ -258,16 +279,23 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                 </div>
               </div>
               <div>
-                <label className="sp-label">Tipo Prodotto *</label>
-                <select className="sp-select" name="product_type" value={formData.product_type} onChange={handleChange}>
-                  {PRODUCT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                <label className="sp-label">Categoria</label>
+                <select className="sp-select" name="category_id" value={formData.category_id} onChange={handleCategoryChange}>
+                  <option value="">— Seleziona Categoria —</option>
+                  {parentCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="sp-label">Categoria</label>
-                <select className="sp-select" name="category_id" value={formData.category_id} onChange={handleChange}>
-                  <option value="">— Nessuna Categoria —</option>
-                  {categoryOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <label className="sp-label">Sottocategoria</label>
+                <select
+                  className="sp-select"
+                  name="subcategory_id"
+                  value={formData.subcategory_id}
+                  onChange={handleSubCategoryChange}
+                  disabled={subCategories.length === 0}
+                >
+                  <option value="">{subCategories.length === 0 ? '— Nessuna sottocategoria —' : '— Seleziona Sottocategoria —'}</option>
+                  {subCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
