@@ -127,9 +127,8 @@ class StoreController extends Controller
             DB::table('warehouses')->insert([
                 'tenant_id'  => $tenantId,
                 'name'       => 'Magazzino ' . trim($request->input('name')),
-                'code'       => strtoupper(trim($request->input('code'))) . '-WH',
+                'type'       => 'store',
                 'store_id'   => $id,
-                'is_default' => false,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);

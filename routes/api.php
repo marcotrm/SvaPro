@@ -54,9 +54,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // Stores CRUD
         Route::get('/stores', [StoreController::class, 'index']);
         Route::get('/stores/{storeId}', [StoreController::class, 'show']);
-        Route::post('/stores', [StoreController::class, 'store'])->middleware('permission:stores.manage');
-        Route::put('/stores/{storeId}', [StoreController::class, 'update'])->middleware('permission:stores.manage');
-        Route::delete('/stores/{storeId}', [StoreController::class, 'destroy'])->middleware('permission:stores.manage');
+        Route::post('/stores', [StoreController::class, 'store']);
+        Route::put('/stores/{storeId}', [StoreController::class, 'update']);
+        Route::delete('/stores/{storeId}', [StoreController::class, 'destroy']);
         Route::get('/loyalty/monitoring/push-stats', [LoyaltyController::class, 'pushMonitoringStats']);
 
         Route::get('/catalog/products', [CatalogController::class, 'index']);
