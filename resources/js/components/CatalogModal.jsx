@@ -1,6 +1,65 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { X, Loader, Plus, Trash2, Barcode, MapPin, Package, Tag, DollarSign, Settings2, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { X, Loader, Plus, Trash2, Barcode, MapPin, Package, Tag, DollarSign, Settings2, AlertTriangle, Upload, ImageIcon } from 'lucide-react';
 import { catalog } from '../api.jsx';
+
+/* ─── Componente Upload Foto Prodotto ─────────────────────── */
+function ProductImageUpload({ currentImageUrl, onFileChange }) {
+  const [preview, setPreview] = useState(currentImageUrl || null);
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef();
+
+  const handleFile = (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    onFileChange(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragging(false);
+    handleFile(e.dataTransfer.files[0]);
+  };
+
+  const handleRemove = () => {
+    setPreview(null);
+    onFileChange(null);
+    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  return (
+    <div>
+      <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }}
+        onChange={e => handleFile(e.target.files[0])} />
+      {preview ? (
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <img src={preview} alt="Anteprima prodotto"
+            style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 12, border: '1px solid var(--color-border)' }} />
+          <button type="button" onClick={handleRemove}
+            style={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24, borderRadius: '50%', background: 'var(--color-error)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            ×
+          </button>
+          <button type="button" onClick={() => inputRef.current?.click()}
+            style={{ display: 'block', marginTop: 6, fontSize: 11, color: 'var(--color-accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            Cambia foto
+          </button>
+        </div>
+      ) : (
+        <div
+          onDrop={handleDrop} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
+          onClick={() => inputRef.current?.click()}
+          style={{
+            border: `2px dashed ${dragging ? 'var(--color-accent)' : 'var(--color-border)'}`,
+            borderRadius: 12, padding: '24px 16px', textAlign: 'center', cursor: 'pointer',
+            background: dragging ? 'rgba(155,143,212,0.05)' : 'var(--color-bg)', transition: 'all 0.15s',
+          }}>
+          <ImageIcon size={28} style={{ color: 'var(--color-text-tertiary)', marginBottom: 8 }} />
+          <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: 0 }}>Trascina una foto o <span style={{ color: 'var(--color-accent)', fontWeight: 600 }}>clicca per caricare</span></p>
+          <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>PNG, JPG, WebP — max 2MB</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // product_type viene derivato automaticamente dalla categoria, non esposto all'utente
 
@@ -81,6 +140,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [activeTab, setActiveTab] = useState('info'); // 'info' | 'variants' | 'fiscal' | 'inventory'
+  const [imageFile, setImageFile] = useState(null); // foto prodotto da caricare
 
   useEffect(() => {
     setFormData(normalizeProduct(product, storesList, selectedStoreId));
@@ -140,6 +200,11 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
           appendValue(fd, k, v);
         }
       });
+
+      // Allega foto prodotto se selezionata
+      if (imageFile) {
+        fd.append('image', imageFile);
+      }
 
       if (product?.id) {
         fd.append('_method', 'PUT');
@@ -308,6 +373,13 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               <div>
                 <label className="sp-label">Codice PLI (Accise)</label>
                 <input className="sp-input" name="pli_code" value={formData.pli_code} onChange={handleChange} placeholder="Es: 9041" />
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label className="sp-label">Foto Prodotto</label>
+                <ProductImageUpload
+                  currentImageUrl={product?.image_url}
+                  onFileChange={(file) => setImageFile(file)}
+                />
               </div>
               <div style={{ gridColumn: '1/-1' }}>
                 <label className="sp-label">Descrizione</label>

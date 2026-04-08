@@ -480,6 +480,12 @@ export const customers = {
   createCustomer: (data) => api.post('/customers', data),
   updateCustomer: (id, data) => api.put(`/customers/${id}`, data),
   getReturnAnalytics: (params = {}) => cachedGet('/customers/analytics/return-frequency', params, 30000, 300000),
+  sendEmailOtp: (customerId, email) => api.post(`/customers/${customerId}/email-otp/send`, { email }),
+  verifyEmailOtp: (customerId, otp) => api.post(`/customers/${customerId}/email-otp/verify`, { otp }),
+  uploadVisura: (customerId, formData) => api.post(`/customers/${customerId}/visura`, formData),
+  downloadVisura: (customerId) => api.get(`/customers/${customerId}/visura/download`, { responseType: 'blob' }),
+  // Metodo generico POST per usi avanzati
+  post_: (path, data) => api.post(path, data),
 };
 
 // Employee APIs

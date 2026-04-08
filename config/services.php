@@ -43,4 +43,10 @@ return [
         'credentials_path' => env('FIREBASE_CREDENTIALS_PATH', storage_path('app/private/firebase-credentials.json')),
     ],
 
+    'twilio' => [
+        'sid'            => env('TWILIO_SID'),
+        'token'          => env('TWILIO_TOKEN'),
+        'whatsapp_from'  => env('TWILIO_WHATSAPP_FROM', 'whatsapp:+14155238886'),
+    ],
+
 ];

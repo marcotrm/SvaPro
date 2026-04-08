@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\CustomerEmailOtp;
 use App\Services\AuditLogger;
 use App\Services\CustomerOtpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -59,6 +63,7 @@ class CustomerController extends Controller
                         ->orWhere('c.last_name', 'like', '%'.$term.'%')
                         ->orWhere('c.company_name', 'like', '%'.$term.'%')
                         ->orWhere('c.email', 'like', '%'.$term.'%')
+                        ->orWhere('c.phone', 'like', '%'.$term.'%')
                         ->orWhere('c.code', 'like', '%'.$term.'%')
                         ->orWhere('c.city', 'like', '%'.$term.'%');
                 });
@@ -404,5 +409,114 @@ class CustomerController extends Controller
                 ];
             })
             ->all();
+    }
+    /**
+     * Invia OTP via email al cliente per verifica.
+     */
+    public function sendEmailOtp(Request $request, int $customerId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $customer = DB::table('customers')->where('id', $customerId)->where('tenant_id', $tenantId)->first();
+
+        if (!$customer) {
+            return response()->json(['message' => 'Cliente non trovato.'], 404);
+        }
+
+        $email = $request->input('email') ?: $customer->email;
+        if (!$email) {
+            return response()->json(['message' => 'Email mancante.'], 422);
+        }
+
+        $otp = (string) random_int(100000, 999999);
+        Cache::put("email_otp_{$customerId}", $otp, now()->addMinutes(10));
+
+        try {
+            Mail::to($email)->send(new CustomerEmailOtp($otp, $customer->first_name . ' ' . $customer->last_name));
+            return response()->json(['message' => 'OTP inviato.']);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Errore invio email: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Verifica OTP email del cliente.
+     */
+    public function verifyEmailOtp(Request $request, int $customerId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $customer = DB::table('customers')->where('id', $customerId)->where('tenant_id', $tenantId)->first();
+
+        if (!$customer) {
+            return response()->json(['message' => 'Cliente non trovato.'], 404);
+        }
+
+        $submitted = (string) $request->input('otp');
+        $stored    = Cache::get("email_otp_{$customerId}");
+
+        if (!$stored || $stored !== $submitted) {
+            return response()->json(['message' => 'Codice OTP non valido o scaduto.'], 422);
+        }
+
+        Cache::forget("email_otp_{$customerId}");
+
+        DB::table('customers')->where('id', $customerId)->update([
+            'email_verified_at' => now(),
+            'updated_at'        => now(),
+        ]);
+
+        return response()->json(['message' => 'Email verificata con successo.']);
+    }
+
+    /**
+     * Upload visura camerale PDF per un cliente azienda.
+     */
+    public function uploadVisura(Request $request, int $customerId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $customer = DB::table('customers')->where('id', $customerId)->where('tenant_id', $tenantId)->first();
+
+        if (!$customer) {
+            return response()->json(['message' => 'Cliente non trovato.'], 404);
+        }
+
+        $request->validate([
+            'visura' => ['required', 'file', 'mimes:pdf', 'max:5120'], // max 5MB
+        ]);
+
+        // Elimina visura precedente
+        if ($customer->visura_camerale_path) {
+            Storage::disk('private')->delete($customer->visura_camerale_path);
+        }
+
+        $path = $request->file('visura')->store("visure/tenant_{$tenantId}", 'private');
+
+        DB::table('customers')->where('id', $customerId)->update([
+            'visura_camerale_path' => $path,
+            'updated_at'           => now(),
+        ]);
+
+        return response()->json(['message' => 'Visura caricata.', 'path' => $path]);
+    }
+
+    /**
+     * Download visura camerale PDF (solo admin).
+     */
+    public function downloadVisura(Request $request, int $customerId): mixed
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $customer = DB::table('customers')->where('id', $customerId)->where('tenant_id', $tenantId)->first();
+
+        if (!$customer || !$customer->visura_camerale_path) {
+            return response()->json(['message' => 'Visura non trovata.'], 404);
+        }
+
+        if (!Storage::disk('private')->exists($customer->visura_camerale_path)) {
+            return response()->json(['message' => 'File non trovato su disco.'], 404);
+        }
+
+        return Storage::disk('private')->download(
+            $customer->visura_camerale_path,
+            "visura_{$customer->company_name}.pdf"
+        );
     }
 }

@@ -67,6 +67,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::put('/customers/{customerId}', [CustomerController::class, 'update'])->middleware('permission:customers.manage');
         Route::post('/customers/{customerId}/otp/send', [CustomerController::class, 'sendOtp']);
         Route::post('/customers/{customerId}/otp/verify', [CustomerController::class, 'verifyOtp']);
+        Route::post('/customers/{customerId}/email-otp/send', [CustomerController::class, 'sendEmailOtp']);
+        Route::post('/customers/{customerId}/email-otp/verify', [CustomerController::class, 'verifyEmailOtp']);
+        Route::post('/customers/{customerId}/visura', [CustomerController::class, 'uploadVisura'])->middleware('permission:customers.manage');
+        Route::get('/customers/{customerId}/visura/download', [CustomerController::class, 'downloadVisura'])->middleware('permission:customers.manage');
 
         Route::get('/employees', [EmployeeController::class, 'index']);
         Route::get('/employees/analytics/top-performers', [EmployeeController::class, 'topPerformers']);
