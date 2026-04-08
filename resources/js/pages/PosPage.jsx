@@ -19,6 +19,7 @@ export default function PosPage() {
   const [subCategories, setSubCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [flavorTerm, setFlavorTerm] = useState('');
 
   // Cart
   const [cartLines, setCartLines] = useState([]);
@@ -163,12 +164,25 @@ export default function PosPage() {
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const s = searchTerm.toLowerCase();
-      const matchSearch = !s || p.name?.toLowerCase().includes(s) || p.sku?.toLowerCase().includes(s);
+      const s = searchTerm.toLowerCase().trim();
+      const f = flavorTerm.toLowerCase().trim();
+
+      // Campo 1: nome, SKU o barcode
+      const matchSearch = !s
+        || p.name?.toLowerCase().includes(s)
+        || p.sku?.toLowerCase().includes(s)
+        || p.barcode?.toLowerCase().includes(s)
+        || p.variants?.some(v => v.barcode?.toLowerCase().includes(s));
+
+      // Campo 2: aroma / gusto (campo flavor nelle varianti)
+      const matchFlavor = !f
+        || p.variants?.some(v => v.flavor?.toLowerCase().includes(f))
+        || p.name?.toLowerCase().includes(f);
+
       const matchCat = !activeCategory || p.category_id === activeCategory;
-      return matchSearch && matchCat;
+      return matchSearch && matchFlavor && matchCat;
     });
-  }, [products, searchTerm, activeCategory]);
+  }, [products, searchTerm, flavorTerm, activeCategory]);
 
   const filteredCustomers = useMemo(() => {
     if (!customerSearch) return allCustomers.slice(0, 10);
@@ -193,15 +207,50 @@ export default function PosPage() {
     <div className="sp-pos-layout">
       {/* LEFT — Products */}
       <div className="sp-pos-products">
-        {/* Search */}
-        <div className="sp-search-box sp-mb-4">
-          <Search size={16} />
-          <input 
-            className="sp-input" 
-            placeholder="Cerca prodotto per nome o SKU..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        {/* Doppia ricerca: prodotto + aroma */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+          {/* Campo 1: barcode, nome, SKU */}
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)', pointerEvents: 'none' }} />
+            <input
+              className="sp-input"
+              style={{ paddingLeft: 32, fontSize: 13 }}
+              placeholder="Barcode, nome o SKU..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                // Se l'utente scansiona un barcode (Enter dopo la scansione)
+                if (e.key === 'Enter' && searchTerm) {
+                  const exact = products.find(
+                    p => p.barcode === searchTerm
+                      || p.sku === searchTerm
+                      || p.variants?.some(v => v.barcode === searchTerm)
+                  );
+                  if (exact) { addToCart(exact); setSearchTerm(''); }
+                }
+              }}
+            />
+            {searchTerm && (
+              <button type="button" onClick={() => setSearchTerm('')}
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', fontSize: 16, lineHeight: 1 }}>×</button>
+            )}
+          </div>
+
+          {/* Campo 2: aroma / gusto */}
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, pointerEvents: 'none' }}>🍓</span>
+            <input
+              className="sp-input"
+              style={{ paddingLeft: 30, fontSize: 13 }}
+              placeholder="Aroma / gusto..."
+              value={flavorTerm}
+              onChange={(e) => setFlavorTerm(e.target.value)}
+            />
+            {flavorTerm && (
+              <button type="button" onClick={() => setFlavorTerm('')}
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', fontSize: 16, lineHeight: 1 }}>×</button>
+            )}
+          </div>
         </div>
 
         {/* Category chips */}
