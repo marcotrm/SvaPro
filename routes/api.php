@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
@@ -180,6 +181,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // Employee KPI Dashboard
         Route::get('/employees/kpi-dashboard', [EmployeeController::class, 'kpiDashboard']);
         Route::post('/employees/{employeeId}/kpi-target', [EmployeeController::class, 'setKpiTarget'])->middleware('permission:employees.manage');
+        // Timbrature dipendenti
+        Route::get('/attendance', [AttendanceController::class, 'index']);
+        Route::get('/attendance/live', [AttendanceController::class, 'live']);
+        Route::get('/attendance/employees-for-kiosk', [AttendanceController::class, 'employeesForKiosk']);
+        Route::post('/attendance/checkin', [AttendanceController::class, 'checkIn']);
+        Route::post('/attendance/checkout', [AttendanceController::class, 'checkOut']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente')->group(function () {

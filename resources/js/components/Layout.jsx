@@ -7,13 +7,14 @@ import {
   Users, Monitor, Truck, Settings, LogOut, Bell,
   FileText, RotateCcw, Gift, Shield, Activity, ChevronDown,
   Receipt, Star, ArrowRightLeft, MapPin, ChevronLeft, ChevronRight,
-  PanelLeftClose, PanelLeftOpen, Link
+  PanelLeftClose, PanelLeftOpen, Link, Fingerprint
 } from 'lucide-react';
 
 const allNavigation = [
   { section: 'Principale', items: [
     { label: 'POS Cassa', href: '/', icon: Monitor, roles: ['superadmin','admin_cliente','dipendente'] },
     { label: 'Dashboard', href: '/dashboard', icon: BarChart3, roles: ['superadmin','admin_cliente'] },
+    { label: 'Timbrature', href: '/attendance', icon: Fingerprint, roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
   { section: 'Gestione', items: [
     { label: 'Prodotti', href: '/catalog', icon: Package, roles: ['superadmin','admin_cliente','dipendente'] },

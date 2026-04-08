@@ -32,6 +32,7 @@ const LoyaltyTiersPage = lazy(() => import('./pages/LoyaltyTiersPage.jsx'));
 const EmployeeKpiPage = lazy(() => import('./pages/EmployeeKpiPage.jsx'));
 const InventoryCountPage = lazy(() => import('./pages/InventoryCountPage.jsx'));
 const CategoryPage = lazy(() => import('./pages/CategoryPage.jsx'));
+const AttendancePage = lazy(() => import('./pages/AttendancePage.jsx'));
 
 const EmployeePurchasesPage = lazy(() => import('./pages/EmployeePurchasesPage.jsx'));
 
@@ -145,6 +146,7 @@ export default function App() {
               <Route path="/loyalty/tiers" element={<LoyaltyTiersPage />} />
               <Route path="/employees/kpi" element={<EmployeeKpiPage />} />
               <Route path="/inventory/count" element={<InventoryCountPage />} />
+              <Route path="/attendance" element={<AttendancePage />} />
             </Route>
           </Route>
 

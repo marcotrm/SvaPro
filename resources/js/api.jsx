@@ -637,6 +637,15 @@ export const reports = {
   summary: (params = {}) => cachedGet('/reports/summary', params, 30000, 300000),
 };
 
+// Attendance APIs (timbrature dipendenti)
+export const attendance = {
+  getList:           (params = {}) => api.get('/attendance', { params }),
+  getLive:           (params = {}) => api.get('/attendance/live', { params }),
+  getEmployeesKiosk: (params = {}) => api.get('/attendance/employees-for-kiosk', { params }),
+  checkIn:           (data)        => api.post('/attendance/checkin', data),
+  checkOut:          (data)        => api.post('/attendance/checkout', data),
+};
+
 export default api;
 
 export { clearApiCache };
