@@ -662,6 +662,11 @@ export const attendance = {
   checkOut:          (data)        => api.post('/attendance/checkout', data),
 };
 
+// Products — convenience alias used by pages that expect a getAll() interface
+export const products = {
+  getAll: (params = {}) => catalog.getProducts(params),
+};
+
 // Stock Transfers / DDT
 export const stockTransfers = {
   getAll:  (params = {}) => api.get('/stock-transfers', { params }),
