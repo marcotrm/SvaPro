@@ -662,6 +662,15 @@ export const attendance = {
   checkOut:          (data)        => api.post('/attendance/checkout', data),
 };
 
+// Stock Transfers / DDT
+export const stockTransfers = {
+  getAll:  (params = {}) => api.get('/stock-transfers', { params }),
+  create:  (data)        => api.post('/stock-transfers', data),
+  send:    (id)          => api.post(`/stock-transfers/${id}/send`),
+  receive: (id, items)   => api.post(`/stock-transfers/${id}/receive`, { items }),
+  cancel:  (id)          => api.post(`/stock-transfers/${id}/cancel`),
+};
+
 export default api;
 
 export { clearApiCache };

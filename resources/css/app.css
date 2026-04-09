@@ -2840,3 +2840,105 @@ a { text-decoration: none; color: inherit; }
 .datepicker-today-btn:hover {
   background: var(--color-accent-light);
 }
+
+/* ── Header labels (click mese / click anno) ── */
+.datepicker-header-labels {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.datepicker-label-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+  transition: background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.datepicker-label-btn:hover,
+.datepicker-label-btn.active {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+.datepicker-year-btn {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Griglia Anni (scrollabile) ── */
+.datepicker-year-grid {
+  max-height: 200px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+.datepicker-year-cell {
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  padding: 7px 4px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.1s, color 0.1s;
+}
+.datepicker-year-cell:hover {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+.datepicker-year-active {
+  background: var(--color-accent) !important;
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,102,255,0.3);
+}
+.datepicker-year-today {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+.datepicker-year-today:not(.datepicker-year-active) {
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-underline-offset: 3px;
+}
+
+/* ── Griglia Mesi ── */
+.datepicker-month-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.datepicker-month-cell {
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  padding: 10px 4px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.1s, color 0.1s;
+}
+.datepicker-month-cell:hover {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+.datepicker-month-active {
+  background: var(--color-accent) !important;
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,102,255,0.3);
+}

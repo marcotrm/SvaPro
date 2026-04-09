@@ -27,6 +27,7 @@ const allNavigation = [
     { label: 'Fornitori', href: '/suppliers', icon: Truck, roles: ['superadmin','admin_cliente'] },
     { label: 'Ordini Acquisto', href: '/purchase-orders', icon: Receipt, roles: ['superadmin','admin_cliente'] },
     { label: 'Fatture Fornitori', href: '/supplier-invoices', icon: FileText, roles: ['superadmin','admin_cliente'] },
+    { label: 'Trasferimenti DDT', href: '/stock-transfers', icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
   ]},
   { section: 'Analisi', items: [
     { label: 'Report', href: '/reports', icon: Activity, roles: ['superadmin','admin_cliente'] },

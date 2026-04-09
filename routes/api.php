@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\SupplierInvoiceController;
 use App\Http\Controllers\Api\HealthScanController;
 use App\Http\Controllers\Api\LoyaltyCardController;
 use App\Http\Controllers\Api\WooCommerceWebhookController;
+use App\Http\Controllers\Api\StockTransferController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/loyalty-card/{uuid}', [LoyaltyCardController::class, 'show']);
@@ -186,12 +187,19 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // Employee KPI Dashboard
         Route::get('/employees/kpi-dashboard', [EmployeeController::class, 'kpiDashboard']);
         Route::post('/employees/{employeeId}/kpi-target', [EmployeeController::class, 'setKpiTarget'])->middleware('permission:employees.manage');
-        // Timbrature dipendenti
+        // Attendance
         Route::get('/attendance', [AttendanceController::class, 'index']);
         Route::get('/attendance/live', [AttendanceController::class, 'live']);
         Route::get('/attendance/employees-for-kiosk', [AttendanceController::class, 'employeesForKiosk']);
         Route::post('/attendance/checkin', [AttendanceController::class, 'checkIn']);
         Route::post('/attendance/checkout', [AttendanceController::class, 'checkOut']);
+
+        // Stock Transfers / DDT
+        Route::get('/stock-transfers', [StockTransferController::class, 'index']);
+        Route::post('/stock-transfers', [StockTransferController::class, 'store']);
+        Route::post('/stock-transfers/{id}/send', [StockTransferController::class, 'send']);
+        Route::post('/stock-transfers/{id}/receive', [StockTransferController::class, 'receive']);
+        Route::post('/stock-transfers/{id}/cancel', [StockTransferController::class, 'cancel']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente')->group(function () {

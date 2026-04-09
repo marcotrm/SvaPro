@@ -33,6 +33,7 @@ const EmployeeKpiPage = lazy(() => import('./pages/EmployeeKpiPage.jsx'));
 const InventoryCountPage = lazy(() => import('./pages/InventoryCountPage.jsx'));
 const CategoryPage = lazy(() => import('./pages/CategoryPage.jsx'));
 const AttendancePage = lazy(() => import('./pages/AttendancePage.jsx'));
+const StockTransfersPage = lazy(() => import('./pages/StockTransfersPage.jsx'));
 const StoresPage = lazy(() => import('./pages/StoresPage.jsx'));
 
 const EmployeePurchasesPage = lazy(() => import('./pages/EmployeePurchasesPage.jsx'));
@@ -148,6 +149,7 @@ export default function App() {
               <Route path="/employees/kpi" element={<EmployeeKpiPage />} />
               <Route path="/inventory/count" element={<InventoryCountPage />} />
               <Route path="/attendance" element={<AttendancePage />} />
+              <Route path="/stock-transfers" element={<StockTransfersPage />} />
               <Route path="/stores" element={<StoresPage />} />
             </Route>
           </Route>
