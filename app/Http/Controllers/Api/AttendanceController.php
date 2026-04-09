@@ -41,7 +41,7 @@ class AttendanceController extends Controller
                 'a.notes',
                 'e.first_name',
                 'e.last_name',
-                'e.badge_code',
+                'e.barcode',
                 'e.expected_start_time as employee_expected_start',
                 's.name as store_name',
             ])
@@ -57,7 +57,7 @@ class AttendanceController extends Controller
                     'id'                   => $r->id,
                     'employee_id'          => $r->employee_id,
                     'employee_name'        => trim("{$r->first_name} {$r->last_name}"),
-                    'badge_code'           => $r->badge_code,
+                    'barcode'              => $r->barcode,
                     'store_id'             => $r->store_id,
                     'store_name'           => $r->store_name,
                     'checked_in_at'        => $r->checked_in_at,
@@ -88,7 +88,7 @@ class AttendanceController extends Controller
             ->when($storeId, fn($q) => $q->where('a.store_id', $storeId))
             ->whereDate('a.checked_in_at', now()->toDateString())
             ->whereNull('a.checked_out_at')
-            ->select(['a.*', 'e.first_name', 'e.last_name', 'e.badge_code', 's.name as store_name'])
+            ->select(['a.*', 'e.first_name', 'e.last_name', 'e.barcode', 's.name as store_name'])
             ->get()
             ->map(fn($r) => [
                 'id'           => $r->id,
@@ -247,7 +247,7 @@ class AttendanceController extends Controller
         $employees = DB::table('employees')
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
-            ->select(['id', 'first_name', 'last_name', 'badge_code', 'barcode', 'expected_start_time', 'role'])
+            ->select(['id', 'first_name', 'last_name', 'barcode', 'expected_start_time', 'role'])
             ->orderBy('first_name')
             ->get();
 
@@ -266,8 +266,7 @@ class AttendanceController extends Controller
                 'name'                 => trim("{$emp->first_name} {$emp->last_name}"),
                 'first_name'           => $emp->first_name,
                 'last_name'            => $emp->last_name,
-                'badge_code'           => $emp->badge_code,
-                'barcode'              => $emp->barcode,   // <-- campo usato dal modal dipendente
+                'barcode'              => $emp->barcode,
                 'expected_start_time'  => $emp->expected_start_time,
                 'role'                 => $emp->role,
                 'status'               => $att
@@ -287,14 +286,11 @@ class AttendanceController extends Controller
 
     private function resolveEmployee(int $tenantId, Request $request): ?\stdClass
     {
-        // Prima prova: badge_code esplicito
+        // Prima prova: barcode esplicito
         if ($request->filled('badge_code')) {
             $emp = DB::table('employees')
                 ->where('tenant_id', $tenantId)
-                ->where(function ($q) use ($request) {
-                    $q->where('badge_code', $request->input('badge_code'))
-                      ->orWhere('barcode', $request->input('badge_code'));
-                })
+                ->where('barcode', $request->input('badge_code'))
                 ->first();
             if ($emp) return $emp;
         }
