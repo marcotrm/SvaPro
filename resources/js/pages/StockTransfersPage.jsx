@@ -341,7 +341,6 @@ export default function StockTransfersPage() {
                                     </div>
                                 );
                             })}
-                        </div>
 
                         {/* Note */}
                         <div>
