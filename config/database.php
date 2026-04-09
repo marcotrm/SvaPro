@@ -16,8 +16,8 @@ return [
     |
     */
 
-    // Se DATABASE_URL è presente (Railway PostgreSQL), usalo automaticamente
-    'default' => !empty(env('DATABASE_URL')) ? 'pgsql' : env('DB_CONNECTION', 'sqlite'),
+    // start.sh esporta DB_CONNECTION=pgsql quando DATABASE_URL è presente
+    'default' => env('DB_CONNECTION', 'sqlite'),
 
     /*
     |--------------------------------------------------------------------------
@@ -85,7 +85,8 @@ return [
 
         'pgsql' => [
             'driver' => 'pgsql',
-            'url' => env('DATABASE_URL', env('DB_URL')), // legge DATABASE_URL di Railway
+            // NON usare 'url' per evitare conflitti con parsing SSL di Railway
+            // start.sh imposta DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'laravel'),
@@ -95,7 +96,7 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
-            'sslmode' => env('PGSSLMODE', 'require'), // Railway PostgreSQL richiede SSL
+            'sslmode' => env('PGSSLMODE', 'prefer'),
         ],
 
         'sqlsrv' => [

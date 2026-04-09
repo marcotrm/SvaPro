@@ -1,6 +1,5 @@
 #!/bin/bash
-# SvaPro — Container entrypoint
-# ATTENZIONE: non usare set -e — gestiamo gli errori esplicitamente
+# SvaPro — Container entrypoint (nessun set -e — errori gestiti manualmente)
 
 echo "========================================"
 echo "  SvaPro — Avvio (PORT: ${PORT:-8000})"
@@ -12,18 +11,45 @@ echo "========================================"
 
 # ─── 2. Seleziona il database ────────────────────────────────────────────────
 if [ -n "$DATABASE_URL" ]; then
-    echo "✅ PostgreSQL: DATABASE_URL trovato"
+    echo "✅ PostgreSQL rilevato"
 
-    # Forza pgsql sovrascrivendo qualsiasi variabile conflittuale
+    # Railway fornisce sia DATABASE_URL che singole variabili PGHOST, PGPORT, ecc.
+    # Usiamo quelle individuali che sono più affidabili del parsing URL.
+    PGHOST_VAL="${PGHOST:-}"
+    PGPORT_VAL="${PGPORT:-5432}"
+    PGDATABASE_VAL="${PGDATABASE:-railway}"
+    PGUSER_VAL="${PGUSER:-postgres}"
+    PGPASSWORD_VAL="${PGPASSWORD:-}"
+
+    # Se Railway non ha già i PG* separati, prova a parserli da DATABASE_URL
+    if [ -z "$PGHOST_VAL" ]; then
+        PGHOST_VAL=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:/?]*\).*|\1|p')
+        PGPORT_VAL=$(echo "$DATABASE_URL" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
+        PGDATABASE_VAL=$(echo "$DATABASE_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')
+        PGUSER_VAL=$(echo "$DATABASE_URL" | sed -n 's|.*://\([^:]*\):.*|\1|p')
+        PGPASSWORD_VAL=$(echo "$DATABASE_URL" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
+    fi
+
+    echo "   Host: $PGHOST_VAL:$PGPORT_VAL / DB: $PGDATABASE_VAL"
+
+    # Esporta variabili singole — questo è il modo più affidabile con Laravel
     export DB_CONNECTION=pgsql
-    export DB_URL="$DATABASE_URL"
-    unset DB_DATABASE
+    export DB_HOST="$PGHOST_VAL"
+    export DB_PORT="$PGPORT_VAL"
+    export DB_DATABASE="$PGDATABASE_VAL"
+    export DB_USERNAME="$PGUSER_VAL"
+    export DB_PASSWORD="$PGPASSWORD_VAL"
+    unset DB_URL  # evita conflitti con URL parsing
 
-    # Aggiorna .env per ogni processo figlio
+    # Aggiorna .env per coerenza
     sed -i "s|DB_CONNECTION=.*|DB_CONNECTION=pgsql|g" /app/.env 2>/dev/null || true
-    grep -q "^DATABASE_URL=" /app/.env 2>/dev/null \
-        && sed -i "s|DATABASE_URL=.*|DATABASE_URL=$DATABASE_URL|g" /app/.env \
-        || echo "DATABASE_URL=$DATABASE_URL" >> /app/.env
+    {
+        grep -q "^DB_HOST=" /app/.env && sed -i "s|DB_HOST=.*|DB_HOST=$PGHOST_VAL|g" /app/.env || echo "DB_HOST=$PGHOST_VAL" >> /app/.env
+        grep -q "^DB_PORT=" /app/.env && sed -i "s|DB_PORT=.*|DB_PORT=$PGPORT_VAL|g" /app/.env || echo "DB_PORT=$PGPORT_VAL" >> /app/.env
+        grep -q "^DB_DATABASE=" /app/.env && sed -i "s|DB_DATABASE=.*|DB_DATABASE=$PGDATABASE_VAL|g" /app/.env || echo "DB_DATABASE=$PGDATABASE_VAL" >> /app/.env
+        grep -q "^DB_USERNAME=" /app/.env && sed -i "s|DB_USERNAME=.*|DB_USERNAME=$PGUSER_VAL|g" /app/.env || echo "DB_USERNAME=$PGUSER_VAL" >> /app/.env
+        grep -q "^DB_PASSWORD=" /app/.env && sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$PGPASSWORD_VAL|g" /app/.env || echo "DB_PASSWORD=$PGPASSWORD_VAL" >> /app/.env
+    } 2>/dev/null || true
 
     DB_MODE="pgsql"
 else
@@ -40,26 +66,23 @@ else
     DB_MODE="sqlite"
 fi
 
-# ─── 3. Ricrea config cache con le variabili corrette ────────────────────────
+# ─── 3. Pulizia config cache ─────────────────────────────────────────────────
 php artisan config:clear --no-interaction 2>/dev/null || true
-php artisan config:cache --no-interaction 2>/dev/null || true
+# NOTA: non eseguiamo config:cache qui perché causa problemi con env dinamici
 
-# ─── 4. Migrazioni ───────────────────────────────────────────────────────────
-echo "▶ php artisan migrate ($DB_MODE)..."
+# ─── 4. Migrazioni (OBBLIGATORIE — se falliscono il container crasha) ────────
+echo "▶ Migrazioni ($DB_MODE)..."
 if php artisan migrate --force --no-interaction 2>&1; then
     echo "✅ Migrate OK"
 else
-    echo "❌ Migrate FALLITO — i dettagli dell'errore sono sopra"
-    echo "   L'app partirà comunque ma potrebbe non funzionare correttamente"
+    echo "❌ MIGRATE FALLITO — controlla i log per i dettagli"
+    echo "   Uscita del container per permettere il debugging"
+    exit 1
 fi
 
-# ─── 5. Seed (il seeder ha un guard idempotente — sicuro chiamarlo sempre) ───
-echo "▶ php artisan db:seed..."
-if php artisan db:seed --force --no-interaction 2>&1; then
-    echo "✅ Seed OK (o già eseguito in precedenza)"
-else
-    echo "⚠️  Seed fallito o già presente — l'app continua comunque"
-fi
+# ─── 5. Seed (sempre — il seeder si auto-protegge) ───────────────────────────
+echo "▶ Seed..."
+php artisan db:seed --force --no-interaction 2>&1 || echo "⚠️  Seed skipped/fallito"
 
 # ─── 6. Storage link ─────────────────────────────────────────────────────────
 php artisan storage:link --force 2>/dev/null || true
