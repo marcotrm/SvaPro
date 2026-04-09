@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { X, Loader, Shield } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { X, Loader, Shield, ScanBarcode } from 'lucide-react';
 import { employees } from '../api.jsx';
 import DatePicker from './DatePicker.jsx';
 
@@ -11,6 +11,7 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
     store_id: employee?.store_id || selectedStoreId || '',
     first_name: employee?.first_name || '',
     last_name: employee?.last_name || '',
+    barcode: employee?.barcode || '',
     hire_date: employee?.hire_date || '',
     status: employee?.status || 'active',
   });
@@ -23,6 +24,7 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       store_id: employee?.store_id || selectedStoreId || '',
       first_name: employee?.first_name || '',
       last_name: employee?.last_name || '',
+      barcode: employee?.barcode || '',
       hire_date: employee?.hire_date || '',
       status: employee?.status || 'active',
     });
@@ -137,6 +139,24 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
               placeholder="Seleziona data assunzione"
             />
             {fe('hire_date') && <p className="mt-1 text-xs text-red-500">{fe('hire_date')}</p>}
+          </div>
+
+          {/* Barcode Operatore */}
+          <div>
+            <label className={labelClass} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ScanBarcode size={13} /> Cod. A Barre Operatore
+              <span className="text-gray-400 font-normal normal-case">(scanner POS)</span>
+            </label>
+            <input
+              type="text"
+              name="barcode"
+              value={formData.barcode}
+              onChange={handleChange}
+              placeholder="Scansiona o digita il codice..."
+              className={`${inputClass} font-mono tracking-widest ${fe('barcode') ? 'border-red-400' : ''}`}
+              autoComplete="off"
+            />
+            {fe('barcode') && <p className="mt-1 text-xs text-red-500">{fe('barcode')}</p>}
           </div>
 
           <div>

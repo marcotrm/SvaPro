@@ -204,7 +204,12 @@ export default function PosPage() {
   const [warehouseId, setWarehouseId]   = useState('');
   const [employees, setEmployees]       = useState([]);
   const [soldByEmployeeId, setSoldByEmployeeId] = useState('');
-  const [note, setNote]                 = useState('');
+  const [operatorBarcode, setOperatorBarcode] = useState('');
+  const [operatorName, setOperatorName]   = useState('');
+  const [operatorError, setOperatorError] = useState('');
+  const operatorBarcodeRef = useRef(null);
+  const [note, setNote]                   = useState('');
+  const [showResoModal, setShowResoModal] = useState(false);
 
   const [allCustomers, setAllCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -236,9 +241,6 @@ export default function PosPage() {
       setEmployees(oRes.data?.data?.employees || []);
       const whs = oRes.data?.data?.warehouses || [];
       if (whs.length > 0) setWarehouseId(whs[0].id);
-      // Auto-seleziona il primo operatore disponibile
-      const emps = oRes.data?.data?.employees || [];
-      if (emps.length > 0 && !soldByEmployeeId) setSoldByEmployeeId(String(emps[0].id));
       const sm = {};
       (stRes.data?.data || []).forEach(si => { sm[si.product_variant_id] = si; });
       setStockMap(sm);
@@ -291,9 +293,9 @@ export default function PosPage() {
   /* Checkout */
   const handleCheckout = async (payload) => {
     if (!cartLines.length) return toast.error('Carrello vuoto');
-    // Risolvi operatore: usa selezionato o fallback al primo disponibile
-    const resolvedEmpId = soldByEmployeeId || (employees.length > 0 ? String(employees[0].id) : null);
-    if (!resolvedEmpId) return toast.error('Nessun operatore disponibile');
+    // Risolvi operatore dal barcode
+    if (!soldByEmployeeId) return toast.error('Scansiona il codice operatore prima di procedere');
+    const resolvedEmpId = soldByEmployeeId;
     try {
       setPlacingOrder(true);
       await ordersApi.place({
@@ -311,8 +313,10 @@ export default function PosPage() {
       });
       toast.success('✅ Vendita completata!');
       setCartLines([]); setSelectedCustomer(null); setNote(''); setShowCheckoutModal(false);
-      clearApiCache(); // invalida cache dashboard/ordini
-      fetchData();
+      // Reset operatore dopo ogni vendita (deve riscannerizzare)
+      setSoldByEmployeeId(''); setOperatorBarcode(''); setOperatorName(''); setOperatorError('');
+      setTimeout(() => operatorBarcodeRef.current?.focus(), 100);
+      clearApiCache(); fetchData();
     } catch (err) {
       const msg = err.response?.data?.errors
         ? Object.values(err.response.data.errors).flat().join(' • ')
@@ -602,29 +606,57 @@ export default function PosPage() {
                 <Trash2 size={12} /> Svuota
               </button>
             )}
+            <button
+              onClick={() => setShowResoModal(true)}
+              style={{ background: 'rgba(251,191,36,0.12)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#fbbf24', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <RotateCcw size={12} /> Reso
+            </button>
           </div>
 
-          {/* Operatore */}
+          {/* Operatore — via barcode scanner */}
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-              Operatore
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ScanBarcode size={11} /> Operatore (scansiona badge)
             </div>
-            <select
-              value={soldByEmployeeId}
-              onChange={e => setSoldByEmployeeId(e.target.value)}
-              style={{
-                width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 10, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: '#fff',
-                cursor: 'pointer', outline: 'none',
-              }}
-            >
-              <option value="" style={{ background: '#1e293b' }}>— Seleziona operatore —</option>
-              {employees.map(e => (
-                <option key={e.id} value={e.id} style={{ background: '#1e293b' }}>
-                  {e.name || `${e.first_name || ''} ${e.last_name || ''}`.trim() || `Operatore #${e.id}`}
-                </option>
-              ))}
-            </select>
+            {soldByEmployeeId ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 10, padding: '9px 12px' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#86efac' }}>✓ {operatorName}</span>
+                <button onClick={() => { setSoldByEmployeeId(''); setOperatorBarcode(''); setOperatorName(''); setOperatorError(''); setTimeout(() => operatorBarcodeRef.current?.focus(), 50); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', display: 'flex' }}>
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <div>
+                <input
+                  ref={operatorBarcodeRef}
+                  value={operatorBarcode}
+                  onChange={e => setOperatorBarcode(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && operatorBarcode.trim()) {
+                      const found = employees.find(em => em.barcode === operatorBarcode.trim());
+                      if (found) {
+                        setSoldByEmployeeId(String(found.id));
+                        setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || found.name || `Operatore #${found.id}`);
+                        setOperatorError('');
+                      } else {
+                        setOperatorError('Codice non riconosciuto');
+                        setOperatorBarcode('');
+                      }
+                    }
+                  }}
+                  placeholder="Scansiona badge operatore..."
+                  autoFocus
+                  style={{
+                    width: '100%', background: operatorError ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${operatorError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: 10, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: '#fff',
+                    outline: 'none', fontFamily: 'monospace', letterSpacing: '0.1em', boxSizing: 'border-box',
+                  }}
+                />
+                {operatorError && <div style={{ fontSize: 11, color: '#fc8181', marginTop: 4 }}>⚠ {operatorError}</div>}
+              </div>
+            )}
           </div>
 
           {/* Cliente */}
@@ -828,6 +860,140 @@ export default function PosPage() {
           </div>
         </div>
       )}
+      {/* Reso Modal */}
+      {showResoModal && <PosResoModal
+        storeId={selectedStoreId}
+        onClose={() => setShowResoModal(false)}
+        onDone={() => { setShowResoModal(false); clearApiCache(); fetchData(); }}
+      />}
+    </div>
+  );
+}
+
+/* ─── Modal Reso POS ──────────────────────────────────────────── */
+function PosResoModal({ storeId, onClose, onDone }) {
+  const [orderId, setOrderId] = useState('');
+  const [order, setOrder]     = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState('');
+  const [reason, setReason]   = useState('customer_request');
+  const [lines, setLines]     = useState([]);
+
+  const searchOrder = async () => {
+    if (!orderId.trim()) return;
+    try {
+      setLoading(true); setError(''); setOrder(null);
+      const { orders: ordersApi2 } = await import('../api.jsx');
+      const res = await ordersApi2.getOne(orderId.trim());
+      const o = res.data?.data || res.data;
+      if (!o) { setError('Ordine non trovato.'); return; }
+      setOrder(o);
+      setLines((o.lines || []).map(l => ({ ...l, qty_return: l.qty || 1 })));
+    } catch { setError('Ordine non trovato.'); }
+    finally { setLoading(false); }
+  };
+
+  const handleReso = async () => {
+    if (!order) return;
+    try {
+      setSaving(true); setError('');
+      const api2 = await import('../api.jsx');
+      await api2.default.post('/returns', {
+        original_order_id: order.id,
+        store_id: storeId,
+        reason,
+        lines: lines.filter(l => l.qty_return > 0).map(l => ({
+          product_variant_id: l.product_variant_id,
+          qty: l.qty_return,
+          unit_refund_amount: l.unit_price ?? l.sale_price ?? 0,
+        })),
+      });
+      toast.success('✅ Reso registrato correttamente');
+      onDone();
+    } catch (e) {
+      setError(e.response?.data?.message || 'Errore nella registrazione del reso');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 500, boxShadow: '0 32px 80px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ background: '#0f172a', padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <RotateCcw size={18} color="#fbbf24" />
+            <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>Reso / Rimborso</span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)' }}><X size={18}/></button>
+        </div>
+
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Cerca ordine */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', display: 'block', marginBottom: 6 }}>N. Ordine</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={orderId}
+                onChange={e => setOrderId(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && searchOrder()}
+                placeholder="Es. 42 o #000042"
+                autoFocus
+                style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none' }}
+              />
+              <button onClick={searchOrder} disabled={loading}
+                style={{ padding: '10px 18px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+                {loading ? '...' : 'Cerca'}
+              </button>
+            </div>
+          </div>
+
+          {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '10px 14px', color: '#dc2626', fontSize: 13 }}>{error}</div>}
+
+          {order && (
+            <>
+              <div style={{ background: '#f8fafc', borderRadius: 12, padding: '12px 16px', fontSize: 13 }}>
+                <strong>Ordine #{order.id}</strong> — {order.customer_name || 'Cliente anonimo'} — {new Date(order.created_at).toLocaleDateString('it-IT')}
+              </div>
+
+              {/* Motivazione */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', display: 'block', marginBottom: 6 }}>Motivazione</label>
+                <select value={reason} onChange={e => setReason(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e5e7eb', borderRadius: 10, fontSize: 13, outline: 'none' }}>
+                  <option value="customer_request">Richiesta cliente</option>
+                  <option value="defective">Prodotto difettoso</option>
+                  <option value="wrong_item">Articolo sbagliato</option>
+                  <option value="other">Altro</option>
+                </select>
+              </div>
+
+              {/* Righe reso */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6b7280', display: 'block', marginBottom: 8 }}>Prodotti da restituire</label>
+                {lines.map((l, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, padding: '8px 12px', background: '#f9fafb', borderRadius: 8 }}>
+                    <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{l.product_name || `Variante #${l.product_variant_id}`}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280' }}>max {l.qty}</div>
+                    <input type="number" min="0" max={l.qty} value={l.qty_return}
+                      onChange={e => { const ls = [...lines]; ls[i] = { ...ls[i], qty_return: Math.min(l.qty, Math.max(0, parseInt(e.target.value)||0)) }; setLines(ls); }}
+                      style={{ width: 60, padding: '6px 8px', border: '1.5px solid #e5e7eb', borderRadius: 8, textAlign: 'center', fontWeight: 700, fontSize: 13, outline: 'none' }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4, borderTop: '1px solid #f0f0f0' }}>
+                <button onClick={onClose} style={{ padding: '10px 18px', border: '1px solid #e5e7eb', borderRadius: 10, background: '#fff', cursor: 'pointer', fontSize: 13 }}>Annulla</button>
+                <button onClick={handleReso} disabled={saving || lines.every(l => l.qty_return === 0)}
+                  style={{ padding: '10px 20px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+                  {saving ? 'Registrazione...' : '✓ Registra Reso'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

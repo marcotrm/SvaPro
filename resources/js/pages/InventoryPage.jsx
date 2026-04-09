@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { inventory } from '../api.jsx';
+import { inventory, stores as storesApi } from '../api.jsx';
 import InventoryMovementModal from '../components/InventoryMovementModal.jsx';
-import { Search, Plus, AlertTriangle, MapPin, Filter } from 'lucide-react';
+import { Search, Plus, AlertTriangle, MapPin, Filter, Store, ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function InventoryPage() {
   const { user, selectedStoreId, selectedStore } = useOutletContext();
@@ -14,6 +14,10 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showMovementModal, setShowMovementModal] = useState(false);
   const [activeTab, setActiveTab] = useState('stock');
+  const [allStoresStock, setAllStoresStock] = useState([]);
+  const [storesList, setStoresList] = useState([]);
+  const [expandedStores, setExpandedStores] = useState({});
+  const [byStoreSearch, setByStoreSearch] = useState('');
 
   useEffect(() => { fetchData(); }, [selectedStoreId]);
 
@@ -34,6 +38,23 @@ export default function InventoryPage() {
 
   const userRoles = user?.roles || [];
   const canAdjust = userRoles.includes('superadmin') || userRoles.includes('admin_cliente');
+  const isSuperAdmin = userRoles.includes('superadmin');
+
+  // Carica giacenze per tutti i negozi (solo superadmin)
+  useEffect(() => {
+    if (activeTab !== 'by_store' || !isSuperAdmin) return;
+    const loadAllStock = async () => {
+      try {
+        const [sRes, stRes] = await Promise.all([
+          storesApi.getAll(),
+          inventory.getStock({ limit: 5000 }),
+        ]);
+        setStoresList(sRes.data?.data || []);
+        setAllStoresStock(stRes.data?.data || []);
+      } catch {}
+    };
+    loadAllStock();
+  }, [activeTab, isSuperAdmin]);
 
   const lowCount = stock.filter(i => i.on_hand < (i.reorder_point || 5)).length;
   const outCount = stock.filter(i => i.on_hand <= 0).length;
@@ -105,12 +126,13 @@ export default function InventoryPage() {
 
       {/* Tabs */}
       <div className="sp-tabs">
-        <button className={`sp-tab ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}>
-          Giacenze
-        </button>
-        <button className={`sp-tab ${activeTab === 'movements' ? 'active' : ''}`} onClick={() => setActiveTab('movements')}>
-          Movimenti
-        </button>
+        <button className={`sp-tab ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}>Giacenze</button>
+        <button className={`sp-tab ${activeTab === 'movements' ? 'active' : ''}`} onClick={() => setActiveTab('movements')}>Movimenti</button>
+        {isSuperAdmin && (
+          <button className={`sp-tab ${activeTab === 'by_store' ? 'active' : ''}`} onClick={() => setActiveTab('by_store')}>
+            <Store size={13} style={{ marginRight: 5 }} />Per Negozio
+          </button>
+        )}
       </div>
 
       {/* Stock Tab */}
@@ -226,6 +248,109 @@ export default function InventoryPage() {
         </div>
       )}
 
+      {/* By Store Tab — superadmin only */}
+      {activeTab === 'by_store' && isSuperAdmin && (() => {
+        // Raggruppa stock per warehouse_id → store
+        const stockByWarehouse = {};
+        allStoresStock.forEach(item => {
+          const key = item.warehouse_name || `Magazzino #${item.warehouse_id}`;
+          if (!stockByWarehouse[key]) stockByWarehouse[key] = { name: key, items: [] };
+          stockByWarehouse[key].items.push(item);
+        });
+
+        // Filtra per search
+        const groups = Object.values(stockByWarehouse).map(g => ({
+          ...g,
+          items: byStoreSearch
+            ? g.items.filter(i => i.product_name?.toLowerCase().includes(byStoreSearch.toLowerCase()) || i.sku?.toLowerCase().includes(byStoreSearch.toLowerCase()))
+            : g.items,
+        })).filter(g => g.items.length > 0);
+
+        return (
+          <div className="sp-table-wrap">
+            <div className="sp-table-toolbar">
+              <div className="sp-search-box" style={{ flex: 1, maxWidth: 300 }}>
+                <Search size={14} />
+                <input className="sp-input" placeholder="Filtra prodotto..." value={byStoreSearch} onChange={e => setByStoreSearch(e.target.value)} />
+              </div>
+              <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                {storesList.length} negozi · {allStoresStock.length} referenze totali
+              </span>
+            </div>
+
+            {groups.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-tertiary)' }}>Nessun dato trovato.</div>}
+
+            {groups.map(group => {
+              const isOpen = expandedStores[group.name] !== false; // default espanso
+              const lowItems = group.items.filter(i => i.on_hand < (i.reorder_point || 5)).length;
+              return (
+                <div key={group.name} style={{ marginBottom: 16, border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+                  {/* Store header */}
+                  <button
+                    onClick={() => setExpandedStores(p => ({ ...p, [group.name]: !isOpen }))}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: 'var(--color-surface-secondary)', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <Store size={16} color="var(--color-accent)" />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{group.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                        {group.items.length} prodotti
+                        {lowItems > 0 && <span style={{ marginLeft: 8, color: 'var(--color-warning)', fontWeight: 600 }}>⚠ {lowItems} in esaurimento</span>}
+                      </div>
+                    </div>
+                    {isOpen ? <ChevronDown size={16} color="var(--color-text-tertiary)" /> : <ChevronRight size={16} color="var(--color-text-tertiary)" />}
+                  </button>
+
+                  {/* Products table */}
+                  {isOpen && (
+                    <table className="sp-table" style={{ margin: 0 }}>
+                      <thead>
+                        <tr>
+                          <th>Prodotto</th>
+                          <th>SKU</th>
+                          <th>Disponibile</th>
+                          <th>Riservato</th>
+                          <th>Pt. Riordino</th>
+                          <th>Stato</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.items.map(item => {
+                          const isLow = item.on_hand < (item.reorder_point || 5);
+                          const isOut = item.on_hand <= 0;
+                          return (
+                            <tr key={item.id}>
+                              <td>
+                                <span className="sp-cell-primary">{item.product_name}</span>
+                                {item.flavor && <span className="sp-cell-secondary" style={{ marginLeft: 6 }}>— {item.flavor}</span>}
+                              </td>
+                              <td className="sp-cell-secondary sp-font-mono">{item.sku || '—'}</td>
+                              <td>
+                                <span style={{ fontWeight: 700, color: isOut ? 'var(--color-error)' : isLow ? 'var(--color-warning)' : 'var(--color-success)', fontSize: 15 }}>
+                                  {item.available ?? item.on_hand}
+                                </span>
+                              </td>
+                              <td className="sp-cell-secondary sp-font-mono">{item.reserved || 0}</td>
+                              <td className="sp-cell-secondary sp-font-mono">{item.reorder_point || '—'}</td>
+                              <td>
+                                {isOut ? <span className="sp-badge sp-badge-error"><span className="sp-badge-dot"/> Esaurito</span>
+                                  : isLow ? <span className="sp-badge sp-badge-warning"><span className="sp-badge-dot"/> Basso</span>
+                                  : <span className="sp-badge sp-badge-success"><span className="sp-badge-dot"/> OK</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+
       {showMovementModal && (
         <InventoryMovementModal
           stock={stock}
@@ -233,6 +358,7 @@ export default function InventoryPage() {
           onSaved={async () => { await fetchData(); setShowMovementModal(false); }}
         />
       )}
+
     </div>
   );
 }
