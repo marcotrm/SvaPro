@@ -1,5 +1,5 @@
 #!/bin/bash
-# SvaPro — Container entrypoint (nessun set -e — errori gestiti manualmente)
+# SvaPro — Container entrypoint
 
 echo "========================================"
 echo "  SvaPro — Avvio (PORT: ${PORT:-8000})"
@@ -11,47 +11,48 @@ echo "========================================"
 
 # ─── 2. Seleziona il database ────────────────────────────────────────────────
 if [ -n "$DATABASE_URL" ]; then
-    echo "✅ PostgreSQL rilevato"
+    echo "✅ PostgreSQL: DATABASE_URL trovato"
 
-    # Railway fornisce sia DATABASE_URL che singole variabili PGHOST, PGPORT, ecc.
-    # Usiamo quelle individuali che sono più affidabili del parsing URL.
-    PGHOST_VAL="${PGHOST:-}"
-    PGPORT_VAL="${PGPORT:-5432}"
-    PGDATABASE_VAL="${PGDATABASE:-railway}"
-    PGUSER_VAL="${PGUSER:-postgres}"
-    PGPASSWORD_VAL="${PGPASSWORD:-}"
+    # Railway PostgreSQL fornisce DATABASE_URL nel formato:
+    # postgresql://user:pass@host:port/dbname
+    # Estraiamo le componenti con sed
 
-    # Se Railway non ha già i PG* separati, prova a parserli da DATABASE_URL
-    if [ -z "$PGHOST_VAL" ]; then
-        PGHOST_VAL=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:/?]*\).*|\1|p')
-        PGPORT_VAL=$(echo "$DATABASE_URL" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
-        PGDATABASE_VAL=$(echo "$DATABASE_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')
-        PGUSER_VAL=$(echo "$DATABASE_URL" | sed -n 's|.*://\([^:]*\):.*|\1|p')
-        PGPASSWORD_VAL=$(echo "$DATABASE_URL" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')
-    fi
+    _URL="$DATABASE_URL"
+    DB_HOST_VAL=$(echo "$_URL" | sed -E 's|.*@([^/:]+):[0-9]+/.*|\1|')
+    DB_PORT_VAL=$(echo "$_URL" | sed -E 's|.*:([0-9]+)/[^/]+$|\1|')
+    DB_NAME_VAL=$(echo "$_URL" | sed -E 's|.*/([^?]+).*|\1|')
+    DB_USER_VAL=$(echo "$_URL" | sed -E 's|[a-z]+://([^:]+):.*|\1|')
+    DB_PASS_VAL=$(echo "$_URL" | sed -E 's|[a-z]+://[^:]+:([^@]+)@.*|\1|')
 
-    echo "   Host: $PGHOST_VAL:$PGPORT_VAL / DB: $PGDATABASE_VAL"
+    # Fallback alle variabili PGHOST/PGPORT/etc. se il parsing fallisce
+    [ -z "$DB_HOST_VAL" ] && DB_HOST_VAL="${PGHOST:-localhost}"
+    [ -z "$DB_PORT_VAL" ] && DB_PORT_VAL="${PGPORT:-5432}"
+    [ -z "$DB_NAME_VAL" ] && DB_NAME_VAL="${PGDATABASE:-railway}"
+    [ -z "$DB_USER_VAL" ] && DB_USER_VAL="${PGUSER:-postgres}"
+    [ -z "$DB_PASS_VAL" ] && DB_PASS_VAL="${PGPASSWORD:-}"
 
-    # Esporta variabili singole — questo è il modo più affidabile con Laravel
+    echo "   Host:  $DB_HOST_VAL:$DB_PORT_VAL"
+    echo "   DB:    $DB_NAME_VAL  User: $DB_USER_VAL"
+
+    # Esporta singole variabili Laravel
     export DB_CONNECTION=pgsql
-    export DB_HOST="$PGHOST_VAL"
-    export DB_PORT="$PGPORT_VAL"
-    export DB_DATABASE="$PGDATABASE_VAL"
-    export DB_USERNAME="$PGUSER_VAL"
-    export DB_PASSWORD="$PGPASSWORD_VAL"
-    unset DB_URL  # evita conflitti con URL parsing
+    export DB_HOST="$DB_HOST_VAL"
+    export DB_PORT="$DB_PORT_VAL"
+    export DB_DATABASE="$DB_NAME_VAL"
+    export DB_USERNAME="$DB_USER_VAL"
+    export DB_PASSWORD="$DB_PASS_VAL"
 
-    # Aggiorna .env per coerenza
+    # Aggiorna .env
     sed -i "s|DB_CONNECTION=.*|DB_CONNECTION=pgsql|g" /app/.env 2>/dev/null || true
-    {
-        grep -q "^DB_HOST=" /app/.env && sed -i "s|DB_HOST=.*|DB_HOST=$PGHOST_VAL|g" /app/.env || echo "DB_HOST=$PGHOST_VAL" >> /app/.env
-        grep -q "^DB_PORT=" /app/.env && sed -i "s|DB_PORT=.*|DB_PORT=$PGPORT_VAL|g" /app/.env || echo "DB_PORT=$PGPORT_VAL" >> /app/.env
-        grep -q "^DB_DATABASE=" /app/.env && sed -i "s|DB_DATABASE=.*|DB_DATABASE=$PGDATABASE_VAL|g" /app/.env || echo "DB_DATABASE=$PGDATABASE_VAL" >> /app/.env
-        grep -q "^DB_USERNAME=" /app/.env && sed -i "s|DB_USERNAME=.*|DB_USERNAME=$PGUSER_VAL|g" /app/.env || echo "DB_USERNAME=$PGUSER_VAL" >> /app/.env
-        grep -q "^DB_PASSWORD=" /app/.env && sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$PGPASSWORD_VAL|g" /app/.env || echo "DB_PASSWORD=$PGPASSWORD_VAL" >> /app/.env
-    } 2>/dev/null || true
+    for VAR in DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD; do
+        VAL=$(eval echo "\$$VAR")
+        grep -q "^${VAR}=" /app/.env 2>/dev/null \
+            && sed -i "s|^${VAR}=.*|${VAR}=${VAL}|g" /app/.env \
+            || echo "${VAR}=${VAL}" >> /app/.env
+    done
 
     DB_MODE="pgsql"
+
 else
     DB_PATH="/app/storage/database.sqlite"
     echo "📁 SQLite: $DB_PATH"
@@ -68,23 +69,61 @@ fi
 
 # ─── 3. Pulizia config cache ─────────────────────────────────────────────────
 php artisan config:clear --no-interaction 2>/dev/null || true
-# NOTA: non eseguiamo config:cache qui perché causa problemi con env dinamici
 
-# ─── 4. Migrazioni (OBBLIGATORIE — se falliscono il container crasha) ────────
+# ─── 4. Migrazioni ───────────────────────────────────────────────────────────
 echo "▶ Migrazioni ($DB_MODE)..."
-if php artisan migrate --force --no-interaction 2>&1; then
-    echo "✅ Migrate OK"
-else
-    echo "❌ MIGRATE FALLITO — controlla i log per i dettagli"
-    echo "   Uscita del container per permettere il debugging"
+MIGRATE_OUT=$(php artisan migrate --force --no-interaction 2>&1)
+MIGRATE_EXIT=$?
+echo "$MIGRATE_OUT"
+
+if [ $MIGRATE_EXIT -ne 0 ]; then
+    echo "❌ migrate --force fallito (exit $MIGRATE_EXIT) — crash del container"
     exit 1
 fi
+echo "✅ Migrate OK"
 
-# ─── 5. Seed (sempre — il seeder si auto-protegge) ───────────────────────────
+# ─── 5. Verifica integrità schema (fix schema corrotto) ──────────────────────
+# Se migrate dice "Nothing to migrate" ma le tabelle fisiche non esistono,
+# eseguiamo migrate:fresh per resettare lo schema corrotto.
+if echo "$MIGRATE_OUT" | grep -qi "nothing to migrate"; then
+    echo "ℹ️  Nothing to migrate — verifico integrità schema..."
+
+    SCHEMA_OK=$(php -r "
+try {
+    \$pdo = new PDO(
+        'pgsql:host=' . getenv('DB_HOST') . ';port=' . (getenv('DB_PORT') ?: '5432') . ';dbname=' . getenv('DB_DATABASE') . ';sslmode=prefer',
+        getenv('DB_USERNAME'),
+        getenv('DB_PASSWORD'),
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+    );
+    \$s = \$pdo->query(\"SELECT COUNT(*) AS c FROM information_schema.tables WHERE table_schema='public' AND table_name='personal_access_tokens'\");
+    \$r = \$s->fetch(PDO::FETCH_ASSOC);
+    echo (\$r && \$r['c'] > 0) ? 'ok' : 'bad';
+} catch (Exception \$e) {
+    echo 'error:' . \$e->getMessage();
+}
+" 2>/dev/null || echo "bad")
+
+    echo "   Schema check: $SCHEMA_OK"
+
+    if [ "$SCHEMA_OK" != "ok" ]; then
+        echo "⚠️  Schema corrotto rilevato — eseguo migrate:fresh (reset completo)"
+        if php artisan migrate:fresh --force --no-interaction 2>&1; then
+            echo "✅ migrate:fresh completato — schema ripristinato"
+        else
+            echo "❌ migrate:fresh fallito — crash del container"
+            exit 1
+        fi
+    else
+        echo "✅ Schema integro"
+    fi
+fi
+
+# ─── 6. Seed (il seeder si auto-protegge con guard idempotente) ──────────────
 echo "▶ Seed..."
-php artisan db:seed --force --no-interaction 2>&1 || echo "⚠️  Seed skipped/fallito"
+php artisan db:seed --force --no-interaction 2>&1 || echo "⚠️  Seed skipped o fallito"
 
-# ─── 6. Storage link ─────────────────────────────────────────────────────────
+# ─── 7. Storage link ─────────────────────────────────────────────────────────
 php artisan storage:link --force 2>/dev/null || true
 
 echo ""
