@@ -222,28 +222,38 @@ export default function PosPage() {
     try {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
-      const [pRes, cRes, aRes, oRes, stRes] = await Promise.all([
+
+      // Carica prodotti + categorie + stock — sempre disponibili per dipendente
+      const [pRes, cRes, stRes] = await Promise.all([
         catalog.getProducts({ ...sp, limit: 500 }),
         catalog.getCategories(),
-        customersApi.getCustomers({ limit: 1000 }),
-        ordersApi.getOptions(sp),
         inventory.getStock({ ...sp, limit: 2000 }),
       ]);
       setProducts(pRes.data?.data || []);
       const allCats = cRes.data?.data || [];
       setCategories(allCats.filter(c => !c.parent_id));
-      // Normalizza il nome cliente (first_name+last_name o name)
-      const normalizedCustomers = (aRes.data?.data || []).map(c => ({
-        ...c,
-        name: c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email || `Cliente #${c.id}`,
-      }));
-      setAllCustomers(normalizedCustomers);
-      setEmployees(oRes.data?.data?.employees || []);
-      const whs = oRes.data?.data?.warehouses || [];
-      if (whs.length > 0) setWarehouseId(whs[0].id);
       const sm = {};
       (stRes.data?.data || []).forEach(si => { sm[si.product_variant_id] = si; });
       setStockMap(sm);
+
+      // Carica clienti — solo admin, dipendente può ricevere 403
+      try {
+        const aRes = await customersApi.getCustomers({ limit: 1000 });
+        const normalizedCustomers = (aRes.data?.data || []).map(c => ({
+          ...c,
+          name: c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email || `Cliente #${c.id}`,
+        }));
+        setAllCustomers(normalizedCustomers);
+      } catch { setAllCustomers([]); }
+
+      // Carica opzioni ordine (warehouse, employees) — disponibile per dipendente
+      try {
+        const oRes = await ordersApi.getOptions(sp);
+        setEmployees(oRes.data?.data?.employees || []);
+        const whs = oRes.data?.data?.warehouses || [];
+        if (whs.length > 0) setWarehouseId(whs[0].id);
+      } catch { /* continua senza warehouse/employees */ }
+
     } catch { toast.error('Errore caricamento dati POS'); }
     finally { setLoading(false); }
   }, [selectedStoreId]);
