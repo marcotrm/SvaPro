@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { supplierInvoices, suppliers as suppliersApi } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
+import DatePicker from '../components/DatePicker.jsx';
 
 export default function SupplierInvoicesPage() {
   const { selectedStoreId } = useOutletContext();
@@ -137,8 +138,8 @@ export default function SupplierInvoicesPage() {
             <div><label className="field-label">Metodo Pag.</label><input className="field-input" value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })} /></div>
             <div><label className="field-label">Totale €</label><input className="field-input" type="number" step="0.01" value={form.total_amount} onChange={e => setForm({ ...form, total_amount: e.target.value })} /></div>
             <div><label className="field-label">IVA €</label><input className="field-input" type="number" step="0.01" value={form.tax_amount} onChange={e => setForm({ ...form, tax_amount: e.target.value })} /></div>
-            <div><label className="field-label">Data Emissione</label><input className="field-input" type="date" value={form.issue_date} onChange={e => setForm({ ...form, issue_date: e.target.value })} /></div>
-            <div><label className="field-label">Scadenza</label><input className="field-input" type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} /></div>
+            <div><label className="field-label">Data Emissione</label><DatePicker className="field-input" name="issue_date" value={form.issue_date} onChange={e => setForm({ ...form, issue_date: e.target.value })} placeholder="Data emissione" /></div>
+            <div><label className="field-label">Scadenza</label><DatePicker className="field-input" name="due_date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} placeholder="Data scadenza" /></div>
             <div style={{ gridColumn: 'span 2' }}><label className="field-label">Note</label><input className="field-input" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
           </div>
           <div style={{ padding: '0 16px 8px' }}>

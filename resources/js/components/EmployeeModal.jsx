@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Loader, Shield } from 'lucide-react';
 import { employees } from '../api.jsx';
+import DatePicker from './DatePicker.jsx';
 
 const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition";
 const labelClass = "block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide";
@@ -129,12 +130,11 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
 
           <div>
             <label className={labelClass}>Data Assunzione <span className="text-gray-400 font-normal normal-case">(opzionale)</span></label>
-            <input
-              type="date"
+            <DatePicker
               name="hire_date"
               value={formData.hire_date}
               onChange={handleChange}
-              className={`${inputClass} ${fe('hire_date') ? 'border-red-400' : ''}`}
+              placeholder="Seleziona data assunzione"
             />
             {fe('hire_date') && <p className="mt-1 text-xs text-red-500">{fe('hire_date')}</p>}
           </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Loader, User, Building2, CheckCircle, Mail, Phone, RefreshCw, Upload, FileText, Trash2, Sparkles } from 'lucide-react';
 import { customers as customersApi } from '../api.jsx';
 import { calcolaCodiceFiscale, cercaComune } from '../utils/codiceFiscale.js';
+import DatePicker from './DatePicker.jsx';
 
 const TAB_PRIVATO = 'privato';
 const TAB_AZIENDA = 'azienda';
@@ -338,7 +339,7 @@ export default function CustomerModal({ customer, onClose, onSave }) {
                 <input className={S.input} name="phone" value={formData.phone} onChange={handleChange} placeholder="+39 333 1234567" />
               </Field>
               <Field label="Data di Nascita" error={fe('birth_date')}>
-                <input className={S.input} type="date" name="birth_date" value={formData.birth_date} onChange={handleChange} />
+                <DatePicker className={S.input} name="birth_date" value={formData.birth_date} onChange={handleChange} placeholder="Seleziona data di nascita" />
               </Field>
 
               <Field label="Sesso" error={fe('gender')}>

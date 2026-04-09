@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { promotions } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
+import DatePicker from '../components/DatePicker.jsx';
 
 const PROMO_TYPES = [
   { value: 'percentage', label: 'Percentuale (%)' },
@@ -154,8 +155,8 @@ export default function PromotionsPage() {
             <div><label className="field-label">Valore *</label><input className="field-input" type="number" step="0.01" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} placeholder={form.type === 'percentage' ? '10' : '5.00'} /></div>
             <div><label className="field-label">Ordine Minimo (€)</label><input className="field-input" type="number" step="0.01" value={form.min_order_amount} onChange={e => setForm({ ...form, min_order_amount: e.target.value })} /></div>
             <div><label className="field-label">Max Utilizzi</label><input className="field-input" type="number" value={form.max_uses} onChange={e => setForm({ ...form, max_uses: e.target.value })} /></div>
-            <div><label className="field-label">Inizio</label><input className="field-input" type="date" value={form.starts_at} onChange={e => setForm({ ...form, starts_at: e.target.value })} /></div>
-            <div><label className="field-label">Fine</label><input className="field-input" type="date" value={form.ends_at} onChange={e => setForm({ ...form, ends_at: e.target.value })} /></div>
+            <div><label className="field-label">Inizio</label><DatePicker className="field-input" name="starts_at" value={form.starts_at} onChange={e => setForm({ ...form, starts_at: e.target.value })} placeholder="Data inizio" /></div>
+            <div><label className="field-label">Fine</label><DatePicker className="field-input" name="ends_at" value={form.ends_at} onChange={e => setForm({ ...form, ends_at: e.target.value })} placeholder="Data fine" /></div>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '0 16px 16px' }}>
             <button className="btn btn-ghost" onClick={resetForm}>Annulla</button>
