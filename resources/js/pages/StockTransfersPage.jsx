@@ -45,7 +45,7 @@ export default function StockTransfersPage() {
 
             const [tRes, sRes] = await Promise.all([
                 stockTransfers.getAll(params),
-                storesApi.getAll(),
+                storesApi.getStores(),
             ]);
             setList(tRes.data?.data || []);
             setStores(sRes.data?.data || []);

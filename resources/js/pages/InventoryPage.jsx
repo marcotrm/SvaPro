@@ -46,7 +46,7 @@ export default function InventoryPage() {
     const loadAllStock = async () => {
       try {
         const [sRes, stRes] = await Promise.all([
-          storesApi.getAll(),
+          storesApi.getStores(),
           inventory.getStock({ limit: 5000 }),
         ]);
         setStoresList(sRes.data?.data || []);
