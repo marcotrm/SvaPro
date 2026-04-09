@@ -95,9 +95,26 @@ class CatalogController extends Controller
             ->get()
             ->groupBy('product_variant_id');
 
-        $data = $products->map(function ($product) use ($variants, $assignedStores) {
-            $productVariants = $variants->get($product->id, collect())->values()->map(function ($variant) use ($assignedStores) {
+        // Stock per variante (somma su tutti i magazzini del tenant)
+        $allVariantIds = $variants->flatten(1)->pluck('id')->all() ?: [0];
+        $stockByVariant = DB::table('stock_items')
+            ->where('tenant_id', $tenantId)
+            ->whereIn('product_variant_id', $allVariantIds)
+            ->select([
+                'product_variant_id',
+                DB::raw('SUM(on_hand) as total_on_hand'),
+                DB::raw('SUM(reserved) as total_reserved'),
+            ])
+            ->groupBy('product_variant_id')
+            ->get()
+            ->keyBy('product_variant_id');
+
+        $data = $products->map(function ($product) use ($variants, $assignedStores, $stockByVariant) {
+            $productVariants = $variants->get($product->id, collect())->values()->map(function ($variant) use ($assignedStores, $stockByVariant) {
                 $variant->assigned_stores = $assignedStores->get($variant->id, collect())->values();
+                $stock = $stockByVariant->get($variant->id);
+                $variant->on_hand        = $stock ? (int) $stock->total_on_hand : 0;
+                $variant->stock_quantity = $stock ? max(0, (int) $stock->total_on_hand - (int) $stock->total_reserved) : 0;
                 return $variant;
             });
 

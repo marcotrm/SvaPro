@@ -5,15 +5,14 @@ import { toast } from 'react-hot-toast';
 const QUICK_AMOUNTS = [5, 10, 20, 50, 100];
 
 export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
-  const [discountType, setDiscountType] = useState('none'); // 'none', 'value', 'percent', 'total_override'
+  const [discountType, setDiscountType] = useState('none');
   const [discountValue, setDiscountValue] = useState('');
-  
-  const [cashAmount, setCashAmount] = useState('');
+  const [cashAmount, setCashAmount] = useState(() => cartTotal > 0 ? cartTotal.toFixed(2) : '');
   const [cardAmount, setCardAmount] = useState('');
   const [receiptType, setReceiptType] = useState('fiscale');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Compute final total based on discounts
+  // Compute final total based on discounts  — deve stare PRIMA dello useEffect
   const finalTotal = useMemo(() => {
     let t = cartTotal;
     if (discountType === 'value') {
@@ -28,6 +27,11 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
     }
     return t;
   }, [cartTotal, discountType, discountValue]);
+
+  // Aggiorna pre-compilazione contanti quando cambia il totale (es. dopo sconto)
+  useEffect(() => {
+    if (!cardAmount) setCashAmount(finalTotal > 0 ? finalTotal.toFixed(2) : '');
+  }, [finalTotal]);
 
   const discountAmount = useMemo(() => {
     return Math.max(0, cartTotal - finalTotal);
@@ -76,8 +80,14 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
       receipt_type: receiptType
     };
 
-    await onComplete(payload);
-    setIsProcessing(false);
+    try {
+      await onComplete(payload);
+    } catch (err) {
+      // onComplete gestisce già il toast dell'errore internamente
+      console.error('Checkout error:', err);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
