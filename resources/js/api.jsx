@@ -596,7 +596,7 @@ export const purchaseOrders = {
   create: (data) => api.post('/purchase-orders', data),
   update: (id, data) => api.put(`/purchase-orders/${id}`, data),
   send: (id) => api.post(`/purchase-orders/${id}/send`),
-  receive: (id) => api.post(`/purchase-orders/${id}/receive`),
+  receive: (id, body = {}) => api.post(`/purchase-orders/${id}/receive`, body),
   cancel: (id) => api.post(`/purchase-orders/${id}/cancel`),
 };
 
