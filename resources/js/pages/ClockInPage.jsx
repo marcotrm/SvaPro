@@ -35,7 +35,11 @@ export default function ClockInPage() {
   useEffect(() => {
     setLoadingEmployees(true);
     attendance.getEmployeesKiosk()
-      .then(res => setEmployees(res.data?.data?.employees || []))
+      .then(res => {
+        // Il backend ritorna { data: [...employees...], server_time: "..." }
+        const list = res.data?.data;
+        setEmployees(Array.isArray(list) ? list : []);
+      })
       .catch(() => setEmployees([]))
       .finally(() => setLoadingEmployees(false));
   }, []);
