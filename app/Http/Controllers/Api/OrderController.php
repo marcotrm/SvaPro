@@ -67,6 +67,10 @@ class OrderController extends Controller
                 $join->on('st.id', '=', 'so.store_id')
                     ->where('st.tenant_id', '=', $tenantId);
             })
+            ->leftJoin('employees as emp', function ($join) use ($tenantId) {
+                $join->on('emp.id', '=', DB::raw('COALESCE(so.sold_by_employee_id, so.employee_id)'))
+                    ->where('emp.tenant_id', '=', $tenantId);
+            })
             ->leftJoin('loyalty_ledger as ll', function ($join) {
                 $join->on('ll.order_id', '=', 'so.id')
                     ->where('ll.event_type', '=', 'earn');
@@ -74,6 +78,8 @@ class OrderController extends Controller
             ->where('so.tenant_id', $tenantId)
             ->when($status !== 'all', fn ($query) => $query->where('so.status', $status))
             ->when($request->filled('store_id'), fn ($query) => $query->where('so.store_id', (int) $request->integer('store_id')))
+            ->when($request->filled('date_from'), fn ($query) => $query->where('so.created_at', '>=', $request->input('date_from')))
+            ->when($request->filled('date_to'), fn ($query) => $query->where('so.created_at', '<=', $request->input('date_to') . ' 23:59:59'))
             ->when($request->filled('supplier_id'), function ($query) use ($request, $tenantId) {
                 // Filtra ordini che contengono prodotti del fornitore specificato
                 $supplierId = (int) $request->integer('supplier_id');
@@ -111,7 +117,10 @@ class OrderController extends Controller
                 'so.id',
                 'so.store_id',
                 'so.customer_id',
+                'so.employee_id',
+                'so.sold_by_employee_id',
                 'so.status',
+                'so.channel',
                 'so.grand_total',
                 'so.currency',
                 'so.created_at',
@@ -120,20 +129,27 @@ class OrderController extends Controller
                 'c.last_name',
                 'st.id',
                 'st.name',
+                'emp.first_name',
+                'emp.last_name',
             ])
             ->select([
                 'so.id',
                 'so.store_id',
                 'so.customer_id',
+                'so.employee_id',
+                'so.sold_by_employee_id',
                 'so.status',
+                'so.channel',
                 'so.grand_total',
                 'so.currency',
                 'so.created_at',
                 'so.updated_at',
                 'c.first_name as customer_first_name',
                 'c.last_name as customer_last_name',
-                'st.id as warehouse_id',
-                'st.name as warehouse_name',
+                'st.id as store_db_id',
+                'st.name as store_name',
+                'emp.first_name as employee_first_name',
+                'emp.last_name as employee_last_name',
                 DB::raw('COALESCE(SUM(ll.points_delta), 0) as loyalty_points_awarded'),
             ])
             ->orderByDesc('so.created_at')
@@ -1200,26 +1216,36 @@ class OrderController extends Controller
 
     private function mapOrderListRow(object $row): array
     {
+        $empName = trim(($row->employee_first_name ?? '') . ' ' . ($row->employee_last_name ?? ''));
         return [
             'id' => (int) $row->id,
             'status' => (string) $row->status,
+            'channel' => (string) ($row->channel ?? 'pos'),
             'store_id' => $row->store_id !== null ? (int) $row->store_id : null,
+            'store_name' => $row->store_name ?? null,
+            'employee_id' => $row->employee_id !== null ? (int) $row->employee_id : null,
+            'sold_by_employee_id' => $row->sold_by_employee_id !== null ? (int) $row->sold_by_employee_id : null,
+            'employee_name' => $empName ?: null,
             'customer_id' => $row->customer_id !== null ? (int) $row->customer_id : null,
             'grand_total' => (float) $row->grand_total,
+            'total' => (float) $row->grand_total,
             'currency' => (string) ($row->currency ?: 'EUR'),
             'created_at' => $row->created_at,
             'updated_at' => $row->updated_at,
             'loyalty_points_awarded' => (int) $row->loyalty_points_awarded,
+            'customer_name' => $row->customer_first_name
+                ? trim(($row->customer_first_name ?? '') . ' ' . ($row->customer_last_name ?? ''))
+                : null,
             'customer' => ($row->customer_first_name || $row->customer_last_name)
                 ? [
                     'first_name' => (string) ($row->customer_first_name ?: ''),
                     'last_name' => (string) ($row->customer_last_name ?: ''),
                 ]
                 : null,
-            'warehouse' => $row->warehouse_id
+            'warehouse' => $row->store_id
                 ? [
-                    'id' => (int) $row->warehouse_id,
-                    'name' => (string) $row->warehouse_name,
+                    'id' => (int) $row->store_id,
+                    'name' => (string) ($row->store_name ?? 'Negozio'),
                 ]
                 : null,
         ];

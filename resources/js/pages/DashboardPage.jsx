@@ -15,11 +15,11 @@ const STORE_COLORS = ['#6C63AC','#22C55E','#F59E0B','#EF4444','#3B82F6','#EC4899
 
 /* ─── Period tabs ───────────────────────────────────────────── */
 const PERIODS = [
-  { id: 'today',   label: 'Oggi',       days: 1 },
-  { id: 'yesterday',label: 'Ieri',      days: 2, offset: 1 },
-  { id: 'week',    label: 'Settimana',  days: 7 },
-  { id: 'month',   label: 'Mese',       days: 30 },
-  { id: 'year',    label: 'Anno',       days: 365 },
+  { id: 'today',     label: 'Oggi',      chartPeriod: 'daily',   days: 1 },
+  { id: 'yesterday', label: 'Ieri',      chartPeriod: 'daily',   days: 2 },
+  { id: 'week',      label: 'Settimana', chartPeriod: 'daily',   days: 7 },
+  { id: 'month',     label: 'Mese',      chartPeriod: 'weekly',  days: 30 },
+  { id: 'year',      label: 'Anno',      chartPeriod: 'monthly', days: 365 },
 ];
 
 /* ─── piccoli helpers UI ────────────────────────────────────── */
@@ -150,11 +150,16 @@ export default function DashboardPage() {
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
       const period = PERIODS.find(p => p.id === activePeriod) || PERIODS[4];
 
+      // Calcola date_from per il filtro ordini
+      const dateFrom = new Date();
+      dateFrom.setDate(dateFrom.getDate() - period.days);
+      const dateFromStr = dateFrom.toISOString().slice(0, 10);
+
       // Fetch each independently so one failure doesn't break everything
       const [resSummary, resTrend, resOrders, resStock, resCust, resStores] = await Promise.allSettled([
         reports.summary(sp),
-        reports.revenueTrend({ ...sp, period: 'monthly', days: period.days }),
-        ordersApi.getOrders({ ...sp, limit: 20, status: 'paid' }),
+        reports.revenueTrend({ ...sp, period: period.chartPeriod, days: period.days }),
+        ordersApi.getOrders({ ...sp, limit: 200, status: 'paid', date_from: dateFromStr }),
         inventory.getStock({ ...sp, limit: 1000 }),
         customers.getCustomers({ limit: 1 }),
         storesApi.getStores(),
@@ -178,20 +183,35 @@ export default function DashboardPage() {
       // ── Revenue Trend Chart ───────────────────────────────────
       if (resTrend.status === 'fulfilled') {
         const trend = resTrend.value?.data?.data || [];
-        const MONTHS = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-        const monthly = MONTHS.map((m, i) => {
-          const found = trend.find(d => {
-            const rawPeriod = d.period ?? d.label ?? '';
-            const mo = new Date(rawPeriod.length === 7 ? rawPeriod + '-01' : rawPeriod).getMonth();
-            return mo === i;
+        if (activePeriod === 'year') {
+          // Monthly chart (12 mesi)
+          const MONTHS = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+          const monthly = MONTHS.map((m, i) => {
+            const found = trend.find(d => {
+              const rawPeriod = d.period ?? d.label ?? '';
+              const mo = new Date(rawPeriod.length === 7 ? rawPeriod + '-01' : rawPeriod).getMonth();
+              return mo === i;
+            });
+            return { label: m, revenue: parseFloat(found?.revenue || 0), orders: parseInt(found?.order_count ?? 0) };
           });
-          return {
-            label: m,
-            revenue: parseFloat(found?.revenue || 0),
-            orders:  parseInt(found?.order_count ?? found?.orders_count ?? found?.orders ?? 0),
-          };
-        });
-        setMonthlyChart(monthly);
+          setMonthlyChart(monthly);
+        } else if (activePeriod === 'month') {
+          // Weekly chart (4-5 settimane)
+          const weekly = trend.map(d => ({
+            label: `W${d.period?.slice(-2) || d.label || ''}`,
+            revenue: parseFloat(d.revenue || 0),
+            orders: parseInt(d.order_count ?? 0),
+          }));
+          setMonthlyChart(weekly.length ? weekly : [{ label: 'N/D', revenue: 0, orders: 0 }]);
+        } else {
+          // Daily chart (today/week/yesterday)
+          const daily = trend.map(d => ({
+            label: d.period ? new Date(d.period).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : (d.label || ''),
+            revenue: parseFloat(d.revenue || 0),
+            orders: parseInt(d.order_count ?? 0),
+          }));
+          setMonthlyChart(daily.length ? daily : [{ label: 'N/D', revenue: 0, orders: 0 }]);
+        }
       }
 
       // ── Recent Orders & Employee Activity ─────────────────────
@@ -199,19 +219,28 @@ export default function DashboardPage() {
         const ordersList = resOrders.value?.data?.data || [];
         setRecentOrders(ordersList);
 
-        // Employee activity: group by employee name, compute sales count + revenue
+        // Employee activity — usa employee_name dal backend
         const empMap = {};
         ordersList.forEach(o => {
-          const name = o.employee_name || o.sold_by_name || o.cashier_name || null;
-          const empId = o.employee_id || o.sold_by_employee_id;
-          if (!name && !empId) return;
-          const key = name || `Operatore #${empId}`;
-          if (!empMap[key]) empMap[key] = { name: key, sales: 0, revenue: 0, lastAt: null };
-          empMap[key].sales++;
-          empMap[key].revenue += parseFloat(o.total || o.grand_total || 0);
-          if (!empMap[key].lastAt || o.created_at > empMap[key].lastAt) empMap[key].lastAt = o.created_at;
+          const name = o.employee_name; // ora restituito dal backend
+          if (!name) return;
+          if (!empMap[name]) empMap[name] = { name, sales: 0, revenue: 0 };
+          empMap[name].sales++;
+          empMap[name].revenue += parseFloat(o.total || o.grand_total || 0);
         });
         setEmployeeActivity(Object.values(empMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
+
+        // Store ranking — usa store_id + store_name dal backend
+        const storeMap = {};
+        ordersList.forEach(o => {
+          const sId = o.store_id;
+          const sName = o.store_name || o.warehouse?.name || `Negozio #${sId}`;
+          if (!sId) return;
+          if (!storeMap[sId]) storeMap[sId] = { id: sId, name: sName, revenue: 0, orders: 0 };
+          storeMap[sId].revenue += parseFloat(o.total || o.grand_total || 0);
+          storeMap[sId].orders++;
+        });
+        setStoreRanking(Object.values(storeMap).sort((a, b) => b.revenue - a.revenue));
 
         // Top products
         const topProd = [...ordersList]
@@ -224,18 +253,6 @@ export default function DashboardPage() {
             return acc;
           }, {});
         setTopProducts(Object.values(topProd).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
-
-        // Store ranking from orders
-        const storeMap = {};
-        ordersList.forEach(o => {
-          const sId = o.store_id;
-          const sName = o.store_name || `Negozio #${sId}`;
-          if (!sId) return;
-          if (!storeMap[sId]) storeMap[sId] = { id: sId, name: sName, revenue: 0, orders: 0 };
-          storeMap[sId].revenue += parseFloat(o.total || o.grand_total || 0);
-          storeMap[sId].orders++;
-        });
-        setStoreRanking(Object.values(storeMap).sort((a, b) => b.revenue - a.revenue));
       }
 
       // ── Customer Count ─────────────────────────────────────────
@@ -271,26 +288,27 @@ export default function DashboardPage() {
   const revenueSparkbar  = monthlyChart.slice(-8).map(d => ({ v: d.revenue }));
   const ordersSparkline  = monthlyChart.slice(-8).map((_, i) => ({ v: Math.max(0, (kpi?.orders_count || 0) / 8 + (i % 3) * 2) }));
 
-  // Donut: per negozio con switchable
+  // Donut: per negozio (automatico, senza switch)
   const donutData = useMemo(() => {
-    if (donutStoreId === 'all') {
-      // Group by channel
+    // Raggruppa per negozio direttamente
+    const byStore = {};
+    recentOrders.forEach(o => {
+      const sId = String(o.store_id || 'unknown');
+      const name = o.store_name || o.warehouse?.name || (o.store_id ? `Negozio #${o.store_id}` : 'Non assegnato');
+      if (!byStore[sId]) byStore[sId] = { name, value: 0 };
+      byStore[sId].value++;
+    });
+    const result = Object.values(byStore);
+    if (result.length === 0) {
+      // Fallback: mostra canali se non ci sono store_id negli ordini
       return [
         { name: 'POS',  value: recentOrders.filter(o => o.channel === 'pos').length  || 1 },
         { name: 'Web',  value: recentOrders.filter(o => o.channel === 'web').length  || 1 },
         { name: 'Altro',value: recentOrders.filter(o => !['pos','web'].includes(o.channel)).length || 1 },
       ];
     }
-    // Group by store
-    const byStore = {};
-    recentOrders.forEach(o => {
-      const sId = String(o.store_id);
-      const name = o.store_name || storesList.find(s => String(s.id) === sId)?.name || `Negozio #${sId}`;
-      if (!byStore[sId]) byStore[sId] = { name, value: 0 };
-      byStore[sId].value++;
-    });
-    return Object.values(byStore).length > 0 ? Object.values(byStore) : [{ name: 'Nessun dato', value: 1 }];
-  }, [recentOrders, donutStoreId, storesList]);
+    return result;
+  }, [recentOrders]);
 
   const avatarColors = ['#9B8FD4','#6C63AC','#C5BEE8','#A78BFA','#7C3AED'];
 
@@ -384,24 +402,14 @@ export default function DashboardPage() {
         {/* ── Riga media: donut (per negozio) + attività dipendenti ── */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1.6fr', gap:16 }}>
 
-          {/* Canali vendita per NEGOZIO (switchable) */}
+          {/* Distribuzione Negozi (donut — automatico) */}
           <div style={{ background:'var(--color-surface)', borderRadius:20, padding:24,
             boxShadow:'0 1px 8px rgba(0,0,0,0.04)', border:'1px solid var(--color-border)' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-              <span style={{ fontWeight:700, fontSize:14 }}>Vendite per negozio</span>
-              {/* Switch store */}
-              <select
-                value={donutStoreId}
-                onChange={e => setDonutStoreId(e.target.value)}
-                style={{
-                  fontSize:11, fontWeight:600, border:'1px solid var(--color-border)',
-                  borderRadius:8, padding:'3px 8px', background:'var(--color-bg)',
-                  color:'var(--color-text-secondary)', cursor:'pointer', outline:'none',
-                }}
-              >
-                <option value="all">Tutti</option>
-                {storesList.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-              </select>
+              <span style={{ fontWeight:700, fontSize:14 }}>Distribuzione Negozi</span>
+              <span style={{ fontSize:11, color:'var(--color-text-tertiary)' }}>
+                {PERIODS.find(p => p.id === activePeriod)?.label}
+              </span>
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:16 }}>
               <DonutChart data={donutData} colors={STORE_COLORS} />
