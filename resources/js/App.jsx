@@ -158,6 +158,9 @@ export default function App() {
               <Route path="/attendance" element={<AttendancePage />} />
               <Route path="/clock-in" element={<ClockInPage />} />
               <Route path="/stock-transfers" element={<StockTransfersPage />} />
+              <Route path="/stores" element={<StoresPage />} />
+            </Route>
+          </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
