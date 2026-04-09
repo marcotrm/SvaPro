@@ -51,7 +51,8 @@ export default function EmployeesPage() {
     .filter(e =>
       e.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.store_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      e.store_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.barcode?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
   const initials = e => `${e.first_name?.[0] || ''}${e.last_name?.[0] || ''}`.toUpperCase();
@@ -120,6 +121,7 @@ export default function EmployeesPage() {
           <thead>
             <tr>
               <th>Nome</th>
+              <th>Codice</th>
               <th>Store</th>
               <th>Ordini</th>
               <th>Punti</th>
@@ -146,6 +148,25 @@ export default function EmployeesPage() {
                       <div className="avatar-sub">Assunto: {employee.hire_date ? new Date(employee.hire_date).toLocaleDateString('it-IT') : '-'}</div>
                     </div>
                   </div>
+                </td>
+                <td>
+                  {employee.barcode ? (
+                    <span className="mono" style={{
+                      background: 'var(--color-bg, #f8f9fa)',
+                      border: '1px solid var(--color-border, #e9ecef)',
+                      borderRadius: 6,
+                      padding: '2px 8px',
+                      fontSize: 12,
+                      letterSpacing: '0.08em',
+                      color: 'var(--color-accent, #6366f1)',
+                      fontWeight: 700,
+                      display: 'inline-block',
+                    }}>
+                      {employee.barcode}
+                    </span>
+                  ) : (
+                    <span style={{color:'var(--muted)', fontSize:12}}>—</span>
+                  )}
                 </td>
                 <td style={{color:'var(--muted2)'}}>{employee.store_name || '-'}</td>
                 <td className="mono">{employee.orders_count || 0}</td>
