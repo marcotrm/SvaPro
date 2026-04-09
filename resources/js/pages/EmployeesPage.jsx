@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { employees } from '../api.jsx';
 import { EmployeesSkeleton } from '../components/Skeleton.jsx';
@@ -121,7 +121,14 @@ export default function EmployeesPage() {
               <tr key={employee.id}>
                 <td>
                   <div className="avatar-cell">
-                    <div className="avatar-sm">{initials(employee)}</div>
+                    <div className="avatar-sm" style={{ overflow: 'hidden', padding: 0 }}>
+                      {employee.photo_url ? (
+                        <img src={employee.photo_url} alt={`${employee.first_name} ${employee.last_name}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                      ) : (
+                        <span>{initials(employee)}</span>
+                      )}
+                    </div>
                     <div>
                       <div className="avatar-name">{employee.first_name} {employee.last_name}</div>
                       <div className="avatar-sub">Assunto: {employee.hire_date ? new Date(employee.hire_date).toLocaleDateString('it-IT') : '-'}</div>

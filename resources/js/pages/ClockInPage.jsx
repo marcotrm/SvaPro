@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { attendance as attendanceApi } from '../api.jsx';
+import { attendance } from '../api.jsx';
 
 /**
  * ClockInPage — Kiosk per timbrature dipendenti
@@ -34,7 +34,7 @@ export default function ClockInPage() {
   // Load employees
   useEffect(() => {
     setLoadingEmployees(true);
-    attendanceApi.getEmployeesForKiosk()
+    attendance.getEmployeesKiosk()
       .then(res => setEmployees(res.data?.data?.employees || []))
       .catch(() => setEmployees([]))
       .finally(() => setLoadingEmployees(false));
@@ -145,9 +145,9 @@ export default function ClockInPage() {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'linear-gradient(160deg, #0e1726 0%, #1a1a2e 50%, #0f1723 100%)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      fontFamily: "'Inter', system-ui, sans-serif", overflow: 'hidden',
+      minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      background: 'linear-gradient(160deg, #0e1726 0%, #1a1a2e 50%, #0f1723 100%)',
+      borderRadius: 24, padding: '40px 20px', position: 'relative',
     }}>
       {/* Orologio */}
       <div style={{ position: 'absolute', top: 28, left: 0, right: 0, textAlign: 'center' }}>
@@ -239,12 +239,15 @@ export default function ClockInPage() {
                       onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
                     >
                       <div style={{
-                        width: 36, height: 36, borderRadius: '50%',
+                        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
                         background: 'linear-gradient(135deg, #c9a227, #f0c035)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 16, fontWeight: 900, color: '#0e1726', flexShrink: 0,
+                        fontSize: 16, fontWeight: 900, color: '#0e1726', overflow: 'hidden',
                       }}>
-                        {(emp.first_name || emp.name || '?')[0].toUpperCase()}
+                        {emp.photo_url
+                          ? <img src={emp.photo_url} alt={emp.first_name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                          : (emp.first_name || emp.name || '?')[0].toUpperCase()
+                        }
                       </div>
                       <div>
                         <div>{emp.first_name || ''} {emp.last_name || emp.name || ''}</div>

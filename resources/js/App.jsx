@@ -156,15 +156,8 @@ export default function App() {
               <Route path="/employees/kpi" element={<EmployeeKpiPage />} />
               <Route path="/inventory/count" element={<InventoryCountPage />} />
               <Route path="/attendance" element={<AttendancePage />} />
+              <Route path="/clock-in" element={<ClockInPage />} />
               <Route path="/stock-transfers" element={<StockTransfersPage />} />
-              <Route path="/stores" element={<StoresPage />} />
-            </Route>
-          </Route>
-
-          {/* Standalone pages (no sidebar) */}
-          <Route element={<ProtectedRoute user={user} />}>
-            <Route path="/clock-in" element={<ClockInPage />} />
-          </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

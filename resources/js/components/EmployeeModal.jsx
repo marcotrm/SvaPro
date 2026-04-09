@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Loader, Shield, ScanBarcode } from 'lucide-react';
+import { X, Loader, Shield, ScanBarcode, Camera, Upload } from 'lucide-react';
 import { employees } from '../api.jsx';
 import DatePicker from './DatePicker.jsx';
 
@@ -14,10 +14,13 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
     barcode: employee?.barcode || '',
     hire_date: employee?.hire_date || '',
     status: employee?.status || 'active',
+    photo_url: employee?.photo_url || '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const [photoPreview, setPhotoPreview] = useState(employee?.photo_url || null);
+  const photoInputRef = useRef(null);
 
   useEffect(() => {
     setFormData({
@@ -27,7 +30,9 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       barcode: employee?.barcode || '',
       hire_date: employee?.hire_date || '',
       status: employee?.status || 'active',
+      photo_url: employee?.photo_url || '',
     });
+    setPhotoPreview(employee?.photo_url || null);
     setFieldErrors({});
     setError('');
   }, [employee, selectedStoreId]);
@@ -36,6 +41,22 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     if (fieldErrors[name]) setFieldErrors(prev => ({ ...prev, [name]: null }));
+  };
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Foto troppo grande. Max 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target.result;
+      setPhotoPreview(base64);
+      setFormData(prev => ({ ...prev, photo_url: base64 }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e) => {
@@ -65,10 +86,11 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
   };
 
   const fe = (field) => fieldErrors[field]?.[0];
+  const initials = `${formData.first_name?.[0] || ''}${formData.last_name?.[0] || ''}`.toUpperCase() || '?';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">
             {employee ? 'Modifica Dipendente' : 'Nuovo Dipendente'}
@@ -85,6 +107,77 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
               {error}
             </div>
           )}
+
+          {/* ── FOTO PROFILO ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, paddingBottom: 8 }}>
+            {/* Avatar / preview */}
+            <div
+              onClick={() => photoInputRef.current?.click()}
+              style={{
+                width: 96, height: 96, borderRadius: '50%', cursor: 'pointer',
+                background: photoPreview ? 'transparent' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '3px solid #e5e7eb', overflow: 'hidden', position: 'relative',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.12)', transition: 'transform 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              {photoPreview ? (
+                <img src={photoPreview} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: 32, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{initials}</span>
+              )}
+              {/* Camera overlay on hover */}
+              <div style={{
+                position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: 0, transition: 'opacity 0.15s',
+              }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+              >
+                <Camera size={24} color="#fff" />
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e7eb',
+                  background: '#f9fafb', color: '#4b5563', fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}
+              >
+                <Upload size={13} />
+                {photoPreview ? 'Cambia foto' : 'Carica foto'}
+              </button>
+              {photoPreview && (
+                <button
+                  type="button"
+                  onClick={() => { setPhotoPreview(null); setFormData(p => ({ ...p, photo_url: '' })); }}
+                  style={{
+                    marginLeft: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid #fecaca',
+                    background: '#fef2f2', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  Rimuovi
+                </button>
+              )}
+              <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>JPG, PNG — max 2MB. La foto appare nel profilo e nelle timbrature.</p>
+            </div>
+
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handlePhotoChange}
+            />
+          </div>
 
           <div>
             <label className={labelClass}>Store *</label>
@@ -145,7 +238,7 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
           <div>
             <label className={labelClass} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <ScanBarcode size={13} /> Cod. A Barre Operatore
-              <span className="text-gray-400 font-normal normal-case">(scanner POS)</span>
+              <span className="text-gray-400 font-normal normal-case">(scanner POS / timbra)</span>
             </label>
             <input
               type="text"
