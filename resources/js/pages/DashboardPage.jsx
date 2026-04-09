@@ -131,60 +131,92 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
-      const [resSummary, resTrend, resOrders, resStock, resCust] = await Promise.all([
+
+      // Fetch each independently so one failure doesn't break everything
+      const [resSummary, resTrend, resOrders, resStock, resCust] = await Promise.allSettled([
         reports.summary(sp),
         reports.revenueTrend({ ...sp, period: 'monthly', days: 365 }),
-        ordersApi.getOrders({ ...sp, limit: 6 }),
+        ordersApi.getOrders({ ...sp, limit: 6, status: 'paid' }),
         inventory.getStock({ ...sp, limit: 1000 }),
-        customers.getCustomers({ ...sp, limit: 1 }),
+        customers.getCustomers({ limit: 1 }),
       ]);
 
-      const raw = resSummary.data?.data;
-      // Normalize field names (API uses 'revenue', dashboard uses 'revenue_total' etc.)
-      setKpi(raw ? {
-        revenue_total:  raw.revenue        ?? raw.revenue_total  ?? 0,
-        orders_count:   raw.orders         ?? raw.orders_count   ?? 0,
-        avg_order:      raw.avg_order      ?? 0,
-        revenue_trend:  raw.delta_revenue  ?? raw.revenue_trend  ?? null,
-        orders_trend:   raw.delta_orders   ?? raw.orders_trend   ?? null,
-        total_customers: raw.total_customers ?? 0,
-        new_customers:  raw.new_customers  ?? 0,
-        low_stock:      raw.low_stock      ?? 0,
-      } : null);
+      // ── KPI Summary ──────────────────────────────────────────────
+      if (resSummary.status === 'fulfilled') {
+        const raw = resSummary.value?.data?.data;
+        console.log('[Dashboard] summary raw:', raw);
+        setKpi(raw ? {
+          revenue_total:   raw.revenue        ?? raw.revenue_total  ?? 0,
+          orders_count:    raw.orders         ?? raw.orders_count   ?? 0,
+          avg_order:       raw.avg_order      ?? 0,
+          revenue_trend:   raw.delta_revenue  ?? raw.revenue_trend  ?? null,
+          orders_trend:    raw.delta_orders   ?? raw.orders_trend   ?? null,
+          total_customers: raw.total_customers ?? 0,
+          new_customers:   raw.new_customers  ?? 0,
+          low_stock:       raw.low_stock      ?? 0,
+        } : null);
+      }
 
-
-      // Build 12-month chart
-      const MONTHS = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-      const trend = resTrend.data?.data || [];
-      const monthly = MONTHS.map((m, i) => {
-        const found = trend.find(d => {
-          const mo = new Date(d.label + '-01').getMonth();
-          return mo === i;
+      // ── Revenue Trend Chart ──────────────────────────────────────
+      // API returns: { period: '2026-03', order_count: N, revenue: X, ... }
+      if (resTrend.status === 'fulfilled') {
+        const trend = resTrend.value?.data?.data || [];
+        console.log('[Dashboard] trend sample:', trend[0]);
+        const MONTHS = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+        const monthly = MONTHS.map((m, i) => {
+          const found = trend.find(d => {
+            // 'period' field is either 'YYYY-MM' (monthly) or 'YYYY-MM-DD' (daily)
+            const rawPeriod = d.period ?? d.label ?? '';
+            const mo = new Date(rawPeriod.length === 7 ? rawPeriod + '-01' : rawPeriod).getMonth();
+            return mo === i;
+          });
+          return {
+            label: m,
+            revenue: parseFloat(found?.revenue || 0),
+            orders:  parseInt(found?.order_count ?? found?.orders_count ?? found?.orders ?? 0),
+          };
         });
-        return { label: m, revenue: parseFloat(found?.revenue || 0), orders: parseInt(found?.orders_count || 0) };
-      });
-      setMonthlyChart(monthly);
+        setMonthlyChart(monthly);
+      }
 
-      const ordersList = resOrders.data?.data || [];
-      setRecentOrders(ordersList);
+      // ── Recent Orders & Top Products ────────────────────────────
+      if (resOrders.status === 'fulfilled') {
+        const ordersList = resOrders.value?.data?.data || [];
+        console.log('[Dashboard] orders count:', ordersList.length);
+        setRecentOrders(ordersList);
+        const topProd = [...ordersList]
+          .flatMap(o => o.lines || [])
+          .reduce((acc, line) => {
+            const key = line.product_name || line.sku || `#${line.product_variant_id}`;
+            if (!acc[key]) acc[key] = { name: key, qty: 0, revenue: 0 };
+            acc[key].qty     += line.qty || 0;
+            acc[key].revenue += (line.qty || 0) * (line.unit_price || 0);
+            return acc;
+          }, {});
+        setTopProducts(Object.values(topProd).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
+      }
 
-      const topProd = [...(resOrders.data?.data || [])]
-        .flatMap(o => o.lines || [])
-        .reduce((acc, line) => {
-          const key = line.product_name || line.sku || `#${line.product_variant_id}`;
-          if (!acc[key]) acc[key] = { name: key, qty: 0, revenue: 0, sale: line.unit_price || 0 };
-          acc[key].qty     += line.qty || 0;
-          acc[key].revenue += (line.qty || 0) * (line.unit_price || 0);
-          return acc;
-        }, {});
-      setTopProducts(Object.values(topProd).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
+      // ── Customer Count ──────────────────────────────────────────
+      if (resCust.status === 'fulfilled') {
+        const custData = resCust.value?.data;
+        // Try multiple paths: meta.total, meta.pagination.total, data.length
+        const total = custData?.meta?.total
+          ?? custData?.meta?.pagination?.total
+          ?? custData?.pagination?.total
+          ?? custData?.total
+          ?? null;
+        console.log('[Dashboard] custTotal:', total, 'meta:', custData?.meta);
+        setCustCount(total !== null ? total : (custData?.data?.length ?? 0));
+      }
 
-      setCustCount(resCust.data?.meta?.total || 0);
+      // ── Stock Stats ─────────────────────────────────────────────
+      if (resStock.status === 'fulfilled') {
+        const stockList = resStock.value?.data?.data || [];
+        const low = stockList.filter(i => i.on_hand > 0 && i.on_hand < (i.reorder_point || 10)).length;
+        const out = stockList.filter(i => i.on_hand <= 0).length;
+        setStockStats({ low, out, total: stockList.length });
+      }
 
-      const stockList = resStock.data?.data || [];
-      const low = stockList.filter(i => i.on_hand > 0 && i.on_hand < (i.reorder_point || 10)).length;
-      const out = stockList.filter(i => i.on_hand <= 0).length;
-      setStockStats({ low, out, total: stockList.length });
     } catch (err) {
       console.error('Dashboard fetch error:', err);
     } finally { setLoading(false); }
