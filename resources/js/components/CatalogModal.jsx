@@ -100,6 +100,7 @@ const createEmptyVariant = () => ({
   excise_unit_amount_override: '',
   prevalenza_code: '',
   prevalenza_label: '',
+  cli_code: '',
 });
 
 const normalizeVariant = (v = {}) => ({
@@ -121,6 +122,7 @@ const normalizeVariant = (v = {}) => ({
   excise_unit_amount_override: v.excise_unit_amount_override ?? '',
   prevalenza_code: v.prevalenza_code ?? '',
   prevalenza_label: v.prevalenza_label ?? '',
+  cli_code: v.cli_code ?? '',
 });
 
 const normalizeProduct = (product, storesList, selectedStoreId = '') => {
@@ -575,6 +577,17 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                       <div>
                         <label className="sp-label">Accisa Unitaria Override (€)</label>
                         <input className="sp-input" type="number" step="0.001" value={v.excise_unit_amount_override} onChange={e => handleVariantChange(idx, 'excise_unit_amount_override', e.target.value)} placeholder="Auto da regole" />
+                      </div>
+                      <div>
+                        <label className="sp-label">🔑 Codice CLI (Accise Doganali)</label>
+                        <input
+                          className="sp-input"
+                          value={v.cli_code}
+                          onChange={e => handleVariantChange(idx, 'cli_code', e.target.value)}
+                          placeholder="Es: CLI-IT-00123"
+                          style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}
+                        />
+                        <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Codice identificativo doganale per le accise sui liquidi da inalazione</p>
                       </div>
                       <div style={{ gridColumn: '1/-1' }}>
                         <label className="sp-label">Prevalenza Tabaccosa</label>

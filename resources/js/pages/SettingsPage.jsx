@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [tenantName, setTenantName] = useState('');
   const [tenantVat, setTenantVat] = useState('');
   const [tenantTimezone, setTenantTimezone] = useState('Europe/Rome');
+  const [tenantLicense, setTenantLicense] = useState('');
   const [tenantMsg, setTenantMsg] = useState('');
   const [tenantErr, setTenantErr] = useState('');
   const [savingTenant, setSavingTenant] = useState(false);
@@ -40,6 +41,7 @@ export default function SettingsPage() {
           setTenantName(t.name || '');
           setTenantVat(t.vat_number || '');
           setTenantTimezone(t.timezone || 'Europe/Rome');
+          setTenantLicense(t.license_code || '');
         }
       }).catch(() => {});
     }
@@ -83,6 +85,7 @@ export default function SettingsPage() {
         name: tenantName,
         vat_number: tenantVat,
         timezone: tenantTimezone,
+        license_code: tenantLicense,
       });
       clearApiCache();
       setTenantMsg('Impostazioni tenant aggiornate.');
@@ -125,6 +128,22 @@ export default function SettingsPage() {
              <div className="p-8">
                <form onSubmit={handleSaveProfile} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                     {/* Codice Licenza */}
+                     <div className="space-y-2" style={{ gridColumn: '1/-1' }}>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">?? Codice Licenza</label>
+                        <div className="relative group">
+                           <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                           <input
+                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none font-mono tracking-widest"
+                             value={tenantLicense}
+                             onChange={e => setTenantLicense(e.target.value.toUpperCase())}
+                             placeholder="Es: SVAPRO-XXXX-XXXX-XXXX"
+                             maxLength={32}
+                           />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 ml-1">Inserisci il codice di licenza fornito da SvaPro per attivare funzioni premium.</p>
+                     </div>
                      <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
                         <div className="relative group">
@@ -134,6 +153,22 @@ export default function SettingsPage() {
                              value={name} onChange={e => setName(e.target.value)} required 
                            />
                         </div>
+                     </div>
+
+                     {/* Codice Licenza */}
+                     <div className="space-y-2" style={{ gridColumn: '1/-1' }}>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">?? Codice Licenza</label>
+                        <div className="relative group">
+                           <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                           <input
+                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none font-mono tracking-widest"
+                             value={tenantLicense}
+                             onChange={e => setTenantLicense(e.target.value.toUpperCase())}
+                             placeholder="Es: SVAPRO-XXXX-XXXX-XXXX"
+                             maxLength={32}
+                           />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 ml-1">Inserisci il codice di licenza fornito da SvaPro per attivare funzioni premium.</p>
                      </div>
                      <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Aziendale</label>
@@ -155,7 +190,23 @@ export default function SettingsPage() {
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                       <div className="space-y-2">
+  
+                     {/* Codice Licenza */}
+                     <div className="space-y-2" style={{ gridColumn: '1/-1' }}>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">?? Codice Licenza</label>
+                        <div className="relative group">
+                           <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                           <input
+                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none font-mono tracking-widest"
+                             value={tenantLicense}
+                             onChange={e => setTenantLicense(e.target.value.toUpperCase())}
+                             placeholder="Es: SVAPRO-XXXX-XXXX-XXXX"
+                             maxLength={32}
+                           />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 ml-1">Inserisci il codice di licenza fornito da SvaPro per attivare funzioni premium.</p>
+                     </div>
+                     <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password Corrente</label>
                           <input 
                             type="password"
@@ -163,7 +214,23 @@ export default function SettingsPage() {
                             value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}
                           />
                        </div>
-                       <div className="space-y-2">
+  
+                     {/* Codice Licenza */}
+                     <div className="space-y-2" style={{ gridColumn: '1/-1' }}>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">?? Codice Licenza</label>
+                        <div className="relative group">
+                           <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                           <input
+                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none font-mono tracking-widest"
+                             value={tenantLicense}
+                             onChange={e => setTenantLicense(e.target.value.toUpperCase())}
+                             placeholder="Es: SVAPRO-XXXX-XXXX-XXXX"
+                             maxLength={32}
+                           />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 ml-1">Inserisci il codice di licenza fornito da SvaPro per attivare funzioni premium.</p>
+                     </div>
+                     <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nuova Password</label>
                           <input 
                             type="password"
@@ -171,7 +238,23 @@ export default function SettingsPage() {
                             value={newPassword} onChange={e => setNewPassword(e.target.value)}
                           />
                        </div>
-                       <div className="space-y-2">
+  
+                     {/* Codice Licenza */}
+                     <div className="space-y-2" style={{ gridColumn: '1/-1' }}>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">?? Codice Licenza</label>
+                        <div className="relative group">
+                           <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                           <input
+                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none font-mono tracking-widest"
+                             value={tenantLicense}
+                             onChange={e => setTenantLicense(e.target.value.toUpperCase())}
+                             placeholder="Es: SVAPRO-XXXX-XXXX-XXXX"
+                             maxLength={32}
+                           />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 ml-1">Inserisci il codice di licenza fornito da SvaPro per attivare funzioni premium.</p>
+                     </div>
+                     <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Conferma Nuova</label>
                           <input 
                             type="password"
@@ -208,7 +291,23 @@ export default function SettingsPage() {
                <div className="p-8">
                  <form onSubmit={handleSaveTenant} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       <div className="space-y-2">
+  
+                     {/* Codice Licenza */}
+                     <div className="space-y-2" style={{ gridColumn: '1/-1' }}>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">?? Codice Licenza</label>
+                        <div className="relative group">
+                           <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                           <input
+                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none font-mono tracking-widest"
+                             value={tenantLicense}
+                             onChange={e => setTenantLicense(e.target.value.toUpperCase())}
+                             placeholder="Es: SVAPRO-XXXX-XXXX-XXXX"
+                             maxLength={32}
+                           />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 ml-1">Inserisci il codice di licenza fornito da SvaPro per attivare funzioni premium.</p>
+                     </div>
+                     <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ragione Sociale</label>
                           <div className="relative group">
                              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
@@ -218,7 +317,23 @@ export default function SettingsPage() {
                              />
                           </div>
                        </div>
-                       <div className="space-y-2">
+  
+                     {/* Codice Licenza */}
+                     <div className="space-y-2" style={{ gridColumn: '1/-1' }}>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">?? Codice Licenza</label>
+                        <div className="relative group">
+                           <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                           <input
+                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none font-mono tracking-widest"
+                             value={tenantLicense}
+                             onChange={e => setTenantLicense(e.target.value.toUpperCase())}
+                             placeholder="Es: SVAPRO-XXXX-XXXX-XXXX"
+                             maxLength={32}
+                           />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 ml-1">Inserisci il codice di licenza fornito da SvaPro per attivare funzioni premium.</p>
+                     </div>
+                     <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Partita IVA / Tax ID</label>
                           <div className="relative group">
                              <Landmark className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
