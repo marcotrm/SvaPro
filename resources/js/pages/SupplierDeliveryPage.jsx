@@ -22,12 +22,20 @@ export default function SupplierDeliveryPage() {
 
   // Form state
   const [step, setStep] = useState(1); // 1=info, 2=products, 3=confirm
+  const [ddtType, setDdtType] = useState('carico'); // 'carico' | 'scarico_vendita' | 'conto_visione'
   const [supplierId, setSupplierId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [ddtNumber, setDdtNumber] = useState(`DDT-${Date.now().toString().slice(-6)}`);
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState([{ product_variant_id: '', product_name: '', qty: 1, unit_cost: 0 }]);
+
+  const DDT_TYPES = [
+    { id: 'carico',          label: '📦 Carico Merce',      sub: 'Fornitore → Magazzino (+stock)',           qtySign: +1, color: '#065f46', bg: '#d1fae5' },
+    { id: 'scarico_vendita', label: '🛒 Scarico Vendita',   sub: 'Genera fattura immediata (-stock)',          qtySign: -1, color: '#1d4ed8', bg: '#dbeafe' },
+    { id: 'conto_visione',   label: '👁 Conto Visione',     sub: 'Trasferimento bene (fattura posticipata)',   qtySign:  0, color: '#92400e', bg: '#fef3c7' },
+  ];
+  const activeDdtType = DDT_TYPES.find(t => t.id === ddtType) || DDT_TYPES[0];
 
   // Status
   const [saving, setSaving] = useState(false);
@@ -88,14 +96,16 @@ export default function SupplierDeliveryPage() {
       // Update stock for each line
       const errors = [];
       for (const line of validLines) {
-        if (!line.product_variant_id) continue; // skip lines with only name (no ID)
+        if (!line.product_variant_id) continue;
+        // Conto visione: non modifica stock
+        if (ddtType === 'conto_visione') continue;
         try {
           await inventory.adjustStock({
             product_variant_id: parseInt(line.product_variant_id),
             store_id: parseInt(warehouseId),
-            qty_change: parseInt(line.qty),
-            reason: `DDT fornitore ${ddtNumber}`,
-            notes: `Scarico fornitore: ${suppliersList.find(s => String(s.id) === String(supplierId))?.name || supplierId}`,
+            qty_change: activeDdtType.qtySign * parseInt(line.qty),
+            reason: `DDT ${ddtType} ${ddtNumber}`,
+            notes: `${activeDdtType.label}: ${suppliersList.find(s => String(s.id) === String(supplierId))?.name || supplierId}`,
           });
         } catch (e) {
           errors.push(`Prodotto #${line.product_variant_id}: ${e.response?.data?.message || e.message}`);
@@ -107,6 +117,8 @@ export default function SupplierDeliveryPage() {
 
       const saved = {
         id: Date.now(),
+        ddtType,
+        ddtTypeName: activeDdtType.label,
         ddtNumber,
         supplierId,
         supplierName: supplier?.name || 'Fornitore',
@@ -118,6 +130,9 @@ export default function SupplierDeliveryPage() {
         totalValue,
         createdAt: new Date().toISOString(),
         errors,
+        // Scarico vendita → flagged for invoice generation
+        needsInvoice: ddtType === 'scarico_vendita',
+        isContoVisione: ddtType === 'conto_visione',
       };
 
       // Save to history
@@ -193,14 +208,29 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
   const warehouse = storesList.find(s => String(s.id) === String(warehouseId));
 
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto', paddingBottom: 48 }}>
+    <div style={{ maxWidth: 900, margin: '0 auto', paddingBottom: 48 }}>
 
       {/* Header */}
       <div className="page-head">
         <div>
-          <div className="page-head-title">📦 DDT Fornitore → Magazzino</div>
-          <div className="page-head-sub">Bolla di carico merce in arrivo da fornitore</div>
+          <div className="page-head-title">🚛 DDT Fornitore / Movimentazione</div>
+          <div className="page-head-sub">Carico, Scarico Vendita e Conto Visione</div>
         </div>
+      </div>
+
+      {/* ── Tipo DDT selector ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 20 }}>
+        {DDT_TYPES.map(t => (
+          <button key={t.id} onClick={() => { setDdtType(t.id); setStep(1); setSuccess(null); }}
+            style={{
+              padding: '14px 16px', borderRadius: 14, border: `2px solid ${ddtType === t.id ? t.color : 'var(--color-border)'}`,
+              background: ddtType === t.id ? t.bg : 'var(--color-surface)', cursor: 'pointer',
+              textAlign: 'left', transition: 'all 0.15s',
+            }}>
+            <div style={{ fontWeight: 800, fontSize: 14, color: ddtType === t.id ? t.color : 'var(--color-text)', marginBottom: 3 }}>{t.label}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t.sub}</div>
+          </button>
+        ))}
       </div>
 
       {/* Step indicator */}
@@ -333,8 +363,12 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
               DDT registrato con successo!
             </div>
             <div style={{ color: 'var(--muted)', fontSize: 14 }}>
-              Stock aggiornato per <strong>{success.lines.filter(l => l.product_variant_id).length}</strong> prodotti
-              nel magazzino <strong>{success.warehouseName}</strong>
+              {ddtType === 'conto_visione'
+                ? <>Bene in <strong>conto visione</strong> — fattura posticipata. {success.warehouseName} è la destinazione.</>
+                : ddtType === 'scarico_vendita'
+                ? <>Scarico effettuato, stock <strong>decrementato</strong> per {success.lines.filter(l => l.product_variant_id).length} prodotti in {success.warehouseName}.</>
+                : <>Stock <strong>aggiornato</strong> per {success.lines.filter(l => l.product_variant_id).length} prodotti nel magazzino <strong>{success.warehouseName}</strong>.</>
+              }
             </div>
           </div>
 
@@ -354,8 +388,25 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button className="btn btn-gold" style={{ fontSize: 15, padding: '10px 28px' }} onClick={() => printDDT(success)}>
-              🖨 Stampa Bolla di Carico DDT
+              🖨 Stampa {activeDdtType.label}
             </button>
+            {success.needsInvoice && (
+              <button className="btn" style={{ fontSize: 14, padding: '10px 20px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700 }}
+                onClick={() => {
+                  // Apri pagina fatture fornitore con pre-fill (via URL params)
+                  window.location.href = `/supplier-invoices?prefill_amount=${success.totalValue}&prefill_supplier=${success.supplierId}&prefill_ddt=${success.ddtNumber}`;
+                }}>
+                📄 Genera Fattura
+              </button>
+            )}
+            {success.isContoVisione && (
+              <button className="btn" style={{ fontSize: 14, padding: '10px 20px', background: '#92400e', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700 }}
+                onClick={() => {
+                  window.location.href = `/supplier-invoices?prefill_amount=${success.totalValue}&prefill_supplier=${success.supplierId}&prefill_ddt=${success.ddtNumber}&type=proforma`;
+                }}>
+                📋 Genera Fattura Proforma
+              </button>
+            )}
             <button className="btn btn-ghost" onClick={() => {
               setStep(1); setSuccess(null); setError('');
               setDdtNumber(`DDT-${Date.now().toString().slice(-6)}`);

@@ -1,16 +1,26 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { orders as ordersApi, inventory, customers, reports, catalog } from '../api.jsx';
+import { orders as ordersApi, inventory, customers, reports, stores as storesApi } from '../api.jsx';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, LineChart, Line, Cell, PieChart, Pie
 } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, Search, Bell, Download } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Search, Bell, Download, Users, Trophy } from 'lucide-react';
 
 /* ─── palette ──────────────────────────────────────────────── */
 const PURPLE   = '#9B8FD4';
 const PURPLE_L = '#C5BEE8';
 const PURPLE_D = '#6C63AC';
+const STORE_COLORS = ['#6C63AC','#22C55E','#F59E0B','#EF4444','#3B82F6','#EC4899','#14B8A6'];
+
+/* ─── Period tabs ───────────────────────────────────────────── */
+const PERIODS = [
+  { id: 'today',   label: 'Oggi',       days: 1 },
+  { id: 'yesterday',label: 'Ieri',      days: 2, offset: 1 },
+  { id: 'week',    label: 'Settimana',  days: 7 },
+  { id: 'month',   label: 'Mese',       days: 30 },
+  { id: 'year',    label: 'Anno',       days: 365 },
+];
 
 /* ─── piccoli helpers UI ────────────────────────────────────── */
 const Avatar = ({ name = '', size = 36, color = '#9B8FD4' }) => {
@@ -36,7 +46,6 @@ const Trend = ({ value }) => {
   );
 };
 
-/* ─── custom bar tooltip ────────────────────────────────────── */
 const CustomBarTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -53,9 +62,8 @@ const CustomBarTooltip = ({ active, payload, label }) => {
   );
 };
 
-/* ─── DONUT CHART PAESE ─────────────────────────────────────── */
-const COUNTRY_COLORS = ['#1C1B2E', PURPLE_D, PURPLE_L, '#D4CFEF'];
-const DonutChart = ({ data = [] }) => {
+/* ─── DONUT CHART ────────────────────────────────────────────── */
+const DonutChart = ({ data = [], colors = STORE_COLORS }) => {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
   return (
     <div style={{ position: 'relative', width: 160, height: 160 }}>
@@ -63,7 +71,7 @@ const DonutChart = ({ data = [] }) => {
         <PieChart>
           <Pie data={data} cx="50%" cy="50%" innerRadius={48} outerRadius={72}
             dataKey="value" startAngle={90} endAngle={-270} strokeWidth={2} stroke="#fff">
-            {data.map((_, i) => <Cell key={i} fill={COUNTRY_COLORS[i % COUNTRY_COLORS.length]} />)}
+            {data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
           </Pie>
         </PieChart>
       </ResponsiveContainer>
@@ -76,7 +84,6 @@ const DonutChart = ({ data = [] }) => {
   );
 };
 
-/* ─── mini sparkline per le card destra ─────────────────────── */
 const MiniBar = ({ data = [], color = '#fff' }) => (
   <ResponsiveContainer width="100%" height={60}>
     <BarChart data={data} barSize={6}>
@@ -100,7 +107,6 @@ const MiniLine = ({ data = [], color = '#fff' }) => (
   </ResponsiveContainer>
 );
 
-/* ─── STATUS badge ──────────────────────────────────────────── */
 const StatusBadge = ({ status }) => {
   const map = {
     paid:      { label: 'Pagato',    color: '#22C55E' },
@@ -127,24 +133,36 @@ export default function DashboardPage() {
   const [stockStats,   setStockStats]   = useState({ low: 0, out: 0, total: 0 });
   const [loading,      setLoading]      = useState(true);
 
+  // NEW: period filter for main chart
+  const [activePeriod, setActivePeriod] = useState('year');
+
+  // NEW: employee activity (ultime attività = dipendenti)
+  const [employeeActivity, setEmployeeActivity] = useState([]);
+
+  // NEW: store revenue ranking
+  const [storeRanking, setStoreRanking] = useState([]);
+  const [storesList, setStoresList] = useState([]);
+  const [donutStoreId, setDonutStoreId] = useState('all');
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
+      const period = PERIODS.find(p => p.id === activePeriod) || PERIODS[4];
 
       // Fetch each independently so one failure doesn't break everything
-      const [resSummary, resTrend, resOrders, resStock, resCust] = await Promise.allSettled([
+      const [resSummary, resTrend, resOrders, resStock, resCust, resStores] = await Promise.allSettled([
         reports.summary(sp),
-        reports.revenueTrend({ ...sp, period: 'monthly', days: 365 }),
-        ordersApi.getOrders({ ...sp, limit: 6, status: 'paid' }),
+        reports.revenueTrend({ ...sp, period: 'monthly', days: period.days }),
+        ordersApi.getOrders({ ...sp, limit: 20, status: 'paid' }),
         inventory.getStock({ ...sp, limit: 1000 }),
         customers.getCustomers({ limit: 1 }),
+        storesApi.getStores(),
       ]);
 
-      // ── KPI Summary ──────────────────────────────────────────────
+      // ── KPI Summary ───────────────────────────────────────────
       if (resSummary.status === 'fulfilled') {
         const raw = resSummary.value?.data?.data;
-        console.log('[Dashboard] summary raw:', raw);
         setKpi(raw ? {
           revenue_total:   raw.revenue        ?? raw.revenue_total  ?? 0,
           orders_count:    raw.orders         ?? raw.orders_count   ?? 0,
@@ -157,15 +175,12 @@ export default function DashboardPage() {
         } : null);
       }
 
-      // ── Revenue Trend Chart ──────────────────────────────────────
-      // API returns: { period: '2026-03', order_count: N, revenue: X, ... }
+      // ── Revenue Trend Chart ───────────────────────────────────
       if (resTrend.status === 'fulfilled') {
         const trend = resTrend.value?.data?.data || [];
-        console.log('[Dashboard] trend sample:', trend[0]);
         const MONTHS = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
         const monthly = MONTHS.map((m, i) => {
           const found = trend.find(d => {
-            // 'period' field is either 'YYYY-MM' (monthly) or 'YYYY-MM-DD' (daily)
             const rawPeriod = d.period ?? d.label ?? '';
             const mo = new Date(rawPeriod.length === 7 ? rawPeriod + '-01' : rawPeriod).getMonth();
             return mo === i;
@@ -179,11 +194,26 @@ export default function DashboardPage() {
         setMonthlyChart(monthly);
       }
 
-      // ── Recent Orders & Top Products ────────────────────────────
+      // ── Recent Orders & Employee Activity ─────────────────────
       if (resOrders.status === 'fulfilled') {
         const ordersList = resOrders.value?.data?.data || [];
-        console.log('[Dashboard] orders count:', ordersList.length);
         setRecentOrders(ordersList);
+
+        // Employee activity: group by employee name, compute sales count + revenue
+        const empMap = {};
+        ordersList.forEach(o => {
+          const name = o.employee_name || o.sold_by_name || o.cashier_name || null;
+          const empId = o.employee_id || o.sold_by_employee_id;
+          if (!name && !empId) return;
+          const key = name || `Operatore #${empId}`;
+          if (!empMap[key]) empMap[key] = { name: key, sales: 0, revenue: 0, lastAt: null };
+          empMap[key].sales++;
+          empMap[key].revenue += parseFloat(o.total || o.grand_total || 0);
+          if (!empMap[key].lastAt || o.created_at > empMap[key].lastAt) empMap[key].lastAt = o.created_at;
+        });
+        setEmployeeActivity(Object.values(empMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
+
+        // Top products
         const topProd = [...ordersList]
           .flatMap(o => o.lines || [])
           .reduce((acc, line) => {
@@ -194,22 +224,28 @@ export default function DashboardPage() {
             return acc;
           }, {});
         setTopProducts(Object.values(topProd).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
+
+        // Store ranking from orders
+        const storeMap = {};
+        ordersList.forEach(o => {
+          const sId = o.store_id;
+          const sName = o.store_name || `Negozio #${sId}`;
+          if (!sId) return;
+          if (!storeMap[sId]) storeMap[sId] = { id: sId, name: sName, revenue: 0, orders: 0 };
+          storeMap[sId].revenue += parseFloat(o.total || o.grand_total || 0);
+          storeMap[sId].orders++;
+        });
+        setStoreRanking(Object.values(storeMap).sort((a, b) => b.revenue - a.revenue));
       }
 
-      // ── Customer Count ──────────────────────────────────────────
+      // ── Customer Count ─────────────────────────────────────────
       if (resCust.status === 'fulfilled') {
         const custData = resCust.value?.data;
-        // Try multiple paths: meta.total, meta.pagination.total, data.length
-        const total = custData?.meta?.total
-          ?? custData?.meta?.pagination?.total
-          ?? custData?.pagination?.total
-          ?? custData?.total
-          ?? null;
-        console.log('[Dashboard] custTotal:', total, 'meta:', custData?.meta);
+        const total = custData?.meta?.total ?? custData?.meta?.pagination?.total ?? custData?.pagination?.total ?? custData?.total ?? null;
         setCustCount(total !== null ? total : (custData?.data?.length ?? 0));
       }
 
-      // ── Stock Stats ─────────────────────────────────────────────
+      // ── Stock Stats ────────────────────────────────────────────
       if (resStock.status === 'fulfilled') {
         const stockList = resStock.value?.data?.data || [];
         const low = stockList.filter(i => i.on_hand > 0 && i.on_hand < (i.reorder_point || 10)).length;
@@ -217,30 +253,45 @@ export default function DashboardPage() {
         setStockStats({ low, out, total: stockList.length });
       }
 
+      // ── Stores list for donut switch ──────────────────────────
+      if (resStores.status === 'fulfilled') {
+        setStoresList(resStores.value?.data?.data || []);
+      }
+
     } catch (err) {
       console.error('Dashboard fetch error:', err);
     } finally { setLoading(false); }
-  }, [selectedStoreId]);
+  }, [selectedStoreId, activePeriod]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const fmt  = v  => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
   const fmtN = v  => new Intl.NumberFormat('it-IT').format(v || 0);
 
-  // dati per le mini chart delle card destra (ultimi 8 mesi)
   const revenueSparkbar  = monthlyChart.slice(-8).map(d => ({ v: d.revenue }));
   const ordersSparkline  = monthlyChart.slice(-8).map((_, i) => ({ v: Math.max(0, (kpi?.orders_count || 0) / 8 + (i % 3) * 2) }));
 
-  // donut: distribuzione ordini per canale (placeholder con dati reali se disponibili)
-  const donutData = [
-    { name: 'POS',  value: recentOrders.filter(o => o.channel === 'pos').length  || 1 },
-    { name: 'Web',  value: recentOrders.filter(o => o.channel === 'web').length  || 1 },
-    { name: 'Altro',value: recentOrders.filter(o => !['pos','web'].includes(o.channel)).length || 1 },
-  ];
+  // Donut: per negozio con switchable
+  const donutData = useMemo(() => {
+    if (donutStoreId === 'all') {
+      // Group by channel
+      return [
+        { name: 'POS',  value: recentOrders.filter(o => o.channel === 'pos').length  || 1 },
+        { name: 'Web',  value: recentOrders.filter(o => o.channel === 'web').length  || 1 },
+        { name: 'Altro',value: recentOrders.filter(o => !['pos','web'].includes(o.channel)).length || 1 },
+      ];
+    }
+    // Group by store
+    const byStore = {};
+    recentOrders.forEach(o => {
+      const sId = String(o.store_id);
+      const name = o.store_name || storesList.find(s => String(s.id) === sId)?.name || `Negozio #${sId}`;
+      if (!byStore[sId]) byStore[sId] = { name, value: 0 };
+      byStore[sId].value++;
+    });
+    return Object.values(byStore).length > 0 ? Object.values(byStore) : [{ name: 'Nessun dato', value: 1 }];
+  }, [recentOrders, donutStoreId, storesList]);
 
-  const fmtDate = v => v ? new Date(v).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : '—';
-
-  // avatar colors rotator
   const avatarColors = ['#9B8FD4','#6C63AC','#C5BEE8','#A78BFA','#7C3AED'];
 
   if (loading) return (
@@ -283,10 +334,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Sales Analytics (bar chart) ── */}
+        {/* ── Sales Analytics with Period Tabs ── */}
         <div style={{ background:'var(--color-surface)', borderRadius:20, padding:24,
           boxShadow:'0 1px 8px rgba(0,0,0,0.04)', border:'1px solid var(--color-border)' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
             <div>
               <div style={{ fontWeight:700, fontSize:15 }}>Analisi Vendite</div>
               <div style={{ display:'flex', gap:16, marginTop:6 }}>
@@ -294,16 +345,24 @@ export default function DashboardPage() {
                   <span style={{ width:10, height:10, borderRadius:2, background:PURPLE_L, display:'inline-block' }} />
                   Fatturato
                 </span>
-                <span style={{ fontSize:12, color:'var(--color-text-tertiary)', display:'flex', alignItems:'center', gap:5 }}>
-                  <span style={{ width:10, height:10, borderRadius:2, background:PURPLE_D, display:'inline-block' }} />
-                  Ordini mese corrente
-                </span>
               </div>
             </div>
-            <div style={{ background:'var(--color-bg)', border:'1px solid var(--color-border)',
-              borderRadius:10, padding:'6px 14px', fontSize:13, fontWeight:600, cursor:'pointer',
-              display:'flex', alignItems:'center', gap:6, color:'var(--color-text-secondary)' }}>
-              Quest'anno ▾
+            {/* Period Tabs ── CLICCABILI */}
+            <div style={{ display:'flex', gap:4, background:'var(--color-bg)', borderRadius:10, padding:4, border:'1px solid var(--color-border)' }}>
+              {PERIODS.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => setActivePeriod(p.id)}
+                  style={{
+                    padding:'5px 12px', fontSize:12, fontWeight:600, borderRadius:7, border:'none', cursor:'pointer',
+                    background: activePeriod === p.id ? PURPLE_D : 'transparent',
+                    color: activePeriod === p.id ? '#fff' : 'var(--color-text-secondary)',
+                    transition:'all 0.15s',
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -322,25 +381,38 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </div>
 
-        {/* ── Riga media: donut + last activity ── */}
+        {/* ── Riga media: donut (per negozio) + attività dipendenti ── */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1.6fr', gap:16 }}>
 
-          {/* Canali vendita (donut) */}
+          {/* Canali vendita per NEGOZIO (switchable) */}
           <div style={{ background:'var(--color-surface)', borderRadius:20, padding:24,
             boxShadow:'0 1px 8px rgba(0,0,0,0.04)', border:'1px solid var(--color-border)' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-              <span style={{ fontWeight:700, fontSize:14 }}>Canali vendita</span>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+              <span style={{ fontWeight:700, fontSize:14 }}>Vendite per negozio</span>
+              {/* Switch store */}
+              <select
+                value={donutStoreId}
+                onChange={e => setDonutStoreId(e.target.value)}
+                style={{
+                  fontSize:11, fontWeight:600, border:'1px solid var(--color-border)',
+                  borderRadius:8, padding:'3px 8px', background:'var(--color-bg)',
+                  color:'var(--color-text-secondary)', cursor:'pointer', outline:'none',
+                }}
+              >
+                <option value="all">Tutti</option>
+                {storesList.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+              </select>
             </div>
-            <div style={{ display:'flex', alignItems:'center', gap:20 }}>
-              <DonutChart data={donutData} />
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+              <DonutChart data={donutData} colors={STORE_COLORS} />
+              <div style={{ display:'flex', flexDirection:'column', gap:8, flex:1, minWidth:0 }}>
                 {donutData.map((d, i) => {
                   const total = donutData.reduce((s, x) => s + x.value, 0);
                   return (
                     <div key={d.name} style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <span style={{ width:8, height:8, borderRadius:'50%', background:COUNTRY_COLORS[i], flexShrink:0 }} />
-                      <span style={{ fontSize:12, color:'var(--color-text-secondary)' }}>{d.name}</span>
-                      <span style={{ fontSize:12, fontWeight:700, marginLeft:'auto' }}>
+                      <span style={{ width:8, height:8, borderRadius:'50%', background:STORE_COLORS[i % STORE_COLORS.length], flexShrink:0 }} />
+                      <span style={{ fontSize:11, color:'var(--color-text-secondary)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.name}</span>
+                      <span style={{ fontSize:12, fontWeight:700 }}>
                         {Math.round(d.value / total * 100)}%
                       </span>
                     </div>
@@ -350,35 +422,42 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Last activity */}
+          {/* Ultima attività — DIPENDENTI */}
           <div style={{ background:'var(--color-surface)', borderRadius:20, padding:24,
             boxShadow:'0 1px 8px rgba(0,0,0,0.04)', border:'1px solid var(--color-border)' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-              <span style={{ fontWeight:700, fontSize:14 }}>Ultima attività</span>
-              <button onClick={() => navigate('/orders')} style={{ background:'none', border:'none',
+              <span style={{ fontWeight:700, fontSize:14, display:'flex', alignItems:'center', gap:8 }}>
+                <Users size={16} color={PURPLE} /> Attività Dipendenti
+              </span>
+              <button onClick={() => navigate('/employees')} style={{ background:'none', border:'none',
                 cursor:'pointer', fontSize:12, color: PURPLE, fontWeight:600 }}>
                 Vedi tutti ↗
               </button>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              {recentOrders.length === 0 && (
-                <div style={{ color:'var(--color-text-tertiary)', fontSize:13 }}>Nessun ordine recente</div>
+              {employeeActivity.length === 0 && (
+                <div style={{ color:'var(--color-text-tertiary)', fontSize:13, textAlign:'center', padding:'16px 0' }}>
+                  <Users size={28} style={{ opacity:0.2, marginBottom:6 }} /><br/>
+                  Nessuna attività registrata nel periodo
+                </div>
               )}
-              {recentOrders.slice(0, 4).map((order, i) => (
-                <div key={order.id} style={{ display:'flex', alignItems:'center', gap:12 }}>
-                  <Avatar name={order.customer_name || 'WI'} size={34}
-                    color={avatarColors[i % avatarColors.length]} />
+              {employeeActivity.map((emp, i) => (
+                <div key={emp.name} style={{ display:'flex', alignItems:'center', gap:12 }}>
+                  <div style={{ position:'relative' }}>
+                    <Avatar name={emp.name} size={34} color={avatarColors[i % avatarColors.length]} />
+                    {i === 0 && (
+                      <Trophy size={12} color="#F59E0B"
+                        style={{ position:'absolute', bottom:-2, right:-2, background:'#fff', borderRadius:'50%', padding:1 }} />
+                    )}
+                  </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                      {order.customer_name || 'Walk-in'}
+                      {emp.name}
                     </div>
-                    <StatusBadge status={order.status} />
+                    <div style={{ fontSize:11, color:'var(--color-text-tertiary)' }}>{emp.sales} vendite</div>
                   </div>
-                  <div style={{ fontSize:12, color:'var(--color-text-tertiary)', fontFamily:'monospace' }}>
-                    #{String(order.id).padStart(6,'0')}
-                  </div>
-                  <div style={{ fontWeight:700, fontSize:13, minWidth:60, textAlign:'right' }}>
-                    {fmt(order.total)}
+                  <div style={{ fontWeight:700, fontSize:13, minWidth:70, textAlign:'right' }}>
+                    {fmt(emp.revenue)}
                   </div>
                 </div>
               ))}
@@ -386,58 +465,59 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Product sales table ── */}
+        {/* ── Classifica Negozi per Fatturato ── */}
         <div style={{ background:'var(--color-surface)', borderRadius:20,
-          boxShadow:'0 1px 8px rgba(0,0,0,0.04)', border:'1px solid var(--color-border)', overflow:'hidden' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'18px 24px' }}>
-            <span style={{ fontWeight:700, fontSize:14 }}>Vendite prodotti</span>
-            <button onClick={() => navigate('/catalog')} style={{ background:'none', border:'none',
-              cursor:'pointer', fontSize:12, color: PURPLE, fontWeight:600 }}>
-              Vedi catalogo ↗
-            </button>
+          boxShadow:'0 1px 8px rgba(0,0,0,0.04)', border:'1px solid var(--color-border)' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'18px 24px', borderBottom:'1px solid var(--color-border)' }}>
+            <span style={{ fontWeight:700, fontSize:14 }}>🏆 Classifica Fatturato per Negozio</span>
+            <span style={{ fontSize:12, color:'var(--color-text-tertiary)' }}>Periodo: {PERIODS.find(p => p.id === activePeriod)?.label}</span>
           </div>
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
-            <thead>
-              <tr style={{ borderTop:`1px solid var(--color-border)` }}>
-                {['Prodotto','Canale','Totale','Stato'].map(h => (
-                  <th key={h} style={{ padding:'10px 24px', textAlign:'left', fontSize:11,
-                    fontWeight:600, color:'var(--color-text-tertiary)', textTransform:'uppercase', letterSpacing:'0.05em' }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {recentOrders.length === 0 && (
-                <tr><td colSpan="4" style={{ textAlign:'center', padding:24, color:'var(--color-text-tertiary)', fontSize:13 }}>
-                  Nessun dato disponibile
-                </td></tr>
-              )}
-              {recentOrders.slice(0, 5).map((order, i) => (
-                <tr key={order.id} style={{ borderTop:`1px solid var(--color-border)` }}>
-                  <td style={{ padding:'12px 24px' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                      <div style={{ width:36, height:36, borderRadius:10, background:'var(--color-bg)',
-                        border:'1px solid var(--color-border)', display:'flex', alignItems:'center', justifyContent:'center',
-                        fontSize:16 }}>
-                        🛒
-                      </div>
-                      <span style={{ fontSize:13, fontWeight:600 }}>Ordine #{String(order.id).padStart(6,'0')}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding:'12px 24px', fontSize:13, color:'var(--color-text-secondary)', textTransform:'uppercase' }}>
-                    {order.channel || 'pos'}
-                  </td>
-                  <td style={{ padding:'12px 24px', fontWeight:700, fontSize:13 }}>
-                    {fmt(order.total)}
-                  </td>
-                  <td style={{ padding:'12px 24px' }}>
-                    <StatusBadge status={order.status} />
-                  </td>
+          {storeRanking.length === 0 ? (
+            <div style={{ padding:'28px 24px', color:'var(--color-text-tertiary)', fontSize:13, textAlign:'center' }}>
+              Nessun dato negozio disponibile — le vendite vengono associate al punto cassa
+            </div>
+          ) : (
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+              <thead>
+                <tr>
+                  {['#','Negozio','Ordini','Fatturato','Quota %'].map(h => (
+                    <th key={h} style={{ padding:'10px 20px', textAlign:'left', fontSize:11,
+                      fontWeight:600, color:'var(--color-text-tertiary)', textTransform:'uppercase', letterSpacing:'0.05em' }}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {storeRanking.map((store, i) => {
+                  const totalRev = storeRanking.reduce((s, x) => s + x.revenue, 0) || 1;
+                  const pct = Math.round(store.revenue / totalRev * 100);
+                  return (
+                    <tr key={store.id} style={{ borderTop:'1px solid var(--color-border)' }}>
+                      <td style={{ padding:'10px 20px' }}>
+                        <span style={{ fontSize:14, fontWeight:900, color: i < 3 ? ['#F59E0B','#9CA3AF','#CD7C2A'][i] : 'var(--color-text-tertiary)' }}>
+                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}
+                        </span>
+                      </td>
+                      <td style={{ padding:'10px 20px' }}>
+                        <div style={{ fontWeight:600, fontSize:13 }}>{store.name}</div>
+                      </td>
+                      <td style={{ padding:'10px 20px', fontSize:13, color:'var(--color-text-secondary)' }}>{store.orders}</td>
+                      <td style={{ padding:'10px 20px', fontWeight:700, fontSize:13 }}>{fmt(store.revenue)}</td>
+                      <td style={{ padding:'10px 20px' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <div style={{ flex:1, height:6, borderRadius:99, background:'var(--color-border)', overflow:'hidden' }}>
+                            <div style={{ height:'100%', width:`${pct}%`, borderRadius:99, background:STORE_COLORS[i % STORE_COLORS.length] }} />
+                          </div>
+                          <span style={{ fontSize:11, fontWeight:700, minWidth:30, color:'var(--color-text-secondary)' }}>{pct}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
 
       </div>{/* fine colonna sinistra */}
@@ -460,7 +540,6 @@ export default function DashboardPage() {
           <div style={{ fontSize:12, opacity:0.5, marginBottom:18 }}>
             {stockStats.total} referenze a magazzino
           </div>
-          {/* progress bar */}
           <div style={{ height:6, borderRadius:99, background:'rgba(255,255,255,0.12)', overflow:'hidden', marginBottom:6 }}>
             <div style={{ height:'100%', width:'60%', borderRadius:99,
               background:`linear-gradient(90deg, ${PURPLE_D}, ${PURPLE_L})` }} />
@@ -471,7 +550,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Card 2 — Total Revenue (gradient purple) */}
+        {/* Card 2 — Total Revenue */}
         <div style={{ background:`linear-gradient(135deg, #6C63AC 0%, #9B8FD4 60%, #C5BEE8 100%)`,
           borderRadius:22, padding:22, color:'#fff' }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
@@ -492,7 +571,7 @@ export default function DashboardPage() {
           <MiniBar data={revenueSparkbar.length ? revenueSparkbar : [{v:0}]} color="rgba(255,255,255,0.6)" />
         </div>
 
-        {/* Card 3 — Total Orders (cream/beige) */}
+        {/* Card 3 — Total Orders */}
         <div style={{ background:'#F5F0E8', borderRadius:22, padding:22 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
             <span style={{ fontSize:13, fontWeight:600, color:'#6B5A3E' }}>Ordini Totali</span>
@@ -502,7 +581,7 @@ export default function DashboardPage() {
             <span style={{ fontSize:26, fontWeight:900, letterSpacing:'-0.5px', color:'#2D1B00' }}>
               {fmtN(kpi?.orders_count)}
             </span>
-            <Trend value={51} />
+            <Trend value={kpi?.orders_trend} />
           </div>
           <div style={{ fontSize:12, color:'#9CA3AF', marginBottom:12 }}>
             {stockStats.low > 0 ? `${stockStats.low} prodotti sotto soglia` : 'Stock regolare'}
