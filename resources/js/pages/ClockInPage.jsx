@@ -1,271 +1,360 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { attendance } from '../api.jsx';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { attendance as attendanceApi } from '../api.jsx';
 
+/**
+ * ClockInPage — Kiosk per timbrature dipendenti
+ *
+ * Flusso: Scansiona badge (barcode) → conferma automatica ENTRATA/USCITA
+ * Fallback: seleziona nome dalla lista → premi il pulsante
+ */
 export default function ClockInPage() {
-  const [time, setTime] = useState(new Date());
-  const [employee, setEmployee] = useState(null);
-  const [employees, setEmployees] = useState([]);
-  const [todayRecords, setTodayRecords] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState(null); // { type: 'success'|'error', text }
-  const [lastStatus, setLastStatus] = useState(null); // 'in' | 'out'
-  const [barcodeInput, setBarcodeInput] = useState('');
+  const [employees, setEmployees]        = useState([]);
+  const [employee, setEmployee]          = useState(null);
+  const [lastStatus, setLastStatus]      = useState(null); // 'in' | 'out' | null
+  const [todayRecords, setTodayRecords]  = useState([]);
+  const [loading, setLoading]            = useState(false);
+  const [loadingEmployees, setLoadingEmployees] = useState(true);
+  const [message, setMessage]            = useState(null); // { text, type }
 
-  // Real-time clock
+  // Barcode input
+  const [barcodeInput, setBarcodeInput]  = useState('');
+  const barcodeRef = useRef(null);
+
+  const now = useRef(null);
+  const [clockStr, setClockStr] = useState('');
+
+  // Live clock
   useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(t);
+    const tick = () => setClockStr(new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, []);
 
-  // Load employees for kiosk
+  // Load employees
   useEffect(() => {
-    attendance.getEmployeesKiosk({}).then(r => {
-      setEmployees(r.data?.data || []);
-    }).catch(() => {});
+    setLoadingEmployees(true);
+    attendanceApi.getEmployeesForKiosk()
+      .then(res => setEmployees(res.data?.data?.employees || []))
+      .catch(() => setEmployees([]))
+      .finally(() => setLoadingEmployees(false));
   }, []);
 
-  // Load today's records when employee selected
-  const loadTodayRecords = useCallback(async (empId) => {
-    try {
-      const r = await attendance.getLive({ employee_id: empId, date: new Date().toISOString().slice(0, 10) });
-      const recs = r.data?.data || [];
-      setTodayRecords(recs);
-      // Determine last status
-      if (recs.length > 0) {
-        const last = recs[recs.length - 1];
-        setLastStatus(last.clock_out ? 'out' : 'in');
-      } else {
-        setLastStatus('out');
-      }
-    } catch { setTodayRecords([]); setLastStatus('out'); }
-  }, []);
-
+  // Auto-focus barcode input when no employee is selected
   useEffect(() => {
-    if (employee) loadTodayRecords(employee.id);
+    if (!employee) {
+      setTimeout(() => barcodeRef.current?.focus(), 100);
+    }
   }, [employee]);
 
-  const handleBarcodeSelect = (barcode) => {
-    const found = employees.find(e => e.barcode === barcode || String(e.id) === barcode);
-    if (found) {
-      setEmployee(found);
-      setMessage(null);
-    } else {
-      setMessage({ type: 'error', text: 'Badge non riconosciuto. Riprova.' });
-      setTimeout(() => setMessage(null), 2500);
-    }
+  const showMessage = (text, type = 'success', duration = 3500) => {
+    setMessage({ text, type });
+    setTimeout(() => { setMessage(null); }, duration);
+  };
+
+  // Resolve employee from barcode/code/ID
+  const resolveEmployee = (val) => {
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+    return employees.find(em =>
+      (em.barcode && em.barcode === trimmed) ||
+      (em.employee_code && em.employee_code === trimmed) ||
+      String(em.id) === trimmed
+    ) || null;
+  };
+
+  // Handle barcode submit (Enter key)
+  const handleBarcodeSubmit = useCallback(async () => {
+    const val = barcodeInput.trim();
+    if (!val) return;
     setBarcodeInput('');
-  };
 
-  const handleClockIn = async () => {
-    if (!employee) return;
+    const found = resolveEmployee(val);
+    if (!found) {
+      showMessage(`❌ Badge "${val}" non riconosciuto. Contatta un amministratore.`, 'error');
+      barcodeRef.current?.focus();
+      return;
+    }
+
+    // Auto-clock in/out
+    await performClock(found);
+    setTimeout(() => barcodeRef.current?.focus(), 3600);
+  }, [barcodeInput, employees]);
+
+  const loadTodayStatus = async (emp) => {
     try {
-      setLoading(true);
-      await attendance.checkIn({ employee_id: employee.id });
-      setMessage({ type: 'success', text: `✅ Entrata registrata — ${new Date().toLocaleTimeString('it-IT')}` });
-      setLastStatus('in');
-      await loadTodayRecords(employee.id);
-    } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Errore nella timbratura' });
-    } finally { setLoading(false); }
+      const res = await attendanceApi.live({ employee_id: emp.id });
+      const rec = (res.data?.data?.employees || []).find(e => e.employee_id === emp.id || e.id === emp.id);
+      setLastStatus(rec?.status === 'presente' ? 'in' : 'out');
+      setTodayRecords(rec?.today_records || []);
+    } catch {
+      setLastStatus(null);
+      setTodayRecords([]);
+    }
   };
 
-  const handleClockOut = async () => {
-    if (!employee) return;
+  // Perform clock action (auto-detect in/out or manual)
+  const performClock = async (emp, forceAction = null) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      await attendance.checkOut({ employee_id: employee.id });
-      setMessage({ type: 'success', text: `✅ Uscita registrata — ${new Date().toLocaleTimeString('it-IT')}` });
-      setLastStatus('out');
-      await loadTodayRecords(employee.id);
+      // Get current status first
+      let currentStatus = null;
+      try {
+        const res = await attendanceApi.live({ employee_id: emp.id });
+        const rec = (res.data?.data?.employees || []).find(e => e.employee_id === emp.id || e.id === emp.id);
+        currentStatus = rec?.status === 'presente' ? 'in' : 'out';
+      } catch {}
+
+      const action = forceAction || (currentStatus === 'in' ? 'out' : 'in');
+
+      if (action === 'in') {
+        await attendanceApi.checkIn({ employee_id: emp.id });
+        showMessage(`✅ Entrata timbrata per ${emp.first_name} ${emp.last_name} — ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`, 'success');
+        setLastStatus('in');
+      } else {
+        await attendanceApi.checkOut({ employee_id: emp.id });
+        showMessage(`👋 Uscita timbrata per ${emp.first_name} ${emp.last_name} — ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`, 'success');
+        setLastStatus('out');
+      }
+
+      setEmployee(emp);
+      await loadTodayStatus(emp);
+
+      // Auto-reset kiosk after 4 seconds
+      setTimeout(() => {
+        setEmployee(null);
+        setLastStatus(null);
+        setTodayRecords([]);
+        setMessage(null);
+        barcodeRef.current?.focus();
+      }, 4000);
+
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Errore nella timbratura' });
-    } finally { setLoading(false); }
+      showMessage(`❌ Errore: ${err.response?.data?.message || err.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const fmtTime = (v) => v ? new Date(v).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '—';
+  const handleSelectEmployee = async (emp) => {
+    setEmployee(emp);
+    await loadTodayStatus(emp);
+  };
+
+  const fmtTime = v => v ? new Date(v).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '—';
 
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', background: 'linear-gradient(135deg, #0e1726 0%, #1a1a3e 50%, #111827 100%)',
-      fontFamily: 'Inter, system-ui, sans-serif', padding: 24, position: 'relative',
+      position: 'fixed', inset: 0, background: 'linear-gradient(160deg, #0e1726 0%, #1a1a2e 50%, #0f1723 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      fontFamily: "'Inter', system-ui, sans-serif", overflow: 'hidden',
     }}>
-      {/* Logo */}
-      <div style={{ position: 'absolute', top: 28, left: 36, color: '#c9a227', fontSize: 22, fontWeight: 900, letterSpacing: '-0.5px' }}>
-        Sva<span style={{ color: '#ffffff' }}>Pro</span>
-      </div>
-
-      {/* Clock */}
-      <div style={{ textAlign: 'center', marginBottom: 40 }}>
-        <div style={{
-          fontSize: 'clamp(52px, 10vw, 96px)', fontWeight: 900, color: '#ffffff',
-          letterSpacing: '-4px', lineHeight: 1, fontVariantNumeric: 'tabular-nums',
-          textShadow: '0 0 40px rgba(201,162,39,0.3)',
-        }}>
-          {time.toLocaleTimeString('it-IT')}
+      {/* Orologio */}
+      <div style={{ position: 'absolute', top: 28, left: 0, right: 0, textAlign: 'center' }}>
+        <div style={{ fontSize: 56, fontWeight: 900, color: '#fff', letterSpacing: -2, fontFamily: 'monospace', lineHeight: 1 }}>
+          {clockStr}
         </div>
-        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 18, marginTop: 8, fontWeight: 500 }}>
-          {time.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
+          {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
         </div>
       </div>
 
-      {/* Employee selection */}
-      {!employee ? (
-        <div style={{ textAlign: 'center', maxWidth: 420, width: '100%' }}>
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 16, marginBottom: 20 }}>
-            Scansiona il tuo badge o seleziona il tuo nome
+      {/* Main card */}
+      <div style={{ width: '100%', maxWidth: 520, padding: '0 20px', marginTop: 20 }}>
+
+        {!employee ? (
+          /* ── SCAN MODE ── */
+          <div>
+            {/* Big barcode input area */}
+            <div
+              onClick={() => barcodeRef.current?.focus()}
+              style={{
+                background: barcodeInput.length > 0 ? 'rgba(201,162,39,0.1)' : 'rgba(255,255,255,0.04)',
+                border: `3px dashed ${barcodeInput.length > 0 ? '#c9a227' : 'rgba(255,255,255,0.15)'}`,
+                borderRadius: 24, padding: '36px 24px', textAlign: 'center', cursor: 'text',
+                marginBottom: 24, transition: 'all 0.2s', position: 'relative',
+              }}
+            >
+              <div style={{ fontSize: 48, marginBottom: 12 }}>
+                {barcodeInput.length > 0 ? '🔦' : '📲'}
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+                {barcodeInput.length > 0 ? (
+                  <span style={{ color: '#c9a227', fontFamily: 'monospace', letterSpacing: 4 }}>{barcodeInput}</span>
+                ) : (
+                  'Scansiona il tuo badge'
+                )}
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>
+                {barcodeInput.length > 0 ? 'Premi Invio per confermare' : 'oppure seleziona il nome qui sotto'}
+              </div>
+
+              {/* Hidden → actual focused input */}
+              <input
+                ref={barcodeRef}
+                value={barcodeInput}
+                onChange={e => setBarcodeInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleBarcodeSubmit(); }}
+                autoFocus
+                style={{
+                  position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
+                  width: 180, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 8, padding: '6px 12px', color: '#fff', fontSize: 13, textAlign: 'center',
+                  outline: 'none', fontFamily: 'monospace', letterSpacing: 2,
+                }}
+                placeholder="ID / Codice badge"
+              />
+            </div>
+
+            {/* Feedback message */}
+            {message && (
+              <div style={{
+                marginBottom: 20, padding: '16px 24px', borderRadius: 16, textAlign: 'center',
+                background: message.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
+                border: `2px solid ${message.type === 'error' ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.5)'}`,
+                color: message.type === 'error' ? '#fca5a5' : '#86efac',
+                fontSize: 16, fontWeight: 700, animation: 'fadeIn 0.3s ease',
+              }}>
+                {message.text}
+              </div>
+            )}
+
+            {/* Employee list (manual fallback) */}
+            <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10, textAlign: 'center' }}>
+                — oppure scegli il tuo nome —
+              </div>
+              {loadingEmployees ? (
+                <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: 16 }}>Caricamento...</div>
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {employees.map(emp => (
+                    <button key={emp.id} onClick={() => handleSelectEmployee(emp)} style={{
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 12, padding: '12px 20px', color: '#fff', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                      transition: 'all 0.15s', fontSize: 15, fontWeight: 600,
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(201,162,39,0.12)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                    >
+                      <div style={{
+                        width: 36, height: 36, borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #c9a227, #f0c035)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 16, fontWeight: 900, color: '#0e1726', flexShrink: 0,
+                      }}>
+                        {(emp.first_name || emp.name || '?')[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <div>{emp.first_name || ''} {emp.last_name || emp.name || ''}</div>
+                        {emp.employee_code && (
+                          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 2, fontFamily: 'monospace' }}>
+                            #{emp.employee_code}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                  {employees.length === 0 && !loadingEmployees && (
+                    <div style={{ color: 'rgba(255,255,255,0.25)', textAlign: 'center', padding: 12 }}>Nessun dipendente trovato</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Hidden barcode input (auto-focused) */}
-          <input
-            autoFocus
-            value={barcodeInput}
-            onChange={e => setBarcodeInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleBarcodeSelect(barcodeInput); }}
-            style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1 }}
-            placeholder="barcode"
-          />
-
-          <div style={{ display: 'grid', gap: 10, maxHeight: 320, overflowY: 'auto' }}>
-            {employees.map(emp => (
-              <button key={emp.id} onClick={() => setEmployee(emp)} style={{
-                background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 14, padding: '16px 24px', color: '#fff', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left',
-                transition: 'all 0.2s', fontSize: 16, fontWeight: 600,
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(201,162,39,0.15)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
-              >
-                <div style={{
-                  width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #c9a227, #f0c035)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 18, fontWeight: 900, color: '#0e1726', flexShrink: 0,
-                }}>
-                  {(emp.first_name || emp.name || '?')[0].toUpperCase()}
+        ) : (
+          /* ── CLOCK ACTION MODE ── */
+          <div style={{ textAlign: 'center' }}>
+            {/* Employee badge */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center',
+              marginBottom: 32, background: 'rgba(255,255,255,0.06)', borderRadius: 20,
+              padding: '16px 28px', border: '1px solid rgba(255,255,255,0.1)',
+            }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
+                background: 'linear-gradient(135deg, #c9a227, #f0c035)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 22, fontWeight: 900, color: '#0e1726',
+              }}>
+                {(employee.first_name || employee.name || '?')[0].toUpperCase()}
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ color: '#fff', fontWeight: 800, fontSize: 20 }}>
+                  {employee.first_name || ''} {employee.last_name || employee.name || ''}
                 </div>
-                <div>
-                  <div>{emp.first_name || ''} {emp.last_name || emp.name || ''}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 2 }}>{emp.role || 'Dipendente'}</div>
+                <div style={{ color: lastStatus === 'in' ? '#4ade80' : 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 2 }}>
+                  {lastStatus === 'in' ? '🟢 In servizio' : '⚪ Fuori servizio'}
                 </div>
+              </div>
+              <button onClick={() => { setEmployee(null); setLastStatus(null); setTodayRecords([]); setMessage(null); setBarcodeInput(''); }}
+                style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 22 }}>
+                ✕
               </button>
-            ))}
-            {employees.length === 0 && (
-              <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>Nessun dipendente trovato</div>
+            </div>
+
+            {/* Message or action button */}
+            {message ? (
+              <div style={{
+                padding: '28px 40px', borderRadius: 24, fontSize: 20, fontWeight: 800, marginBottom: 24,
+                background: message.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
+                border: `2px solid ${message.type === 'error' ? '#ef4444' : '#22c55e'}`,
+                color: message.type === 'error' ? '#fca5a5' : '#86efac',
+              }}>
+                {message.text}
+              </div>
+            ) : lastStatus === 'in' ? (
+              <button onClick={() => performClock(employee, 'out')} disabled={loading} style={{
+                width: '100%', padding: '32px 40px', borderRadius: 24, border: '3px solid #ef4444',
+                background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 24, fontWeight: 900,
+                cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.2s', letterSpacing: '-0.5px',
+              }}
+                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'rgba(239,68,68,0.3)'; }}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.15)'}
+              >
+                {loading ? '⏳ Attendere...' : '🔴 TIMBRA USCITA'}
+              </button>
+            ) : (
+              <button onClick={() => performClock(employee, 'in')} disabled={loading} style={{
+                width: '100%', padding: '32px 40px', borderRadius: 24, border: '3px solid #22c55e',
+                background: 'rgba(34,197,94,0.15)', color: '#86efac', fontSize: 24, fontWeight: 900,
+                cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.2s', letterSpacing: '-0.5px',
+              }}
+                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'rgba(34,197,94,0.3)'; }}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(34,197,94,0.15)'}
+              >
+                {loading ? '⏳ Attendere...' : '🟢 TIMBRA ENTRATA'}
+              </button>
+            )}
+
+            {/* Today's records */}
+            {todayRecords.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+                  Timbrature di oggi
+                </div>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  {todayRecords.map((rec, i) => (
+                    <div key={i} style={{
+                      background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 14px',
+                      border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: 10, alignItems: 'center',
+                    }}>
+                      <span style={{ color: '#4ade80', fontSize: 13, fontWeight: 700 }}>🟢 {fmtTime(rec.clock_in)}</span>
+                      {rec.clock_out && <span style={{ color: '#f87171', fontSize: 13, fontWeight: 700 }}>🔴 {fmtTime(rec.clock_out)}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
+        )}
+      </div>
 
-          {message && (
-            <div style={{
-              marginTop: 16, padding: '12px 20px', borderRadius: 12,
-              background: message.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
-              border: `1px solid ${message.type === 'error' ? 'rgba(239,68,68,0.4)' : 'rgba(34,197,94,0.4)'}`,
-              color: message.type === 'error' ? '#fca5a5' : '#86efac', fontSize: 14, fontWeight: 600,
-            }}>
-              {message.text}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Clock action panel */
-        <div style={{ textAlign: 'center', width: '100%', maxWidth: 480 }}>
-
-          {/* Employee badge */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center',
-            marginBottom: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 20,
-            padding: '16px 28px', border: '1px solid rgba(255,255,255,0.1)',
-          }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
-              background: 'linear-gradient(135deg, #c9a227, #f0c035)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 22, fontWeight: 900, color: '#0e1726',
-            }}>
-              {(employee.first_name || employee.name || '?')[0].toUpperCase()}
-            </div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ color: '#fff', fontWeight: 800, fontSize: 20 }}>
-                {employee.first_name || ''} {employee.last_name || employee.name || ''}
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>{employee.role || 'Dipendente'}</div>
-            </div>
-            <button onClick={() => { setEmployee(null); setLastStatus(null); setTodayRecords([]); setMessage(null); }}
-              style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 20 }}>
-              ✕
-            </button>
-          </div>
-
-          {/* Status indicator */}
-          <div style={{ marginBottom: 28, color: 'rgba(255,255,255,0.5)', fontSize: 15 }}>
-            {lastStatus === 'in'
-              ? <span style={{ color: '#4ade80' }}>● Sei attualmente <strong>in servizio</strong></span>
-              : <span style={{ color: 'rgba(255,255,255,0.4)' }}>● Fuori servizio</span>
-            }
-          </div>
-
-          {/* Main action button */}
-          {message ? (
-            <div style={{
-              padding: '28px 40px', borderRadius: 24, fontSize: 22, fontWeight: 800,
-              background: message.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
-              border: `2px solid ${message.type === 'error' ? '#ef4444' : '#22c55e'}`,
-              color: message.type === 'error' ? '#fca5a5' : '#86efac',
-              marginBottom: 24,
-            }}>
-              {message.text}
-            </div>
-          ) : lastStatus === 'in' ? (
-            <button onClick={handleClockOut} disabled={loading} style={{
-              width: '100%', padding: '32px 40px', borderRadius: 24, border: '3px solid #ef4444',
-              background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 24, fontWeight: 900,
-              cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
-              letterSpacing: '-0.5px',
-            }}
-              onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'rgba(239,68,68,0.3)'; }}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.15)'}
-            >
-              {loading ? 'Attendere...' : '■  TIMBRA USCITA'}
-            </button>
-          ) : (
-            <button onClick={handleClockIn} disabled={loading} style={{
-              width: '100%', padding: '32px 40px', borderRadius: 24, border: '3px solid #22c55e',
-              background: 'rgba(34,197,94,0.15)', color: '#86efac', fontSize: 24, fontWeight: 900,
-              cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
-              letterSpacing: '-0.5px',
-            }}
-              onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'rgba(34,197,94,0.3)'; }}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(34,197,94,0.15)'}
-            >
-              {loading ? 'Attendere...' : '▶  TIMBRA ENTRATA'}
-            </button>
-          )}
-
-          {/* Today's records */}
-          {todayRecords.length > 0 && (
-            <div style={{ marginTop: 28 }}>
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-                Timbrature di oggi
-              </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-                {todayRecords.map((rec, i) => (
-                  <div key={i} style={{
-                    background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 14px',
-                    border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: 10, alignItems: 'center',
-                  }}>
-                    <span style={{ color: '#4ade80', fontSize: 13, fontWeight: 700 }}>▶ {fmtTime(rec.clock_in)}</span>
-                    {rec.clock_out && <span style={{ color: '#f87171', fontSize: 13, fontWeight: 700 }}>■ {fmtTime(rec.clock_out)}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Footer hint */}
-      <div style={{ position: 'absolute', bottom: 20, color: 'rgba(255,255,255,0.15)', fontSize: 12 }}>
-        SvaPro Timbrature — {new Date().getFullYear()}
+      {/* Footer */}
+      <div style={{ position: 'absolute', bottom: 20, color: 'rgba(255,255,255,0.12)', fontSize: 12 }}>
+        SvaPro Timbrature © {new Date().getFullYear()} — Scansiona il badge o inserisci l'ID + Invio
       </div>
     </div>
   );

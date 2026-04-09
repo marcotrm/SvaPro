@@ -14,11 +14,11 @@ const allNavigation = [
   { section: 'Principale', items: [
     { label: 'POS Cassa', href: '/', icon: Monitor, roles: ['superadmin','admin_cliente','dipendente'] },
     { label: 'Dashboard', href: '/dashboard', icon: BarChart3, roles: ['superadmin','admin_cliente'] },
-    { label: 'Timbrature', href: '/attendance', icon: Fingerprint, roles: ['superadmin','admin_cliente','dipendente'] },
     { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in', icon: Fingerprint, roles: ['dipendente'] },
+    { label: 'Prodotti', href: '/catalog', icon: Package, roles: ['dipendente'] },
   ]},
   { section: 'Gestione', items: [
-    { label: 'Prodotti', href: '/catalog', icon: Package, roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Prodotti', href: '/catalog', icon: Package, roles: ['superadmin','admin_cliente'] },
     { label: 'Magazzino', href: '/inventory', icon: Warehouse, roles: ['superadmin','admin_cliente'] },
     { label: 'Inventario', href: '/inventory/count', icon: ClipboardList, roles: ['superadmin','admin_cliente'] },
     { label: 'Ordini', href: '/orders', icon: ShoppingBag, roles: ['superadmin','admin_cliente'] },
@@ -41,7 +41,6 @@ const allNavigation = [
     { label: 'Gestione Dipendenti', href: '/employees', icon: Users, roles: ['superadmin','admin_cliente'] },
     { label: '🕐 Timbrature', href: '/attendance', icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
     { label: '🏆 Gamification', href: '/gamification', icon: Activity, roles: ['superadmin','admin_cliente','dipendente'] },
-    { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in', icon: Fingerprint, roles: ['dipendente'] },
   ]},
   { section: 'Amministrazione', items: [
     { label: 'Impostazioni', href: '/settings', icon: Settings, roles: ['superadmin','admin_cliente'] },
