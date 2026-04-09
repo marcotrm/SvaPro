@@ -8,6 +8,7 @@ use App\Services\EmployeeNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class EmployeeController extends Controller
@@ -131,6 +132,83 @@ class EmployeeController extends Controller
         AuditLogger::log($request, 'create', 'employee', $employeeId, $request->input('first_name') . ' ' . $request->input('last_name'));
 
         return response()->json(['message' => 'Dipendente creato.', 'employee_id' => $employeeId], 201);
+    }
+
+    public function destroy(Request $request, int $employeeId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $employee = DB::table('employees')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $employeeId)
+            ->first();
+
+        if (!$employee) {
+            return response()->json(['message' => 'Dipendente non trovato.'], 404);
+        }
+
+        // Elimina foto da storage se presente
+        if ($employee->photo_url && str_starts_with($employee->photo_url, '/storage/')) {
+            $path = str_replace('/storage/', '', $employee->photo_url);
+            Storage::disk('public')->delete($path);
+        }
+
+        // Soft-delete: imposta status = deleted e svuota i dati sensibili
+        DB::table('employees')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $employeeId)
+            ->update([
+                'status'     => 'deleted',
+                'updated_at' => now(),
+            ]);
+
+        // Opzionale: elimina wallet punti
+        DB::table('employee_point_wallets')
+            ->where('tenant_id', $tenantId)
+            ->where('employee_id', $employeeId)
+            ->delete();
+
+        AuditLogger::log($request, 'delete', 'employee', $employeeId,
+            ($employee->first_name ?? '') . ' ' . ($employee->last_name ?? ''));
+
+        return response()->json(['message' => 'Dipendente eliminato.']);
+    }
+
+    public function uploadPhoto(Request $request, int $employeeId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $employee = DB::table('employees')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $employeeId)
+            ->first();
+
+        if (!$employee) {
+            return response()->json(['message' => 'Dipendente non trovato.'], 404);
+        }
+
+        $request->validate([
+            'photo' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:2048'],
+        ]);
+
+        // Elimina foto precedente
+        if ($employee->photo_url && str_starts_with($employee->photo_url, '/storage/')) {
+            $oldPath = str_replace('/storage/', '', $employee->photo_url);
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        $path = $request->file('photo')->store("employees/tenant_{$tenantId}", 'public');
+        $photoUrl = '/storage/' . $path;
+
+        DB::table('employees')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $employeeId)
+            ->update(['photo_url' => $photoUrl, 'updated_at' => now()]);
+
+        AuditLogger::log($request, 'upload_photo', 'employee', $employeeId,
+            ($employee->first_name ?? '') . ' ' . ($employee->last_name ?? ''));
+
+        return response()->json(['message' => 'Foto caricata.', 'photo_url' => $photoUrl]);
     }
 
     public function update(Request $request, int $employeeId): JsonResponse

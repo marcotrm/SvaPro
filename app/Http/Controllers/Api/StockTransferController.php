@@ -300,4 +300,33 @@ class StockTransferController extends Controller
 
         return response()->json(['message' => 'DDT annullato.']);
     }
+
+    /* ─── DELETE ─────────────────────────────────────────────────── */
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $transfer = DB::table('stock_transfers')->where('id', $id)->where('tenant_id', $tenantId)->first();
+        if (!$transfer) {
+            return response()->json(['message' => 'DDT non trovato.'], 404);
+        }
+
+        if (!in_array($transfer->status, ['draft', 'cancelled'])) {
+            return response()->json([
+                'message' => 'Puoi eliminare solo DDT in bozza o annullati. Per eliminare un DDT in transito, annullalo prima.',
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            DB::table('stock_transfer_items')->where('transfer_id', $id)->delete();
+            DB::table('stock_transfers')->where('id', $id)->delete();
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Errore eliminazione DDT: ' . $e->getMessage()], 500);
+        }
+
+        return response()->json(['message' => 'DDT eliminato.']);
+    }
 }

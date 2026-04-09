@@ -20,6 +20,7 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [photoPreview, setPhotoPreview] = useState(employee?.photo_url || null);
+  const [photoFile, setPhotoFile] = useState(null);
   const photoInputRef = useRef(null);
 
   useEffect(() => {
@@ -50,12 +51,9 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       setError('Foto troppo grande. Max 2MB.');
       return;
     }
+    setPhotoFile(file);
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = ev.target.result;
-      setPhotoPreview(base64);
-      setFormData(prev => ({ ...prev, photo_url: base64 }));
-    };
+    reader.onload = (ev) => setPhotoPreview(ev.target.result);
     reader.readAsDataURL(file);
   };
 
@@ -66,11 +64,30 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       setError('');
       setFieldErrors({});
 
+      // Salva i dati anagrafici (senza photo_url se useremo upload separato)
+      const payload = { ...formData };
+      delete payload.photo_url; // la foto viene caricata separatamente
+
+      let savedId = employee?.id;
       if (employee?.id) {
-        await employees.updateEmployee(employee.id, formData);
+        await employees.updateEmployee(employee.id, payload);
       } else {
-        await employees.createEmployee(formData);
+        const res = await employees.createEmployee(payload);
+        savedId = res.data?.employee_id;
       }
+
+      // Upload foto se selezionata
+      if (photoFile && savedId) {
+        try {
+          const fd = new FormData();
+          fd.append('photo', photoFile);
+          await employees.uploadPhoto(savedId, fd);
+        } catch {
+          // Upload foto non bloccante
+          setError('Dipendente salvato, ma caricamento foto fallito. Riprova.');
+        }
+      }
+
       onSave();
     } catch (err) {
       const serverErrors = err.response?.data?.errors;
@@ -158,7 +175,7 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
               {photoPreview && (
                 <button
                   type="button"
-                  onClick={() => { setPhotoPreview(null); setFormData(p => ({ ...p, photo_url: '' })); }}
+                  onClick={() => { setPhotoPreview(null); setPhotoFile(null); setFormData(p => ({ ...p, photo_url: '' })); }}
                   style={{
                     marginLeft: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid #fecaca',
                     background: '#fef2f2', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer',

@@ -365,9 +365,21 @@ export default function PosPage() {
 
   /* Barcode scan su Enter — prodotto o fidelity card cliente */
   const handleSearchKey = (e) => {
-    if (e.key === 'Enter' && searchTerm) {
-      const match = products.find(p => p.barcode === searchTerm || p.sku === searchTerm || p.variants?.some(v => v.barcode === searchTerm));
-      if (match) { addToCart(match); setSearchTerm(''); }
+    if (e.key === 'Enter' && searchTerm.trim()) {
+      const bc = searchTerm.trim().toLowerCase();
+      const match = products.find(p =>
+        p.barcode?.toLowerCase() === bc ||
+        p.sku?.toLowerCase() === bc ||
+        p.variants?.some(v =>
+          v.barcode?.toLowerCase() === bc ||
+          v.sku?.toLowerCase() === bc
+        )
+      );
+      if (match) {
+        addToCart(match);
+        setSearchTerm('');
+        searchRef.current?.focus();
+      }
     }
   };
 

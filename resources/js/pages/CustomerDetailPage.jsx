@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useOutletContext } from 'react-router-dom';
 import { customers, orders as ordersApi, loyalty } from '../api.jsx';
 
-const TABS = ['anagrafica', 'ordini', 'loyalty', 'note'];
-const TAB_LABELS = { anagrafica: '📋 Anagrafica', ordini: '🛒 Ordini', loyalty: '🎁 Loyalty & Punti', note: '📝 Note CRM' };
+const TABS = ['anagrafica', 'ordini', 'loyalty', 'crm', 'note'];
+const TAB_LABELS = { anagrafica: '📋 Anagrafica', ordini: '🛒 Ordini', loyalty: '🎁 Loyalty & Punti', crm: '💬 CRM / Messaggi', note: '📝 Note CRM' };
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
@@ -18,6 +18,15 @@ export default function CustomerDetailPage() {
   const [newNote, setNewNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // CRM
+  const [waMsgTemplate, setWaMsgTemplate] = useState('');
+  const [waMsg, setWaMsg] = useState('');
+  const [waSending, setWaSending] = useState(false);
+  const [waResult, setWaResult] = useState(null);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailResult, setEmailResult] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -196,6 +205,142 @@ export default function CustomerDetailPage() {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* ── CRM ── */}
+      {activeTab === 'crm' && (
+        <div style={{ display: 'grid', gap: 20 }}>
+
+          {/* WhatsApp */}
+          <div className="card-v3" style={{ padding: 28 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              📱 Invia WhatsApp
+              {customer.phone
+                ? <span style={{ fontWeight: 400, fontSize: 13, color: '#64748b' }}>→ {customer.phone}</span>
+                : <span style={{ fontWeight: 400, fontSize: 12, color: '#ef4444' }}>Numero non disponibile</span>}
+            </h2>
+
+            {/* Template rapidi */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              {[
+                { label: '🎁 Promozione', text: `Ciao ${customer.first_name}! Abbiamo un'offerta esclusiva per te. Passa in negozio o contattaci per saperne di più!` },
+                { label: '👋 Bentornato', text: `Ciao ${customer.first_name}! È un po' che non ti vediamo. Ti aspettiamo con tante novità!` },
+                { label: '⭐ Follow-up', text: `Ciao ${customer.first_name}! Come va con il tuo ultimo acquisto? Siamo qui per ogni domanda.` },
+              ].map(tmpl => (
+                <button key={tmpl.label}
+                  onClick={() => setWaMsg(tmpl.text)}
+                  style={{
+                    padding: '6px 12px', borderRadius: 8, border: '1px solid #e2e8f0',
+                    background: '#f8fafc', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#4f46e5'; e.currentTarget.style.color = '#fff'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = ''; }}
+                >
+                  {tmpl.label}
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              value={waMsg}
+              onChange={e => setWaMsg(e.target.value)}
+              placeholder="Scrivi il messaggio WhatsApp..."
+              style={{ width: '100%', minHeight: 100, padding: '12px 16px', border: '2px solid #e2e8f0', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, resize: 'vertical', outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
+              onFocus={e => e.target.style.borderColor = '#25D366'}
+              onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 12, color: '#94a3b8' }}>{waMsg.length} / 1600 caratteri</span>
+              <button
+                disabled={!waMsg.trim() || !customer.phone || waSending}
+                onClick={async () => {
+                  setWaSending(true); setWaResult(null);
+                  try {
+                    await customers.sendWhatsapp(customer.id, waMsg);
+                    setWaResult({ ok: true, msg: 'Messaggio inviato!' });
+                    setWaMsg('');
+                  } catch (e) {
+                    setWaResult({ ok: false, msg: e.response?.data?.message || 'Errore invio' });
+                  } finally { setWaSending(false); }
+                }}
+                style={{
+                  background: waMsg.trim() && customer.phone ? '#25D366' : '#e5e7eb',
+                  color: waMsg.trim() && customer.phone ? '#fff' : '#9ca3af',
+                  border: 'none', borderRadius: 10, padding: '10px 24px', fontWeight: 700,
+                  cursor: waMsg.trim() && customer.phone ? 'pointer' : 'not-allowed', fontSize: 14,
+                }}
+              >
+                {waSending ? 'Invio...' : '💬 Invia WhatsApp'}
+              </button>
+            </div>
+            {waResult && (
+              <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+                background: waResult.ok ? '#f0fdf4' : '#fef2f2',
+                color: waResult.ok ? '#16a34a' : '#dc2626',
+                border: `1px solid ${waResult.ok ? '#bbf7d0' : '#fecaca'}` }}>
+                {waResult.ok ? '✅' : '❌'} {waResult.msg}
+              </div>
+            )}
+          </div>
+
+          {/* Email */}
+          <div className="card-v3" style={{ padding: 28 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              📧 Invia Email
+              {customer.email
+                ? <span style={{ fontWeight: 400, fontSize: 13, color: '#64748b' }}>→ {customer.email}</span>
+                : <span style={{ fontWeight: 400, fontSize: 12, color: '#ef4444' }}>Email non disponibile</span>}
+            </h2>
+            <input
+              value={emailSubject}
+              onChange={e => setEmailSubject(e.target.value)}
+              placeholder="Oggetto email..."
+              style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: 10, fontFamily: 'inherit', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
+              onFocus={e => e.target.style.borderColor = '#6366f1'}
+              onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+            />
+            <textarea
+              value={emailBody}
+              onChange={e => setEmailBody(e.target.value)}
+              placeholder={`Ciao ${customer.first_name},\n\nScrivi qui il corpo dell'email...`}
+              style={{ width: '100%', minHeight: 120, padding: '12px 16px', border: '2px solid #e2e8f0', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, resize: 'vertical', outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
+              onFocus={e => e.target.style.borderColor = '#6366f1'}
+              onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                disabled={!emailSubject.trim() || !emailBody.trim() || !customer.email || emailSending}
+                onClick={async () => {
+                  setEmailSending(true); setEmailResult(null);
+                  try {
+                    await customers.sendEmail(customer.id, emailSubject, emailBody);
+                    setEmailResult({ ok: true, msg: 'Email inviata!' });
+                    setEmailSubject(''); setEmailBody('');
+                  } catch (e) {
+                    setEmailResult({ ok: false, msg: e.response?.data?.message || 'Errore invio email' });
+                  } finally { setEmailSending(false); }
+                }}
+                style={{
+                  background: emailSubject.trim() && emailBody.trim() && customer.email ? '#4f46e5' : '#e5e7eb',
+                  color: emailSubject.trim() && emailBody.trim() && customer.email ? '#fff' : '#9ca3af',
+                  border: 'none', borderRadius: 10, padding: '10px 24px', fontWeight: 700,
+                  cursor: emailSubject.trim() && emailBody.trim() && customer.email ? 'pointer' : 'not-allowed', fontSize: 14,
+                }}
+              >
+                {emailSending ? 'Invio...' : '📧 Invia Email'}
+              </button>
+            </div>
+            {emailResult && (
+              <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+                background: emailResult.ok ? '#f0fdf4' : '#fef2f2',
+                color: emailResult.ok ? '#16a34a' : '#dc2626',
+                border: `1px solid ${emailResult.ok ? '#bbf7d0' : '#fecaca'}` }}>
+                {emailResult.ok ? '✅' : '❌'} {emailResult.msg}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

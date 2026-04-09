@@ -28,11 +28,12 @@ export default function StockTransfersPage() {
     const [saving,  setSaving]  = useState(false);
     const [detailId, setDetailId] = useState(null);
 
-    // Form nuovo DDT
     const [form, setForm] = useState({
         from_store_id: '', to_store_id: '', notes: '',
         items: [{ product_variant_id: '', quantity_sent: 1 }],
     });
+    const [barcodeInput, setBarcodeInput] = useState('');
+    const barcodeInputRef = useRef(null);
 
     useEffect(() => { fetchAll(); }, [statusFilter]);
 
@@ -129,6 +130,15 @@ export default function StockTransfersPage() {
         try {
             setError('');
             await stockTransfers.cancel(id);
+            await fetchAll();
+        } catch (e) { setError(e.response?.data?.message || e.message); }
+    };
+
+    const handleDelete = async (id) => {
+        if (!confirm('Eliminare definitivamente questo DDT? L\'operazione non è reversibile.')) return;
+        try {
+            setError('');
+            await stockTransfers.delete(id);
             await fetchAll();
         } catch (e) { setError(e.response?.data?.message || e.message); }
     };
@@ -240,9 +250,53 @@ export default function StockTransfersPage() {
                             </div>
                         </div>
 
-                        {/* Righe prodotti */}
-                        <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        {/* Barcode scanner prodotto nel DDT */}
+                        {form.from_store_id && (
+                            <div style={{ marginBottom: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>📷 Scansiona barcode:</span>
+                                <input
+                                    ref={barcodeInputRef}
+                                    className="field-input"
+                                    style={{ flex: 1 }}
+                                    value={barcodeInput}
+                                    onChange={e => setBarcodeInput(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && barcodeInput.trim()) {
+                                            const bc = barcodeInput.trim().toLowerCase();
+                                            const found = variants.find(v =>
+                                                v.barcode?.toLowerCase() === bc ||
+                                                v.sku?.toLowerCase() === bc ||
+                                                v.label?.toLowerCase().includes(bc)
+                                            );
+                                            if (found) {
+                                                // Aggiunge il prodotto trovato alla lista
+                                                const existingIdx = form.items.findIndex(i => String(i.product_variant_id) === String(found.id));
+                                                if (existingIdx >= 0) {
+                                                    updateItem(existingIdx, 'quantity_sent', form.items[existingIdx].quantity_sent + 1);
+                                                } else {
+                                                    const items = [...form.items];
+                                                    if (items[items.length - 1].product_variant_id === '') {
+                                                        items[items.length - 1] = { product_variant_id: String(found.id), quantity_sent: 1 };
+                                                    } else {
+                                                        items.push({ product_variant_id: String(found.id), quantity_sent: 1 });
+                                                    }
+                                                    setForm(f => ({ ...f, items }));
+                                                }
+                                                setBarcodeInput('');
+                                                barcodeInputRef.current?.focus();
+                                            } else {
+                                                setError(`Barcode "${barcodeInput}" non trovato nel catalogo del negozio selezionato.`);
+                                                setBarcodeInput('');
+                                            }
+                                        }
+                                    }}
+                                    placeholder="Barcode / SKU prodotto + Invio"
+                                    autoComplete="off"
+                                />
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                 <label className="field-label" style={{ margin: 0 }}>Prodotti da Trasferire *</label>
                                 <button className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={addItem} type="button">+ Aggiungi</button>
                             </div>
@@ -361,6 +415,9 @@ export default function StockTransfersPage() {
                                             )}
                                             {['draft','in_transit'].includes(t.status) && (
                                                 <button className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 8px', color: 'var(--color-error)' }} onClick={() => handleCancel(t.id)}>Annulla</button>
+                                            )}
+                                            {['draft','cancelled'].includes(t.status) && (
+                                                <button className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 8px', color: 'var(--color-error)', fontWeight: 800 }} onClick={() => handleDelete(t.id)} title="Elimina DDT">🗑</button>
                                             )}
                                         </div>
                                     </td>

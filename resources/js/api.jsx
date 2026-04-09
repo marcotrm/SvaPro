@@ -500,6 +500,8 @@ export const customers = {
   verifyEmailOtp: (customerId, otp) => api.post(`/customers/${customerId}/email-otp/verify`, { otp }),
   uploadVisura: (customerId, formData) => api.post(`/customers/${customerId}/visura`, formData),
   downloadVisura: (customerId) => api.get(`/customers/${customerId}/visura/download`, { responseType: 'blob' }),
+  sendWhatsapp: (customerId, message) => api.post(`/customers/${customerId}/send-whatsapp`, { message }),
+  sendEmail: (customerId, subject, body) => api.post(`/customers/${customerId}/send-email`, { subject, body }),
   // Metodo generico POST per usi avanzati
   post_: (path, data) => api.post(path, data),
 };
@@ -510,6 +512,8 @@ export const employees = {
   getEmployee: (id) => api.get(`/employees/${id}`),
   createEmployee: (data) => api.post('/employees', data),
   updateEmployee: (id, data) => api.put(`/employees/${id}`, data),
+  deleteEmployee: (id) => api.delete(`/employees/${id}`),
+  uploadPhoto: (id, formData) => api.post(`/employees/${id}/photo`, formData),
   getTopPerformers: (params = {}) => cachedGet('/employees/analytics/top-performers', params, 30000, 300000),
   getKpiDashboard: (params = {}) => cachedGet('/employees/kpi-dashboard', params, 15000, 120000),
   setKpiTarget: (employeeId, data) => api.post(`/employees/${employeeId}/kpi-target`, data),
@@ -674,6 +678,7 @@ export const stockTransfers = {
   send:    (id)          => api.post(`/stock-transfers/${id}/send`),
   receive: (id, items)   => api.post(`/stock-transfers/${id}/receive`, { items }),
   cancel:  (id)          => api.post(`/stock-transfers/${id}/cancel`),
+  delete:  (id)          => api.delete(`/stock-transfers/${id}`),
 };
 
 export default api;

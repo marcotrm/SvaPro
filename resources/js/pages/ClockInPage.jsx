@@ -52,12 +52,19 @@ export default function ClockInPage() {
     setTimeout(() => { setMessage(null); }, duration);
   };
 
-  // Resolve employee from barcode/code/ID
+  // Recupera store_id dal localStorage (impostato dal selettore negozio nel Layout)
+  const getStoreId = () => {
+    const val = localStorage.getItem('selectedStoreId');
+    return val ? parseInt(val, 10) : null;
+  };
+
+  // Resolve employee from barcode/badge_code/employee_code/ID
   const resolveEmployee = (val) => {
     const trimmed = val.trim();
     if (!trimmed) return null;
     return employees.find(em =>
       (em.barcode && em.barcode === trimmed) ||
+      (em.badge_code && em.badge_code === trimmed) ||
       (em.employee_code && em.employee_code === trimmed) ||
       String(em.id) === trimmed
     ) || null;
@@ -83,10 +90,16 @@ export default function ClockInPage() {
 
   const loadTodayStatus = async (emp) => {
     try {
-      const res = await attendanceApi.live({ employee_id: emp.id });
-      const rec = (res.data?.data?.employees || []).find(e => e.employee_id === emp.id || e.id === emp.id);
-      setLastStatus(rec?.status === 'presente' ? 'in' : 'out');
-      setTodayRecords(rec?.today_records || []);
+      const res = await attendance.getLive({ employee_id: emp.id });
+      const liveList = res.data?.data || [];
+      const isPresent = liveList.some(e => e.employee_id === emp.id || e.id === emp.id);
+      setLastStatus(isPresent ? 'in' : 'out');
+      // Carica timbrature di oggi
+      try {
+        const todayRes = await attendance.getList({ employee_id: emp.id });
+        const all = (todayRes.data?.data || []).filter(r => r.employee_id === emp.id);
+        setTodayRecords(all.map(r => ({ clock_in: r.checked_in_at, clock_out: r.checked_out_at })));
+      } catch { setTodayRecords([]); }
     } catch {
       setLastStatus(null);
       setTodayRecords([]);
@@ -96,23 +109,31 @@ export default function ClockInPage() {
   // Perform clock action (auto-detect in/out or manual)
   const performClock = async (emp, forceAction = null) => {
     setLoading(true);
+    const storeId = getStoreId();
+
+    if (!storeId) {
+      showMessage('❌ Nessun negozio selezionato. Seleziona prima un negozio dal menu in alto.', 'error');
+      setLoading(false);
+      return;
+    }
+
     try {
       // Get current status first
       let currentStatus = null;
       try {
-        const res = await attendanceApi.live({ employee_id: emp.id });
-        const rec = (res.data?.data?.employees || []).find(e => e.employee_id === emp.id || e.id === emp.id);
-        currentStatus = rec?.status === 'presente' ? 'in' : 'out';
+        const res = await attendance.getLive({ employee_id: emp.id });
+        const liveList = res.data?.data || [];
+        currentStatus = liveList.some(e => e.employee_id === emp.id || e.id === emp.id) ? 'in' : 'out';
       } catch {}
 
       const action = forceAction || (currentStatus === 'in' ? 'out' : 'in');
 
       if (action === 'in') {
-        await attendanceApi.checkIn({ employee_id: emp.id });
+        await attendance.checkIn({ employee_id: emp.id, store_id: storeId });
         showMessage(`✅ Entrata timbrata per ${emp.first_name} ${emp.last_name} — ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`, 'success');
         setLastStatus('in');
       } else {
-        await attendanceApi.checkOut({ employee_id: emp.id });
+        await attendance.checkOut({ employee_id: emp.id, store_id: storeId });
         showMessage(`👋 Uscita timbrata per ${emp.first_name} ${emp.last_name} — ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`, 'success');
         setLastStatus('out');
       }

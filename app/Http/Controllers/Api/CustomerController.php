@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\CustomerEmailOtp;
 use App\Services\AuditLogger;
 use App\Services\CustomerOtpService;
+use App\Services\WhatsAppService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -183,6 +184,84 @@ class CustomerController extends Controller
             'city_breakdown' => $cityBreakdown,
             'top_returners' => $topReturners,
         ]);
+    }
+
+    public function show(Request $request, int $customerId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $customer = DB::table('customers as c')
+            ->leftJoin('loyalty_cards as lc', function ($join) use ($tenantId) {
+                $join->on('lc.customer_id', '=', 'c.id')
+                    ->where('lc.tenant_id', '=', $tenantId);
+            })
+            ->where('c.id', $customerId)
+            ->where('c.tenant_id', $tenantId)
+            ->select(['c.*', 'lc.card_code', 'lc.status as loyalty_status'])
+            ->first();
+
+        if (!$customer) {
+            return response()->json(['message' => 'Cliente non trovato.'], 404);
+        }
+
+        $hydrated = $this->hydrateCustomers(collect([$customer]))[0];
+        return response()->json(['data' => $hydrated]);
+    }
+
+    public function sendWhatsapp(Request $request, int $customerId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $customer = DB::table('customers')->where('id', $customerId)->where('tenant_id', $tenantId)->first();
+
+        if (!$customer) {
+            return response()->json(['message' => 'Cliente non trovato.'], 404);
+        }
+
+        $request->validate(['message' => ['required', 'string', 'max:1600']]);
+
+        $phone = $customer->phone;
+        if (!$phone) {
+            return response()->json(['message' => 'Numero di telefono non disponibile per questo cliente.'], 422);
+        }
+
+        try {
+            $whatsapp = app(WhatsAppService::class);
+            $whatsapp->send($phone, $request->input('message'));
+            AuditLogger::log($request, 'send_whatsapp', 'customer', $customerId, $customer->first_name . ' ' . $customer->last_name);
+            return response()->json(['message' => 'Messaggio WhatsApp inviato.']);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Errore invio WhatsApp: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function sendEmail(Request $request, int $customerId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $customer = DB::table('customers')->where('id', $customerId)->where('tenant_id', $tenantId)->first();
+
+        if (!$customer) {
+            return response()->json(['message' => 'Cliente non trovato.'], 404);
+        }
+
+        $request->validate([
+            'subject' => ['required', 'string', 'max:255'],
+            'body'    => ['required', 'string'],
+        ]);
+
+        $email = $customer->email;
+        if (!$email) {
+            return response()->json(['message' => 'Email non disponibile per questo cliente.'], 422);
+        }
+
+        try {
+            Mail::raw($request->input('body'), function ($msg) use ($email, $request) {
+                $msg->to($email)->subject($request->input('subject'));
+            });
+            AuditLogger::log($request, 'send_email', 'customer', $customerId, $customer->first_name . ' ' . $customer->last_name);
+            return response()->json(['message' => 'Email inviata.']);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Errore invio email: ' . $e->getMessage()], 500);
+        }
     }
 
     public function store(Request $request): JsonResponse

@@ -70,6 +70,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
 
         Route::get('/customers', [CustomerController::class, 'index']);
         Route::get('/customers/analytics/return-frequency', [CustomerController::class, 'returnFrequencyAnalytics']);
+        Route::get('/customers/{customerId}', [CustomerController::class, 'show']);
         Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.manage');
         Route::put('/customers/{customerId}', [CustomerController::class, 'update'])->middleware('permission:customers.manage');
         Route::post('/customers/{customerId}/otp/send', [CustomerController::class, 'sendOtp']);
@@ -78,11 +79,15 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/customers/{customerId}/email-otp/verify', [CustomerController::class, 'verifyEmailOtp']);
         Route::post('/customers/{customerId}/visura', [CustomerController::class, 'uploadVisura'])->middleware('permission:customers.manage');
         Route::get('/customers/{customerId}/visura/download', [CustomerController::class, 'downloadVisura'])->middleware('permission:customers.manage');
+        Route::post('/customers/{customerId}/send-whatsapp', [CustomerController::class, 'sendWhatsapp']);
+        Route::post('/customers/{customerId}/send-email', [CustomerController::class, 'sendEmail']);
 
         Route::get('/employees', [EmployeeController::class, 'index']);
         Route::get('/employees/analytics/top-performers', [EmployeeController::class, 'topPerformers']);
         Route::post('/employees', [EmployeeController::class, 'store'])->middleware('permission:employees.manage');
         Route::put('/employees/{employeeId}', [EmployeeController::class, 'update'])->middleware('permission:employees.manage');
+        Route::delete('/employees/{employeeId}', [EmployeeController::class, 'destroy'])->middleware('permission:employees.manage');
+        Route::post('/employees/{employeeId}/photo', [EmployeeController::class, 'uploadPhoto'])->middleware('permission:employees.manage');
         Route::get('/employees/{employeeId}/notifications', [EmployeeController::class, 'notifications']);
         Route::post('/employees/{employeeId}/notifications/{notificationId}/read', [EmployeeController::class, 'markNotificationRead']);
         Route::post('/employees/{employeeId}/notifications/read-all', [EmployeeController::class, 'markAllNotificationsRead']);
@@ -202,9 +207,17 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/stock-transfers/{id}/send', [StockTransferController::class, 'send']);
         Route::post('/stock-transfers/{id}/receive', [StockTransferController::class, 'receive']);
         Route::post('/stock-transfers/{id}/cancel', [StockTransferController::class, 'cancel']);
+        Route::delete('/stock-transfers/{id}', [StockTransferController::class, 'destroy']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente')->group(function () {
+        // Catalog: accessibile anche ai dipendenti per il POS
+        Route::get('/catalog/products', [CatalogController::class, 'index']);
+        Route::get('/catalog/brands', [CatalogController::class, 'brands']);
+        Route::get('/catalog/categories', [CatalogController::class, 'categories']);
+        Route::get('/catalog/tax-classes', [CatalogController::class, 'taxClasses']);
+        Route::get('/catalog/products/{productId}', [CatalogController::class, 'show']);
+
         Route::get('/inventory/stock', [InventoryController::class, 'index']);
         Route::get('/inventory/movements', [InventoryController::class, 'movements']);
 
