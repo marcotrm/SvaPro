@@ -5,8 +5,8 @@ import { CheckCircle, LogIn, LogOut, Clock, AlertTriangle, Loader, RefreshCw, Wi
 
 const STATUS_COLOR = {
   presente: { bg: '#D1FAE5', text: '#065F46', border: '#6EE7B7', label: 'Presente' },
-  fuori:    { bg: '#F3F4F6', text: '#6B7280', border: '#D1D5DB', label: 'Uscito'   },
-  assente:  { bg: 'var(--color-surface)', text: 'var(--color-text)', border: 'var(--color-border)', label: 'Non timbrato' },
+  fuori: { bg: '#F3F4F6', text: '#6B7280', border: '#D1D5DB', label: 'Uscito' },
+  assente: { bg: 'var(--color-surface)', text: 'var(--color-text)', border: 'var(--color-border)', label: 'Non timbrato' },
 };
 
 function Clock_({ serverTime }) {
@@ -31,9 +31,9 @@ function FeedbackBanner({ message, type }) {
   if (!message) return null;
   const colors = {
     success: { bg: '#D1FAE5', text: '#065F46', border: '#6EE7B7' },
-    error:   { bg: '#FEE2E2', text: '#991B1B', border: '#FCA5A5' },
+    error: { bg: '#FEE2E2', text: '#991B1B', border: '#FCA5A5' },
     warning: { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' },
-    info:    { bg: '#EFF6FF', text: '#1E40AF', border: '#93C5FD' },
+    info: { bg: '#EFF6FF', text: '#1E40AF', border: '#93C5FD' },
   }[type] || { bg: '#EFF6FF', text: '#1E40AF', border: '#93C5FD' };
 
   return (
@@ -51,16 +51,16 @@ function FeedbackBanner({ message, type }) {
 
 export default function AttendancePage() {
   const { selectedStoreId } = useOutletContext?.() || {};
-  const [employees, setEmployees]     = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [processing, setProcessing]   = useState(null); // employee_id in lavorazione
-  const [feedback, setFeedback]       = useState(null); // { message, type }
-  const [serverTime, setServerTime]   = useState(null);
-  const [online, setOnline]           = useState(navigator.onLine);
-  const feedbackTimer                 = useRef(null);
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(null); // employee_id in lavorazione
+  const [feedback, setFeedback] = useState(null); // { message, type }
+  const [serverTime, setServerTime] = useState(null);
+  const [online, setOnline] = useState(navigator.onLine);
+  const feedbackTimer = useRef(null);
 
   useEffect(() => {
-    window.addEventListener('online',  () => setOnline(true));
+    window.addEventListener('online', () => setOnline(true));
     window.addEventListener('offline', () => setOnline(false));
   }, []);
 
@@ -133,7 +133,7 @@ export default function AttendancePage() {
   );
 
   const present = employees.filter(e => e.status === 'presente').length;
-  const absent  = employees.filter(e => e.status === 'assente').length;
+  const absent = employees.filter(e => e.status === 'assente').length;
 
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1100, margin: '0 auto' }}>

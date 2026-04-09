@@ -17,22 +17,18 @@ if [ -n "$DATABASE_URL" ]; then
         sed -i "s|DATABASE_URL=.*|DATABASE_URL=$DATABASE_URL|g" /app/.env || \
         echo "DATABASE_URL=$DATABASE_URL" >> /app/.env
 else
-    # ─── SQLite su volume persistente Railway (/app/database) ───────
-    echo "ℹ️  Uso SQLite su volume persistente /app/database"
-    mkdir -p /app/database
-    # Imposta il path nel .env
-    sed -i "s|DB_DATABASE=.*|DB_DATABASE=/app/database/database.sqlite|g" /app/.env
-    # Crea il file SQLite se non esiste (primo deploy)
-    if [ ! -f /app/database/database.sqlite ]; then
-        echo "🆕 Primo deploy: creo database SQLite..."
-        touch /app/database/database.sqlite
+    # ─── SQLite: assicura che il file esista (volume persistente) ───
+    DB_PATH="/app/storage/database.sqlite"
+    if [ ! -f "$DB_PATH" ]; then
+        echo "🆕 DB SQLite non trovato — creo e migro..."
+        touch "$DB_PATH"
+        chmod 666 "$DB_PATH"
     else
-        echo "✅ Database SQLite esistente trovato ($(du -sh /app/database/database.sqlite | cut -f1))"
+        echo "✅ DB SQLite trovato ($(du -sh $DB_PATH | cut -f1))"
     fi
 fi
 
-# ─── Storage & config ────────────────────────────────
-mkdir -p /app/storage/app/public
+# ─── Config + migrate ────────────────────────────────
 php artisan config:clear --no-interaction
 php artisan config:cache --no-interaction
 php artisan migrate --force --no-interaction
