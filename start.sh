@@ -82,44 +82,7 @@ if [ $MIGRATE_EXIT -ne 0 ]; then
 fi
 echo "✅ Migrate OK"
 
-# ─── 5. Verifica integrità schema (fix schema corrotto) ──────────────────────
-# Se migrate dice "Nothing to migrate" ma le tabelle fisiche non esistono,
-# eseguiamo migrate:fresh per resettare lo schema corrotto.
-if echo "$MIGRATE_OUT" | grep -qi "nothing to migrate"; then
-    echo "ℹ️  Nothing to migrate — verifico integrità schema..."
-
-    SCHEMA_OK=$(php -r "
-try {
-    \$pdo = new PDO(
-        'pgsql:host=' . getenv('DB_HOST') . ';port=' . (getenv('DB_PORT') ?: '5432') . ';dbname=' . getenv('DB_DATABASE') . ';sslmode=prefer',
-        getenv('DB_USERNAME'),
-        getenv('DB_PASSWORD'),
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
-    );
-    \$s = \$pdo->query(\"SELECT COUNT(*) AS c FROM information_schema.tables WHERE table_schema='public' AND table_name='personal_access_tokens'\");
-    \$r = \$s->fetch(PDO::FETCH_ASSOC);
-    echo (\$r && \$r['c'] > 0) ? 'ok' : 'bad';
-} catch (Exception \$e) {
-    echo 'error:' . \$e->getMessage();
-}
-" 2>/dev/null || echo "bad")
-
-    echo "   Schema check: $SCHEMA_OK"
-
-    if [ "$SCHEMA_OK" != "ok" ]; then
-        echo "⚠️  Schema corrotto rilevato — eseguo migrate:fresh (reset completo)"
-        if php artisan migrate:fresh --force --no-interaction 2>&1; then
-            echo "✅ migrate:fresh completato — schema ripristinato"
-        else
-            echo "❌ migrate:fresh fallito — crash del container"
-            exit 1
-        fi
-    else
-        echo "✅ Schema integro"
-    fi
-fi
-
-# ─── 6. Seed (il seeder si auto-protegge con guard idempotente) ──────────────
+# ─── 5. Seed (il seeder si auto-protegge con guard idempotente) ──────────────
 echo "▶ Seed..."
 php artisan db:seed --force --no-interaction 2>&1 || echo "⚠️  Seed skipped o fallito"
 
