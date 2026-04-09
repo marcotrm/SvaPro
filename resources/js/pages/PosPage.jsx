@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { orders as ordersApi, catalog, customers as customersApi, inventory, getImageUrl } from '../api.jsx';
+import { orders as ordersApi, catalog, customers as customersApi, inventory, getImageUrl, clearApiCache } from '../api.jsx';
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, X, User,
   MapPin, Zap, Package, ChevronRight, ReceiptText, Loader2,
@@ -227,7 +227,12 @@ export default function PosPage() {
       setProducts(pRes.data?.data || []);
       const allCats = cRes.data?.data || [];
       setCategories(allCats.filter(c => !c.parent_id));
-      setAllCustomers(aRes.data?.data || []);
+      // Normalizza il nome cliente (first_name+last_name o name)
+      const normalizedCustomers = (aRes.data?.data || []).map(c => ({
+        ...c,
+        name: c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email || `Cliente #${c.id}`,
+      }));
+      setAllCustomers(normalizedCustomers);
       setEmployees(oRes.data?.data?.employees || []);
       const whs = oRes.data?.data?.warehouses || [];
       if (whs.length > 0) setWarehouseId(whs[0].id);
@@ -247,6 +252,13 @@ export default function PosPage() {
   const addToCart = useCallback((product) => {
     const variant = product.variants?.[0];
     if (!variant) return;
+    // Blocca aggiunta se stock 0
+    const stockInfo = stockMap[variant.id];
+    const onHand = stockInfo?.on_hand ?? product.variants?.[0]?.stock_quantity ?? 0;
+    if (onHand <= 0) {
+      toast.error(`❌ ${product.name} non disponibile in magazzino`, { duration: 2000 });
+      return;
+    }
     setCartLines(prev => {
       const ex = prev.find(l => l.product_variant_id === variant.id);
       if (ex) return prev.map(l => l.product_variant_id === variant.id ? { ...l, qty: l.qty + 1 } : l);
@@ -260,7 +272,7 @@ export default function PosPage() {
       }];
     });
     toast.success(`${product.name}`, { duration: 900, icon: '🛒' });
-  }, []);
+  }, [stockMap]);
 
   const updateQty = (variantId, delta) => {
     setCartLines(prev => prev.map(l => {
@@ -299,6 +311,7 @@ export default function PosPage() {
       });
       toast.success('✅ Vendita completata!');
       setCartLines([]); setSelectedCustomer(null); setNote(''); setShowCheckoutModal(false);
+      clearApiCache(); // invalida cache dashboard/ordini
       fetchData();
     } catch (err) {
       const msg = err.response?.data?.errors
@@ -322,9 +335,16 @@ export default function PosPage() {
   }), [products, searchTerm, flavorTerm, activeCategory]);
 
   const filteredCustomers = useMemo(() => {
-    if (!customerSearch) return allCustomers.slice(0, 8);
     const s = customerSearch.toLowerCase();
-    return allCustomers.filter(c => c.name?.toLowerCase().includes(s) || c.email?.toLowerCase().includes(s)).slice(0, 8);
+    if (!s) return allCustomers.slice(0, 8);
+    return allCustomers.filter(c => {
+      const haystack = [
+        c.name, c.email,
+        c.first_name, c.last_name,
+        c.fidelity_card, c.phone,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(s);
+    }).slice(0, 8);
   }, [allCustomers, customerSearch]);
 
   /* Cross-sell */
@@ -339,11 +359,30 @@ export default function PosPage() {
     return rel;
   }, [cartLines, products]);
 
-  /* Barcode scan on Enter */
+  /* Barcode scan su Enter — prodotto o fidelity card cliente */
   const handleSearchKey = (e) => {
     if (e.key === 'Enter' && searchTerm) {
       const match = products.find(p => p.barcode === searchTerm || p.sku === searchTerm || p.variants?.some(v => v.barcode === searchTerm));
       if (match) { addToCart(match); setSearchTerm(''); }
+    }
+  };
+
+  /* Barcode scan fidelity card nel campo cliente */
+  const handleCustomerBarcode = (e) => {
+    if (e.key === 'Enter' && customerSearch) {
+      const found = allCustomers.find(c =>
+        c.fidelity_card === customerSearch ||
+        c.phone === customerSearch ||
+        c.email?.toLowerCase() === customerSearch.toLowerCase()
+      );
+      if (found) {
+        setSelectedCustomer(found);
+        setCustomerSearch('');
+        setShowCustomerDrop(false);
+        toast.success(`Cliente: ${found.name}`, { icon: '👤' });
+      } else {
+        toast.error('Cliente non trovato con questo codice');
+      }
     }
   };
 
@@ -481,6 +520,56 @@ export default function PosPage() {
             )}
           </div>
         </div>
+
+        {/* ─── CROSS-SELL — Sezione grande fuori dal carrello ─── */}
+        {crossSell.length > 0 && (
+          <div style={{ flexShrink: 0, paddingBottom: 16, borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <Zap size={13} color="#FBBF24" />
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Potrebbe interessarti</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+              {crossSell.map(p => {
+                const pal = catPalette(p.category_id);
+                const imgUrl = p.image_url ? getImageUrl(p.image_url) : null;
+                const sv = p.variants?.[0];
+                const sInfo = sv ? stockMap[sv.id] : null;
+                const avail = sInfo?.on_hand ?? 0;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => addToCart(p)}
+                    disabled={avail <= 0}
+                    style={{
+                      flexShrink: 0, width: 130, background: '#fff', border: '1.5px solid #eee',
+                      borderRadius: 14, overflow: 'hidden', textAlign: 'left', cursor: avail > 0 ? 'pointer' : 'not-allowed',
+                      opacity: avail > 0 ? 1 : 0.45, transition: 'all 0.15s', padding: 0,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    }}
+                    onMouseEnter={e => { if (avail > 0) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)'; } }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; }}
+                  >
+                    <div style={{ height: 72, overflow: 'hidden' }}>
+                      {imgUrl
+                        ? <img src={imgUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <div style={{ width: '100%', height: '100%', background: pal.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Package size={22} color="rgba(255,255,255,0.6)" />
+                          </div>
+                      }
+                    </div>
+                    <div style={{ padding: '8px 10px' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{p.name}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 12, fontWeight: 900, color: pal.accent }}>{fmt(parseFloat(sv?.sale_price) || 0)}</span>
+                        <span style={{ fontSize: 9, background: avail > 0 ? '#d1fae5' : '#fee2e2', color: avail > 0 ? '#065f46' : '#991b1b', borderRadius: 6, padding: '1px 5px', fontWeight: 700 }}>{avail > 0 ? avail : '✕'}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ─── DESTRA: Carrello ───────────────────────────────── */}
@@ -531,7 +620,9 @@ export default function PosPage() {
             >
               <option value="" style={{ background: '#1e293b' }}>— Seleziona operatore —</option>
               {employees.map(e => (
-                <option key={e.id} value={e.id} style={{ background: '#1e293b' }}>{e.name}</option>
+                <option key={e.id} value={e.id} style={{ background: '#1e293b' }}>
+                  {e.name || `${e.first_name || ''} ${e.last_name || ''}`.trim() || `Operatore #${e.id}`}
+                </option>
               ))}
             </select>
           </div>
@@ -561,7 +652,8 @@ export default function PosPage() {
                   value={customerSearch}
                   onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDrop(true); }}
                   onFocus={() => setShowCustomerDrop(true)}
-                  placeholder="Cerca cliente..."
+                  onKeyDown={handleCustomerBarcode}
+                  placeholder="Nome, email, fidelity card..."
                   style={{
                     width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: 10, padding: '9px 12px 9px 34px', fontSize: 12, color: '#fff', outline: 'none', boxSizing: 'border-box',
@@ -605,52 +697,6 @@ export default function PosPage() {
                   onRemove={() => removeFromCart(line.product_variant_id)}
                 />
               ))}
-
-              {/* Cross-sell — striscia orizzontale scrollabile con mini card */}
-              {crossSell.length > 0 && (
-                <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <Zap size={10} color="#FBBF24" />
-                    <span>Potrebbe interessarti</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-                    {crossSell.map(p => {
-                      const pal = catPalette(p.category_id);
-                      const imgUrl = p.image_url ? getImageUrl(p.image_url) : null;
-                      return (
-                        <button
-                          key={p.id}
-                          onClick={() => addToCart(p)}
-                          style={{
-                            flexShrink: 0, width: 90, background: 'rgba(255,255,255,0.06)',
-                            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
-                            cursor: 'pointer', overflow: 'hidden', textAlign: 'left',
-                            transition: 'all 0.15s',
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(123,111,208,0.2)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-                        >
-                          {/* Mini immagine */}
-                          <div style={{ height: 48, overflow: 'hidden', position: 'relative' }}>
-                            {imgUrl
-                              ? <img src={imgUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              : <div style={{ width: '100%', height: '100%', background: pal.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Package size={16} color="rgba(255,255,255,0.5)" />
-                                </div>
-                            }
-                          </div>
-                          <div style={{ padding: '6px 8px' }}>
-                            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                            <div style={{ fontSize: 10, fontWeight: 800, color: pal.accent, marginTop: 2 }}>
-                              {new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(parseFloat(p.variants?.[0]?.sale_price)||0)}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
               {/* Note */}
               <div style={{ marginTop: 14 }}>

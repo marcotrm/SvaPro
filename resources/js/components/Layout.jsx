@@ -117,7 +117,7 @@ export default function Layout({ user, setUser }) {
 
   const isActive = (href) => {
     if (href === '/') return location.pathname === '/';
-    return location.pathname === href || location.pathname.startsWith(href + '/');
+    return location.pathname === href; // exact match — evita doppia attivazione parent/child
   };
 
   // Auto-open section of active item

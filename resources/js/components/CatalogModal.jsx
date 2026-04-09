@@ -576,13 +576,29 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                         <label className="sp-label">Accisa Unitaria Override (€)</label>
                         <input className="sp-input" type="number" step="0.001" value={v.excise_unit_amount_override} onChange={e => handleVariantChange(idx, 'excise_unit_amount_override', e.target.value)} placeholder="Auto da regole" />
                       </div>
-                      <div>
-                        <label className="sp-label">Codice Prevalenza</label>
-                        <input className="sp-input" value={v.prevalenza_code} onChange={e => handleVariantChange(idx, 'prevalenza_code', e.target.value)} placeholder="Es: PREVALENZA_1" />
-                      </div>
-                      <div style={{ gridColumn: '2/-1' }}>
-                        <label className="sp-label">Label Prevalenza</label>
-                        <input className="sp-input" value={v.prevalenza_label} onChange={e => handleVariantChange(idx, 'prevalenza_label', e.target.value)} placeholder="Es: Tabacco prevalente" />
+                      <div style={{ gridColumn: '1/-1' }}>
+                        <label className="sp-label">Prevalenza Tabaccosa</label>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                          {[
+                            { val: 'PREVALENZA_SI', label: 'Sì — Prevalenza tabaccosa' },
+                            { val: '',              label: 'No — Non applicabile' },
+                          ].map(opt => (
+                            <button
+                              key={opt.val}
+                              type="button"
+                              onClick={() => { handleVariantChange(idx, 'prevalenza_code', opt.val); handleVariantChange(idx, 'prevalenza_label', opt.val ? 'Tabacco prevalente' : ''); }}
+                              style={{
+                                flex: 1, padding: '10px 16px', borderRadius: 'var(--radius-sm)',
+                                fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s',
+                                border: v.prevalenza_code === opt.val ? '2px solid var(--color-accent)' : '2px solid var(--color-border)',
+                                background: v.prevalenza_code === opt.val ? 'var(--color-accent-light)' : 'var(--color-surface)',
+                                color: v.prevalenza_code === opt.val ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                              }}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
