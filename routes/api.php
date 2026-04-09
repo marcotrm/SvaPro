@@ -220,6 +220,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/orders/quote', [OrderController::class, 'quote']);
         Route::post('/orders/place', [OrderController::class, 'place']);
 
+        // Dipendente ha bisogno di vedere i negozi per il selettore store nel POS
+        Route::get('/stores', [StoreController::class, 'index']);
+        Route::get('/stores/{storeId}', [StoreController::class, 'show']);
+
         // POS Sessions
         Route::get('/pos/sessions', [PosSessionController::class, 'index']);
         Route::get('/pos/active', [PosSessionController::class, 'active']);
