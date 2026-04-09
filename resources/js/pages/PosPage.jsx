@@ -355,7 +355,15 @@ export default function PosPage() {
   );
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden', background: '#f5f4ff', gap: 0 }}>
+    <div style={{
+      display: 'flex',
+      height: 'calc(100vh - 64px)',
+      /* Neutralizza il padding di .sp-content (24px top, 32px sides, 40px bottom) */
+      margin: '-24px -32px -40px',
+      overflow: 'hidden',
+      background: '#f5f4ff',
+      gap: 0,
+    }}>
 
       {/* ─── SINISTRA: Catalogo ─────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '20px 20px 0' }}>
@@ -563,7 +571,7 @@ export default function PosPage() {
                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, marginTop: 4, background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
                     {filteredCustomers.map(c => (
                       <button key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(''); setShowCustomerDrop(false); }}
-                        style={{ display: 'block', width: '100%', padding: '10px 14px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#fff' }}
+              style={{ display: 'block', width: '100%', padding: '10px 14px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#fff' }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(123,111,208,0.15)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'none'}
                       >
@@ -598,19 +606,48 @@ export default function PosPage() {
                 />
               ))}
 
-              {/* Cross-sell */}
+              {/* Cross-sell — striscia orizzontale scrollabile con mini card */}
               {crossSell.length > 0 && (
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-                    <Zap size={10} style={{ display: 'inline', marginRight: 4 }} />Potrebbe interessare
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Zap size={10} color="#FBBF24" />
+                    <span>Potrebbe interessarti</span>
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {crossSell.map(p => (
-                      <button key={p.id} onClick={() => addToCart(p)}
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '4px 12px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', whiteSpace: 'nowrap', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        + {p.name}
-                      </button>
-                    ))}
+                  <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                    {crossSell.map(p => {
+                      const pal = catPalette(p.category_id);
+                      const imgUrl = p.image_url ? getImageUrl(p.image_url) : null;
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => addToCart(p)}
+                          style={{
+                            flexShrink: 0, width: 90, background: 'rgba(255,255,255,0.06)',
+                            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
+                            cursor: 'pointer', overflow: 'hidden', textAlign: 'left',
+                            transition: 'all 0.15s',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(123,111,208,0.2)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                        >
+                          {/* Mini immagine */}
+                          <div style={{ height: 48, overflow: 'hidden', position: 'relative' }}>
+                            {imgUrl
+                              ? <img src={imgUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              : <div style={{ width: '100%', height: '100%', background: pal.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Package size={16} color="rgba(255,255,255,0.5)" />
+                                </div>
+                            }
+                          </div>
+                          <div style={{ padding: '6px 8px' }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: pal.accent, marginTop: 2 }}>
+                              {new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(parseFloat(p.variants?.[0]?.sale_price)||0)}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -627,6 +664,7 @@ export default function PosPage() {
             </div>
           )}
         </div>
+
 
         {/* Cart Footer — Total + CTA */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '16px 22px 24px' }}>
