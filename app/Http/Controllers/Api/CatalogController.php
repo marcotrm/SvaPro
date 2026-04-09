@@ -397,10 +397,16 @@ class CatalogController extends Controller
         ];
 
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('products', 'public');
-            $payload['image_path'] = $path;
-            $payload['image_url']  = '/storage/' . $path;
-        } elseif ($request->exists('image_url')) {
+            // Salva come base64 data URL direttamente nel DB:
+            // sopravvive ai redeploy su Railway (filesystem effimero)
+            $file     = $request->file('image');
+            $mime     = $file->getMimeType();
+            $encoded  = base64_encode(file_get_contents($file->getRealPath()));
+            $dataUrl  = "data:{$mime};base64,{$encoded}";
+            $payload['image_url'] = $dataUrl;
+            // Mantieni anche il path per retrocompatibilità locale
+            $payload['image_path'] = 'base64_stored';
+        } elseif ($request->exists('image_url') && $request->input('image_url')) {
             $payload['image_url'] = $request->input('image_url');
         }
 

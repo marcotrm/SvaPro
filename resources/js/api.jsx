@@ -8,7 +8,11 @@ export const API_URL = configuredApiUrl || '/api';
 export const BACKEND_URL = configuredApiUrl ? configuredApiUrl.replace('/api', '').replace(/\/$/, '') : '';
 export const getImageUrl = (path) => {
   if (!path) return null;
+  // base64 data URL — già assoluto, usato direttamente
+  if (path.startsWith('data:')) return path;
+  // URL HTTP assoluto
   if (path.startsWith('http')) return path;
+  // Path relativo: prefissa con backend URL (cross-domain Railway)
   return BACKEND_URL ? `${BACKEND_URL}${path}` : path;
 };
 

@@ -60,7 +60,7 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
       }}
     >
       {/* Immagine o gradient placeholder */}
-      <div style={{ height: 90, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ height: 120, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
         {imgUrl ? (
           <img
             src={imgUrl}
@@ -108,7 +108,7 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
 
       {/* Info */}
       <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.3, color: '#1a1a2e', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.35, color: '#1a1a2e', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {displayMode === 'sku' ? (product.sku || product.name) : product.name}
         </div>
         {variant?.flavor && (
@@ -117,7 +117,7 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
           </div>
         )}
         <div style={{ marginTop: 'auto', paddingTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: palette.accent }}>
+          <span style={{ fontSize: 17, fontWeight: 800, color: palette.accent }}>
             {fmt(price)}
           </span>
           {variant?.location && (
@@ -440,7 +440,7 @@ export default function PosPage() {
         <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 20 }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
             gap: 12,
           }}>
             {filteredProducts.map(p => (
