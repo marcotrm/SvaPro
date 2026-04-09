@@ -13,6 +13,12 @@ class CoreSetupSeeder extends Seeder
      */
     public function run(): void
     {
+        // ── Guard idempotenza: se il DB è già stato seedato, esci senza fare nulla ──
+        if (DB::table('tenants')->where('code', 'DEMO')->exists()) {
+            $this->command?->info('CoreSetupSeeder: dati già presenti — skip.');
+            return;
+        }
+
         $now = now();
 
         $tenantId = DB::table('tenants')->insertGetId([
