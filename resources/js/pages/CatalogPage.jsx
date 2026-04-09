@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { catalog, suppliers, inventory, stores as storesApi } from '../api.jsx';
+import { catalog, suppliers, inventory, orders as ordersApi } from '../api.jsx';
 import { getImageUrl } from '../api.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
 import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, PackagePlus } from 'lucide-react';
@@ -35,12 +35,11 @@ export default function CatalogPage() {
       setProducts(pRes.data?.data || []);
       setSuppliersList(sRes.data?.data || []);
       setCategories(cRes.data?.data || []);
-      // Carica magazzini (per adjust stock)
+      // Carica magazzini dalle opzioni ordine (sempre disponibile)
       try {
-        const wRes = await inventory.getStock({ limit: 1 });
-        // Recupera l'ID del primo magazzino dall'inventario esistente oppure fallback
-        const firstWarehouseId = wRes.data?.data?.[0]?.warehouse_id || null;
-        if (firstWarehouseId) setWarehousesList([{ id: firstWarehouseId }]);
+        const oRes = await ordersApi.getOptions(sp);
+        const whs = oRes.data?.data?.warehouses || [];
+        if (whs.length > 0) setWarehousesList(whs);
       } catch {}
     } catch (err) {
       setError(err.message || 'Errore caricamento dati');

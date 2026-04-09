@@ -231,6 +231,9 @@ export default function PosPage() {
       setEmployees(oRes.data?.data?.employees || []);
       const whs = oRes.data?.data?.warehouses || [];
       if (whs.length > 0) setWarehouseId(whs[0].id);
+      // Auto-seleziona il primo operatore disponibile
+      const emps = oRes.data?.data?.employees || [];
+      if (emps.length > 0 && !soldByEmployeeId) setSoldByEmployeeId(String(emps[0].id));
       const sm = {};
       (stRes.data?.data || []).forEach(si => { sm[si.product_variant_id] = si; });
       setStockMap(sm);
@@ -276,14 +279,16 @@ export default function PosPage() {
   /* Checkout */
   const handleCheckout = async (payload) => {
     if (!cartLines.length) return toast.error('Carrello vuoto');
-    if (!soldByEmployeeId) return toast.error('Seleziona un operatore');
+    // Risolvi operatore: usa selezionato o fallback al primo disponibile
+    const resolvedEmpId = soldByEmployeeId || (employees.length > 0 ? String(employees[0].id) : null);
+    if (!resolvedEmpId) return toast.error('Nessun operatore disponibile');
     try {
       setPlacingOrder(true);
       await ordersApi.place({
         channel: 'pos',
         store_id: selectedStoreId,
         warehouse_id: Number(warehouseId),
-        sold_by_employee_id: Number(soldByEmployeeId),
+        sold_by_employee_id: Number(resolvedEmpId),
         customer_id: selectedCustomer?.id,
         lines: cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
         notes: note + (payload.receipt_type ? ` [${payload.receipt_type}]` : ''),
@@ -294,9 +299,15 @@ export default function PosPage() {
       toast.success('✅ Vendita completata!');
       setCartLines([]); setSelectedCustomer(null); setNote(''); setShowCheckoutModal(false);
       fetchData();
-    } catch (err) { toast.error(err.response?.data?.message || 'Errore pagamento'); }
+    } catch (err) {
+      const msg = err.response?.data?.errors
+        ? Object.values(err.response.data.errors).flat().join(' • ')
+        : err.response?.data?.message || 'Errore durante il pagamento';
+      toast.error(msg);
+    }
     finally { setPlacingOrder(false); }
   };
+
 
   /* Filters */
   const filteredProducts = useMemo(() => products.filter(p => {
