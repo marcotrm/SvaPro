@@ -95,7 +95,7 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
-            'sslmode' => 'prefer',
+            'sslmode' => env('PGSSLMODE', 'require'), // Railway PostgreSQL richiede SSL
         ],
 
         'sqlsrv' => [
