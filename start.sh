@@ -13,18 +13,26 @@ echo "PORT: ${PORT:-8000}"
 if [ -n "$DATABASE_URL" ]; then
     echo "✅ DATABASE_URL rilevato — uso PostgreSQL"
     sed -i "s|DB_CONNECTION=.*|DB_CONNECTION=pgsql|g" /app/.env
-    # Aggiungi DATABASE_URL se non presente
     grep -q "^DATABASE_URL=" /app/.env && \
         sed -i "s|DATABASE_URL=.*|DATABASE_URL=$DATABASE_URL|g" /app/.env || \
         echo "DATABASE_URL=$DATABASE_URL" >> /app/.env
 else
-    echo "⚠️  DATABASE_URL non trovato — uso SQLite locale"
-    echo "DB: /app/storage/database.sqlite"
-    ls -la /app/storage/database.sqlite 2>/dev/null || echo "WARN: DB non trovato, verrà creato"
-    touch /app/storage/database.sqlite 2>/dev/null || true
+    # ─── SQLite su volume persistente Railway (/app/database) ───────
+    echo "ℹ️  Uso SQLite su volume persistente /app/database"
+    mkdir -p /app/database
+    # Imposta il path nel .env
+    sed -i "s|DB_DATABASE=.*|DB_DATABASE=/app/database/database.sqlite|g" /app/.env
+    # Crea il file SQLite se non esiste (primo deploy)
+    if [ ! -f /app/database/database.sqlite ]; then
+        echo "🆕 Primo deploy: creo database SQLite..."
+        touch /app/database/database.sqlite
+    else
+        echo "✅ Database SQLite esistente trovato ($(du -sh /app/database/database.sqlite | cut -f1))"
+    fi
 fi
 
-# ─── Configura cache e migra ────────────────────────
+# ─── Storage & config ────────────────────────────────
+mkdir -p /app/storage/app/public
 php artisan config:clear --no-interaction
 php artisan config:cache --no-interaction
 php artisan migrate --force --no-interaction
