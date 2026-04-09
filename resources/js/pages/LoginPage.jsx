@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { auth } from '../api.jsx';
 
@@ -8,28 +8,6 @@ export default function LoginPage({ setUser }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    // Auto-login for development
-    useEffect(() => {
-        const autoLogin = async () => {
-            try {
-                setLoading(true);
-                const response = await auth.login('admin@demo.local', 'ChangeMe123!');
-                if (response.data.token) {
-                    localStorage.setItem('authToken', response.data.token);
-                    localStorage.setItem('user', JSON.stringify(response.data.user));
-                    if (response.data.user?.tenant_code) {
-                        localStorage.setItem('tenantCode', response.data.user.tenant_code);
-                    }
-                    setUser(response.data.user);
-                    window.location.href = '/';
-                }
-            } catch (err) {
-                console.error("AutoLogin failed:", err);
-                setLoading(false);
-            }
-        };
-        autoLogin();
-    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();

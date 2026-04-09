@@ -139,7 +139,19 @@ export default function DashboardPage() {
         customers.getCustomers({ ...sp, limit: 1 }),
       ]);
 
-      setKpi(resSummary.data?.data || null);
+      const raw = resSummary.data?.data;
+      // Normalize field names (API uses 'revenue', dashboard uses 'revenue_total' etc.)
+      setKpi(raw ? {
+        revenue_total:  raw.revenue        ?? raw.revenue_total  ?? 0,
+        orders_count:   raw.orders         ?? raw.orders_count   ?? 0,
+        avg_order:      raw.avg_order      ?? 0,
+        revenue_trend:  raw.delta_revenue  ?? raw.revenue_trend  ?? null,
+        orders_trend:   raw.delta_orders   ?? raw.orders_trend   ?? null,
+        total_customers: raw.total_customers ?? 0,
+        new_customers:  raw.new_customers  ?? 0,
+        low_stock:      raw.low_stock      ?? 0,
+      } : null);
+
 
       // Build 12-month chart
       const MONTHS = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];

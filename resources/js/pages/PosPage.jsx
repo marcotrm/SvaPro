@@ -885,14 +885,15 @@ function PosResoModal({ storeId, onClose, onDone }) {
     try {
       setLoading(true); setError(''); setOrder(null);
       const { orders: ordersApi2 } = await import('../api.jsx');
-      const res = await ordersApi2.getOne(orderId.trim());
+      const res = await ordersApi2.getOrder(orderId.trim());
       const o = res.data?.data || res.data;
       if (!o) { setError('Ordine non trovato.'); return; }
       setOrder(o);
       setLines((o.lines || []).map(l => ({ ...l, qty_return: l.qty || 1 })));
-    } catch { setError('Ordine non trovato.'); }
+    } catch { setError('Ordine non trovato. Verifica il numero ID ordine.'); }
     finally { setLoading(false); }
   };
+
 
   const handleReso = async () => {
     if (!order) return;

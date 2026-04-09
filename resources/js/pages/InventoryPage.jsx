@@ -70,6 +70,77 @@ export default function InventoryPage() {
 
   const fmt = (v) => v ? new Date(v).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
+  const printBollaScarico = () => {
+    const w = window.open('', '_blank');
+    const today = new Date().toLocaleDateString('it-IT');
+    const storeName = selectedStore?.name || 'Tutti i Negozi';
+    w.document.write(`<!DOCTYPE html><html><head>
+<title>Bolla di Scarico — ${storeName} — ${today}</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 32px; color: #111; font-size: 13px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #666; font-size: 12px; margin-bottom: 24px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; background: #f5f5f7; padding: 14px 16px; border-radius: 8px; }
+  .info-block h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin: 0 0 2px; }
+  .info-block p { font-size: 14px; font-weight: 700; margin: 0; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { text-align: left; padding: 7px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; background: #1a1a2e; color: #fff; }
+  td { padding: 7px 10px; border-bottom: 1px solid #eee; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700; }
+  .badge-ok { background: #d1fae5; color: #065f46; }
+  .badge-warn { background: #fef3c7; color: #92400e; }
+  .badge-err { background: #fee2e2; color: #991b1b; }
+  .footer { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .sign-box { border-top: 1px solid #ccc; width: 180px; text-align: center; padding-top: 6px; font-size: 11px; color: #666; }
+  .totals { background: #f0f0f0; padding: 10px 14px; border-radius: 6px; font-size: 12px; margin-top: 16px; display: flex; gap: 32px; }
+  .total-item { display: flex; flex-direction: column; }
+  .total-item strong { font-size: 18px; font-weight: 900; }
+  @media print { body { margin: 16px; } }
+</style></head><body>
+<h1>📦 Bolla di Scarico Merci</h1>
+<div class="sub">Documento interno — Non valido ai fini fiscali</div>
+<div class="info-grid">
+  <div class="info-block"><h3>Negozio</h3><p>${storeName}</p></div>
+  <div class="info-block"><h3>Data Emissione</h3><p>${today}</p></div>
+  <div class="info-block"><h3>Totale Referenze</h3><p>${filtered.length}</p></div>
+</div>
+<table>
+  <thead><tr><th>#</th><th>Prodotto</th><th>SKU</th><th>Magazzino</th><th>Qta Disponibile</th><th>Riservata</th><th>Pt. Riordino</th><th>Stato</th></tr></thead>
+  <tbody>
+    ${filtered.map((item, i) => {
+      const isOut = item.on_hand <= 0;
+      const isLow = !isOut && item.on_hand < (item.reorder_point || 5);
+      const badge = isOut ? 'badge-err' : isLow ? 'badge-warn' : 'badge-ok';
+      const label = isOut ? 'Esaurito' : isLow ? 'Basso' : 'OK';
+      return `<tr>
+        <td style="color:#aaa;font-size:11px">${i+1}</td>
+        <td><strong>${item.product_name || ''}</strong>${item.flavor ? ' <span style="color:#888">— '+item.flavor+'</span>' : ''}</td>
+        <td style="font-family:monospace;font-size:11px">${item.sku || '—'}</td>
+        <td style="color:#666">${item.warehouse_name || '—'}</td>
+        <td style="font-weight:700;font-size:15px">${item.available ?? item.on_hand}</td>
+        <td style="color:#666">${item.reserved || 0}</td>
+        <td style="color:#666">${item.reorder_point || '—'}</td>
+        <td><span class="badge ${badge}">${label}</span></td>
+      </tr>`;
+    }).join('')}
+  </tbody>
+</table>
+<div class="totals">
+  <div class="total-item"><span>Totale Referenze</span><strong>${filtered.length}</strong></div>
+  <div class="total-item"><span>⚠ Stock Basso</span><strong style="color:#d97706">${filtered.filter(i => i.on_hand < (i.reorder_point||5) && i.on_hand > 0).length}</strong></div>
+  <div class="total-item"><span>🔴 Esaurito</span><strong style="color:#dc2626">${filtered.filter(i => i.on_hand <= 0).length}</strong></div>
+  <div class="total-item"><span>✅ In Ordine</span><strong style="color:#16a34a">${filtered.filter(i => i.on_hand >= (i.reorder_point||5)).length}</strong></div>
+</div>
+<div class="footer">
+  <div class="sign-box">Firma Responsabile</div>
+  <div style="font-size:10px;color:#aaa">Stampato il ${new Date().toLocaleString('it-IT')}</div>
+  <div class="sign-box">Firma Operatore</div>
+</div>
+</body></html>`);
+    w.document.close(); w.print();
+  };
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
       <div style={{ width: 32, height: 32, border: '3px solid var(--color-border)', borderTopColor: 'var(--color-accent)', borderRadius: '50%' }} className="sp-spin" />
@@ -88,9 +159,14 @@ export default function InventoryPage() {
         </div>
         <div className="sp-page-actions">
           {canAdjust && (
-            <button className="sp-btn sp-btn-primary" onClick={() => setShowMovementModal(true)}>
-              <Plus size={16} /> Nuovo Movimento
-            </button>
+            <>
+              <button className="sp-btn sp-btn-ghost" onClick={printBollaScarico} title="Stampa Bolla di Scarico">
+                🖨 Bolla di Scarico
+              </button>
+              <button className="sp-btn sp-btn-primary" onClick={() => setShowMovementModal(true)}>
+                <Plus size={16} /> Nuovo Movimento
+              </button>
+            </>
           )}
         </div>
       </div>
