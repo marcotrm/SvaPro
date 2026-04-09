@@ -26,7 +26,8 @@ const allNavigation = [
   ]},
   { section: 'Supply Chain', items: [
     { label: 'Fornitori', href: '/suppliers', icon: Truck, roles: ['superadmin','admin_cliente'] },
-    { label: 'Ordini Acquisto', href: '/purchase-orders', icon: Receipt, roles: ['superadmin','admin_cliente'] },
+    { label: 'Ordini Acquisto (PO)', href: '/purchase-orders', icon: Receipt, roles: ['superadmin','admin_cliente'] },
+    { label: '📦 DDT Fornitore', href: '/supplier-delivery', icon: Truck, roles: ['superadmin','admin_cliente'] },
     { label: 'Fatture Fornitori', href: '/supplier-invoices', icon: FileText, roles: ['superadmin','admin_cliente'] },
     { label: 'Trasferimenti DDT', href: '/stock-transfers', icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
   ]},
@@ -37,8 +38,10 @@ const allNavigation = [
     { label: 'Promozioni', href: '/promotions', icon: Gift, roles: ['superadmin','admin_cliente'] },
   ]},
   { section: 'Dipendenti', items: [
-    { label: 'Dipendenti', href: '/employees', icon: Users, roles: ['superadmin','admin_cliente'] },
+    { label: 'Gestione Dipendenti', href: '/employees', icon: Users, roles: ['superadmin','admin_cliente'] },
+    { label: '🕐 Timbrature', href: '/attendance', icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
     { label: '🏆 Gamification', href: '/gamification', icon: Activity, roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in', icon: Fingerprint, roles: ['dipendente'] },
   ]},
   { section: 'Amministrazione', items: [
     { label: 'Impostazioni', href: '/settings', icon: Settings, roles: ['superadmin','admin_cliente'] },

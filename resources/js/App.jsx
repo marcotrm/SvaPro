@@ -40,6 +40,7 @@ const EmployeePurchasesPage = lazy(() => import('./pages/EmployeePurchasesPage.j
 const ClockInPage = lazy(() => import('./pages/ClockInPage.jsx'));
 const CustomerDetailPage = lazy(() => import('./pages/CustomerDetailPage.jsx'));
 const GamificationPage = lazy(() => import('./pages/GamificationPage.jsx'));
+const SupplierDeliveryPage = lazy(() => import('./pages/SupplierDeliveryPage.jsx'));
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -147,6 +148,7 @@ export default function App() {
               <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
               <Route path="/returns" element={<ReturnsPage />} />
               <Route path="/supplier-invoices" element={<SupplierInvoicesPage />} />
+              <Route path="/supplier-delivery" element={<SupplierDeliveryPage />} />
               <Route path="/pos" element={<PosPage />} />
               <Route path="/shipping" element={<ShippingPage />} />
               <Route path="/promotions" element={<PromotionsPage />} />

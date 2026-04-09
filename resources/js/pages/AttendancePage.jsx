@@ -137,8 +137,31 @@ export default function AttendancePage() {
 
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1100, margin: '0 auto' }}>
+      {/* Info banner: how to clock in */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e1b4b, #312e81)', borderRadius: 16, padding: '18px 24px',
+        marginBottom: 28, display: 'flex', alignItems: 'center', gap: 20, color: '#fff',
+      }}>
+        <span style={{ fontSize: 32, flexShrink: 0 }}>⏱</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 2 }}>Come funzionano le Timbrature</div>
+          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.5 }}>
+            <strong>Dipendenti:</strong> vanno su <code style={{ background: 'rgba(255,255,255,0.15)', padding: '1px 6px', borderRadius: 4 }}>/clock-in</code> da tablet all'ingresso,
+            selezionano il proprio nome (o scansionano il badge) e premono il pulsante. &nbsp;|&nbsp;
+            <strong>Admin:</strong> in questa pagina vedete lo stato live di tutti + potete timbrare manualmente cliccando sulla card.
+          </div>
+        </div>
+        <button
+          onClick={() => window.open('/clock-in', '_blank')}
+          style={{ background: '#c9a227', color: '#0e1726', border: 'none', borderRadius: 10, padding: '10px 18px', fontWeight: 800, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
+        >
+          🖥 Apri Kiosk Timbra
+        </button>
+      </div>
+
       {/* Header orologio */}
       <Clock_ serverTime={serverTime} />
+
 
       {/* Status bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 28 }}>
