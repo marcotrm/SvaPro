@@ -60,10 +60,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::delete('/stores/{storeId}', [StoreController::class, 'destroy']);
         Route::get('/loyalty/monitoring/push-stats', [LoyaltyController::class, 'pushMonitoringStats']);
 
-        Route::get('/catalog/products', [CatalogController::class, 'index']);
-        Route::get('/catalog/brands', [CatalogController::class, 'brands']);
-        Route::get('/catalog/categories', [CatalogController::class, 'categories']);
-        Route::get('/catalog/tax-classes', [CatalogController::class, 'taxClasses']);
+        // Catalog WRITE - solo admin
         Route::post('/catalog/products/import', [CatalogController::class, 'import'])->middleware('permission:catalog.manage');
         Route::post('/catalog/products', [CatalogController::class, 'store'])->middleware('permission:catalog.manage');
         Route::put('/catalog/products/{productId}', [CatalogController::class, 'update'])->middleware('permission:catalog.manage');
@@ -194,12 +191,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // Employee KPI Dashboard
         Route::get('/employees/kpi-dashboard', [EmployeeController::class, 'kpiDashboard']);
         Route::post('/employees/{employeeId}/kpi-target', [EmployeeController::class, 'setKpiTarget'])->middleware('permission:employees.manage');
-        // Attendance
+        // Attendance - solo admin
         Route::get('/attendance', [AttendanceController::class, 'index']);
-        Route::get('/attendance/live', [AttendanceController::class, 'live']);
-        Route::get('/attendance/employees-for-kiosk', [AttendanceController::class, 'employeesForKiosk']);
-        Route::post('/attendance/checkin', [AttendanceController::class, 'checkIn']);
-        Route::post('/attendance/checkout', [AttendanceController::class, 'checkOut']);
 
         // Stock Transfers / DDT
         Route::get('/stock-transfers', [StockTransferController::class, 'index']);
@@ -232,6 +225,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/pos/active', [PosSessionController::class, 'active']);
         Route::post('/pos/open', [PosSessionController::class, 'open'])->middleware('permission:pos_sessions.manage');
         Route::post('/pos/sessions/{sessionId}/close', [PosSessionController::class, 'close'])->middleware('permission:pos_sessions.manage');
+
+        // Attendance - accessibile anche ai dipendenti (per timbrare se stessi)
+        Route::get('/attendance/live', [AttendanceController::class, 'live']);
+        Route::get('/attendance/employees-for-kiosk', [AttendanceController::class, 'employeesForKiosk']);
+        Route::post('/attendance/checkin', [AttendanceController::class, 'checkIn']);
+        Route::post('/attendance/checkout', [AttendanceController::class, 'checkOut']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente,cliente_finale')->group(function () {
