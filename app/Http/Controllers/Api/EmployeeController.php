@@ -91,12 +91,13 @@ class EmployeeController extends Controller
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
         $validator = Validator::make($request->all(), [
-            'store_id' => ['required', 'integer'],
-            'user_id' => ['nullable', 'integer'],
+            'store_id'   => ['required', 'integer'],
+            'user_id'    => ['nullable', 'integer'],
             'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
-            'photo_url' => ['nullable', 'string', 'max:255'],
-            'hire_date' => ['nullable', 'date'],
+            'last_name'  => ['required', 'string', 'max:100'],
+            'photo_url'  => ['nullable', 'string', 'max:255'],
+            'hire_date'  => ['nullable', 'date'],
+            'barcode'    => ['nullable', 'string', 'max:100'],
         ]);
 
         if ($validator->fails()) {
@@ -109,14 +110,15 @@ class EmployeeController extends Controller
         }
 
         $employeeId = DB::table('employees')->insertGetId([
-            'tenant_id' => $tenantId,
-            'store_id' => $request->integer('store_id'),
-            'user_id' => $request->input('user_id'),
+            'tenant_id'  => $tenantId,
+            'store_id'   => $request->integer('store_id'),
+            'user_id'    => $request->input('user_id'),
             'first_name' => $request->input('first_name'),
-            'last_name' => $request->input('last_name'),
-            'photo_url' => $request->input('photo_url'),
-            'hire_date' => $request->input('hire_date'),
-            'status' => 'active',
+            'last_name'  => $request->input('last_name'),
+            'photo_url'  => $request->input('photo_url'),
+            'barcode'    => $request->input('barcode') ?: null,
+            'hire_date'  => $request->input('hire_date'),
+            'status'     => 'active',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -221,10 +223,13 @@ class EmployeeController extends Controller
             ->where('tenant_id', $tenantId)
             ->where('id', $employeeId)
             ->update([
+                'store_id'   => $request->input('store_id') ? (int) $request->input('store_id') : DB::raw('store_id'),
                 'first_name' => $request->input('first_name'),
-                'last_name' => $request->input('last_name'),
-                'photo_url' => $request->input('photo_url'),
-                'status' => $request->input('status', 'active'),
+                'last_name'  => $request->input('last_name'),
+                'photo_url'  => $request->input('photo_url'),
+                'barcode'    => $request->input('barcode') ?: null,
+                'status'     => $request->input('status', 'active'),
+                'hire_date'  => $request->input('hire_date'),
                 'updated_at' => now(),
             ]);
 
