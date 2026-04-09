@@ -616,6 +616,11 @@ export const supplierInvoices = {
   update: (id, data) => api.put(`/supplier-invoices/${id}`, data),
   markPaid: (id) => api.post(`/supplier-invoices/${id}/mark-paid`),
   remove: (id) => api.delete(`/supplier-invoices/${id}`),
+  exportXml: (id) => {
+    const token = localStorage.getItem('authToken');
+    const base = api.defaults.baseURL || '/api';
+    window.open(`${base}/supplier-invoices/${id}/export-xml?token=${token}`, '_blank');
+  },
 };
 
 // POS APIs

@@ -201,6 +201,10 @@ export default function SupplierInvoicesPage() {
                 <td style={{ color: 'var(--muted2)' }}>{fmtDate(inv.due_date)}</td>
                 <td style={{ textAlign: 'right' }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+                    <button className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 8px', color: '#4f46e5' }}
+                      onClick={() => supplierInvoices.exportXml(inv.id)} title="Esporta XML FatturaPA SDI">
+                      📥 XML SDI
+                    </button>
                     {!inv.is_paid && (
                       <button className="btn btn-gold" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => handleMarkPaid(inv.id)}>Paga</button>
                     )}

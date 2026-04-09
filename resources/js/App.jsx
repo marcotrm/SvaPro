@@ -37,6 +37,9 @@ const StockTransfersPage = lazy(() => import('./pages/StockTransfersPage.jsx'));
 const StoresPage = lazy(() => import('./pages/StoresPage.jsx'));
 
 const EmployeePurchasesPage = lazy(() => import('./pages/EmployeePurchasesPage.jsx'));
+const ClockInPage = lazy(() => import('./pages/ClockInPage.jsx'));
+const CustomerDetailPage = lazy(() => import('./pages/CustomerDetailPage.jsx'));
+const GamificationPage = lazy(() => import('./pages/GamificationPage.jsx'));
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -128,6 +131,8 @@ export default function App() {
               <Route path="/inventory" element={<InventoryPage />} />
               <Route path="/inventory/smart-reorder" element={<SmartReorderPage />} />
               <Route path="/customers" element={<CustomersPage />} />
+              <Route path="/customers/:id" element={<CustomerDetailPage />} />
+              <Route path="/gamification" element={<GamificationPage />} />
               <Route path="/employees" element={<EmployeesPage />} />
               <Route path="/employee-purchases" element={<EmployeePurchasesPage />} />
               <Route path="/analytics/loyalty" element={<LoyaltyAnalyticsPage />} />
@@ -152,6 +157,11 @@ export default function App() {
               <Route path="/stock-transfers" element={<StockTransfersPage />} />
               <Route path="/stores" element={<StoresPage />} />
             </Route>
+          </Route>
+
+          {/* Standalone pages (no sidebar) */}
+          <Route element={<ProtectedRoute user={user} />}>
+            <Route path="/clock-in" element={<ClockInPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

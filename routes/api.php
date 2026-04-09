@@ -140,10 +140,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // Supplier Invoices (Fatture Passive)
         Route::get('/supplier-invoices', [SupplierInvoiceController::class, 'index']);
         Route::get('/supplier-invoices/{id}', [SupplierInvoiceController::class, 'show']);
+        Route::get('/supplier-invoices/{id}/export-xml', [SupplierInvoiceController::class, 'exportXml']);
         Route::post('/supplier-invoices', [SupplierInvoiceController::class, 'store'])->middleware('permission:invoices.manage');
         Route::put('/supplier-invoices/{id}', [SupplierInvoiceController::class, 'update'])->middleware('permission:invoices.manage');
         Route::post('/supplier-invoices/{id}/mark-paid', [SupplierInvoiceController::class, 'markPaid'])->middleware('permission:invoices.manage');
         Route::delete('/supplier-invoices/{id}', [SupplierInvoiceController::class, 'destroy'])->middleware('permission:invoices.manage');
+
 
         // Documents
         Route::post('/documents/generate', [DocumentController::class, 'generate'])->middleware('permission:documents.generate');

@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\AuditLogger;
+use App\Services\FatturaPAService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+
 
 class SupplierInvoiceController extends Controller
 {
@@ -287,4 +289,81 @@ class SupplierInvoiceController extends Controller
 
         return response()->json(['message' => 'Fattura fornitore eliminata.']);
     }
+
+    /**
+     * Esporta fattura fornitore in formato XML FatturaPA (SDI / Cassetto Fiscale).
+     */
+    public function exportXml(Request $request, int $id)
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $invoice = DB::table('supplier_invoices as si')
+            ->leftJoin('suppliers as s', 's.id', '=', 'si.supplier_id')
+            ->where('si.tenant_id', $tenantId)
+            ->where('si.id', $id)
+            ->select([
+                'si.*',
+                's.name as supplier_name',
+                's.vat_number as supplier_vat',
+                's.email as supplier_email',
+                's.address as supplier_address',
+                's.city as supplier_city',
+                's.postal_code as supplier_postal_code',
+                's.country as supplier_country',
+            ])
+            ->first();
+
+        if (! $invoice) {
+            return response()->json(['message' => 'Fattura fornitore non trovata.'], 404);
+        }
+
+        $lines = DB::table('supplier_invoice_lines as sil')
+            ->leftJoin('product_variants as pv', 'pv.id', '=', 'sil.product_variant_id')
+            ->leftJoin('products as p', 'p.id', '=', 'pv.product_id')
+            ->where('sil.supplier_invoice_id', $id)
+            ->select(['sil.*', 'p.name as product_name'])
+            ->get()
+            ->toArray();
+
+        // Load tenant/company settings for cessionario
+        $tenant = DB::table('tenants')->where('id', $tenantId)->first();
+        $settings = DB::table('settings')->where('tenant_id', $tenantId)->get()->keyBy('key');
+
+        $supplierData = [
+            'name'        => $invoice->supplier_name,
+            'vat_number'  => $invoice->supplier_vat ?: '00000000000',
+            'address'     => $invoice->supplier_address ?: 'Via Sconosciuta 1',
+            'city'        => $invoice->supplier_city ?: 'Roma',
+            'postal_code' => $invoice->supplier_postal_code ?: '00100',
+            'province'    => 'RM',
+        ];
+
+        $companyData = [
+            'name'        => $settings->get('company_name')?->value ?? $tenant?->name ?? 'Azienda',
+            'vat_number'  => $settings->get('company_vat')?->value ?? '00000000000',
+            'address'     => $settings->get('company_address')?->value ?? 'Via Esempio 1',
+            'city'        => $settings->get('company_city')?->value ?? 'Milano',
+            'postal_code' => $settings->get('company_postal_code')?->value ?? '20100',
+            'province'    => $settings->get('company_province')?->value ?? 'MI',
+        ];
+
+        $invoiceData = (array) $invoice;
+        // Map fields for FatturaPAService
+        $invoiceData['total_net']   = $invoice->grand_total;
+        $invoiceData['tax_amount']  = $invoice->tax_total ?? 0;
+
+        $linesData = array_map(fn ($l) => (array) $l, $lines);
+
+        $xml = FatturaPAService::generate($invoiceData, $linesData, $supplierData, $companyData);
+
+        $filename = 'IT' . ($supplierData['vat_number']) . '_' .
+            str_pad($id, 5, '0', STR_PAD_LEFT) . '.xml';
+
+        AuditLogger::log($request, 'export_xml', 'supplier_invoice', $id, $invoice->invoice_number);
+
+        return response($xml, 200)
+            ->header('Content-Type', 'application/xml; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+    }
 }
+

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { customers } from '../api.jsx';
 import { CustomersSkeleton } from '../components/Skeleton.jsx';
 import VirtualTable from '../components/VirtualTable.jsx';
@@ -13,6 +13,7 @@ import {
 
 export default function CustomersPage() {
   const { selectedStoreId, selectedStore } = useOutletContext();
+  const navigate = useNavigate();
   const [customersList, setCustomersList] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -202,7 +203,7 @@ export default function CustomersPage() {
              </thead>
              <tbody>
                {filtered.map((customer) => (
-                 <tr key={customer.id} className="group hover:bg-slate-50/50 transition-colors">
+                 <tr key={customer.id} className="group hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => navigate(`/customers/${customer.id}`)}>
                    <td>
                      <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md tracking-tighter">
                        {customer.code}
@@ -257,16 +258,17 @@ export default function CustomersPage() {
                    <td>
                      <div className="flex items-center justify-end gap-2">
                        <button 
-                         onClick={() => handleOpenModal(customer)}
+                         onClick={(e) => { e.stopPropagation(); navigate(`/customers/${customer.id}`); }}
+                         className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95"
+                         title="Apri Scheda CRM"
+                       >
+                         <span style={{ fontSize: 14 }}>👤</span>
+                       </button>
+                       <button 
+                         onClick={(e) => { e.stopPropagation(); handleOpenModal(customer); }}
                          className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm active:scale-95"
                        >
                          <Edit2 size={16} />
-                       </button>
-                       <button className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm active:scale-95">
-                         <Trash2 size={16} />
-                       </button>
-                       <button className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95">
-                         <MoreHorizontal size={16} />
                        </button>
                      </div>
                    </td>
