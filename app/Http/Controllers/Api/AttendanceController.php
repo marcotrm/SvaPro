@@ -247,7 +247,7 @@ class AttendanceController extends Controller
         $employees = DB::table('employees')
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
-            ->select(['id', 'first_name', 'last_name', 'barcode', 'expected_start_time', 'role'])
+            ->select(['id', 'first_name', 'last_name', 'barcode', 'expected_start_time'])
             ->orderBy('first_name')
             ->get();
 
@@ -268,7 +268,6 @@ class AttendanceController extends Controller
                 'last_name'            => $emp->last_name,
                 'barcode'              => $emp->barcode,
                 'expected_start_time'  => $emp->expected_start_time,
-                'role'                 => $emp->role,
                 'status'               => $att
                     ? ($att->checked_out_at ? 'fuori' : 'presente')
                     : 'assente',
