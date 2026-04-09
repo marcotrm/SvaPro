@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { purchaseOrders, suppliers as suppliersApi, storesApi } from '../api.jsx';
+import { purchaseOrders, suppliers as suppliersApi, stores as storesApi } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 
