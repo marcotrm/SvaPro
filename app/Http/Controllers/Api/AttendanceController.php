@@ -247,7 +247,7 @@ class AttendanceController extends Controller
         $employees = DB::table('employees')
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
-            ->select(['id', 'first_name', 'last_name', 'badge_code', 'expected_start_time', 'role'])
+            ->select(['id', 'first_name', 'last_name', 'badge_code', 'barcode', 'expected_start_time', 'role'])
             ->orderBy('first_name')
             ->get();
 
@@ -264,7 +264,10 @@ class AttendanceController extends Controller
             return [
                 'id'                   => $emp->id,
                 'name'                 => trim("{$emp->first_name} {$emp->last_name}"),
+                'first_name'           => $emp->first_name,
+                'last_name'            => $emp->last_name,
                 'badge_code'           => $emp->badge_code,
+                'barcode'              => $emp->barcode,   // <-- campo usato dal modal dipendente
                 'expected_start_time'  => $emp->expected_start_time,
                 'role'                 => $emp->role,
                 'status'               => $att
@@ -284,12 +287,18 @@ class AttendanceController extends Controller
 
     private function resolveEmployee(int $tenantId, Request $request): ?\stdClass
     {
+        // Prima prova: badge_code esplicito
         if ($request->filled('badge_code')) {
-            return DB::table('employees')
+            $emp = DB::table('employees')
                 ->where('tenant_id', $tenantId)
-                ->where('badge_code', $request->input('badge_code'))
+                ->where(function ($q) use ($request) {
+                    $q->where('badge_code', $request->input('badge_code'))
+                      ->orWhere('barcode', $request->input('badge_code'));
+                })
                 ->first();
+            if ($emp) return $emp;
         }
+        // Seconda prova: employee_id numerico
         if ($request->filled('employee_id')) {
             return DB::table('employees')
                 ->where('tenant_id', $tenantId)

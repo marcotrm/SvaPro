@@ -58,14 +58,12 @@ export default function ClockInPage() {
     return val ? parseInt(val, 10) : null;
   };
 
-  // Resolve employee from barcode/badge_code/employee_code/ID
   const resolveEmployee = (val) => {
-    const trimmed = val.trim();
+    const trimmed = val.trim().toLowerCase();
     if (!trimmed) return null;
     return employees.find(em =>
-      (em.barcode && em.barcode === trimmed) ||
-      (em.badge_code && em.badge_code === trimmed) ||
-      (em.employee_code && em.employee_code === trimmed) ||
+      (em.barcode    && em.barcode.toLowerCase()    === trimmed) ||
+      (em.badge_code && em.badge_code.toLowerCase() === trimmed) ||
       String(em.id) === trimmed
     ) || null;
   };
