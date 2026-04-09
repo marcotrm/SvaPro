@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { stockTransfers, stores as storesApi, products as productsApi } from '../api.jsx';
+import { stockTransfers, stores as storesApi, catalog } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 
@@ -58,7 +58,7 @@ export default function StockTransfersPage() {
     const loadVariants = async (storeId) => {
         if (!storeId) return;
         try {
-            const res = await productsApi.getAll({ store_id: storeId, limit: 500, include_variants: 1 });
+            const res = await catalog.getProducts({ store_id: storeId, limit: 500, include_variants: 1 });
             const all = [];
             (res.data?.data || []).forEach(p => {
                 (p.variants || []).forEach(v => {
