@@ -1,16 +1,12 @@
-FROM php:8.3-cli
+FROM dunglas/frankenphp:1-php8.3
 
-# --- System deps + SQLite + PostgreSQL ---
+# --- PHP extensions ---
+RUN install-php-extensions pdo_sqlite pdo_pgsql zip bcmath opcache intl
+
+# --- Node.js 20 + system tools ---
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    unzip git curl \
-    libzip-dev libonig-dev \
-    libsqlite3-dev \
-    libpq-dev \
-    && docker-php-ext-install pdo_sqlite pdo_pgsql zip bcmath opcache \
-    && rm -rf /var/lib/apt/lists/*
-
-# --- Node.js 20 ---
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    git unzip curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
@@ -20,13 +16,13 @@ COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 COPY . .
 
-# --- PHP deps ---
+# --- PHP deps (no-dev, ottimizzato) ---
 RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction
 
 # --- Build frontend ---
 RUN npm ci && npm run build
 
-# --- Setup filesystem + DB + migrate + seed ---
+# --- Filesystem + .env + key ---
 RUN mkdir -p /app/storage/framework/{cache,sessions,views} \
     /app/storage/logs /app/bootstrap/cache \
     /app/database \
@@ -36,12 +32,10 @@ RUN mkdir -p /app/storage/framework/{cache,sessions,views} \
     && touch /app/storage/database.sqlite \
     && chmod 666 /app/storage/database.sqlite \
     && php artisan key:generate --force \
-    && php artisan migrate --force \
-    && php artisan db:seed --force \
-    && echo "=== Build DB OK ===" \
-    && ls -la /app/storage/database.sqlite
+    && echo "=== Build OK ==="
 
 RUN chmod +x start.sh
 
 EXPOSE 8000
+
 CMD ["bash", "start.sh"]

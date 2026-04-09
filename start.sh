@@ -66,7 +66,9 @@ php artisan storage:link --force 2>/dev/null || true
 
 echo ""
 echo "========================================"
-echo "  🚀 Server: 0.0.0.0:${PORT:-8000}"
+echo "  🚀 FrankenPHP: 0.0.0.0:${PORT:-8000}"
 echo "========================================"
 
-exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"
+exec frankenphp php-server \
+    --listen ":${PORT:-8000}" \
+    --root /app/public
