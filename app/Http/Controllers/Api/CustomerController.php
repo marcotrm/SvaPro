@@ -55,7 +55,8 @@ class CustomerController extends Controller
                     ->where('lc.tenant_id', '=', $tenantId);
             })
             ->where('c.tenant_id', $tenantId)
-            ->when($storeId !== null, fn ($q) => $q->whereNotNull('order_stats.customer_id'))
+            // Nota: I clienti appartengono al tenant, non al singolo negozio.
+            // Il filtro store_id cambia solo le statistiche ordini mostrate, non nasconde clienti.
             ->when($request->filled('q'), function ($query) use ($request) {
                 $term = trim((string) $request->input('q'));
                 $query->where(function ($inner) use ($term) {
