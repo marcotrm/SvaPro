@@ -288,7 +288,8 @@ export default function PosPage() {
         channel: 'pos',
         store_id: selectedStoreId,
         warehouse_id: Number(warehouseId),
-        sold_by_employee_id: Number(resolvedEmpId),
+        employee_id: Number(resolvedEmpId),          // richiesto dal backend POS
+        sold_by_employee_id: Number(resolvedEmpId),  // per commissioni/stats
         customer_id: selectedCustomer?.id,
         lines: cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
         notes: note + (payload.receipt_type ? ` [${payload.receipt_type}]` : ''),
