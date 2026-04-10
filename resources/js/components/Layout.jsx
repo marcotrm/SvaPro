@@ -308,6 +308,7 @@ export default function Layout({ user, setUser }) {
                 <LogOut size={16} style={{ color: '#666', flexShrink: 0 }} />
               </>
             )}
+          </div>
         </div>
       </aside>
 
