@@ -663,7 +663,14 @@ export default function DashboardPage() {
             <Trend value={kpi?.orders_trend} />
           </div>
           <div style={{ fontSize:12, color:'#9CA3AF', marginBottom:12 }}>
-            {stockStats.low > 0 ? `${stockStats.low} prodotti sotto soglia` : 'Stock regolare'}
+            {stockStats.low > 0 ? (
+              <span
+                onClick={() => navigate('/inventory?filter=low')}
+                style={{ color:'#D97706', fontWeight:700, cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }}
+              >
+                ⚠ {stockStats.low} prodotti sotto soglia →
+              </span>
+            ) : 'Stock regolare'}
           </div>
           <MiniLine data={ordersSparkline.length ? ordersSparkline : [{v:0}]} color="#C4A772" />
         </div>

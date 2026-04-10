@@ -190,14 +190,30 @@ class CustomerController extends Controller
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
 
+        $orderStats = DB::table('sales_orders')
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'paid')
+            ->whereNotNull('customer_id')
+            ->where('customer_id', $customerId)
+            ->groupBy('customer_id')
+            ->selectRaw('customer_id, COUNT(*) as paid_orders_count, MAX(paid_at) as last_purchase_at, MIN(paid_at) as first_purchase_at');
+
         $customer = DB::table('customers as c')
+            ->leftJoinSub($orderStats, 'order_stats', fn ($j) => $j->on('order_stats.customer_id', '=', 'c.id'))
             ->leftJoin('loyalty_cards as lc', function ($join) use ($tenantId) {
                 $join->on('lc.customer_id', '=', 'c.id')
                     ->where('lc.tenant_id', '=', $tenantId);
             })
             ->where('c.id', $customerId)
             ->where('c.tenant_id', $tenantId)
-            ->select(['c.*', 'lc.card_code', 'lc.status as loyalty_status'])
+            ->select([
+                'c.*',
+                'order_stats.paid_orders_count',
+                'order_stats.last_purchase_at as last_purchase_at_db',
+                'order_stats.first_purchase_at',
+                'lc.card_code',
+                'lc.status as loyalty_status',
+            ])
             ->first();
 
         if (!$customer) {

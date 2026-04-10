@@ -473,6 +473,21 @@ export default function CustomerModal({ customer, onClose, onSave }) {
                 </span>
               </label>
             </div>
+
+            {/* ─── Codice tessera fidelity ─── */}
+            <Field label="Codice Tessera Fidelity" error={fe('code')} full>
+              <input
+                className={S.input}
+                name="code"
+                value={formData.code}
+                onChange={handleChange}
+                placeholder="Es: FID-0001 (lascia vuoto per assegnazione automatica)"
+                style={{ fontFamily: 'monospace', letterSpacing: 1 }}
+              />
+              <p style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+                Codice univoco per la tessera fedeltà del cliente
+              </p>
+            </Field>
           </div>
         </form>
 

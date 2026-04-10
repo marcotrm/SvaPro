@@ -88,10 +88,15 @@ export default function EmployeesPage() {
 
   const handleDelete = async (employee) => {
     if (!window.confirm(`Eliminare il dipendente ${employee.first_name} ${employee.last_name}?\nQuesta azione non può essere annullata.`)) return;
+    // Rimuovi immediatamente dalla lista (ottimistic)
+    setEmployeesList(prev => prev.filter(e => e.id !== employee.id));
     try {
       await employees.deleteEmployee(employee.id);
-      await fetchEmployees();
+      // Refresh silenzioso in background per confermare
+      fetchEmployees().catch(() => {});
     } catch (err) {
+      // Rollback: ripristina il dipendente se l'eliminazione fallisce
+      setEmployeesList(prev => [...prev, employee].sort((a, b) => a.id - b.id));
       setError(err.response?.data?.message || 'Errore durante l\'eliminazione');
     }
   };

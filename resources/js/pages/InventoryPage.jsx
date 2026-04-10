@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useLocation } from 'react-router-dom';
 import { inventory, stores as storesApi } from '../api.jsx';
 import InventoryMovementModal from '../components/InventoryMovementModal.jsx';
 import { Search, Plus, AlertTriangle, MapPin, Filter, Store, ChevronDown, ChevronRight } from 'lucide-react';
@@ -18,6 +18,14 @@ export default function InventoryPage() {
   const [storesList, setStoresList] = useState([]);
   const [expandedStores, setExpandedStores] = useState({});
   const [byStoreSearch, setByStoreSearch] = useState('');
+
+  const location = useLocation();
+
+  // Attiva filtro stock basso se arrivi dalla Dashboard con ?filter=low
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('filter') === 'low') setFilterLowStock(true);
+  }, [location.search]);
 
   useEffect(() => { fetchData(); }, [selectedStoreId]);
 
@@ -186,9 +194,10 @@ export default function InventoryPage() {
           <div className="sp-stat-label">Totale Referenze</div>
           <div className="sp-stat-value">{stock.length}</div>
         </div>
-        <div className="sp-stat-card">
+        <div className="sp-stat-card" style={{ cursor:'pointer' }} onClick={() => setFilterLowStock(v => !v)}>
           <div className="sp-stat-label">Stock Basso</div>
           <div className="sp-stat-value" style={{ color: lowCount > 0 ? 'var(--color-warning)' : 'inherit' }}>{lowCount}</div>
+          {filterLowStock && <div style={{ fontSize:10, color:'var(--color-warning)', marginTop:2 }}>● filtro attivo</div>}
         </div>
         <div className="sp-stat-card">
           <div className="sp-stat-label">Esaurito</div>
