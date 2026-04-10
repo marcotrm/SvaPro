@@ -939,15 +939,25 @@ function PosResoModal({ storeId, onClose, onDone }) {
 
   const searchOrder = async () => {
     if (!orderId.trim()) return;
+    // Rimuove '#', spazi e zeri iniziali — accetta sia "42" che "#000042" che "  42 "
+    const cleanId = orderId.trim().replace(/^#0*/, '').replace(/\D/g, '') || orderId.trim().replace(/^#/, '').trim();
+    if (!cleanId) return;
     try {
       setLoading(true); setError(''); setOrder(null);
       const { orders: ordersApi2 } = await import('../api.jsx');
-      const res = await ordersApi2.getOrder(orderId.trim());
+      const res = await ordersApi2.getOrder(cleanId);
       const o = res.data?.data || res.data;
       if (!o) { setError('Ordine non trovato.'); return; }
       setOrder(o);
       setLines((o.lines || []).map(l => ({ ...l, qty_return: l.qty || 1 })));
-    } catch { setError('Ordine non trovato. Verifica il numero ID ordine.'); }
+    } catch (err) {
+      const status = err.response?.status;
+      if (status === 404) {
+        setError(`Ordine #${cleanId} non trovato. Controlla il numero e riprova.`);
+      } else {
+        setError(err.response?.data?.message || 'Errore di connessione. Riprova.');
+      }
+    }
     finally { setLoading(false); }
   };
 
@@ -995,7 +1005,7 @@ function PosResoModal({ storeId, onClose, onDone }) {
                 value={orderId}
                 onChange={e => setOrderId(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && searchOrder()}
-                placeholder="Es. 42 o #000042"
+                placeholder="Inserisci il numero ordine (es. 42)"
                 autoFocus
                 style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none' }}
               />
