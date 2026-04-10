@@ -95,7 +95,7 @@ class EmployeeController extends Controller
             'user_id'    => ['nullable', 'integer'],
             'first_name' => ['required', 'string', 'max:100'],
             'last_name'  => ['required', 'string', 'max:100'],
-            'photo_url'  => ['nullable', 'string', 'max:255'],
+            'photo_url'  => ['nullable', 'string'],
             'hire_date'  => ['nullable', 'date'],
             'barcode'    => ['nullable', 'string', 'max:100'],
         ]);
