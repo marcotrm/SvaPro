@@ -336,11 +336,21 @@ export default function DashboardPage() {
   // Si aggiorna quando main fetchData cambia
   React.useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Ascolta aggiornamenti dipendenti da altre pagine (es. EmployeesPage)
+  // Auto-refresh ogni 60 secondi — la dashboard rimane sempre aggiornata in tempo reale
   React.useEffect(() => {
-    const handleEmployeeUpdated = () => { fetchData(); };
-    window.addEventListener('employeeUpdated', handleEmployeeUpdated);
-    return () => window.removeEventListener('employeeUpdated', handleEmployeeUpdated);
+    const interval = setInterval(() => { fetchData(); }, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // Aggiornamento immediato quando arriva una vendita dal POS o una modifica dipendente
+  React.useEffect(() => {
+    const refresh = () => fetchData();
+    window.addEventListener('orderPlaced', refresh);
+    window.addEventListener('employeeUpdated', refresh);
+    return () => {
+      window.removeEventListener('orderPlaced', refresh);
+      window.removeEventListener('employeeUpdated', refresh);
+    };
   }, [fetchData]);
 
   const fmt  = v  => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);

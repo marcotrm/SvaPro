@@ -326,6 +326,8 @@ export default function PosPage() {
       // Reset operatore dopo ogni vendita (deve riscannerizzare)
       setSoldByEmployeeId(''); setOperatorBarcode(''); setOperatorName(''); setOperatorError('');
       setTimeout(() => operatorBarcodeRef.current?.focus(), 100);
+      // Notifica dashboard e altri componenti che è avvenuta una vendita
+      window.dispatchEvent(new CustomEvent('orderPlaced'));
       clearApiCache(); fetchData();
     } catch (err) {
       const msg = err.response?.data?.errors
