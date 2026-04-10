@@ -67,6 +67,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/catalog/products', [CatalogController::class, 'store'])->middleware('permission:catalog.manage');
         Route::put('/catalog/products/{productId}', [CatalogController::class, 'update'])->middleware('permission:catalog.manage');
         Route::post('/catalog/categories', [CatalogController::class, 'storeCategory'])->middleware('permission:catalog.manage');
+        Route::put('/catalog/categories/{categoryId}', [CatalogController::class, 'updateCategory'])->middleware('permission:catalog.manage');
         Route::delete('/catalog/categories/{categoryId}', [CatalogController::class, 'destroyCategory'])->middleware('permission:catalog.manage');
 
         Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.manage');

@@ -450,6 +450,7 @@ export const catalog = {
   getBrands: () => api.get('/catalog/brands'),
   getCategories: () => api.get('/catalog/categories'),
   createCategory: (data) => api.post('/catalog/categories', data),
+  updateCategory: (id, data) => api.put(`/catalog/categories/${id}`, data),
   deleteCategory: (id) => api.delete(`/catalog/categories/${id}`),
   getTaxClasses: () => api.get('/catalog/tax-classes'),
 };

@@ -610,6 +610,42 @@ class CatalogController extends Controller
         ], 201);
     }
 
+    public function updateCategory(Request $request, int $categoryId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $exists = DB::table('categories')
+            ->where('id', $categoryId)
+            ->where('tenant_id', $tenantId)
+            ->exists();
+
+        if (!$exists) {
+            return response()->json(['message' => 'Categoria non trovata.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name'      => ['required', 'string', 'max:120'],
+            'parent_id' => ['nullable', 'integer'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        DB::table('categories')
+            ->where('id', $categoryId)
+            ->where('tenant_id', $tenantId)
+            ->update([
+                'name'       => (string) $request->input('name'),
+                'parent_id'  => $request->input('parent_id') ?: null,
+                'updated_at' => now(),
+            ]);
+
+        AuditLogger::log($request, 'update', 'category', $categoryId, $request->input('name'));
+
+        return response()->json(['message' => 'Categoria aggiornata.']);
+    }
+
     public function destroyCategory(Request $request, int $categoryId): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
