@@ -568,4 +568,63 @@ class CatalogController extends Controller
 
         return $productId;
     }
+
+    public function storeCategory(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'name'      => ['required', 'string', 'max:120'],
+            'parent_id' => ['nullable', 'integer'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        // Verifica parent
+        if ($request->filled('parent_id')) {
+            $parentExists = DB::table('categories')
+                ->where('id', (int) $request->integer('parent_id'))
+                ->where('tenant_id', $tenantId)
+                ->exists();
+
+            if (!$parentExists) {
+                return response()->json(['message' => 'Categoria padre non valida.'], 422);
+            }
+        }
+
+        $id = DB::table('categories')->insertGetId([
+            'tenant_id'  => $tenantId,
+            'name'       => (string) $request->input('name'),
+            'parent_id'  => $request->input('parent_id'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditLogger::log($request, 'create', 'category', $id, $request->input('name'));
+
+        return response()->json([
+            'message' => 'Categoria creata.',
+            'data'    => ['id' => $id, 'name' => $request->input('name'), 'parent_id' => $request->input('parent_id')],
+        ], 201);
+    }
+
+    public function destroyCategory(Request $request, int $categoryId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $exists = DB::table('categories')
+            ->where('id', $categoryId)
+            ->where('tenant_id', $tenantId)
+            ->exists();
+
+        if (!$exists) {
+            return response()->json(['message' => 'Categoria non trovata.'], 404);
+        }
+
+        DB::table('categories')->where('id', $categoryId)->where('tenant_id', $tenantId)->delete();
+
+        return response()->json(['message' => 'Categoria eliminata.']);
+    }
 }
