@@ -44,10 +44,11 @@ const allNavigation = [
     { label: '🏆 Gamification', href: '/gamification', icon: Activity, roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
   { section: 'Amministrazione', items: [
-    { label: 'Impostazioni', href: '/settings', icon: Settings, roles: ['superadmin','admin_cliente'] },
-    { label: 'Ruoli & Permessi', href: '/roles-permissions', icon: Shield, roles: ['superadmin'] },
-    { label: 'Audit Log', href: '/audit-log', icon: ClipboardList, roles: ['superadmin'] },
-    { label: 'Control Tower', href: '/control-tower', icon: Activity, roles: ['superadmin'] },
+    { label: 'Negozi',          href: '/stores',            icon: Store,    roles: ['superadmin','admin_cliente'] },
+    { label: 'Impostazioni',    href: '/settings',          icon: Settings, roles: ['superadmin','admin_cliente'] },
+    { label: 'Ruoli & Permessi',href: '/roles-permissions', icon: Shield,   roles: ['superadmin'] },
+    { label: 'Audit Log',       href: '/audit-log',         icon: ClipboardList, roles: ['superadmin'] },
+    { label: 'Control Tower',   href: '/control-tower',     icon: Activity, roles: ['superadmin'] },
   ]},
 ];
 
