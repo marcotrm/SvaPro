@@ -411,6 +411,9 @@ export default function CustomerModal({ customer, onClose, onSave }) {
               <Field label="Codice SDI" error={fe('sdi_code')}>
                 <input className={S.input} name="sdi_code" value={formData.sdi_code} onChange={handleChange} placeholder="Es: ABCDEFG" maxLength={7} />
               </Field>
+              <Field label="Codice Licenza" error={fe('license_code')}>
+                <input className={S.input} name="license_code" value={formData.license_code || ''} onChange={handleChange} placeholder="Es: LIC-2026-001" style={{ fontFamily: 'monospace', letterSpacing: 1 }} />
+              </Field>
               <Field label="PEC" error={fe('pec_email')}>
                 <input className={S.input} type="email" name="pec_email" value={formData.pec_email} onChange={handleChange} placeholder="pec@pec-azienda.it" />
               </Field>

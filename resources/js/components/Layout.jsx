@@ -22,7 +22,7 @@ const allNavigation = [
     { label: 'Prodotti', href: '/catalog', icon: Package, roles: ['superadmin','admin_cliente'] },
     { label: 'Magazzino', href: '/inventory', icon: Warehouse, roles: ['superadmin','admin_cliente'] },
     { label: 'Inventario', href: '/inventory/count', icon: ClipboardList, roles: ['superadmin','admin_cliente'] },
-    { label: 'Ordini', href: '/orders', icon: ShoppingBag, roles: ['superadmin','admin_cliente'] },
+    { label: 'Vendite', href: '/orders', icon: ShoppingBag, roles: ['superadmin','admin_cliente'] },
     { label: 'Clienti', href: '/customers', icon: Users, roles: ['superadmin','admin_cliente'] },
   ]},
   { section: 'Supply Chain', items: [

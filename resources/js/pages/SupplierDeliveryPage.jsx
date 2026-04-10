@@ -70,15 +70,55 @@ export default function SupplierDeliveryPage() {
   const updateLine = (i, field, val) => {
     const next = [...lines];
     next[i] = { ...next[i], [field]: val };
-    // Auto-fill product name from stock
+    // Auto-fill product name from stock (by ID or barcode/SKU)
     if (field === 'product_variant_id') {
-      const found = stockItems.find(s => String(s.product_variant_id) === String(val) || String(s.variant_id) === String(val));
+      const found = stockItems.find(s =>
+        String(s.product_variant_id) === String(val) ||
+        String(s.variant_id) === String(val) ||
+        (s.barcode && s.barcode.toLowerCase() === val.toString().toLowerCase()) ||
+        (s.sku && s.sku.toLowerCase() === val.toString().toLowerCase())
+      );
       if (found) {
         next[i].product_name = found.product_name || found.name || '';
         next[i].unit_cost = found.cost_price || found.sale_price || 0;
+        // Se trovato per barcode/SKU, sostituisce l'ID con l'ID reale
+        if (String(found.product_variant_id || found.variant_id) !== String(val)) {
+          next[i].product_variant_id = found.product_variant_id || found.variant_id || val;
+        }
       }
     }
     setLines(next);
+  };
+
+  // Scan rapido barcode: aggiunge una nuova riga dalla scansione
+  const [barcodeScan, setBarcodeScan] = useState('');
+  const handleBarcodeScan = (e) => {
+    if (e.key !== 'Enter') return;
+    const val = barcodeScan.trim();
+    if (!val) return;
+    const found = stockItems.find(s =>
+      (s.barcode && s.barcode.toLowerCase() === val.toLowerCase()) ||
+      (s.sku && s.sku.toLowerCase() === val.toLowerCase()) ||
+      String(s.product_variant_id) === String(val) ||
+      String(s.variant_id) === String(val)
+    );
+    if (found) {
+      const variantId = found.product_variant_id || found.variant_id;
+      // Se riga vuota disponibile, usa quella, altrimenti aggiunge
+      const emptyIdx = lines.findIndex(l => !l.product_variant_id && !l.product_name);
+      if (emptyIdx >= 0) {
+        const next = [...lines];
+        next[emptyIdx] = { product_variant_id: variantId, product_name: found.product_name || '', unit_cost: found.cost_price || 0, qty: 1 };
+        setLines(next);
+      } else {
+        setLines([...lines, { product_variant_id: variantId, product_name: found.product_name || '', unit_cost: found.cost_price || 0, qty: 1 }]);
+      }
+    } else {
+      // Prodotto non trovato
+      setError(`Barcode/SKU "${val}" non trovato nel catalogo.`);
+      setTimeout(() => setError(''), 3000);
+    }
+    setBarcodeScan('');
   };
 
   const totalValue = lines.reduce((s, l) => s + (parseFloat(l.qty) || 0) * (parseFloat(l.unit_cost) || 0), 0);
@@ -303,18 +343,38 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
             <strong>Fornitore:</strong> {supplier?.name} &nbsp;·&nbsp; <strong>Destinazione:</strong> {warehouse?.name} &nbsp;·&nbsp; <strong>DDT:</strong> {ddtNumber}
           </div>
 
+          {/* Scan rapido barcode */}
+          <div style={{ marginBottom: 18, padding: '12px 16px', background: 'rgba(6,95,70,0.06)', borderRadius: 12, border: '1px solid rgba(6,95,70,0.15)', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 20 }}>📷</span>
+            <div style={{ flex: 1 }}>
+              <label className="field-label" style={{ marginBottom: 4 }}>Scan Barcode Rapido</label>
+              <input
+                className="field-input"
+                value={barcodeScan}
+                onChange={e => setBarcodeScan(e.target.value)}
+                onKeyDown={handleBarcodeScan}
+                placeholder="Scansiona o digita barcode/SKU + Invio per aggiungere riga"
+                style={{ fontFamily: 'monospace', letterSpacing: 1 }}
+                autoFocus
+              />
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'right', lineHeight: 1.4 }}>
+              {stockItems.length} prodotti<br/>in catalogo
+            </div>
+          </div>
+
+
           {lines.map((line, i) => (
             <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 10, marginBottom: 10, alignItems: 'center' }}>
-              {/* Product search */}
               <div>
-                {i === 0 && <label className="field-label">Prodotto (ID Variante o nome)</label>}
+                {i === 0 && <label className="field-label">Prodotto (ID Variante / Barcode / SKU)</label>}
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input className="field-input" value={line.product_variant_id}
                     onChange={e => updateLine(i, 'product_variant_id', e.target.value)}
-                    placeholder="ID variante (numero)" style={{ width: 100, flexShrink: 0 }} />
+                    placeholder="ID / barcode / SKU" style={{ width: 130, flexShrink: 0, fontFamily: 'monospace' }} />
                   <input className="field-input" value={line.product_name}
                     onChange={e => updateLine(i, 'product_name', e.target.value)}
-                    placeholder="Nome prodotto / descrizione" style={{ flex: 1 }} />
+                    placeholder="Nome prodotto (auto da barcode)" style={{ flex: 1 }} />
                 </div>
               </div>
               <div>

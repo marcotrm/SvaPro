@@ -106,7 +106,7 @@ export default function OrdersPage() {
       {/* ── Header ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tighter">Cronologia Ordini</h1>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter">Cronologia Vendite</h1>
           <p className="text-sm font-bold text-slate-400 mt-1">Gestione flussi di vendita e terminali</p>
         </div>
         <div className="flex items-center gap-3">
@@ -116,7 +116,7 @@ export default function OrdersPage() {
           </div>
           <button className="btn-v3-primary" onClick={handleOpenModal}>
             <Plus size={20} strokeWidth={3} />
-            <span>Nuovo Ordine</span>
+            <span>Nuova Vendita</span>
           </button>
         </div>
       </div>
@@ -183,7 +183,7 @@ export default function OrdersPage() {
                   className={`px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap 
                     ${statusFilter === s ? 'bg-charcoal text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
                 >
-                  {s === 'all' ? 'Tutti gli Ordini' : statusLabel[s]}
+                  {s === 'all' ? 'Tutte le Vendite' : statusLabel[s]}
                 </button>
               ))}
            </div>
@@ -251,8 +251,8 @@ export default function OrdersPage() {
                   <td colSpan="8" className="!py-20 text-center">
                     <div className="flex flex-col items-center">
                        <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 mb-4"><ShoppingCart size={32} /></div>
-                       <p className="text-sm font-black text-slate-400 uppercase tracking-[2px]">Nessun ordine presente nel database</p>
-                       <p className="text-xs font-bold text-slate-300 mt-1">Modifica i filtri o crea una nuova transazione.</p>
+                       <p className="text-sm font-black text-slate-400 uppercase tracking-[2px]">Nessuna vendita nel database</p>
+                       <p className="text-xs font-bold text-slate-300 mt-1">Modifica i filtri o registra una nuova vendita dal POS.</p>
                     </div>
                   </td>
                 </tr>
