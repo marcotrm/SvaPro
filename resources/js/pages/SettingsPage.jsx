@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const [tenantMsg, setTenantMsg] = useState('');
   const [tenantErr, setTenantErr] = useState('');
   const [savingTenant, setSavingTenant] = useState(false);
+  const [qscarePrice, setQscarePrice] = useState('');
 
   useEffect(() => {
     if (isAdmin) {
@@ -42,6 +43,8 @@ export default function SettingsPage() {
           setTenantVat(t.vat_number || '');
           setTenantTimezone(t.timezone || 'Europe/Rome');
           setTenantLicense(t.license_code || '');
+          const sj = t.settings_json;
+          if (sj?.qscare_price !== undefined) setQscarePrice(String(sj.qscare_price));
         }
       }).catch(() => {});
     }
@@ -86,6 +89,9 @@ export default function SettingsPage() {
         vat_number: tenantVat,
         timezone: tenantTimezone,
         license_code: tenantLicense,
+        settings_json: {
+          qscare_price: qscarePrice !== '' ? parseFloat(qscarePrice) : null,
+        },
       });
       clearApiCache();
       setTenantMsg('Impostazioni tenant aggiornate.');
@@ -153,6 +159,21 @@ export default function SettingsPage() {
                              value={name} onChange={e => setName(e.target.value)} required 
                            />
                         </div>
+                     </div>
+
+                     {/* Prezzo QScare */}
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">🛡 QScare — Prezzo Assicurazione (€)</label>
+                        <div className="relative group max-w-sm">
+                           <input
+                             type="number" min="0" step="0.01"
+                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3.5 font-bold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                             value={qscarePrice}
+                             onChange={e => setQscarePrice(e.target.value)}
+                             placeholder="Es: 9.90"
+                           />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 ml-1">Prezzo assicurazione QScare per dispositivi. Lascia vuoto per disabilitarla nel POS.</p>
                      </div>
 
                      {/* Codice Licenza */}
