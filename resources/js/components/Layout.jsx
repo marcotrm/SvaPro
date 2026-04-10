@@ -13,45 +13,74 @@ import {
 } from 'lucide-react';
 
 const allNavigation = [
+  // Principale — visibile anche ai dipendenti
   { section: 'Principale', items: [
-    { label: 'POS Cassa', href: '/', icon: Monitor, roles: ['superadmin','admin_cliente','dipendente'] },
-    { label: 'Dashboard', href: '/dashboard', icon: BarChart3, roles: ['superadmin','admin_cliente'] },
-    { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in', icon: Fingerprint, roles: ['dipendente'] },
-    { label: 'Clienti', href: '/customers', icon: Users, roles: ['dipendente'] },
-    { label: '📦 Carico Negozio', href: '/store-loading', icon: Package, roles: ['dipendente'] },
+    { label: 'POS Cassa',              href: '/',            icon: Monitor,      roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Dashboard',              href: '/dashboard',   icon: BarChart3,    roles: ['superadmin','admin_cliente'] },
+    { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in',   icon: Fingerprint,  roles: ['dipendente'] },
+    { label: '📦 Carico Negozio',        href: '/store-loading', icon: Package,    roles: ['dipendente'] },
   ]},
-  { section: 'Gestione', items: [
-    { label: 'Prodotti', href: '/catalog', icon: Package, roles: ['superadmin','admin_cliente'] },
-    { label: 'Magazzino', href: '/inventory', icon: Warehouse, roles: ['superadmin','admin_cliente'] },
-    { label: 'Inventario', href: '/inventory/count', icon: ClipboardList, roles: ['superadmin','admin_cliente'] },
-    { label: 'Vendite', href: '/orders', icon: ShoppingBag, roles: ['superadmin','admin_cliente'] },
-    { label: 'Clienti', href: '/customers', icon: Users, roles: ['superadmin','admin_cliente'] },
+
+  // 2. POS / Cassa — strumenti di cassa avanzati
+  { section: 'POS / Cassa', items: [
+    { label: 'Vendite POS',            href: '/orders',      icon: ShoppingBag,  roles: ['superadmin','admin_cliente'] },
+    { label: 'Resi',                   href: '/returns',     icon: RotateCcw,    roles: ['superadmin','admin_cliente'] },
+    { label: 'Promozioni',             href: '/promotions',  icon: Gift,         roles: ['superadmin','admin_cliente'] },
   ]},
-  { section: 'Supply Chain', items: [
-    { label: 'Fornitori', href: '/suppliers', icon: Truck, roles: ['superadmin','admin_cliente'] },
-    { label: 'Ordini Acquisto (PO)', href: '/purchase-orders', icon: Receipt, roles: ['superadmin','admin_cliente'] },
-    { label: '📦 DDT Fornitore', href: '/supplier-delivery', icon: Truck, roles: ['superadmin','admin_cliente'] },
-    { label: 'Fatture Fornitori', href: '/supplier-invoices', icon: FileText, roles: ['superadmin','admin_cliente'] },
-    { label: 'Trasferimenti DDT', href: '/stock-transfers', icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
+
+  // 3. Magazzino
+  { section: 'Magazzino', items: [
+    { label: 'Prodotti',               href: '/catalog',          icon: Package,        roles: ['superadmin','admin_cliente'] },
+    { label: 'Stock & Giacenze',       href: '/inventory',        icon: Warehouse,      roles: ['superadmin','admin_cliente'] },
+    { label: 'Inventario Guidato',     href: '/inventory/count',  icon: ClipboardList,  roles: ['superadmin','admin_cliente'] },
+    { label: 'Trasferimenti DDT',      href: '/stock-transfers',  icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
   ]},
-  { section: 'Analisi', items: [
-    { label: 'Report', href: '/reports', icon: Activity, roles: ['superadmin','admin_cliente'] },
-    { label: 'Fatturazione', href: '/invoices', icon: FileText, roles: ['superadmin','admin_cliente'] },
-    { label: 'Resi', href: '/returns', icon: RotateCcw, roles: ['superadmin','admin_cliente'] },
-    { label: 'Promozioni', href: '/promotions', icon: Gift, roles: ['superadmin','admin_cliente'] },
+
+  // 4. Vendite
+  { section: 'Vendite', items: [
+    { label: 'Tutti gli Ordini',       href: '/orders',      icon: ShoppingBag,  roles: ['superadmin','admin_cliente'] },
+    { label: 'Fatturazione',           href: '/invoices',    icon: FileText,     roles: ['superadmin','admin_cliente'] },
+    { label: 'Report & Analisi',       href: '/reports',     icon: Activity,     roles: ['superadmin','admin_cliente'] },
   ]},
-  { section: 'Dipendenti', items: [
-    { label: 'Gestione Dipendenti', href: '/employees', icon: Users, roles: ['superadmin','admin_cliente'] },
-    { label: '🕐 Timbrature', href: '/attendance', icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
-    { label: '⏱ Kiosk Timbratura', href: '/clock-in', icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
-    { label: '🏆 Gamification', href: '/gamification', icon: Activity, roles: ['superadmin','admin_cliente','dipendente'] },
+
+  // 5. Acquisti / Fornitori
+  { section: 'Acquisti / Fornitori', items: [
+    { label: 'Fornitori',              href: '/suppliers',          icon: Truck,    roles: ['superadmin','admin_cliente'] },
+    { label: 'Ordini Acquisto (PO)',   href: '/purchase-orders',    icon: Receipt,  roles: ['superadmin','admin_cliente'] },
+    { label: '📦 DDT Fornitore',         href: '/supplier-delivery',  icon: Truck,    roles: ['superadmin','admin_cliente'] },
+    { label: 'Fatture Fornitori',      href: '/supplier-invoices',  icon: FileText, roles: ['superadmin','admin_cliente'] },
   ]},
+
+  // 6. Amministrazione
   { section: 'Amministrazione', items: [
-    { label: 'Negozi',          href: '/stores',            icon: Store,    roles: ['superadmin','admin_cliente'] },
-    { label: 'Impostazioni',    href: '/settings',          icon: Settings, roles: ['superadmin','admin_cliente'] },
-    { label: 'Ruoli & Permessi',href: '/roles-permissions', icon: Shield,   roles: ['superadmin'] },
-    { label: 'Audit Log',       href: '/audit-log',         icon: ClipboardList, roles: ['superadmin'] },
-    { label: 'Control Tower',   href: '/control-tower',     icon: Activity, roles: ['superadmin'] },
+    { label: 'Negozi',                 href: '/stores',             icon: Store,         roles: ['superadmin','admin_cliente'] },
+    { label: 'Ruoli & Permessi',       href: '/roles-permissions',  icon: Shield,        roles: ['superadmin'] },
+    { label: 'Audit Log',             href: '/audit-log',          icon: ClipboardList, roles: ['superadmin'] },
+    { label: 'Control Tower',         href: '/control-tower',      icon: Activity,      roles: ['superadmin'] },
+  ]},
+
+  // 7. Marketing
+  { section: 'Marketing', items: [
+    { label: 'Promozioni & Bundle',    href: '/promotions',   icon: Gift,         roles: ['superadmin','admin_cliente'] },
+    { label: '🏆 Gamification',         href: '/gamification', icon: Star,         roles: ['superadmin','admin_cliente','dipendente'] },
+  ]},
+
+  // 8. Dipendenti
+  { section: 'Dipendenti', items: [
+    { label: 'Gestione Dipendenti',    href: '/employees',   icon: Users,        roles: ['superadmin','admin_cliente'] },
+    { label: '🕐 Timbrature',            href: '/attendance',  icon: Fingerprint,  roles: ['superadmin','admin_cliente'] },
+    { label: '⏱ Kiosk Timbratura',      href: '/clock-in',    icon: Fingerprint,  roles: ['superadmin','admin_cliente'] },
+  ]},
+
+  // 9. Clienti
+  { section: 'Clienti', items: [
+    { label: 'Anagrafica Clienti',     href: '/customers',   icon: Users,        roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Resi Clienti',          href: '/returns',     icon: RotateCcw,    roles: ['superadmin','admin_cliente'] },
+  ]},
+
+  // 10. Impostazioni
+  { section: 'Impostazioni', items: [
+    { label: 'Configurazione',         href: '/settings',    icon: Settings,     roles: ['superadmin','admin_cliente'] },
   ]},
 ];
 
@@ -67,8 +96,8 @@ export default function Layout({ user, setUser }) {
   const [openSections, setOpenSections] = useState(() => {
     try {
       const saved = localStorage.getItem('sidebarOpenSections');
-      return saved ? JSON.parse(saved) : { 'Principale': true, 'Gestione': true, 'Supply Chain': true, 'Analisi': true, 'Amministrazione': true };
-    } catch { return { 'Principale': true, 'Gestione': true, 'Supply Chain': true, 'Analisi': true, 'Amministrazione': true }; }
+      return saved ? JSON.parse(saved) : { 'Principale': true, 'POS / Cassa': false, 'Magazzino': false, 'Vendite': false, 'Acquisti / Fornitori': false, 'Amministrazione': false, 'Marketing': false, 'Dipendenti': false, 'Clienti': false, 'Impostazioni': false };
+    } catch { return { 'Principale': true }; }
   });
 
   const userRoles = useMemo(() => user?.roles || [], [user]);
