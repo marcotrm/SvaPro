@@ -4,9 +4,9 @@ import { attendance as attendanceApi } from '../api.jsx';
 import { CheckCircle, LogIn, LogOut, Clock, AlertTriangle, Loader, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 
 const STATUS_COLOR = {
-  presente: { bg: '#D1FAE5', text: '#065F46', border: '#6EE7B7', label: 'Presente' },
-  fuori: { bg: '#F3F4F6', text: '#6B7280', border: '#D1D5DB', label: 'Uscito' },
-  assente: { bg: 'var(--color-surface)', text: 'var(--color-text)', border: 'var(--color-border)', label: 'Non timbrato' },
+  presente: { bg: '#ECFDF5', text: '#065F46', border: '#6EE7B7', label: 'Presente', avatarBg: 'linear-gradient(135deg, #10B981, #059669)' },
+  fuori: { bg: '#F9FAFB', text: '#6B7280', border: '#E5E7EB', label: 'Uscito', avatarBg: '#9CA3AF' },
+  assente: { bg: 'var(--color-surface)', text: 'var(--color-text)', border: 'var(--color-border)', label: 'Non timbrato', avatarBg: '#D1D5DB' },
 };
 
 function Clock_({ serverTime }) {
@@ -213,10 +213,12 @@ export default function AttendancePage() {
             >
               {/* Avatar */}
               <div style={{
-                width: 60, height: 60, borderRadius: '50%', margin: '0 auto 12px',
-                background: emp.status === 'presente' ? '#A7F3D0' : 'var(--color-bg)',
+                width: 64, height: 64, borderRadius: '50%', margin: '0 auto 12px',
+                background: sc.avatarBg || (emp.status === 'presente' ? 'linear-gradient(135deg, #10B981, #059669)' : 'var(--color-bg)'),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 24, border: `3px solid ${sc.border}`,
+                fontSize: 24, fontWeight: 800, color: emp.status === 'presente' ? '#fff' : sc.text,
+                border: `3px solid ${sc.border}`,
+                boxShadow: emp.status === 'presente' ? '0 4px 12px rgba(16,185,129,0.35)' : 'none',
               }}>
                 {emp.name.charAt(0).toUpperCase()}
               </div>
@@ -238,17 +240,30 @@ export default function AttendancePage() {
                 {isProcessing ? '...' : sc.label}
               </div>
 
-              {/* Orario entrata/uscita */}
+              {/* Orario entrata/uscita + ore totali */}
               {emp.checked_in_at && (
-                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
-                  Entrata: {new Date(emp.checked_in_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 2 }}>
+                  Entrata: <strong>{new Date(emp.checked_in_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</strong>
                 </div>
               )}
               {emp.checked_out_at && (
                 <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
-                  Uscita: {new Date(emp.checked_out_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                  Uscita: <strong>{new Date(emp.checked_out_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</strong>
                 </div>
               )}
+              {/* Ore lavorate */}
+              {emp.checked_in_at && emp.checked_out_at && (() => {
+                const inTime = new Date(emp.checked_in_at);
+                const outTime = new Date(emp.checked_out_at);
+                const diffMs = outTime - inTime;
+                const h = Math.floor(diffMs / 3600000);
+                const m = Math.floor((diffMs % 3600000) / 60000);
+                return (
+                  <div style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#065F46', background: '#D1FAE5', padding: '3px 10px', borderRadius: 100 }}>
+                    ⏱ {h}h {m}m
+                  </div>
+                );
+              })()}
               {emp.late_minutes > 0 && (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#92400E', background: '#FEF3C7', padding: '3px 8px', borderRadius: 100 }}>
                   <AlertTriangle size={10} /> {emp.late_minutes} min ritardo

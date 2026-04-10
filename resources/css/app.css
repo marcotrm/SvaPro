@@ -252,10 +252,9 @@ a { text-decoration: none; color: inherit; }
 
 .sp-nav-section-title {
   font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #555;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #666;
   padding: 12px 12px 6px;
 }
 
@@ -263,26 +262,29 @@ a { text-decoration: none; color: inherit; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 9px 12px 9px 10px;
   border-radius: var(--radius-sm);
   color: #888;
   font-size: 13px;
   font-weight: 500;
   width: 100%;
   text-align: left;
-  transition: all 0.15s var(--ease);
+  transition: all 0.18s var(--ease);
   position: relative;
+  border-left: 3px solid transparent;
 }
 
 .sp-nav-item:hover {
   background: var(--color-sidebar-hover);
-  color: #ccc;
+  color: #d0d0d0;
+  border-left-color: rgba(0,102,255,0.3);
 }
 
 .sp-nav-item.active {
-  background: var(--color-accent);
-  color: #fff;
-  font-weight: 600;
+  background: rgba(0,102,255,0.15);
+  color: #6ea6ff;
+  font-weight: 700;
+  border-left-color: var(--color-accent);
 }
 
 .sp-nav-item .sp-nav-icon {
@@ -1180,6 +1182,34 @@ a { text-decoration: none; color: inherit; }
   75% { transform: translateX(4px); }
 }
 
+/* POS: animazione aggiunta al carrello */
+@keyframes spCartPop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(0.94); }
+  60%  { transform: scale(1.06); }
+  80%  { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+
+/* Badge carrello pulse */
+@keyframes spBadgePulse {
+  0%   { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,102,255,0.5); }
+  60%  { transform: scale(1.2); box-shadow: 0 0 0 8px rgba(0,102,255,0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,102,255,0); }
+}
+
+/* Float in da basso */
+@keyframes spFloatIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Shimmer skeleton */
+@keyframes spShimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+
 .sp-animate-in {
   animation: spSlideUp 0.25s var(--ease) forwards;
 }
@@ -1188,8 +1218,27 @@ a { text-decoration: none; color: inherit; }
   animation: spFadeIn 0.2s var(--ease) forwards;
 }
 
+.sp-animate-float {
+  animation: spFloatIn 0.2s var(--ease) forwards;
+}
+
 .sp-spin {
   animation: spin 0.7s linear infinite;
+}
+
+/* ─── POS Product Card ─── */
+.sp-pos-card-added {
+  animation: spCartPop 0.35s var(--ease) forwards;
+}
+
+/* Overlay hover su card prodotto POS */
+.sp-pos-product-card:hover .pos-add-overlay {
+  opacity: 1 !important;
+}
+
+/* Badge carrello animato */
+.sp-cart-badge-pulse {
+  animation: spBadgePulse 0.5s ease-out forwards;
 }
 
 
@@ -1197,10 +1246,16 @@ a { text-decoration: none; color: inherit; }
    SCROLLBAR
    ═══════════════════════════════════════ */
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+::-webkit-scrollbar-thumb { background: rgba(0,102,255,0.18); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,102,255,0.4); }
+
+/* POS sidebar scrollbar più sottile */
+.sp-pos-cart::-webkit-scrollbar,
+.sp-pos-cart-items::-webkit-scrollbar { width: 3px; }
+.sp-pos-cart::-webkit-scrollbar-thumb,
+.sp-pos-cart-items::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
 
 
 /* ═══════════════════════════════════════

@@ -156,6 +156,9 @@ export default function Layout({ user, setUser }) {
 
   const sidebarWidth = collapsed ? 72 : 240;
 
+  // Conta prodotti sotto soglia dai dati caricati (placeholder per ora)
+  const [lowStockCount, setLowStockCount] = React.useState(0);
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
 
@@ -283,8 +286,21 @@ export default function Layout({ user, setUser }) {
                 ))}
               </select>
             )}
-            <button className="sp-btn sp-btn-ghost sp-btn-icon" title="Notifiche">
+            <button
+              className="sp-btn sp-btn-ghost sp-btn-icon"
+              title={lowStockCount > 0 ? `${lowStockCount} alert stock` : 'Notifiche'}
+              style={{ position: 'relative' }}
+            >
               <Bell size={18} />
+              {lowStockCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: 6, right: 6,
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: '#EF4444',
+                  border: '2px solid white',
+                  animation: 'spBadgePulse 1.5s ease-out infinite',
+                }} />
+              )}
             </button>
           </div>
         </header>

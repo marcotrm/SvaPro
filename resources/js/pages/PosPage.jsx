@@ -33,10 +33,18 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
   const palette   = catPalette(product.category_id);
   const imgUrl    = product.image_url ? getImageUrl(product.image_url) : null;
   const inStock   = onHand > 0;
+  const [popped, setPopped] = React.useState(false);
+
+  const handleAdd = () => {
+    onAdd(product);
+    setPopped(true);
+    setTimeout(() => setPopped(false), 380);
+  };
 
   return (
     <div
-      onClick={() => onAdd(product)}
+      onClick={handleAdd}
+      className={popped ? 'sp-pos-card-added' : ''}
       style={{
         background: 'white',
         borderRadius: 16,
@@ -84,11 +92,13 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
         {/* Stock badge */}
         <div style={{
           position: 'absolute', top: 7, left: 7,
-          background: inStock ? 'rgba(16,185,129,0.9)' : 'rgba(239,68,68,0.9)',
-          color: '#fff', borderRadius: 8, padding: '2px 7px', fontSize: 10, fontWeight: 700,
-          backdropFilter: 'blur(4px)',
+          background: inStock ? 'rgba(16,185,129,0.92)' : 'rgba(239,68,68,0.92)',
+          color: '#fff', borderRadius: 8, padding: '2px 8px', fontSize: 10, fontWeight: 800,
+          backdropFilter: 'blur(6px)',
+          boxShadow: inStock ? '0 2px 8px rgba(16,185,129,0.4)' : '0 2px 8px rgba(239,68,68,0.4)',
+          letterSpacing: '0.02em',
         }}>
-          {inStock ? onHand : '✕'}
+          {inStock ? onHand : '×'}
         </div>
 
         {/* Info button */}
@@ -838,7 +848,18 @@ export default function PosPage() {
           >
             {placingOrder
               ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-              : <><ReceiptText size={18} /> Vai alla Cassa</>
+              : <><ReceiptText size={18} /> Vai alla Cassa
+                {cartCount > 0 && (
+                  <span style={{
+                    background: 'rgba(255,255,255,0.25)',
+                    borderRadius: 20,
+                    padding: '1px 9px',
+                    fontSize: 13,
+                    fontWeight: 900,
+                    marginLeft: 4,
+                  }}>{cartCount}</span>
+                )}
+              </>
             }
           </button>
         </div>
