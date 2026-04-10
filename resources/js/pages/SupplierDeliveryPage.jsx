@@ -132,19 +132,23 @@ export default function SupplierDeliveryPage() {
       // Update stock for each line
       const errors = [];
       for (const line of validLines) {
-        if (!line.product_variant_id) continue;
+        if (!line.product_variant_id) {
+          errors.push(`Prodotto "${line.product_name}": nessun ID variante — aggiungilo dal catalogo`);
+          continue;
+        }
         // Conto visione: non modifica stock
         if (ddtType === 'conto_visione') continue;
         try {
           await inventory.adjustStock({
             product_variant_id: parseInt(line.product_variant_id),
-            store_id: parseInt(warehouseId),
-            qty_change: activeDdtType.qtySign * parseInt(line.qty),
-            reason: `DDT ${ddtType} ${ddtNumber}`,
-            notes: `${activeDdtType.label}: ${suppliersList.find(s => String(s.id) === String(supplierId))?.name || supplierId}`,
+            store_id:           parseInt(warehouseId),
+            qty:                activeDdtType.qtySign * parseInt(line.qty),
+            movement_type:      ddtType === 'scarico_vendita' ? 'out' : 'in',
+            unit_cost:          parseFloat(line.unit_cost) || 0,
+            reference_type:     'ddt',
           });
         } catch (e) {
-          errors.push(`Prodotto #${line.product_variant_id}: ${e.response?.data?.message || e.message}`);
+          errors.push(`Prodotto "${line.product_name}": ${e.response?.data?.message || e.message}`);
         }
       }
 

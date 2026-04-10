@@ -141,14 +141,27 @@ class InventoryController extends Controller
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
 
+        // ── Auto-resolve warehouse_id da store_id se necessario ──────────
+        if (!$request->filled('warehouse_id') && $request->filled('store_id')) {
+            $wh = DB::table('warehouses')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', (int) $request->integer('store_id'))
+                ->orderBy('id')
+                ->value('id');
+            if ($wh) {
+                $request->merge(['warehouse_id' => $wh]);
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────
+
         $validator = Validator::make($request->all(), [
-            'warehouse_id' => ['required', 'integer'],
+            'warehouse_id'       => ['required', 'integer'],
             'product_variant_id' => ['required', 'integer'],
-            'qty' => ['required', 'integer', 'not_in:0'],
-            'movement_type' => ['required', 'string', 'max:40'],
-            'unit_cost' => ['nullable', 'numeric', 'min:0'],
-            'reference_type' => ['nullable', 'string', 'max:100'],
-            'reference_id' => ['nullable', 'integer'],
+            'qty'                => ['required', 'integer', 'not_in:0'],
+            'movement_type'      => ['required', 'string', 'max:40'],
+            'unit_cost'          => ['nullable', 'numeric', 'min:0'],
+            'reference_type'     => ['nullable', 'string', 'max:100'],
+            'reference_id'       => ['nullable', 'integer'],
         ]);
 
         if ($validator->fails()) {
