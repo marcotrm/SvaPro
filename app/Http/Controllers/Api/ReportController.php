@@ -13,22 +13,23 @@ class ReportController extends Controller
      */
     public function revenueTrend(Request $request)
     {
-        $tenantId = $request->attributes->get('tenant_id');
-        $storeId  = $request->input('store_id');
-        $period   = $request->input('period', 'daily'); // daily|weekly|monthly
-        $days     = (int) $request->input('days', 30);
-        $days     = min($days, 365);
+        $tenantId  = $request->attributes->get('tenant_id');
+        $storeId   = $request->input('store_id');
+        $period    = $request->input('period', 'daily'); // daily|weekly|monthly
+        $days      = (int) $request->input('days', 30);
+        $days      = min($days, 365);
+        $dateFrom  = $request->input('date_from'); // es. 2026-04-10
+        $dateTo    = $request->input('date_to');   // es. 2026-04-10
 
         $dateExpr = match ($period) {
-            'weekly'  => DB::raw("to_char(date_trunc('week', sales_orders.created_at), 'YYYY-MM-DD') as period"),
-            'monthly' => DB::raw("to_char(date_trunc('month', sales_orders.created_at), 'YYYY-MM') as period"),
-            default   => DB::raw("to_char(sales_orders.created_at::date, 'YYYY-MM-DD') as period"),
+            'weekly'  => DB::raw("to_char(date_trunc('week', sales_orders.created_at AT TIME ZONE 'Europe/Rome'), 'YYYY-MM-DD') as period"),
+            'monthly' => DB::raw("to_char(date_trunc('month', sales_orders.created_at AT TIME ZONE 'Europe/Rome'), 'YYYY-MM') as period"),
+            default   => DB::raw("to_char((sales_orders.created_at AT TIME ZONE 'Europe/Rome')::date, 'YYYY-MM-DD') as period"),
         };
 
         $query = DB::table('sales_orders')
             ->where('sales_orders.tenant_id', $tenantId)
             ->where('sales_orders.status', 'paid')
-            ->where('sales_orders.created_at', '>=', now()->subDays($days))
             ->select(
                 $dateExpr,
                 DB::raw('count(*) as order_count'),
@@ -38,6 +39,14 @@ class ReportController extends Controller
             )
             ->groupBy(DB::raw('1'))
             ->orderBy(DB::raw('1'));
+
+        // Usa date esatte se fornite, altrimenti fallback su subDays
+        if ($dateFrom && $dateTo) {
+            $query->whereRaw("(sales_orders.created_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom])
+                  ->whereRaw("(sales_orders.created_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]);
+        } else {
+            $query->where('sales_orders.created_at', '>=', now()->subDays($days));
+        }
 
         if ($storeId) {
             $query->where('sales_orders.store_id', $storeId);
@@ -116,11 +125,20 @@ class ReportController extends Controller
         $tenantId = $request->attributes->get('tenant_id');
         $storeId  = $request->input('store_id');
         $days     = min((int) ($request->input('days', 30) ?: 30), 365);
+        $dateFrom = $request->input('date_from');
+        $dateTo   = $request->input('date_to');
 
         $orderBase = DB::table('sales_orders')
             ->where('tenant_id', $tenantId)
-            ->where('status', 'paid')
-            ->where('created_at', '>=', now()->subDays($days));
+            ->where('status', 'paid');
+
+        // Usa date esatte se fornite dalla dashboard
+        if ($dateFrom && $dateTo) {
+            $orderBase->whereRaw("(created_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom])
+                      ->whereRaw("(created_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]);
+        } else {
+            $orderBase->where('created_at', '>=', now()->subDays($days));
+        }
 
         if ($storeId) {
             $orderBase->where('store_id', $storeId);

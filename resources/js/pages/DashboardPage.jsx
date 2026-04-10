@@ -195,8 +195,8 @@ export default function DashboardPage() {
 
       // Fetch each independently so one failure doesn't break everything
       const [resSummary, resTrend, resOrders, resStock, resCust, resStores, resEmployees] = await Promise.allSettled([
-        reports.summary(sp),
-        reports.revenueTrend({ ...sp, period: period.chartPeriod, days }),
+        reports.summary({ ...sp, date_from, date_to, days }),
+        reports.revenueTrend({ ...sp, period: period.chartPeriod, days, date_from, date_to }),
         ordersApi.getOrders({ ...sp, limit: 200, status: 'paid', date_from, date_to }),
         inventory.getStock({ ...sp, limit: 1000 }),
         customers.getCustomers({ limit: 1 }),
