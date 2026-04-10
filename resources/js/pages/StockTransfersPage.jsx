@@ -1,18 +1,252 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { stockTransfers, stores as storesApi, catalog } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 
 const STATUS_LABELS = {
-    draft:      { label: 'Bozza',      cls: 'mid'  },
+    draft:      { label: 'Bozza',       cls: 'mid'  },
     in_transit: { label: 'In Transito', cls: 'warn' },
-    received:   { label: 'Ricevuto',   cls: 'high' },
-    cancelled:  { label: 'Annullato',  cls: 'low'  },
+    received:   { label: 'Ricevuto',    cls: 'high' },
+    cancelled:  { label: 'Annullato',   cls: 'low'  },
 };
 
-const fmtDate  = v => v ? new Date(v).toLocaleDateString('it-IT') : '–';
-const fmtDT    = v => v ? new Date(v).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '–';
+const fmtDate = v => v ? new Date(v).toLocaleDateString('it-IT') : '–';
+const fmtDT   = v => v ? new Date(v).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '–';
+
+/* ─── Autocomplete prodotto ─────────────────────────────────────────────── */
+function ProductAutocomplete({ variants, value, onChange }) {
+    const [query, setQuery]       = useState('');
+    const [open,  setOpen]        = useState(false);
+    const [active, setActive]     = useState(-1);
+    const wrapRef                 = useRef(null);
+
+    // Etichetta del valore selezionato
+    const selectedLabel = value ? (variants.find(v => String(v.id) === String(value))?.label || '') : '';
+
+    // Filtra i suggerimenti
+    const suggestions = query.length >= 1
+        ? variants.filter(v => v.label.toLowerCase().includes(query.toLowerCase())).slice(0, 10)
+        : [];
+
+    // Chiudi se si clicca fuori
+    useEffect(() => {
+        const handler = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const select = (v) => {
+        onChange(String(v.id));
+        setQuery('');
+        setOpen(false);
+        setActive(-1);
+    };
+
+    const handleKeyDown = (e) => {
+        if (!open || suggestions.length === 0) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActive(a => Math.min(a + 1, suggestions.length - 1)); }
+        if (e.key === 'ArrowUp')   { e.preventDefault(); setActive(a => Math.max(a - 1, 0)); }
+        if (e.key === 'Enter' && active >= 0) { e.preventDefault(); select(suggestions[active]); }
+        if (e.key === 'Escape')    { setOpen(false); }
+    };
+
+    return (
+        <div ref={wrapRef} style={{ position: 'relative', flex: 1 }}>
+            {/* Campo di input con il prodotto selezionato o la ricerca */}
+            {!open && value ? (
+                <div
+                    onClick={() => { setQuery(''); setOpen(true); }}
+                    style={{
+                        padding: '8px 12px',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 8,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        background: 'var(--color-surface)',
+                        color: 'var(--color-text)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        minHeight: 38,
+                    }}
+                >
+                    <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedLabel}</span>
+                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 8, flexShrink: 0 }}>✎</span>
+                </div>
+            ) : (
+                <input
+                    className="field-input"
+                    autoFocus={open}
+                    value={query}
+                    onChange={e => { setQuery(e.target.value); setOpen(true); setActive(-1); }}
+                    onFocus={() => setOpen(true)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Digita nome prodotto, SKU, gusto..."
+                    autoComplete="off"
+                />
+            )}
+
+            {/* Dropdown suggerimenti */}
+            {open && suggestions.length > 0 && (
+                <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 9000,
+                    background: 'var(--color-card)', border: '1px solid var(--color-border)',
+                    borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                    maxHeight: 240, overflowY: 'auto', marginTop: 4,
+                }}>
+                    {suggestions.map((v, idx) => (
+                        <div
+                            key={v.id}
+                            onMouseDown={() => select(v)}
+                            style={{
+                                padding: '10px 14px',
+                                cursor: 'pointer',
+                                background: idx === active ? 'rgba(99,102,241,0.12)' : 'transparent',
+                                borderBottom: '1px solid var(--color-border)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                fontSize: 13,
+                            }}
+                            onMouseEnter={() => setActive(idx)}
+                        >
+                            <span style={{ fontWeight: 600 }}>{v.label}</span>
+                            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginLeft: 8 }}>Disp: {v.on_hand}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Nessun risultato */}
+            {open && query.length >= 2 && suggestions.length === 0 && (
+                <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 9000,
+                    background: 'var(--color-card)', border: '1px solid var(--color-border)',
+                    borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                    padding: '12px 14px', marginTop: 4, fontSize: 13,
+                    color: 'var(--color-text-tertiary)', textAlign: 'center',
+                }}>
+                    Nessun prodotto trovato per "{query}"
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ─── Modal Dettaglio DDT ───────────────────────────────────────────────── */
+function DDTDetailModal({ transfer, onClose }) {
+    if (!transfer) return null;
+    const st = STATUS_LABELS[transfer.status] || { label: transfer.status, cls: '' };
+
+    return (
+        <div
+            onClick={onClose}
+            style={{
+                position: 'fixed', inset: 0, zIndex: 10000,
+                background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+            }}
+        >
+            <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                    background: 'var(--color-card)', borderRadius: 16,
+                    width: '100%', maxWidth: 680, maxHeight: '85vh',
+                    display: 'flex', flexDirection: 'column',
+                    boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
+                    border: '1px solid var(--color-border)',
+                }}
+            >
+                {/* Header modal */}
+                <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                    <div>
+                        <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--color-text)' }}>
+                            DDT {transfer.ddt_number}
+                        </div>
+                        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                            Creato il {fmtDT(transfer.created_at)}
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span className={`badge ${st.cls}`}><span className="badge-dot"/>{st.label}</span>
+                        <button
+                            onClick={onClose}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'var(--color-text-secondary)', lineHeight: 1 }}
+                        >×</button>
+                    </div>
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+                    {/* Info grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                        {[
+                            ['📤 Mittente',    transfer.from_store_name || '–'],
+                            ['📥 Destinatario',transfer.to_store_name   || '–'],
+                            ['📅 Data Invio',  fmtDT(transfer.sent_at)],
+                            ['✅ Data Ricezione', fmtDT(transfer.received_at)],
+                        ].map(([label, val]) => (
+                            <div key={label} style={{ background: 'var(--color-surface)', borderRadius: 10, padding: '12px 14px', border: '1px solid var(--color-border)' }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>{label}</div>
+                                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text)' }}>{val}</div>
+                            </div>
+                        ))}
+                        {transfer.notes && (
+                            <div style={{ gridColumn: 'span 2', background: 'var(--color-surface)', borderRadius: 10, padding: '12px 14px', border: '1px solid var(--color-border)' }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>📝 Note</div>
+                                <div style={{ fontSize: 13, color: 'var(--color-text)' }}>{transfer.notes}</div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Articoli */}
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: 'var(--color-text)' }}>
+                        Articoli ({(transfer.items || []).length})
+                    </div>
+                    <div style={{ border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr style={{ background: 'var(--color-surface)' }}>
+                                    {['Prodotto', 'Qtà Inviata', 'Qtà Ricevuta'].map(h => (
+                                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)' }}>{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(transfer.items || []).length === 0 ? (
+                                    <tr><td colSpan="3" style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-tertiary)', fontSize: 13 }}>Nessun articolo</td></tr>
+                                ) : (transfer.items || []).map((item, i) => (
+                                    <tr key={i} style={{ borderTop: '1px solid var(--color-border)' }}>
+                                        <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+                                            {item.product_name || '–'}
+                                            {item.flavor ? <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 400 }}> — {item.flavor}</span> : ''}
+                                            {item.resistance_ohm ? <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 400 }}> {item.resistance_ohm}Ω</span> : ''}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: 'var(--color-accent)' }}>{item.quantity_sent}</td>
+                                        <td style={{ padding: '12px 14px', fontSize: 13, color: item.quantity_received != null ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontWeight: item.quantity_received != null ? 700 : 400 }}>
+                                            {item.quantity_received ?? '—'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Totale */}
+                    <div style={{ marginTop: 14, display: 'flex', gap: 12 }}>
+                        <div style={{ background: 'rgba(99,102,241,0.08)', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, color: 'var(--color-accent)' }}>
+                            Totale pezzi inviati: {(transfer.items || []).reduce((s, i) => s + (i.quantity_sent || 0), 0)}
+                        </div>
+                        {transfer.status === 'received' && (
+                            <div style={{ background: 'rgba(34,197,94,0.08)', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, color: 'var(--color-success)' }}>
+                                Totale pezzi ricevuti: {(transfer.items || []).reduce((s, i) => s + (i.quantity_received || 0), 0)}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 /* ─── Componente principale ─────────────────────────────────────── */
 export default function StockTransfersPage() {
@@ -26,7 +260,7 @@ export default function StockTransfersPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [showForm, setShowForm] = useState(false);
     const [saving,  setSaving]  = useState(false);
-    const [detailId, setDetailId] = useState(null);
+    const [viewTransfer, setViewTransfer] = useState(null); // per il modal dettaglio
 
     const [form, setForm] = useState({
         from_store_id: '', to_store_id: '', notes: '',
@@ -55,7 +289,6 @@ export default function StockTransfersPage() {
         } finally { setLoading(false); }
     };
 
-    // Carica le varianti quando si sceglie lo store mittente
     const loadVariants = async (storeId) => {
         if (!storeId) return;
         try {
@@ -66,6 +299,8 @@ export default function StockTransfersPage() {
                     all.push({
                         id: v.id,
                         label: `${p.name}${v.flavor ? ' – ' + v.flavor : ''}${v.resistance_ohm ? ' ' + v.resistance_ohm + 'Ω' : ''}`,
+                        sku: v.sku || '',
+                        barcode: v.barcode || '',
                         on_hand: v.on_hand ?? 0,
                     });
                 });
@@ -80,7 +315,7 @@ export default function StockTransfersPage() {
         if (storeId) loadVariants(storeId);
     };
 
-    const addItem  = () => setForm(f => ({ ...f, items: [...f.items, { product_variant_id: '', quantity_sent: 1 }] }));
+    const addItem    = () => setForm(f => ({ ...f, items: [...f.items, { product_variant_id: '', quantity_sent: 1 }] }));
     const removeItem = (i) => setForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }));
     const updateItem = (i, field, val) => {
         const items = [...form.items];
@@ -109,38 +344,26 @@ export default function StockTransfersPage() {
 
     const handleSend = async (id) => {
         if (!confirm('Inviare il DDT? Lo stock verrà scalato dal magazzino mittente.')) return;
-        try {
-            setError('');
-            await stockTransfers.send(id);
-            await fetchAll();
-        } catch (e) { setError(e.response?.data?.message || e.message); }
+        try { setError(''); await stockTransfers.send(id); await fetchAll(); }
+        catch (e) { setError(e.response?.data?.message || e.message); }
     };
 
     const handleReceive = async (transfer) => {
         if (!confirm('Confermare la ricezione? Lo stock verrà aggiunto al magazzino destinatario.')) return;
-        try {
-            setError('');
-            await stockTransfers.receive(transfer.id);
-            await fetchAll();
-        } catch (e) { setError(e.response?.data?.message || e.message); }
+        try { setError(''); await stockTransfers.receive(transfer.id); await fetchAll(); }
+        catch (e) { setError(e.response?.data?.message || e.message); }
     };
 
     const handleCancel = async (id) => {
         if (!confirm('Annullare il DDT?')) return;
-        try {
-            setError('');
-            await stockTransfers.cancel(id);
-            await fetchAll();
-        } catch (e) { setError(e.response?.data?.message || e.message); }
+        try { setError(''); await stockTransfers.cancel(id); await fetchAll(); }
+        catch (e) { setError(e.response?.data?.message || e.message); }
     };
 
     const handleDelete = async (id) => {
-        if (!confirm('Eliminare definitivamente questo DDT? L\'operazione non è reversibile.')) return;
-        try {
-            setError('');
-            await stockTransfers.delete(id);
-            await fetchAll();
-        } catch (e) { setError(e.response?.data?.message || e.message); }
+        if (!confirm("Eliminare definitivamente questo DDT? L'operazione non è reversibile.")) return;
+        try { setError(''); await stockTransfers.delete(id); await fetchAll(); }
+        catch (e) { setError(e.response?.data?.message || e.message); }
     };
 
     const printDDT = (t) => {
@@ -190,7 +413,6 @@ export default function StockTransfersPage() {
         w.print();
     };
 
-    const detail = list.find(t => t.id === detailId);
     const counts = {
         draft:      list.filter(t => t.status === 'draft').length,
         in_transit: list.filter(t => t.status === 'in_transit').length,
@@ -201,6 +423,9 @@ export default function StockTransfersPage() {
 
     return (
         <>
+            {/* Modal dettaglio DDT */}
+            {viewTransfer && <DDTDetailModal transfer={viewTransfer} onClose={() => setViewTransfer(null)} />}
+
             {/* Header */}
             <div className="page-head">
                 <div>
@@ -250,7 +475,7 @@ export default function StockTransfersPage() {
                             </div>
                         </div>
 
-                        {/* Barcode scanner prodotto nel DDT */}
+                        {/* Barcode scanner */}
                         {form.from_store_id && (
                             <div style={{ marginBottom: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
                                 <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>📷 Scansiona barcode:</span>
@@ -269,7 +494,6 @@ export default function StockTransfersPage() {
                                                 v.label?.toLowerCase().includes(bc)
                                             );
                                             if (found) {
-                                                // Aggiunge il prodotto trovato alla lista
                                                 const existingIdx = form.items.findIndex(i => String(i.product_variant_id) === String(found.id));
                                                 if (existingIdx >= 0) {
                                                     updateItem(existingIdx, 'quantity_sent', form.items[existingIdx].quantity_sent + 1);
@@ -285,7 +509,7 @@ export default function StockTransfersPage() {
                                                 setBarcodeInput('');
                                                 barcodeInputRef.current?.focus();
                                             } else {
-                                                setError(`Barcode "${barcodeInput}" non trovato nel catalogo del negozio selezionato.`);
+                                                setError(`Barcode "${barcodeInput}" non trovato.`);
                                                 setBarcodeInput('');
                                             }
                                         }
@@ -296,51 +520,48 @@ export default function StockTransfersPage() {
                             </div>
                         )}
 
+                        {/* Prodotti */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <label className="field-label" style={{ margin: 0 }}>Prodotti da Trasferire *</label>
-                                <button className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={addItem} type="button">+ Aggiungi</button>
+                            <label className="field-label" style={{ margin: 0 }}>Prodotti da Trasferire *</label>
+                            <button className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={addItem} type="button">+ Aggiungi</button>
+                        </div>
+
+                        {!form.from_store_id && (
+                            <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
+                                Seleziona prima il negozio mittente per caricare i prodotti disponibili.
                             </div>
+                        )}
 
-                            {!form.from_store_id && (
-                                <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
-                                    Seleziona prima il negozio mittente per caricare i prodotti disponibili.
-                                </div>
-                            )}
-
-                            {form.from_store_id && form.items.map((item, i) => {
-                                const selected = variants.find(v => String(v.id) === String(item.product_variant_id));
-                                return (
-                                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 80px 32px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
-                                        <select
-                                            className="field-input"
-                                            value={item.product_variant_id}
-                                            onChange={e => updateItem(i, 'product_variant_id', e.target.value)}
-                                        >
-                                            <option value="">— prodotto —</option>
-                                            {variants.map(v => (
-                                                <option key={v.id} value={v.id}>{v.label}</option>
-                                            ))}
-                                        </select>
-                                        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center' }}>
-                                            {selected ? `Disp: ${selected.on_hand}` : ''}
-                                        </div>
-                                        <input
-                                            className="field-input"
-                                            type="number" min="1"
-                                            max={selected?.on_hand || 99999}
-                                            value={item.quantity_sent}
-                                            onChange={e => updateItem(i, 'quantity_sent', parseInt(e.target.value) || 1)}
-                                            placeholder="Qtà"
-                                        />
-                                        {form.items.length > 1 && (
-                                            <button type="button" onClick={() => removeItem(i)}
-                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)', fontSize: 18, lineHeight: 1 }}>
-                                                ×
-                                            </button>
-                                        )}
+                        {form.from_store_id && form.items.map((item, i) => {
+                            const selected = variants.find(v => String(v.id) === String(item.product_variant_id));
+                            return (
+                                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 80px 32px', gap: 8, alignItems: 'center' }}>
+                                    {/* ── Autocomplete prodotto ── */}
+                                    <ProductAutocomplete
+                                        variants={variants}
+                                        value={item.product_variant_id}
+                                        onChange={val => updateItem(i, 'product_variant_id', val)}
+                                    />
+                                    <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center' }}>
+                                        {selected ? `Disp: ${selected.on_hand}` : ''}
                                     </div>
-                                );
-                            })}
+                                    <input
+                                        className="field-input"
+                                        type="number" min="1"
+                                        max={selected?.on_hand || 99999}
+                                        value={item.quantity_sent}
+                                        onChange={e => updateItem(i, 'quantity_sent', parseInt(e.target.value) || 1)}
+                                        placeholder="Qtà"
+                                    />
+                                    {form.items.length > 1 && (
+                                        <button type="button" onClick={() => removeItem(i)}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)', fontSize: 18, lineHeight: 1 }}>
+                                            ×
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
 
                         {/* Note */}
                         <div>
@@ -405,6 +626,15 @@ export default function StockTransfersPage() {
                                     <td style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{fmtDT(t.sent_at)}</td>
                                     <td>
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+                                            {/* ── TASTO VISUALIZZA ── */}
+                                            <button
+                                                className="btn btn-ghost"
+                                                style={{ fontSize: 11, padding: '4px 10px', color: 'var(--color-accent)', fontWeight: 700 }}
+                                                onClick={() => setViewTransfer(t)}
+                                                title="Visualizza dettagli DDT"
+                                            >
+                                                👁 Visualizza
+                                            </button>
                                             <button className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => printDDT(t)} title="Stampa DDT">🖨</button>
                                             {t.status === 'draft' && (
                                                 <button className="btn btn-gold" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => handleSend(t.id)}>Invia</button>
