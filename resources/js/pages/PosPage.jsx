@@ -347,7 +347,7 @@ export default function PosPage() {
         warehouse_id: Number(warehouseId),
         employee_id: Number(resolvedEmpId),          // richiesto dal backend POS
         sold_by_employee_id: Number(resolvedEmpId),  // per commissioni/stats
-        customer_id: selectedCustomer?.id,
+        customer_id: selectedCustomer?.id ?? null,
         lines: [
           ...cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
           ...(qscareEnabled ? [{ product_variant_id: null, qty: 1, is_service: true, service_name: 'QScare Assicurazione Dispositivo', unit_price: effectiveQscarePrice }] : []),
@@ -918,7 +918,7 @@ export default function PosPage() {
       {/* ─── Checkout Modal ─── */}
       {showCheckoutModal && (
         <PosCheckoutModal
-          cartTotal={cartTotal}
+          cartTotal={cartTotalWithQscare}
           onComplete={handleCheckout}
           onCancel={() => setShowCheckoutModal(false)}
         />
