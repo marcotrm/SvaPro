@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { orders as ordersApi, inventory, customers, reports, stores as storesApi } from '../api.jsx';
+import { orders as ordersApi, inventory, customers, reports, stores as storesApi, employees as employeesApi } from '../api.jsx';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, LineChart, Line, Cell, PieChart, Pie
@@ -194,13 +194,14 @@ export default function DashboardPage() {
       const { date_from, date_to, days } = getPeriodDates(activePeriod);
 
       // Fetch each independently so one failure doesn't break everything
-      const [resSummary, resTrend, resOrders, resStock, resCust, resStores] = await Promise.allSettled([
+      const [resSummary, resTrend, resOrders, resStock, resCust, resStores, resEmployees] = await Promise.allSettled([
         reports.summary(sp),
         reports.revenueTrend({ ...sp, period: period.chartPeriod, days }),
         ordersApi.getOrders({ ...sp, limit: 200, status: 'paid', date_from, date_to }),
         inventory.getStock({ ...sp, limit: 1000 }),
         customers.getCustomers({ limit: 1 }),
         storesApi.getStores(),
+        employeesApi.getEmployees({ limit: 200 }),
       ]);
 
       // ── KPI Summary ───────────────────────────────────────────
@@ -253,20 +254,32 @@ export default function DashboardPage() {
       }
 
       // ── Recent Orders & Employee Activity ─────────────────────
+      // Costruisce mappa nome dipendente → photo_url dai dati reali dipendenti
+      const empPhotoMap = {};
+      if (resEmployees?.status === 'fulfilled') {
+        (resEmployees.value?.data?.data || []).forEach(emp => {
+          const fullName = `${emp.first_name} ${emp.last_name}`.trim();
+          if (fullName && emp.photo_url) empPhotoMap[fullName] = emp.photo_url;
+        });
+      }
+
       if (resOrders.status === 'fulfilled') {
         const ordersList = resOrders.value?.data?.data || [];
         setRecentOrders(ordersList);
 
-        // Employee activity — usa employee_name + photo_url dal backend
+        // Employee activity — abbina la foto tramite nome dipendente
         const empMap = {};
         ordersList.forEach(o => {
-          const name = o.employee_name; // ora restituito dal backend
+          const name = o.employee_name;
           if (!name) return;
-          if (!empMap[name]) empMap[name] = { name, sales: 0, revenue: 0, photoUrl: o.employee_photo_url || null };
+          if (!empMap[name]) empMap[name] = {
+            name,
+            sales: 0,
+            revenue: 0,
+            photoUrl: empPhotoMap[name] || o.employee_photo_url || null,
+          };
           empMap[name].sales++;
           empMap[name].revenue += parseFloat(o.total || o.grand_total || 0);
-          // aggiorna la foto se disponibile
-          if (o.employee_photo_url && !empMap[name].photoUrl) empMap[name].photoUrl = o.employee_photo_url;
         });
         setEmployeeActivity(Object.values(empMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
 
