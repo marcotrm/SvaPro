@@ -13,25 +13,17 @@ import {
 } from 'lucide-react';
 
 const allNavigation = [
-  // ── Principale (dipendenti) ─────────────────────────────────────
+  // ── Principale ───────────────────────────────────────────────────
   { section: 'Principale', items: [
     { label: 'POS Cassa',              href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Panoramica Generale',    href: '/dashboard',    icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
+    { label: 'Resi',                   href: '/returns',      icon: RotateCcw,   roles: ['superadmin','admin_cliente'] },
     { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in',    icon: Fingerprint, roles: ['dipendente'] },
     { label: '📦 Carico Negozio',        href: '/store-loading', icon: Package,  roles: ['dipendente'] },
     { label: 'Clienti',                href: '/customers',    icon: Users,       roles: ['dipendente'] },
   ]},
 
-  // 1. Dashboard ────────────────────────────────────────────────────
-  { section: 'Dashboard', items: [
-    { label: 'Panoramica Generale',    href: '/dashboard',    icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
-  ]},
-
-  // 2. POS / Cassa ──────────────────────────────────────────────────
-  { section: 'POS / Cassa', items: [
-    { label: 'Resi',                   href: '/returns',      icon: RotateCcw,   roles: ['superadmin','admin_cliente'] },
-  ]},
-
-  // 3. Vendite ──────────────────────────────────────────────────────
+  // Vendite ─────────────────────────────────────────────────────────
   { section: 'Vendite', items: [
     { label: 'Fatturazione',           href: '/invoices',     icon: FileText,    roles: ['superadmin','admin_cliente'] },
     { label: 'Report & Analisi',       href: '/reports',      icon: Activity,    roles: ['superadmin','admin_cliente'] },
