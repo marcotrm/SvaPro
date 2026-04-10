@@ -20,7 +20,6 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [photoPreview, setPhotoPreview] = useState(employee?.photo_url || null);
-  const [photoFile, setPhotoFile] = useState(null);
   const photoInputRef = useRef(null);
 
   useEffect(() => {
@@ -51,9 +50,12 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       setError('Foto troppo grande. Max 2MB.');
       return;
     }
-    setPhotoFile(file);
     const reader = new FileReader();
-    reader.onload = (ev) => setPhotoPreview(ev.target.result);
+    reader.onload = (ev) => {
+      const base64 = ev.target.result;
+      setPhotoPreview(base64);
+      setFormData(prev => ({ ...prev, photo_url: base64 }));
+    };
     reader.readAsDataURL(file);
   };
 
@@ -65,29 +67,12 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       setFieldErrors({});
 
       const isNew = !employee?.id;
+      const payload = { ...formData }; // photo_url base64 incluso
 
-      // Salva i dati anagrafici (senza photo_url se useremo upload separato)
-      const payload = { ...formData };
-      delete payload.photo_url; // la foto viene caricata separatamente
-
-      let savedId = employee?.id;
       if (employee?.id) {
         await employees.updateEmployee(employee.id, payload);
       } else {
-        const res = await employees.createEmployee(payload);
-        savedId = res.data?.employee_id;
-      }
-
-      // Upload foto se selezionata
-      if (photoFile && savedId) {
-        try {
-          const fd = new FormData();
-          fd.append('photo', photoFile);
-          await employees.uploadPhoto(savedId, fd);
-        } catch {
-          // Upload foto non bloccante
-          setError('Dipendente salvato, ma caricamento foto fallito. Riprova.');
-        }
+        await employees.createEmployee(payload);
       }
 
       onSave(isNew);
