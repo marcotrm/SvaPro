@@ -450,6 +450,7 @@ export const catalog = {
   getBrands: () => api.get('/catalog/brands'),
   getCategories: () => api.get('/catalog/categories'),
   createCategory: (data) => api.post('/catalog/categories', data),
+  updateCategory: (id, data) => api.put(`/catalog/categories/${id}`, data),
   deleteCategory: (id) => api.delete(`/catalog/categories/${id}`),
   getTaxClasses: () => api.get('/catalog/tax-classes'),
 };
@@ -684,3 +685,20 @@ export const stockTransfers = {
 export default api;
 
 export { clearApiCache };
+
+// ── Delivery Notes (Bolle di Carico) ──────────────────────────────
+export const deliveryNotes = {
+  getAll:              (params = {}) => api.get('/delivery-notes', { params }),
+  getOne:              (id)          => api.get(`/delivery-notes/${id}`),
+  create:              (data)        => api.post('/delivery-notes', data),
+  receive:             (id, data)    => api.post(`/delivery-notes/${id}/receive`, data),
+  getDiscrepancies:    (params = {}) => api.get('/delivery-notes/discrepancies', { params }),
+  resolveDiscrepancy:  (id, data)    => api.post(`/delivery-notes/discrepancies/${id}/resolve`, data),
+};
+
+// ── Chat (polling) ───────────────────────────────────────────────
+export const chat = {
+  getMessages: (params = {}) => api.get('/chat/messages', { params }),
+  sendMessage: (data)        => api.post('/chat/messages', data),
+  markRead:    (data)        => api.post('/chat/messages/read', data),
+};

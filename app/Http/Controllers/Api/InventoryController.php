@@ -20,18 +20,40 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Store non valido per il tenant.'], 422);
         }
 
-        $rows = DB::table('stock_items as si')
+        $baseQuery = DB::table('stock_items as si')
             ->join('warehouses as w', 'w.id', '=', 'si.warehouse_id')
             ->join('product_variants as pv', 'pv.id', '=', 'si.product_variant_id')
             ->join('products as p', 'p.id', '=', 'pv.product_id')
             ->where('si.tenant_id', $tenantId)
             ->when($storeId !== null, fn ($query) => $query->where('w.store_id', $storeId))
-            ->select([
+            ->orderBy('p.name');
+
+        // Prova prima con campi extra (barcode su p, cost_price su pv)
+        try {
+            $rows = (clone $baseQuery)->select([
                 'si.id',
                 'si.warehouse_id',
                 'w.name as warehouse_name',
                 'si.product_variant_id',
-                'p.sku',
+                'p.barcode',
+                'p.sku as product_sku',
+                'p.name as product_name',
+                'pv.flavor',
+                'pv.sale_price',
+                'pv.cost_price',
+                'si.on_hand',
+                'si.reserved',
+                'si.reorder_point',
+                'si.safety_stock',
+                DB::raw('(si.on_hand - si.reserved) as available'),
+            ])->get();
+        } catch (\Throwable) {
+            // Fallback senza colonne opzionali
+            $rows = (clone $baseQuery)->select([
+                'si.id',
+                'si.warehouse_id',
+                'w.name as warehouse_name',
+                'si.product_variant_id',
                 'p.name as product_name',
                 'pv.flavor',
                 'pv.sale_price',
@@ -40,9 +62,8 @@ class InventoryController extends Controller
                 'si.reorder_point',
                 'si.safety_stock',
                 DB::raw('(si.on_hand - si.reserved) as available'),
-            ])
-            ->orderBy('p.name')
-            ->get();
+            ])->get();
+        }
 
         return response()->json(['data' => $rows]);
     }
@@ -120,14 +141,27 @@ class InventoryController extends Controller
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
 
+        // ── Auto-resolve warehouse_id da store_id se necessario ──────────
+        if (!$request->filled('warehouse_id') && $request->filled('store_id')) {
+            $wh = DB::table('warehouses')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', (int) $request->integer('store_id'))
+                ->orderBy('id')
+                ->value('id');
+            if ($wh) {
+                $request->merge(['warehouse_id' => $wh]);
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────
+
         $validator = Validator::make($request->all(), [
-            'warehouse_id' => ['required', 'integer'],
+            'warehouse_id'       => ['required', 'integer'],
             'product_variant_id' => ['required', 'integer'],
-            'qty' => ['required', 'integer', 'not_in:0'],
-            'movement_type' => ['required', 'string', 'max:40'],
-            'unit_cost' => ['nullable', 'numeric', 'min:0'],
-            'reference_type' => ['nullable', 'string', 'max:100'],
-            'reference_id' => ['nullable', 'integer'],
+            'qty'                => ['required', 'integer', 'not_in:0'],
+            'movement_type'      => ['required', 'string', 'max:40'],
+            'unit_cost'          => ['nullable', 'numeric', 'min:0'],
+            'reference_type'     => ['nullable', 'string', 'max:100'],
+            'reference_id'       => ['nullable', 'integer'],
         ]);
 
         if ($validator->fails()) {

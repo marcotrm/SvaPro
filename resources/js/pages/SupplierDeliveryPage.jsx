@@ -51,34 +51,70 @@ export default function SupplierDeliveryPage() {
     Promise.all([
       suppliersApi.getAll(),
       stores.getStores(),
-      inventory.getStock({ limit: 500 }),
-    ]).then(([supRes, storeRes, stockRes]) => {
+    ]).then(([supRes, storeRes]) => {
       setSuppliersList(supRes.data?.data || []);
       setStoresList(storeRes.data?.data || []);
-      setStockItems(stockRes.data?.data || []);
-      // Default warehouse to first store
       if (!warehouseId && (storeRes.data?.data || []).length > 0) {
         setWarehouseId(storeRes.data.data[0].id);
       }
     }).catch(err => setError('Errore caricamento dati: ' + err.message));
+
+    // Stock separato — se fallisce il DDT è comunque usabile
+    inventory.getStock({ limit: 500 })
+      .then(stockRes => setStockItems(stockRes.data?.data || []))
+      .catch(() => {});
   }, []);
 
   const addLine = () => setLines([...lines, { product_variant_id: '', product_name: '', qty: 1, unit_cost: 0 }]);
 
   const removeLine = (i) => setLines(lines.filter((_, idx) => idx !== i));
 
+  // Helper: cerca uno stock item per barcode (su prodotto), SKU prodotto, o ID variante numerico
+  const findStockItem = (val) => {
+    const v = String(val).trim().toLowerCase();
+    if (!v) return null;
+    return stockItems.find(s =>
+      String(s.product_variant_id) === v ||
+      (s.barcode      && s.barcode.trim().toLowerCase()      === v) ||
+      (s.product_sku  && s.product_sku.trim().toLowerCase()  === v)
+    ) || null;
+  };
+
   const updateLine = (i, field, val) => {
     const next = [...lines];
     next[i] = { ...next[i], [field]: val };
-    // Auto-fill product name from stock
     if (field === 'product_variant_id') {
-      const found = stockItems.find(s => String(s.product_variant_id) === String(val) || String(s.variant_id) === String(val));
+      const found = findStockItem(val);
       if (found) {
-        next[i].product_name = found.product_name || found.name || '';
-        next[i].unit_cost = found.cost_price || found.sale_price || 0;
+        next[i].product_name       = found.product_name || '';
+        next[i].unit_cost          = found.cost_price   || found.sale_price || 0;
+        next[i].product_variant_id = found.product_variant_id;
       }
     }
     setLines(next);
+  };
+
+  // Scan rapido barcode: aggiunge una nuova riga dalla scansione
+  const [barcodeScan, setBarcodeScan] = useState('');
+  const handleBarcodeScan = (e) => {
+    if (e.key !== 'Enter') return;
+    const val = barcodeScan.trim();
+    if (!val) return;
+    const found = findStockItem(val);
+    if (found) {
+      const variantId = found.product_variant_id;
+      const emptyIdx  = lines.findIndex(l => !l.product_variant_id && !l.product_name);
+      const newLine   = { product_variant_id: variantId, product_name: found.product_name || '', unit_cost: found.cost_price || found.sale_price || 0, qty: 1 };
+      if (emptyIdx >= 0) {
+        const next = [...lines]; next[emptyIdx] = newLine; setLines(next);
+      } else {
+        setLines([...lines, newLine]);
+      }
+    } else {
+      setError(`Barcode/SKU "${val}" non trovato. Verifica che il prodotto abbia un barcode nel catalogo.`);
+      setTimeout(() => setError(''), 4000);
+    }
+    setBarcodeScan('');
   };
 
   const totalValue = lines.reduce((s, l) => s + (parseFloat(l.qty) || 0) * (parseFloat(l.unit_cost) || 0), 0);
@@ -96,19 +132,23 @@ export default function SupplierDeliveryPage() {
       // Update stock for each line
       const errors = [];
       for (const line of validLines) {
-        if (!line.product_variant_id) continue;
+        if (!line.product_variant_id) {
+          errors.push(`Prodotto "${line.product_name}": nessun ID variante — aggiungilo dal catalogo`);
+          continue;
+        }
         // Conto visione: non modifica stock
         if (ddtType === 'conto_visione') continue;
         try {
           await inventory.adjustStock({
             product_variant_id: parseInt(line.product_variant_id),
-            store_id: parseInt(warehouseId),
-            qty_change: activeDdtType.qtySign * parseInt(line.qty),
-            reason: `DDT ${ddtType} ${ddtNumber}`,
-            notes: `${activeDdtType.label}: ${suppliersList.find(s => String(s.id) === String(supplierId))?.name || supplierId}`,
+            store_id:           parseInt(warehouseId),
+            qty:                activeDdtType.qtySign * parseInt(line.qty),
+            movement_type:      ddtType === 'scarico_vendita' ? 'out' : 'in',
+            unit_cost:          parseFloat(line.unit_cost) || 0,
+            reference_type:     'ddt',
           });
         } catch (e) {
-          errors.push(`Prodotto #${line.product_variant_id}: ${e.response?.data?.message || e.message}`);
+          errors.push(`Prodotto "${line.product_name}": ${e.response?.data?.message || e.message}`);
         }
       }
 
@@ -303,18 +343,38 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
             <strong>Fornitore:</strong> {supplier?.name} &nbsp;·&nbsp; <strong>Destinazione:</strong> {warehouse?.name} &nbsp;·&nbsp; <strong>DDT:</strong> {ddtNumber}
           </div>
 
+          {/* Scan rapido barcode */}
+          <div style={{ marginBottom: 18, padding: '12px 16px', background: 'rgba(6,95,70,0.06)', borderRadius: 12, border: '1px solid rgba(6,95,70,0.15)', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 20 }}>📷</span>
+            <div style={{ flex: 1 }}>
+              <label className="field-label" style={{ marginBottom: 4 }}>Scan Barcode Rapido</label>
+              <input
+                className="field-input"
+                value={barcodeScan}
+                onChange={e => setBarcodeScan(e.target.value)}
+                onKeyDown={handleBarcodeScan}
+                placeholder="Scansiona o digita barcode/SKU + Invio per aggiungere riga"
+                style={{ fontFamily: 'monospace', letterSpacing: 1 }}
+                autoFocus
+              />
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'right', lineHeight: 1.4 }}>
+              {stockItems.length} prodotti<br/>in catalogo
+            </div>
+          </div>
+
+
           {lines.map((line, i) => (
             <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 10, marginBottom: 10, alignItems: 'center' }}>
-              {/* Product search */}
               <div>
-                {i === 0 && <label className="field-label">Prodotto (ID Variante o nome)</label>}
+                {i === 0 && <label className="field-label">Prodotto (ID Variante / Barcode / SKU)</label>}
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input className="field-input" value={line.product_variant_id}
                     onChange={e => updateLine(i, 'product_variant_id', e.target.value)}
-                    placeholder="ID variante (numero)" style={{ width: 100, flexShrink: 0 }} />
+                    placeholder="ID / barcode / SKU" style={{ width: 130, flexShrink: 0, fontFamily: 'monospace' }} />
                   <input className="field-input" value={line.product_name}
                     onChange={e => updateLine(i, 'product_name', e.target.value)}
-                    placeholder="Nome prodotto / descrizione" style={{ flex: 1 }} />
+                    placeholder="Nome prodotto (auto da barcode)" style={{ flex: 1 }} />
                 </div>
               </div>
               <div>

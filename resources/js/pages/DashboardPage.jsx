@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { orders as ordersApi, inventory, customers, reports, stores as storesApi } from '../api.jsx';
+import { orders as ordersApi, inventory, customers, reports, stores as storesApi, employees as employeesApi } from '../api.jsx';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, LineChart, Line, Cell, PieChart, Pie
@@ -15,16 +15,58 @@ const STORE_COLORS = ['#6C63AC','#22C55E','#F59E0B','#EF4444','#3B82F6','#EC4899
 
 /* ─── Period tabs ───────────────────────────────────────────── */
 const PERIODS = [
-  { id: 'today',     label: 'Oggi',      chartPeriod: 'daily',   days: 1 },
-  { id: 'yesterday', label: 'Ieri',      chartPeriod: 'daily',   days: 2 },
-  { id: 'week',      label: 'Settimana', chartPeriod: 'daily',   days: 7 },
-  { id: 'month',     label: 'Mese',      chartPeriod: 'weekly',  days: 30 },
-  { id: 'year',      label: 'Anno',      chartPeriod: 'monthly', days: 365 },
+  { id: 'today',     label: 'Oggi',      chartPeriod: 'daily' },
+  { id: 'yesterday', label: 'Ieri',      chartPeriod: 'daily' },
+  { id: 'week',      label: 'Settimana', chartPeriod: 'daily' },
+  { id: 'month',     label: 'Mese',      chartPeriod: 'weekly' },
+  { id: 'year',      label: 'Anno',      chartPeriod: 'monthly' },
 ];
 
+// Calcola date_from e date_to per ogni periodo
+const getPeriodDates = (periodId) => {
+  const today = new Date();
+  const fmt = d => d.toISOString().slice(0, 10);
+  const todayStr = fmt(today);
+
+  if (periodId === 'today') {
+    return { date_from: todayStr, date_to: todayStr, days: 1 };
+  }
+  if (periodId === 'yesterday') {
+    const y = new Date(today); y.setDate(y.getDate() - 1);
+    const yStr = fmt(y);
+    return { date_from: yStr, date_to: yStr, days: 2 };
+  }
+  if (periodId === 'week') {
+    const from = new Date(today); from.setDate(from.getDate() - 6);
+    return { date_from: fmt(from), date_to: todayStr, days: 7 };
+  }
+  if (periodId === 'month') {
+    const from = new Date(today); from.setDate(from.getDate() - 29);
+    return { date_from: fmt(from), date_to: todayStr, days: 30 };
+  }
+  // year
+  const from = new Date(today); from.setDate(from.getDate() - 364);
+  return { date_from: fmt(from), date_to: todayStr, days: 365 };
+};
+
 /* ─── piccoli helpers UI ────────────────────────────────────── */
-const Avatar = ({ name = '', size = 36, color = '#9B8FD4' }) => {
+const Avatar = ({ name = '', size = 36, color = '#9B8FD4', photoUrl = null }) => {
   const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+  if (photoUrl) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: '50%', flexShrink: 0,
+        overflow: 'hidden', background: color,
+      }}>
+        <img
+          src={photoUrl}
+          alt={name}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          onError={e => { e.currentTarget.style.display = 'none'; }}
+        />
+      </div>
+    );
+  }
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', background: color,
@@ -149,20 +191,17 @@ export default function DashboardPage() {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
       const period = PERIODS.find(p => p.id === activePeriod) || PERIODS[4];
-
-      // Calcola date_from per il filtro ordini
-      const dateFrom = new Date();
-      dateFrom.setDate(dateFrom.getDate() - period.days);
-      const dateFromStr = dateFrom.toISOString().slice(0, 10);
+      const { date_from, date_to, days } = getPeriodDates(activePeriod);
 
       // Fetch each independently so one failure doesn't break everything
-      const [resSummary, resTrend, resOrders, resStock, resCust, resStores] = await Promise.allSettled([
-        reports.summary(sp),
-        reports.revenueTrend({ ...sp, period: period.chartPeriod, days: period.days }),
-        ordersApi.getOrders({ ...sp, limit: 200, status: 'paid', date_from: dateFromStr }),
+      const [resSummary, resTrend, resOrders, resStock, resCust, resStores, resEmployees] = await Promise.allSettled([
+        reports.summary({ ...sp, date_from, date_to, days }),
+        reports.revenueTrend({ ...sp, period: period.chartPeriod, days, date_from, date_to }),
+        ordersApi.getOrders({ ...sp, limit: 200, status: 'paid', date_from, date_to }),
         inventory.getStock({ ...sp, limit: 1000 }),
         customers.getCustomers({ limit: 1 }),
         storesApi.getStores(),
+        employeesApi.getEmployees({ limit: 200 }),
       ]);
 
       // ── KPI Summary ───────────────────────────────────────────
@@ -215,16 +254,30 @@ export default function DashboardPage() {
       }
 
       // ── Recent Orders & Employee Activity ─────────────────────
+      // Costruisce mappa nome dipendente → photo_url dai dati reali dipendenti
+      const empPhotoMap = {};
+      if (resEmployees?.status === 'fulfilled') {
+        (resEmployees.value?.data?.data || []).forEach(emp => {
+          const fullName = `${emp.first_name} ${emp.last_name}`.trim();
+          if (fullName && emp.photo_url) empPhotoMap[fullName] = emp.photo_url;
+        });
+      }
+
       if (resOrders.status === 'fulfilled') {
         const ordersList = resOrders.value?.data?.data || [];
         setRecentOrders(ordersList);
 
-        // Employee activity — usa employee_name dal backend
+        // Employee activity — abbina la foto tramite nome dipendente
         const empMap = {};
         ordersList.forEach(o => {
-          const name = o.employee_name; // ora restituito dal backend
+          const name = o.employee_name;
           if (!name) return;
-          if (!empMap[name]) empMap[name] = { name, sales: 0, revenue: 0 };
+          if (!empMap[name]) empMap[name] = {
+            name,
+            sales: 0,
+            revenue: 0,
+            photoUrl: empPhotoMap[name] || o.employee_photo_url || null,
+          };
           empMap[name].sales++;
           empMap[name].revenue += parseFloat(o.total || o.grand_total || 0);
         });
@@ -280,7 +333,25 @@ export default function DashboardPage() {
     } finally { setLoading(false); }
   }, [selectedStoreId, activePeriod]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Si aggiorna quando main fetchData cambia
+  React.useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Auto-refresh ogni 60 secondi — la dashboard rimane sempre aggiornata in tempo reale
+  React.useEffect(() => {
+    const interval = setInterval(() => { fetchData(); }, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // Aggiornamento immediato quando arriva una vendita dal POS o una modifica dipendente
+  React.useEffect(() => {
+    const refresh = () => fetchData();
+    window.addEventListener('orderPlaced', refresh);
+    window.addEventListener('employeeUpdated', refresh);
+    return () => {
+      window.removeEventListener('orderPlaced', refresh);
+      window.removeEventListener('employeeUpdated', refresh);
+    };
+  }, [fetchData]);
 
   const fmt  = v  => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
   const fmtN = v  => new Intl.NumberFormat('it-IT').format(v || 0);
@@ -452,7 +523,7 @@ export default function DashboardPage() {
               {employeeActivity.map((emp, i) => (
                 <div key={emp.name} style={{ display:'flex', alignItems:'center', gap:12 }}>
                   <div style={{ position:'relative' }}>
-                    <Avatar name={emp.name} size={34} color={avatarColors[i % avatarColors.length]} />
+                    <Avatar name={emp.name} size={34} color={avatarColors[i % avatarColors.length]} photoUrl={emp.photoUrl} />
                     {i === 0 && (
                       <Trophy size={12} color="#F59E0B"
                         style={{ position:'absolute', bottom:-2, right:-2, background:'#fff', borderRadius:'50%', padding:1 }} />
@@ -592,7 +663,14 @@ export default function DashboardPage() {
             <Trend value={kpi?.orders_trend} />
           </div>
           <div style={{ fontSize:12, color:'#9CA3AF', marginBottom:12 }}>
-            {stockStats.low > 0 ? `${stockStats.low} prodotti sotto soglia` : 'Stock regolare'}
+            {stockStats.low > 0 ? (
+              <span
+                onClick={() => navigate('/inventory?filter=low')}
+                style={{ color:'#D97706', fontWeight:700, cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }}
+              >
+                ⚠ {stockStats.low} prodotti sotto soglia →
+              </span>
+            ) : 'Stock regolare'}
           </div>
           <MiniLine data={ordersSparkline.length ? ordersSparkline : [{v:0}]} color="#C4A772" />
         </div>

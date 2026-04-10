@@ -4,6 +4,7 @@ import { employees } from '../api.jsx';
 import { EmployeesSkeleton } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import EmployeeModal from '../components/EmployeeModal.jsx';
+import toast from 'react-hot-toast';
 
 export default function EmployeesPage() {
   const { selectedStoreId, selectedStore, storesList } = useOutletContext();
@@ -24,7 +25,6 @@ export default function EmployeesPage() {
         employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 }),
         employees.getTopPerformers(selectedStoreId ? { store_id: selectedStoreId } : {}),
       ]);
-
       setEmployeesList(employeesResponse.data.data || []);
       setAnalytics(analyticsResponse.data || null);
     } catch (err) {
@@ -32,16 +32,71 @@ export default function EmployeesPage() {
     } finally { setLoading(false); }
   };
 
+  // Refresh silenzioso (senza skeleton) dopo salvataggio
+  const refreshEmployees = async () => {
+    try {
+      const [employeesResponse, analyticsResponse] = await Promise.all([
+        employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 }),
+        employees.getTopPerformers(selectedStoreId ? { store_id: selectedStoreId } : {}),
+      ]);
+      setEmployeesList(employeesResponse.data.data || []);
+      setAnalytics(analyticsResponse.data || null);
+    } catch (err) {
+      console.error('Refresh silent error:', err);
+    }
+  };
+
   const handleOpenModal = (employee = null) => { setSelectedEmployee(employee); setShowModal(true); };
   const handleCloseModal = () => { setShowModal(false); setSelectedEmployee(null); };
-  const handleSaveEmployee = async () => { await fetchEmployees(); handleCloseModal(); };
+
+  const handleSaveEmployee = async (isNew = false, updatedData = null) => {
+    handleCloseModal();
+    toast.success(isNew ? 'Dipendente creato! 🎉' : 'Dipendente aggiornato! ✅');
+
+    // Aggiornamento ottimistico istantaneo: mostra subito la nuova foto
+    if (!isNew && updatedData?.id) {
+      setEmployeesList(prev => prev.map(e =>
+        e.id === updatedData.id
+          ? { ...e, photo_url: updatedData.photo_url ?? e.photo_url,
+                    first_name: updatedData.first_name ?? e.first_name,
+                    last_name: updatedData.last_name ?? e.last_name }
+          : e
+      ));
+    }
+
+    window.dispatchEvent(new CustomEvent('employeeUpdated'));
+
+    // Refresh in background — preserva la foto ottimistica se il server è ancora in sync
+    try {
+      const [empRes, anaRes] = await Promise.all([
+        employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 }),
+        employees.getTopPerformers(selectedStoreId ? { store_id: selectedStoreId } : {}),
+      ]);
+      const freshList = empRes.data.data || [];
+      setEmployeesList(freshList.map(e => {
+        // Se il server non ha ancora la nuova foto, teniamo quella ottimistica
+        if (!isNew && updatedData?.id && e.id === updatedData.id && !e.photo_url && updatedData.photo_url) {
+          return { ...e, photo_url: updatedData.photo_url };
+        }
+        return e;
+      }));
+      setAnalytics(anaRes.data || null);
+    } catch (err) {
+      console.error('Refresh silent error:', err);
+    }
+  };
 
   const handleDelete = async (employee) => {
     if (!window.confirm(`Eliminare il dipendente ${employee.first_name} ${employee.last_name}?\nQuesta azione non può essere annullata.`)) return;
+    // Rimuovi immediatamente dalla lista (ottimistic)
+    setEmployeesList(prev => prev.filter(e => e.id !== employee.id));
     try {
       await employees.deleteEmployee(employee.id);
-      await fetchEmployees();
+      // Refresh silenzioso in background per confermare
+      fetchEmployees().catch(() => {});
     } catch (err) {
+      // Rollback: ripristina il dipendente se l'eliminazione fallisce
+      setEmployeesList(prev => [...prev, employee].sort((a, b) => a.id - b.id));
       setError(err.response?.data?.message || 'Errore durante l\'eliminazione');
     }
   };
@@ -135,7 +190,7 @@ export default function EmployeesPage() {
               <tr key={employee.id}>
                 <td>
                   <div className="avatar-cell">
-                    <div className="avatar-sm" style={{ overflow: 'hidden', padding: 0 }}>
+                    <div className="avatar-sm" style={{ width: 36, height: 36, minWidth: 36, borderRadius: '50%', overflow: 'hidden', padding: 0, flexShrink: 0 }}>
                       {employee.photo_url ? (
                         <img src={employee.photo_url} alt={`${employee.first_name} ${employee.last_name}`}
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />

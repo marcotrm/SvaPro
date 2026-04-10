@@ -175,6 +175,10 @@ class OrderController extends Controller
                 $join->on('st.id', '=', 'so.store_id')
                     ->where('st.tenant_id', '=', $tenantId);
             })
+            ->leftJoin('employees as emp', function ($join) use ($tenantId) {
+                $join->on('emp.id', '=', 'so.employee_id')
+                    ->where('emp.tenant_id', '=', $tenantId);
+            })
             ->leftJoin('loyalty_ledger as ll', function ($join) {
                 $join->on('ll.order_id', '=', 'so.id')
                     ->where('ll.event_type', '=', 'earn');
@@ -184,6 +188,8 @@ class OrderController extends Controller
             ->groupBy([
                 'so.id',
                 'so.store_id',
+                'so.employee_id',
+                'so.sold_by_employee_id',
                 'so.customer_id',
                 'so.status',
                 'so.grand_total',
@@ -194,10 +200,14 @@ class OrderController extends Controller
                 'c.last_name',
                 'st.id',
                 'st.name',
+                'emp.first_name',
+                'emp.last_name',
             ])
             ->select([
                 'so.id',
                 'so.store_id',
+                'so.employee_id',
+                'so.sold_by_employee_id',
                 'so.customer_id',
                 'so.status',
                 'so.grand_total',
@@ -208,6 +218,9 @@ class OrderController extends Controller
                 'c.last_name as customer_last_name',
                 'st.id as warehouse_id',
                 'st.name as warehouse_name',
+                'st.name as store_name',
+                'emp.first_name as employee_first_name',
+                'emp.last_name as employee_last_name',
                 DB::raw('COALESCE(SUM(ll.points_delta), 0) as loyalty_points_awarded'),
             ])
             ->first();
@@ -308,30 +321,47 @@ class OrderController extends Controller
         $tenantId = (int) $request->attributes->get('tenant_id');
 
         $validator = Validator::make($request->all(), [
-            'channel' => ['required', 'in:web,pos'],
-            'store_id' => ['nullable', 'integer'],
-            'customer_id' => ['nullable', 'integer'],
-            'employee_id' => [$request->input('channel') === 'pos' ? 'required' : 'nullable', 'integer'],
-            'sold_by_employee_id' => ['nullable', 'integer'],
-            'warehouse_id' => ['required', 'integer'],
-            'payment_method' => ['nullable', 'string', 'max:50'],
-            'payments' => ['nullable', 'array'],
-            'payments.*.method' => ['required', 'string', 'max:50'],
-            'payments.*.amount' => ['required', 'numeric', 'min:0'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'status' => ['nullable', 'in:draft,paid'],
-            'lines' => ['required', 'array', 'min:1'],
-            'lines.*.product_variant_id' => ['required', 'integer'],
-            'lines.*.qty' => ['required', 'integer', 'min:1'],
-            'lines.*.unit_price' => ['nullable', 'numeric', 'min:0'],
-            'lines.*.discount' => ['nullable', 'numeric', 'min:0'],
-            'order_discount_amount' => ['nullable', 'numeric', 'min:0'],
-            'is_employee_purchase' => ['nullable', 'boolean'],
-            'points_to_redeem' => ['nullable', 'integer', 'min:0'],
+            'channel'                    => ['required', 'in:web,pos'],
+            'store_id'                   => ['nullable', 'integer'],
+            'customer_id'                => ['nullable', 'integer'],
+            'employee_id'                => ['nullable', 'integer'],
+            'sold_by_employee_id'        => ['nullable', 'integer'],
+            'warehouse_id'               => ['nullable', 'integer'],
+            'payment_method'             => ['nullable', 'string', 'max:50'],
+            'payments'                   => ['nullable', 'array'],
+            'payments.*.method'          => ['required', 'string', 'max:50'],
+            'payments.*.amount'          => ['required', 'numeric', 'min:0'],
+            'notes'                      => ['nullable', 'string', 'max:2000'],
+            'status'                     => ['nullable', 'in:draft,paid'],
+            'lines'                      => ['required', 'array', 'min:1'],
+            'lines.*.product_variant_id' => ['nullable', 'integer'],
+            'lines.*.qty'                => ['required', 'integer', 'min:1'],
+            'lines.*.unit_price'         => ['nullable', 'numeric', 'min:0'],
+            'lines.*.discount'           => ['nullable', 'numeric', 'min:0'],
+            'lines.*.is_service'         => ['nullable', 'boolean'],
+            'lines.*.service_name'       => ['nullable', 'string', 'max:200'],
+            'order_discount_amount'      => ['nullable', 'numeric', 'min:0'],
+            'is_employee_purchase'       => ['nullable', 'boolean'],
+            'points_to_redeem'           => ['nullable', 'integer', 'min:0'],
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        // Auto-resolve warehouse_id se non fornito: prende il primo warehouse dello store
+        if (! $request->filled('warehouse_id') || (int) $request->integer('warehouse_id') <= 0) {
+            $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
+            $autoWarehouse = DB::table('warehouses')
+                ->where('tenant_id', $tenantId)
+                ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+                ->orderBy('id')
+                ->value('id');
+            if ($autoWarehouse) {
+                $request->merge(['warehouse_id' => $autoWarehouse]);
+            } else {
+                return response()->json(['message' => 'Nessun magazzino disponibile per questo negozio.'], 422);
+            }
         }
 
         if (! $this->isValidOrderContext($tenantId, $request)) {
@@ -937,6 +967,10 @@ class OrderController extends Controller
     {
         $warehouseId = (int) $request->integer('warehouse_id');
 
+        if ($warehouseId <= 0) {
+            return false;
+        }
+
         $warehouse = DB::table('warehouses')
             ->where('id', $warehouseId)
             ->where('tenant_id', $tenantId)
@@ -955,7 +989,13 @@ class OrderController extends Controller
                 ->where('tenant_id', $tenantId)
                 ->exists();
 
-            if (! $storeExists || ((int) ($warehouse->store_id ?? 0) !== 0 && (int) $warehouse->store_id !== $storeId)) {
+            if (! $storeExists) {
+                return false;
+            }
+
+            // Se il warehouse appartiene a uno store specifico, deve coincidere
+            // Se warehouse.store_id è null (magazzino centrale), accettiamo qualsiasi store
+            if ($warehouse->store_id !== null && (int) $warehouse->store_id !== $storeId) {
                 return false;
             }
         }
@@ -967,8 +1007,10 @@ class OrderController extends Controller
             return false;
         }
 
-        if ($request->filled('employee_id') && ! DB::table('employees')
-            ->where('id', (int) $request->integer('employee_id'))
+        // employee_id=0 o mancante: accettato (admin senza record employee)
+        $empId = (int) $request->integer('employee_id');
+        if ($empId > 0 && ! DB::table('employees')
+            ->where('id', $empId)
             ->where('tenant_id', $tenantId)
             ->exists()) {
             return false;

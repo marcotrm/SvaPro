@@ -1,0 +1,303 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+class DeliveryNoteController extends Controller
+{
+    /** GET /delivery-notes — lista bolle per il tenant (admin) o per il negozio (dipendente) */
+    public function index(Request $request)
+    {
+        try {
+            $tenantId = $request->user()->tenant_id;
+            $storeId  = $request->query('store_id');
+            $status   = $request->query('status');
+
+            $query = DB::table('delivery_notes as dn')
+                ->where('dn.tenant_id', $tenantId)
+                ->leftJoin('users as creator', 'creator.id', '=', 'dn.created_by')
+                ->leftJoin('users as receiver', 'receiver.id', '=', 'dn.received_by')
+                ->leftJoin('stores as st', 'st.id', '=', 'dn.store_id')
+                ->select(
+                    'dn.*',
+                    'creator.name as created_by_name',
+                    'receiver.name as received_by_name',
+                    'st.name as store_name'
+                )
+                ->orderByDesc('dn.created_at');
+
+            if ($storeId) $query->where('dn.store_id', $storeId);
+            if ($status)  $query->where('dn.status', $status);
+
+            $notes = $query->get();
+
+            // Aggiungi conteggio articoli
+            foreach ($notes as $note) {
+                $note->items_count = DB::table('delivery_note_items')
+                    ->where('delivery_note_id', $note->id)->count();
+            }
+
+            return response()->json(['data' => $notes]);
+        } catch (\Throwable $e) {
+            // Tabelle non ancora create — restituisce lista vuota senza crash
+            \Log::warning('delivery_notes table not ready: ' . $e->getMessage());
+            return response()->json(['data' => [], 'warning' => 'Sistema in aggiornamento, riprovare tra poco.']);
+        }
+    }
+
+    /** GET /delivery-notes/:id — dettaglio con articoli */
+    public function show(Request $request, $id)
+    {
+        try {
+            $tenantId = $request->user()->tenant_id;
+            $note = DB::table('delivery_notes')->where('id', $id)->where('tenant_id', $tenantId)->first();
+            if (!$note) return response()->json(['message' => 'Bolla non trovata.'], 404);
+
+            $note->items = DB::table('delivery_note_items')
+                ->where('delivery_note_id', $id)
+                ->get();
+
+            return response()->json(['data' => $note]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Funzionalità in aggiornamento sul server. Riprovare tra qualche minuto.'], 503);
+        }
+    }
+
+    /** POST /delivery-notes — crea nuova bolla (admin) */
+    public function store(Request $request)
+    {
+        try {
+        $data = $request->validate([
+            'store_id'    => 'required|integer',
+            'type'        => 'in:carico,scarico,trasferimento',
+            'notes'       => 'nullable|string',
+            'expected_at' => 'nullable|date',
+            'items'       => 'required|array|min:1',
+            'items.*.product_variant_id' => 'nullable|integer',
+            'items.*.product_name'       => 'required|string',
+            'items.*.barcode'            => 'nullable|string',
+            'items.*.sku'                => 'nullable|string',
+            'items.*.expected_qty'       => 'required|integer|min:1',
+            'items.*.unit_cost'          => 'nullable|numeric',
+        ]);
+
+        $tenantId = $request->user()->tenant_id;
+        $noteNumber = 'BDC-' . strtoupper(Str::random(6));
+
+        $noteId = DB::table('delivery_notes')->insertGetId([
+            'tenant_id'   => $tenantId,
+            'store_id'    => $data['store_id'],
+            'created_by'  => $request->user()->id,
+            'note_number' => $noteNumber,
+            'type'        => $data['type'] ?? 'carico',
+            'status'      => 'pending',
+            'notes'       => $data['notes'] ?? null,
+            'expected_at' => $data['expected_at'] ?? null,
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ]);
+
+        foreach ($data['items'] as $item) {
+            DB::table('delivery_note_items')->insert([
+                'delivery_note_id'   => $noteId,
+                'product_variant_id' => $item['product_variant_id'] ?? null,
+                'product_name'       => $item['product_name'],
+                'barcode'            => $item['barcode'] ?? null,
+                'sku'                => $item['sku'] ?? null,
+                'expected_qty'       => $item['expected_qty'],
+                'received_qty'       => null,
+                'unit_cost'          => $item['unit_cost'] ?? 0,
+                'created_at'         => now(),
+                'updated_at'         => now(),
+            ]);
+        }
+
+        $note = DB::table('delivery_notes')->where('id', $noteId)->first();
+        $note->items = DB::table('delivery_note_items')->where('delivery_note_id', $noteId)->get();
+
+        return response()->json(['data' => $note], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Funzionalità in aggiornamento sul server. Riprovare tra qualche minuto.'], 503);
+        }
+    }
+
+    /** POST /delivery-notes/:id/receive — dipendente registra ricezione */
+    public function receive(Request $request, $id)
+    {
+        $tenantId = $request->user()->tenant_id;
+        $note = DB::table('delivery_notes')->where('id', $id)->where('tenant_id', $tenantId)->first();
+        if (!$note) return response()->json(['message' => 'Bolla non trovata.'], 404);
+        if ($note->status === 'received') return response()->json(['message' => 'Bolla già ricevuta.'], 409);
+
+        $items = $request->validate([
+            'items'                => 'required|array',
+            'items.*.id'           => 'required|integer',
+            'items.*.received_qty' => 'required|integer|min:0',
+        ])['items'];
+
+        $hasDiscrepancy = false;
+        $discrepancies  = [];
+
+        foreach ($items as $item) {
+            $noteItem = DB::table('delivery_note_items')
+                ->where('id', $item['id'])
+                ->where('delivery_note_id', $id)
+                ->first();
+            if (!$noteItem) continue;
+
+            DB::table('delivery_note_items')
+                ->where('id', $item['id'])
+                ->update(['received_qty' => $item['received_qty'], 'updated_at' => now()]);
+
+            $diff = $item['received_qty'] - $noteItem->expected_qty;
+            if ($diff !== 0) {
+                $hasDiscrepancy = true;
+                $discrepancies[] = [
+                    'tenant_id'          => $tenantId,
+                    'store_id'           => $note->store_id,
+                    'delivery_note_id'   => $id,
+                    'product_variant_id' => $noteItem->product_variant_id,
+                    'product_name'       => $noteItem->product_name,
+                    'expected_qty'       => $noteItem->expected_qty,
+                    'received_qty'       => $item['received_qty'],
+                    'difference'         => $diff,
+                    'status'             => 'open',
+                    'created_at'         => now(),
+                    'updated_at'         => now(),
+                ];
+            }
+        }
+
+        if (!empty($discrepancies)) {
+            DB::table('inventory_discrepancies')->insert($discrepancies);
+        }
+
+        // ── Aggiorna stock_items per ogni articolo ricevuto ──────────────────
+        $warehouse = DB::table('warehouses')
+            ->where('store_id', $note->store_id)
+            ->where('tenant_id', $tenantId)
+            ->orderBy('id')
+            ->first();
+
+        if ($warehouse) {
+            foreach ($items as $item) {
+                $noteItem = DB::table('delivery_note_items')
+                    ->where('id', $item['id'])
+                    ->where('delivery_note_id', $id)
+                    ->first();
+
+                if (!$noteItem || !$noteItem->product_variant_id || $item['received_qty'] <= 0) continue;
+
+                // Upsert stock_items — crea o aggiorna on_hand
+                $existing = DB::table('stock_items')
+                    ->where('tenant_id', $tenantId)
+                    ->where('warehouse_id', $warehouse->id)
+                    ->where('product_variant_id', $noteItem->product_variant_id)
+                    ->first();
+
+                if ($existing) {
+                    DB::table('stock_items')
+                        ->where('id', $existing->id)
+                        ->update([
+                            'on_hand'    => $existing->on_hand + $item['received_qty'],
+                            'updated_at' => now(),
+                        ]);
+                } else {
+                    DB::table('stock_items')->insert([
+                        'tenant_id'          => $tenantId,
+                        'warehouse_id'       => $warehouse->id,
+                        'product_variant_id' => $noteItem->product_variant_id,
+                        'on_hand'            => $item['received_qty'],
+                        'reserved'           => 0,
+                        'reorder_point'      => 0,
+                        'safety_stock'       => 0,
+                        'created_at'         => now(),
+                        'updated_at'         => now(),
+                    ]);
+                }
+
+                // Traccia il movimento
+                try {
+                    DB::table('stock_movements')->insert([
+                        'tenant_id'          => $tenantId,
+                        'warehouse_id'       => $warehouse->id,
+                        'product_variant_id' => $noteItem->product_variant_id,
+                        'movement_type'      => 'in',
+                        'qty'                => $item['received_qty'],
+                        'unit_cost'          => $noteItem->unit_cost ?? 0,
+                        'reference_type'     => 'delivery_note',
+                        'reference_id'       => $id,
+                        'employee_id'        => $request->user()->id,
+                        'occurred_at'        => now(),
+                        'created_at'         => now(),
+                        'updated_at'         => now(),
+                    ]);
+                } catch (\Throwable) { /* stock_movements potrebbe non essere ancora migrata */ }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
+        DB::table('delivery_notes')->where('id', $id)->update([
+            'status'      => $hasDiscrepancy ? 'discrepancy' : 'received',
+            'received_by' => $request->user()->id,
+            'received_at' => now(),
+            'updated_at'  => now(),
+        ]);
+
+        return response()->json([
+            'data' => [
+                'status'       => $hasDiscrepancy ? 'discrepancy' : 'received',
+                'discrepancies' => count($discrepancies),
+            ]
+        ]);
+    }
+
+    /** GET /delivery-notes/discrepancies — elenco discrepanze aperte (admin) */
+    public function discrepancies(Request $request)
+    {
+        $tenantId = $request->user()->tenant_id;
+        $storeId  = $request->query('store_id');
+
+        $query = DB::table('inventory_discrepancies as d')
+            ->where('d.tenant_id', $tenantId)
+            ->leftJoin('stores as st', 'st.id', '=', 'd.store_id')
+            ->leftJoin('delivery_notes as dn', 'dn.id', '=', 'd.delivery_note_id')
+            ->select('d.*', 'st.name as store_name', 'dn.note_number')
+            ->orderByDesc('d.created_at');
+
+        if ($storeId) $query->where('d.store_id', $storeId);
+
+        $items = $query->get();
+        $openCount = DB::table('inventory_discrepancies')
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'open')
+            ->count();
+
+        return response()->json(['data' => $items, 'open_count' => $openCount]);
+    }
+
+    /** POST /delivery-notes/discrepancies/:id/resolve — admin chiude discrepanza */
+    public function resolveDiscrepancy(Request $request, $id)
+    {
+        $tenantId = $request->user()->tenant_id;
+        $data = $request->validate(['status' => 'required|in:resolved,accepted', 'notes' => 'nullable|string']);
+
+        DB::table('inventory_discrepancies')
+            ->where('id', $id)->where('tenant_id', $tenantId)
+            ->update([
+                'status'      => $data['status'],
+                'notes'       => $data['notes'] ?? null,
+                'resolved_by' => $request->user()->id,
+                'resolved_at' => now(),
+                'updated_at'  => now(),
+            ]);
+
+        return response()->json(['message' => 'Discrepanza aggiornata.']);
+    }
+}

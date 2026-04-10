@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { orders as ordersApi, catalog, customers as customersApi, inventory, getImageUrl, clearApiCache } from '../api.jsx';
+import { orders as ordersApi, catalog, customers as customersApi, inventory, stores, getImageUrl, clearApiCache } from '../api.jsx';
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, X, User,
   MapPin, Zap, Package, ChevronRight, ReceiptText, Loader2,
@@ -196,7 +196,7 @@ function CartItem({ line, onUpdateQty, onRemove }) {
 
 /* ─── PosPage ───────────────────────────────────── */
 export default function PosPage() {
-  const { selectedStoreId, displayMode } = useOutletContext();
+  const { selectedStoreId, displayMode, user } = useOutletContext();
   const [loading, setLoading]           = useState(true);
 
   const [products, setProducts]         = useState([]);
@@ -227,24 +227,32 @@ export default function PosPage() {
   const [showCustomerDrop, setShowCustomerDrop] = useState(false);
   const [showProductInfo, setShowProductInfo]   = useState(null);
 
+  // QScare assicurazione dispositivi
+  const [qscareEnabled, setQscareEnabled] = useState(false);
+  const [qscarePrice, setQscarePrice]     = useState(null); // null = non configurato
+
   /* Load data */
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
 
-      // Carica prodotti + categorie + stock — sempre disponibili per dipendente
-      const [pRes, cRes, stRes] = await Promise.all([
+      // Carica prodotti + categorie — sempre disponibili per dipendente
+      const [pRes, cRes] = await Promise.all([
         catalog.getProducts({ ...sp, limit: 500 }),
         catalog.getCategories(),
-        inventory.getStock({ ...sp, limit: 2000 }),
       ]);
       setProducts(pRes.data?.data || []);
       const allCats = cRes.data?.data || [];
       setCategories(allCats.filter(c => !c.parent_id));
-      const sm = {};
-      (stRes.data?.data || []).forEach(si => { sm[si.product_variant_id] = si; });
-      setStockMap(sm);
+
+      // Carica stock separatamente — se fallisce il POS funziona comunque
+      try {
+        const stRes = await inventory.getStock({ ...sp, limit: 2000 });
+        const sm = {};
+        (stRes.data?.data || []).forEach(si => { sm[si.product_variant_id] = si; });
+        setStockMap(sm);
+      } catch { /* stock non disponibile, POS funziona senza giacenze */ }
 
       // Carica clienti — solo admin, dipendente può ricevere 403
       try {
@@ -269,6 +277,25 @@ export default function PosPage() {
   }, [selectedStoreId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Auto-precompila operatore se l'utente loggato è un dipendente
+  useEffect(() => {
+    if (!user) return;
+    const empId = user.employee_id || (user.role === 'dipendente' ? user.id : null);
+    if (empId && !soldByEmployeeId) {
+      setSoldByEmployeeId(String(empId));
+      const name = `${user.first_name || user.name || ''}`.trim() || `Operatore #${empId}`;
+      setOperatorName(name);
+    }
+  }, [user]);
+
+  // Carica prezzo QScare dalle impostazioni tenant
+  useEffect(() => {
+    stores.getTenantSettings().then(res => {
+      const sj = res.data?.data?.settings_json;
+      if (sj?.qscare_price) setQscarePrice(parseFloat(sj.qscare_price));
+    }).catch(() => {});
+  }, []);
 
   /* Cart logic */
   const addToCart = useCallback((product) => {
@@ -310,6 +337,26 @@ export default function PosPage() {
   const cartTotal = useMemo(() => cartLines.reduce((s, l) => s + l.price * l.qty, 0), [cartLines]);
   const cartCount = useMemo(() => cartLines.reduce((s, l) => s + l.qty, 0), [cartLines]);
 
+  // Controlla se il carrello contiene dispositivi (categoria il cui nome contiene 'dispositiv' oppure product_type 'device')
+  const cartHasDevice = useMemo(() => {
+    return cartLines.some(line => {
+      const product = products.find(p => p.variants?.some(v => v.id === line.product_variant_id));
+      if (!product) return false;
+      const cat = categories.find(c => c.id === product.category_id);
+      return (
+        cat?.name?.toLowerCase().includes('dispositiv') ||
+        cat?.name?.toLowerCase().includes('device') ||
+        cat?.name?.toLowerCase().includes('mod') ||
+        product.product_type === 'device'
+      );
+    });
+  }, [cartLines, products, categories]);
+
+  // QScare: reset ad ogni nuova vendita (già fatto in handleCheckout)
+
+  const effectiveQscarePrice = qscarePrice ?? 0;
+  const cartTotalWithQscare = cartTotal + (qscareEnabled ? effectiveQscarePrice : 0);
+
   /* Checkout */
   const handleCheckout = async (payload) => {
     if (!cartLines.length) return toast.error('Carrello vuoto');
@@ -318,24 +365,30 @@ export default function PosPage() {
     const resolvedEmpId = soldByEmployeeId;
     try {
       setPlacingOrder(true);
+      const empId = Number(resolvedEmpId) > 0 ? Number(resolvedEmpId) : null;
       await ordersApi.place({
         channel: 'pos',
-        store_id: selectedStoreId,
-        warehouse_id: Number(warehouseId),
-        employee_id: Number(resolvedEmpId),          // richiesto dal backend POS
-        sold_by_employee_id: Number(resolvedEmpId),  // per commissioni/stats
-        customer_id: selectedCustomer?.id,
-        lines: cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
+        store_id: selectedStoreId || null,
+        warehouse_id: Number(warehouseId) || null,
+        employee_id: empId,
+        sold_by_employee_id: empId,
+        customer_id: selectedCustomer?.id ?? null,
+        lines: [
+          ...cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
+          ...(qscareEnabled ? [{ product_variant_id: null, qty: 1, is_service: true, service_name: 'QScare Assicurazione Dispositivo', unit_price: effectiveQscarePrice }] : []),
+        ],
         notes: note + (payload.receipt_type ? ` [${payload.receipt_type}]` : ''),
         status: 'paid',
         payments: payload.payments,
         order_discount_amount: payload.order_discount_amount,
       });
       toast.success('✅ Vendita completata!');
-      setCartLines([]); setSelectedCustomer(null); setNote(''); setShowCheckoutModal(false);
+      setCartLines([]); setSelectedCustomer(null); setNote(''); setShowCheckoutModal(false); setQscareEnabled(false);
       // Reset operatore dopo ogni vendita (deve riscannerizzare)
       setSoldByEmployeeId(''); setOperatorBarcode(''); setOperatorName(''); setOperatorError('');
       setTimeout(() => operatorBarcodeRef.current?.focus(), 100);
+      // Notifica dashboard e altri componenti che è avvenuta una vendita
+      window.dispatchEvent(new CustomEvent('orderPlaced'));
       clearApiCache(); fetchData();
     } catch (err) {
       const msg = err.response?.data?.errors
@@ -664,22 +717,42 @@ export default function PosPage() {
                   ref={operatorBarcodeRef}
                   value={operatorBarcode}
                   onChange={e => setOperatorBarcode(e.target.value)}
-                  onKeyDown={e => {
+                  onKeyDown={async e => {
                     if (e.key === 'Enter' && operatorBarcode.trim()) {
                       const val = operatorBarcode.trim();
-                      // Match by: barcode field, employee_code, or numeric ID
-                      const found = employees.find(em =>
-                        (em.barcode && em.barcode === val) ||
-                        (em.employee_code && em.employee_code === val) ||
+                      const valLow = val.toLowerCase();
+                      // Cerca barcode per: barcode, employee_code, ID
+                      let found = employees.find(em =>
+                        (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
+                        (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
                         String(em.id) === val
                       );
+                      // Fallback: cerca via API con parametro barcode specifico
+                      if (!found) {
+                        try {
+                          const { employees: empApi } = await import('../api.jsx');
+                          // Prova prima con barcode esatto
+                          const res = await empApi.getEmployees({ search: val, limit: 10 });
+                          const list = res.data?.data || [];
+                          found = list.find(em =>
+                            (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
+                            (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
+                            String(em.id) === val
+                          );
+                          // Se ancora non trovato, se è numerico considera come ID diretto
+                          if (!found && /^\d+$/.test(val)) {
+                            found = list.find(em => String(em.id) === val) ||
+                                    employees.find(em => String(em.id) === val);
+                          }
+                        } catch {}
+                      }
                       if (found) {
                         setSoldByEmployeeId(String(found.id));
-                        setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || found.name || `Operatore #${found.id}`);
+                        setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || `Operatore #${found.id}`);
                         setOperatorError('');
                         setOperatorBarcode('');
                       } else {
-                        setOperatorError(`Codice "${val}" non trovato — prova con l'ID numerico o seleziona sotto`);
+                        setOperatorError(`Codice "${val}" non riconosciuto`);
                         setOperatorBarcode('');
                       }
                     }
@@ -693,33 +766,7 @@ export default function PosPage() {
                     outline: 'none', fontFamily: 'monospace', letterSpacing: '0.1em', boxSizing: 'border-box',
                   }}
                 />
-                {operatorError && <div style={{ fontSize: 11, color: '#fc8181', marginTop: 4 }}>⚠ {operatorError}</div>}
-                {/* Dropdown fallback: selezione manuale per nome */}
-                <select
-                  value=""
-                  onChange={e => {
-                    const found = employees.find(em => String(em.id) === e.target.value);
-                    if (found) {
-                      setSoldByEmployeeId(String(found.id));
-                      setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || `Operatore #${found.id}`);
-                      setOperatorError(''); setOperatorBarcode('');
-                    }
-                  }}
-                  style={{
-                    width: '100%', marginTop: 6,
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 8, padding: '7px 10px', fontSize: 11, color: 'rgba(255,255,255,0.5)',
-                    cursor: 'pointer', outline: 'none',
-                  }}
-                >
-                  <option value="">— oppure seleziona operatore per nome —</option>
-                  {employees.map(em => (
-                    <option key={em.id} value={em.id}>
-                      {`${em.first_name || ''} ${em.last_name || ''}`.trim() || `Operatore #${em.id}`}
-                      {em.employee_code ? ` [${em.employee_code}]` : ''}
-                    </option>
-                  ))}
-                </select>
+                {operatorError && <div style={{ fontSize: 11, color: '#fc8181', marginTop: 6 }}>⚠ {operatorError}</div>}
               </div>
             )}
           </div>
@@ -808,6 +855,58 @@ export default function PosPage() {
           )}
         </div>
 
+        {/* ─── QScare toggle (sempre visibile con prodotti nel carrello) ─── */}
+        {cartLines.length > 0 && (
+          <div style={{ padding: '0 22px 12px' }}>
+            {qscarePrice === null ? (
+              // Prezzo non configurato: mostra banner informativo
+              <div style={{
+                background: 'rgba(234,179,8,0.08)', border: '1.5px solid rgba(234,179,8,0.2)',
+                borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <span style={{ fontSize: 18 }}>🛡</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(234,179,8,0.9)' }}>QScare — Assicurazione Dispositivo</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+                    Configura il prezzo in <strong style={{ color: 'rgba(234,179,8,0.7)' }}>Impostazioni → QScare</strong> per attivare
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Prezzo configurato: toggle funzionante
+              <button
+                onClick={() => setQscareEnabled(e => !e)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                  background: qscareEnabled ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
+                  border: `1.5px solid ${qscareEnabled ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  borderRadius: 12, padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <span style={{ fontSize: 20 }}>🛡</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: qscareEnabled ? '#86efac' : '#fff' }}>QScare — Assicurazione Dispositivo</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>Copertura guasti e danni accidentali</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                  <span style={{ fontSize: 13, fontWeight: 900, color: qscareEnabled ? '#86efac' : 'rgba(255,255,255,0.6)' }}>+{fmt(effectiveQscarePrice)}</span>
+                  <div style={{
+                    width: 36, height: 20, borderRadius: 10, background: qscareEnabled ? '#22c55e' : 'rgba(255,255,255,0.15)',
+                    position: 'relative', transition: 'background 0.2s',
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: 2, left: qscareEnabled ? 18 : 2,
+                      width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                      transition: 'left 0.2s',
+                    }} />
+                  </div>
+                </div>
+              </button>
+            )}
+          </div>
+        )}
+
 
         {/* Cart Footer — Total + CTA */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '16px 22px 24px' }}>
@@ -824,10 +923,20 @@ export default function PosPage() {
           )}
 
           {/* Totale */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: qscareEnabled ? 4 : 16 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Subtotale</span>
+            <span style={{ fontSize: 20, fontWeight: 900, color: 'rgba(255,255,255,0.7)' }}>{fmt(cartTotal)}</span>
+          </div>
+          {qscareEnabled && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#86efac' }}>🛡 QScare</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#86efac' }}>+{fmt(effectiveQscarePrice)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: qscareEnabled ? 8 : 0, borderTop: qscareEnabled ? '1px solid rgba(255,255,255,0.1)' : 'none' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Totale</span>
             <span style={{ fontSize: 28, fontWeight: 900, color: '#fff', letterSpacing: -1 }}>
-              {fmt(cartTotal)}
+              {fmt(cartTotalWithQscare)}
             </span>
           </div>
 
@@ -868,7 +977,7 @@ export default function PosPage() {
       {/* ─── Checkout Modal ─── */}
       {showCheckoutModal && (
         <PosCheckoutModal
-          cartTotal={cartTotal}
+          cartTotal={cartTotalWithQscare}
           onComplete={handleCheckout}
           onCancel={() => setShowCheckoutModal(false)}
         />
@@ -958,15 +1067,25 @@ function PosResoModal({ storeId, onClose, onDone }) {
 
   const searchOrder = async () => {
     if (!orderId.trim()) return;
+    // Rimuove '#', spazi e zeri iniziali — accetta sia "42" che "#000042" che "  42 "
+    const cleanId = orderId.trim().replace(/^#0*/, '').replace(/\D/g, '') || orderId.trim().replace(/^#/, '').trim();
+    if (!cleanId) return;
     try {
       setLoading(true); setError(''); setOrder(null);
       const { orders: ordersApi2 } = await import('../api.jsx');
-      const res = await ordersApi2.getOrder(orderId.trim());
+      const res = await ordersApi2.getOrder(cleanId);
       const o = res.data?.data || res.data;
       if (!o) { setError('Ordine non trovato.'); return; }
       setOrder(o);
       setLines((o.lines || []).map(l => ({ ...l, qty_return: l.qty || 1 })));
-    } catch { setError('Ordine non trovato. Verifica il numero ID ordine.'); }
+    } catch (err) {
+      const status = err.response?.status;
+      if (status === 404) {
+        setError(`Ordine #${cleanId} non trovato. Controlla il numero e riprova.`);
+      } else {
+        setError(err.response?.data?.message || 'Errore di connessione. Riprova.');
+      }
+    }
     finally { setLoading(false); }
   };
 
@@ -1014,7 +1133,7 @@ function PosResoModal({ storeId, onClose, onDone }) {
                 value={orderId}
                 onChange={e => setOrderId(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && searchOrder()}
-                placeholder="Es. 42 o #000042"
+                placeholder="Inserisci il numero ordine (es. 42)"
                 autoFocus
                 style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none' }}
               />

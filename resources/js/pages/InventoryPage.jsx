@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useLocation } from 'react-router-dom';
 import { inventory, stores as storesApi } from '../api.jsx';
 import InventoryMovementModal from '../components/InventoryMovementModal.jsx';
 import { Search, Plus, AlertTriangle, MapPin, Filter, Store, ChevronDown, ChevronRight } from 'lucide-react';
@@ -11,6 +11,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterLowStock, setFilterLowStock] = useState(false);
+  const [filterOutStock, setFilterOutStock] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showMovementModal, setShowMovementModal] = useState(false);
   const [activeTab, setActiveTab] = useState('stock');
@@ -18,6 +19,14 @@ export default function InventoryPage() {
   const [storesList, setStoresList] = useState([]);
   const [expandedStores, setExpandedStores] = useState({});
   const [byStoreSearch, setByStoreSearch] = useState('');
+
+  const location = useLocation();
+
+  // Attiva filtro stock basso se arrivi dalla Dashboard con ?filter=low
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('filter') === 'low') setFilterLowStock(true);
+  }, [location.search]);
 
   useEffect(() => { fetchData(); }, [selectedStoreId]);
 
@@ -60,7 +69,8 @@ export default function InventoryPage() {
   const outCount = stock.filter(i => i.on_hand <= 0).length;
 
   const filtered = stock.filter(i => {
-    if (filterLowStock && i.on_hand >= (i.reorder_point || 5)) return false;
+    if (filterOutStock && i.on_hand > 0) return false;
+    if (filterLowStock && (i.on_hand <= 0 || i.on_hand >= (i.reorder_point || 5))) return false;
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       return i.product_name?.toLowerCase().includes(s) || i.sku?.toLowerCase().includes(s);
@@ -186,13 +196,15 @@ export default function InventoryPage() {
           <div className="sp-stat-label">Totale Referenze</div>
           <div className="sp-stat-value">{stock.length}</div>
         </div>
-        <div className="sp-stat-card">
+        <div className="sp-stat-card" style={{ cursor:'pointer' }} onClick={() => setFilterLowStock(v => !v)}>
           <div className="sp-stat-label">Stock Basso</div>
           <div className="sp-stat-value" style={{ color: lowCount > 0 ? 'var(--color-warning)' : 'inherit' }}>{lowCount}</div>
+          {filterLowStock && <div style={{ fontSize:10, color:'var(--color-warning)', marginTop:2 }}>● filtro attivo</div>}
         </div>
-        <div className="sp-stat-card">
+        <div className="sp-stat-card" style={{ cursor: 'pointer' }} onClick={() => { setFilterOutStock(v => !v); setFilterLowStock(false); }}>
           <div className="sp-stat-label">Esaurito</div>
           <div className="sp-stat-value" style={{ color: outCount > 0 ? 'var(--color-error)' : 'inherit' }}>{outCount}</div>
+          {filterOutStock && <div style={{ fontSize:10, color:'var(--color-error)', marginTop:2 }}>● filtro attivo</div>}
         </div>
         <div className="sp-stat-card">
           <div className="sp-stat-label">Movimenti Recenti</div>

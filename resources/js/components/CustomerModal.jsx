@@ -411,6 +411,9 @@ export default function CustomerModal({ customer, onClose, onSave }) {
               <Field label="Codice SDI" error={fe('sdi_code')}>
                 <input className={S.input} name="sdi_code" value={formData.sdi_code} onChange={handleChange} placeholder="Es: ABCDEFG" maxLength={7} />
               </Field>
+              <Field label="Codice Licenza" error={fe('license_code')}>
+                <input className={S.input} name="license_code" value={formData.license_code || ''} onChange={handleChange} placeholder="Es: LIC-2026-001" style={{ fontFamily: 'monospace', letterSpacing: 1 }} />
+              </Field>
               <Field label="PEC" error={fe('pec_email')}>
                 <input className={S.input} type="email" name="pec_email" value={formData.pec_email} onChange={handleChange} placeholder="pec@pec-azienda.it" />
               </Field>
@@ -473,6 +476,21 @@ export default function CustomerModal({ customer, onClose, onSave }) {
                 </span>
               </label>
             </div>
+
+            {/* ─── Codice tessera fidelity ─── */}
+            <Field label="Codice Tessera Fidelity" error={fe('code')} full>
+              <input
+                className={S.input}
+                name="code"
+                value={formData.code}
+                onChange={handleChange}
+                placeholder="Es: FID-0001 (lascia vuoto per assegnazione automatica)"
+                style={{ fontFamily: 'monospace', letterSpacing: 1 }}
+              />
+              <p style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+                Codice univoco per la tessera fedeltà del cliente
+              </p>
+            </Field>
           </div>
         </form>
 

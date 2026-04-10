@@ -28,13 +28,19 @@ export default function CustomersPage() {
   const fetchCustomers = async () => {
     try {
       setLoading(true); setError('');
-      const [customersResponse, analyticsResponse] = await Promise.all([
-        customers.getCustomers(selectedStoreId ? { store_id: selectedStoreId, limit: 100 } : { limit: 100 }),
-        customers.getReturnAnalytics(selectedStoreId ? { store_id: selectedStoreId } : {}),
-      ]);
-
+      const customersResponse = await customers.getCustomers(
+        selectedStoreId ? { store_id: selectedStoreId, limit: 100 } : { limit: 100 }
+      );
       setCustomersList(customersResponse.data.data || []);
-      setAnalytics(analyticsResponse.data || null);
+
+      // Analytics solo per admin — il dipendente riceve 403, ignoriamo silenziosamente
+      try {
+        const analyticsResponse = await customers.getReturnAnalytics(
+          selectedStoreId ? { store_id: selectedStoreId } : {}
+        );
+        setAnalytics(analyticsResponse.data || null);
+      } catch { setAnalytics(null); }
+
     } catch (err) {
       setError(err.message || 'Errore nel caricamento dei clienti');
     } finally { setLoading(false); }

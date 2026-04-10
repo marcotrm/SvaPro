@@ -20,7 +20,6 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [photoPreview, setPhotoPreview] = useState(employee?.photo_url || null);
-  const [photoFile, setPhotoFile] = useState(null);
   const photoInputRef = useRef(null);
 
   useEffect(() => {
@@ -44,17 +43,38 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
     if (fieldErrors[name]) setFieldErrors(prev => ({ ...prev, [name]: null }));
   };
 
-  const handlePhotoChange = (e) => {
+  // Ridimensiona a max 200x200px, qualità JPEG 0.82 — funziona con qualsiasi dimensione
+  const compressImage = (file) => new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 200;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Errore caricamento immagine')); };
+    img.src = url;
+  });
+
+  const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Foto troppo grande. Max 2MB.');
-      return;
+    // Nessun limite di dimensione: comprimiamo sempre automaticamente
+    try {
+      const compressed = await compressImage(file);
+      setPhotoPreview(compressed);
+      setFormData(prev => ({ ...prev, photo_url: compressed }));
+    } catch {
+      setError('Impossibile leggere la foto. Prova un altro file.');
     }
-    setPhotoFile(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setPhotoPreview(ev.target.result);
-    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e) => {
@@ -64,31 +84,16 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       setError('');
       setFieldErrors({});
 
-      // Salva i dati anagrafici (senza photo_url se useremo upload separato)
-      const payload = { ...formData };
-      delete payload.photo_url; // la foto viene caricata separatamente
+      const isNew = !employee?.id;
+      const payload = { ...formData }; // photo_url base64 incluso
 
-      let savedId = employee?.id;
       if (employee?.id) {
         await employees.updateEmployee(employee.id, payload);
+        onSave(isNew, { ...payload, id: employee.id });
       } else {
-        const res = await employees.createEmployee(payload);
-        savedId = res.data?.employee_id;
+        await employees.createEmployee(payload);
+        onSave(isNew, null);
       }
-
-      // Upload foto se selezionata
-      if (photoFile && savedId) {
-        try {
-          const fd = new FormData();
-          fd.append('photo', photoFile);
-          await employees.uploadPhoto(savedId, fd);
-        } catch {
-          // Upload foto non bloccante
-          setError('Dipendente salvato, ma caricamento foto fallito. Riprova.');
-        }
-      }
-
-      onSave();
     } catch (err) {
       const serverErrors = err.response?.data?.errors;
       if (serverErrors) {

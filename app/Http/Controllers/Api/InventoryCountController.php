@@ -146,18 +146,26 @@ class InventoryCountController extends Controller
         $barcodeScanned = $request->input('barcode');
 
         if (! $variantId && $barcodeScanned) {
+            // Cerca per: barcode variante, barcode prodotto, SKU prodotto, ID variante numerico
+            $isNumeric = ctype_digit((string) $barcodeScanned);
+
             $variant = DB::table('product_variants as pv')
                 ->join('products as p', 'p.id', '=', 'pv.product_id')
                 ->where('p.tenant_id', $tenantId)
-                ->where(function ($q) use ($barcodeScanned) {
+                ->where(function ($q) use ($barcodeScanned, $isNumeric) {
                     $q->where('pv.barcode', $barcodeScanned)
-                      ->orWhere('p.barcode', $barcodeScanned);
+                      ->orWhere('p.barcode', $barcodeScanned)
+                      ->orWhere('p.sku', $barcodeScanned)
+                      ->orWhere('pv.sku', $barcodeScanned);
+                    if ($isNumeric) {
+                        $q->orWhere('pv.id', (int) $barcodeScanned);
+                    }
                 })
                 ->select('pv.id')
                 ->first();
 
             if (! $variant) {
-                return response()->json(['message' => 'Barcode non trovato nel catalogo.'], 422);
+                return response()->json(['message' => 'Prodotto non trovato. Verifica barcode, SKU o ID nel catalogo.'], 422);
             }
 
             $variantId = $variant->id;

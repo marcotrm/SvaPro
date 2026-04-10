@@ -28,6 +28,8 @@ use App\Http\Controllers\Api\HealthScanController;
 use App\Http\Controllers\Api\LoyaltyCardController;
 use App\Http\Controllers\Api\WooCommerceWebhookController;
 use App\Http\Controllers\Api\StockTransferController;
+use App\Http\Controllers\Api\DeliveryNoteController;
+use App\Http\Controllers\Api\ChatController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/loyalty-card/{uuid}', [LoyaltyCardController::class, 'show']);
@@ -64,10 +66,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/catalog/products/import', [CatalogController::class, 'import'])->middleware('permission:catalog.manage');
         Route::post('/catalog/products', [CatalogController::class, 'store'])->middleware('permission:catalog.manage');
         Route::put('/catalog/products/{productId}', [CatalogController::class, 'update'])->middleware('permission:catalog.manage');
+        Route::post('/catalog/categories', [CatalogController::class, 'storeCategory'])->middleware('permission:catalog.manage');
+        Route::put('/catalog/categories/{categoryId}', [CatalogController::class, 'updateCategory'])->middleware('permission:catalog.manage');
+        Route::delete('/catalog/categories/{categoryId}', [CatalogController::class, 'destroyCategory'])->middleware('permission:catalog.manage');
 
-        Route::get('/customers', [CustomerController::class, 'index']);
-        Route::get('/customers/analytics/return-frequency', [CustomerController::class, 'returnFrequencyAnalytics']);
-        Route::get('/customers/{customerId}', [CustomerController::class, 'show']);
         Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.manage');
         Route::put('/customers/{customerId}', [CustomerController::class, 'update'])->middleware('permission:customers.manage');
         Route::post('/customers/{customerId}/otp/send', [CustomerController::class, 'sendOtp']);
@@ -78,6 +80,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/customers/{customerId}/visura/download', [CustomerController::class, 'downloadVisura'])->middleware('permission:customers.manage');
         Route::post('/customers/{customerId}/send-whatsapp', [CustomerController::class, 'sendWhatsapp']);
         Route::post('/customers/{customerId}/send-email', [CustomerController::class, 'sendEmail']);
+        Route::get('/customers/analytics/return-frequency', [CustomerController::class, 'returnFrequencyAnalytics']);
 
         Route::get('/employees', [EmployeeController::class, 'index']);
         Route::get('/employees/analytics/top-performers', [EmployeeController::class, 'topPerformers']);
@@ -201,6 +204,18 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/stock-transfers/{id}/receive', [StockTransferController::class, 'receive']);
         Route::post('/stock-transfers/{id}/cancel', [StockTransferController::class, 'cancel']);
         Route::delete('/stock-transfers/{id}', [StockTransferController::class, 'destroy']);
+
+        // Delivery Notes (Bolle di Carico) — admin crea, gestisce discrepanze
+        Route::get('/delivery-notes', [DeliveryNoteController::class, 'index']);
+        Route::post('/delivery-notes', [DeliveryNoteController::class, 'store']);
+        Route::get('/delivery-notes/discrepancies', [DeliveryNoteController::class, 'discrepancies']);
+        Route::post('/delivery-notes/discrepancies/{id}/resolve', [DeliveryNoteController::class, 'resolveDiscrepancy']);
+        Route::get('/delivery-notes/{id}', [DeliveryNoteController::class, 'show']);
+
+        // Chat — admin (area manager) vede tutti i messaggi
+        Route::get('/chat/messages', [ChatController::class, 'index']);
+        Route::post('/chat/messages', [ChatController::class, 'store']);
+        Route::post('/chat/messages/read', [ChatController::class, 'markRead']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente')->group(function () {
@@ -235,6 +250,23 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/attendance/employees-for-kiosk', [AttendanceController::class, 'employeesForKiosk']);
         Route::post('/attendance/checkin', [AttendanceController::class, 'checkIn']);
         Route::post('/attendance/checkout', [AttendanceController::class, 'checkOut']);
+
+        // Clienti: GET accessibili a tutti i ruoli (incluso dipendente)
+        // POST/PUT senza permission check perché il dipendente deve poter creare clienti al POS
+        Route::get('/customers', [CustomerController::class, 'index']);
+        Route::get('/customers/{customerId}', [CustomerController::class, 'show']);
+        Route::post('/customers', [CustomerController::class, 'store']);
+        Route::put('/customers/{customerId}', [CustomerController::class, 'update']);
+
+        // Delivery Notes — dipendente vede le bolle assegnate al suo negozio e registra la ricezione
+        Route::get('/delivery-notes', [DeliveryNoteController::class, 'index']);
+        Route::get('/delivery-notes/{id}', [DeliveryNoteController::class, 'show']);
+        Route::post('/delivery-notes/{id}/receive', [DeliveryNoteController::class, 'receive']);
+
+        // Chat — dipendente può chattare con area manager
+        Route::get('/chat/messages', [ChatController::class, 'index']);
+        Route::post('/chat/messages', [ChatController::class, 'store']);
+        Route::post('/chat/messages/read', [ChatController::class, 'markRead']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente,cliente_finale')->group(function () {
