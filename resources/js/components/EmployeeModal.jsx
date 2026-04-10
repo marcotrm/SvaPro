@@ -43,20 +43,40 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
     if (fieldErrors[name]) setFieldErrors(prev => ({ ...prev, [name]: null }));
   };
 
-  const handlePhotoChange = (e) => {
+  // Ridimensiona e comprime l'immagine a max 200x200px, qualità 0.80
+  const compressImage = (file) => new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 200;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.80));
+    };
+    img.src = url;
+  });
+
+  const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Foto troppo grande. Max 2MB.');
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Foto troppo grande. Max 5MB.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = ev.target.result;
-      setPhotoPreview(base64);
-      setFormData(prev => ({ ...prev, photo_url: base64 }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file);
+      setPhotoPreview(compressed);
+      setFormData(prev => ({ ...prev, photo_url: compressed }));
+    } catch {
+      setError('Errore nella lettura della foto.');
+    }
   };
 
   const handleSubmit = async (e) => {

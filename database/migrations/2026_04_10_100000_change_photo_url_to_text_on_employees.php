@@ -1,22 +1,30 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('employees', function (Blueprint $table) {
-            $table->text('photo_url')->nullable()->change();
-        });
+        $conn = config('database.default');
+
+        if ($conn === 'pgsql') {
+            DB::statement('ALTER TABLE employees ALTER COLUMN photo_url TYPE TEXT');
+        } elseif ($conn === 'mysql') {
+            DB::statement('ALTER TABLE employees MODIFY COLUMN photo_url LONGTEXT NULL');
+        }
+        // SQLite: VARCHAR e TEXT sono identici, nessuna azione necessaria
     }
 
     public function down(): void
     {
-        Schema::table('employees', function (Blueprint $table) {
-            $table->string('photo_url')->nullable()->change();
-        });
+        $conn = config('database.default');
+
+        if ($conn === 'pgsql') {
+            DB::statement('ALTER TABLE employees ALTER COLUMN photo_url TYPE VARCHAR(255)');
+        } elseif ($conn === 'mysql') {
+            DB::statement('ALTER TABLE employees MODIFY COLUMN photo_url VARCHAR(255) NULL');
+        }
     }
 };
