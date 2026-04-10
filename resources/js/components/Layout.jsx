@@ -41,6 +41,7 @@ const allNavigation = [
   { section: 'Dipendenti', items: [
     { label: 'Gestione Dipendenti', href: '/employees', icon: Users, roles: ['superadmin','admin_cliente'] },
     { label: '🕐 Timbrature', href: '/attendance', icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
+    { label: '⏱ Kiosk Timbratura', href: '/clock-in', icon: Fingerprint, roles: ['superadmin','admin_cliente','dipendente'] },
     { label: '🏆 Gamification', href: '/gamification', icon: Activity, roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
   { section: 'Amministrazione', items: [
