@@ -559,24 +559,7 @@ const SectionReport = () => {
 
 export default function AdminPanelPage() {
   const [active, setActive] = useState('dashboard');
-
-  // Flyout hover — stesso meccanismo del Layout principale
-  const [flyout, setFlyout] = useState(null); // { top }
-  const flyoutTimer = useRef(null);
-
-  const cancelTimer = useCallback(() => {
-    if (flyoutTimer.current) { clearTimeout(flyoutTimer.current); flyoutTimer.current = null; }
-  }, []);
-
-  const scheduleClose = useCallback(() => {
-    flyoutTimer.current = setTimeout(() => setFlyout(null), 150);
-  }, []);
-
-  const handleRailEnter = useCallback((e) => {
-    cancelTimer();
-    const rect = e.currentTarget.getBoundingClientRect();
-    setFlyout({ top: rect.top });
-  }, [cancelTimer]);
+  const [hoveredTab, setHoveredTab] = useState(null);
 
   const content = useMemo(() => {
     switch (active) {
@@ -595,115 +578,59 @@ export default function AdminPanelPage() {
   }, [active]);
 
   const current = SECTIONS.find(s => s.id === active);
-  const RAIL_W = 52;
 
   return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - 64px)', background: C.bg, margin: '-24px -32px -40px', overflow: 'hidden', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)', background: C.bg, margin: '-24px -32px -40px', overflow: 'hidden' }}>
 
-      {/* ── Icon Rail (sostituisce la sidebar) ── */}
-      <div
-        style={{
-          width: RAIL_W,
-          background: C.sidebar,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          flexShrink: 0,
-          padding: '12px 0',
-          gap: 4,
-          borderRight: '1px solid rgba(255,255,255,0.05)',
-        }}
-      >
-        {/* Label top */}
-        <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8, writingMode: 'vertical-rl', transform: 'rotate(180deg)', lineHeight: 1 }}>
-          AMM
-        </div>
-
+      {/* ── Tab Bar orizzontale ── */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        background: C.sidebar,
+        padding: '10px 16px',
+        overflowX: 'auto',
+        flexShrink: 0,
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
         {SECTIONS.map(({ id, label, icon: Icon }) => {
           const isAct = active === id;
+          const isHov = hoveredTab === id;
           return (
-            <div
+            <button
               key={id}
-              title={label}
-              onMouseEnter={handleRailEnter}
-              onMouseLeave={scheduleClose}
               onClick={() => setActive(id)}
+              onMouseEnter={() => setHoveredTab(id)}
+              onMouseLeave={() => setHoveredTab(null)}
               style={{
-                width: 38, height: 38,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '8px 14px',
                 borderRadius: 10,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: 'none',
                 cursor: 'pointer',
-                background: isAct ? C.accent : 'transparent',
-                color: isAct ? '#fff' : 'rgba(255,255,255,0.45)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                fontSize: 13,
+                fontWeight: isAct ? 700 : 500,
                 transition: 'all 0.15s',
-                position: 'relative',
+                background: isAct
+                  ? C.accent
+                  : isHov
+                    ? 'rgba(255,255,255,0.09)'
+                    : 'transparent',
+                color: isAct ? '#fff' : isHov ? '#fff' : 'rgba(255,255,255,0.5)',
+                boxShadow: isAct ? `0 0 0 1px ${C.accent}` : 'none',
+                transform: isHov && !isAct ? 'translateY(-1px)' : 'translateY(0)',
               }}
-              onMouseEnter={e => { handleRailEnter(e); if (!isAct) e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
-              onMouseLeave={e => { scheduleClose(); if (!isAct) e.currentTarget.style.background = 'transparent'; }}
             >
-              <Icon size={17} />
-              {isAct && (
-                <div style={{
-                  position: 'absolute', left: -1, top: '50%', transform: 'translateY(-50%)',
-                  width: 3, height: 18, borderRadius: '0 3px 3px 0',
-                  background: C.accent,
-                }} />
-              )}
-            </div>
+              <Icon size={14} style={{ opacity: isAct ? 1 : 0.7, flexShrink: 0 }} />
+              {label}
+            </button>
           );
         })}
       </div>
-
-      {/* ── Flyout sezioni ── */}
-      {flyout && (
-        <div
-          onMouseEnter={cancelTimer}
-          onMouseLeave={scheduleClose}
-          style={{
-            position: 'fixed',
-            left: RAIL_W,
-            top: Math.max(8, Math.min(flyout.top, window.innerHeight - (SECTIONS.length * 44 + 56))),
-            zIndex: 9999,
-            minWidth: 200,
-            background: '#1C1B2E',
-            borderRadius: '0 12px 12px 0',
-            boxShadow: '4px 8px 28px rgba(0,0,0,0.4)',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderLeft: 'none',
-            overflow: 'hidden',
-            animation: 'flyoutIn 0.15s ease',
-          }}
-        >
-          <div style={{ padding: '10px 16px 8px', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            Dashboard Amministrativa
-          </div>
-          {SECTIONS.map(({ id, label, icon: Icon }) => {
-            const isAct = active === id;
-            return (
-              <button
-                key={id}
-                onClick={() => { setActive(id); setFlyout(null); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  width: '100%', padding: '10px 16px',
-                  background: isAct ? 'rgba(99,102,241,0.18)' : 'transparent',
-                  border: 'none', cursor: 'pointer',
-                  color: isAct ? '#a5b4fc' : 'rgba(255,255,255,0.72)',
-                  fontSize: 13, fontWeight: isAct ? 700 : 500,
-                  textAlign: 'left',
-                  borderLeft: isAct ? '3px solid #6366f1' : '3px solid transparent',
-                  transition: 'background 0.1s',
-                }}
-                onMouseEnter={e => { if (!isAct) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-                onMouseLeave={e => { if (!isAct) e.currentTarget.style.background = 'transparent'; }}
-              >
-                <Icon size={15} style={{ opacity: isAct ? 1 : 0.55, flexShrink: 0 }} />
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      )}
 
       {/* ── Main Content ── */}
       <div style={{ flex: 1, overflow: 'auto', padding: 28 }}>
