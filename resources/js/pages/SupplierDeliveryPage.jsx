@@ -51,16 +51,18 @@ export default function SupplierDeliveryPage() {
     Promise.all([
       suppliersApi.getAll(),
       stores.getStores(),
-      inventory.getStock({ limit: 500 }),
-    ]).then(([supRes, storeRes, stockRes]) => {
+    ]).then(([supRes, storeRes]) => {
       setSuppliersList(supRes.data?.data || []);
       setStoresList(storeRes.data?.data || []);
-      setStockItems(stockRes.data?.data || []);
-      // Default warehouse to first store
       if (!warehouseId && (storeRes.data?.data || []).length > 0) {
         setWarehouseId(storeRes.data.data[0].id);
       }
     }).catch(err => setError('Errore caricamento dati: ' + err.message));
+
+    // Stock separato — se fallisce il DDT è comunque usabile
+    inventory.getStock({ limit: 500 })
+      .then(stockRes => setStockItems(stockRes.data?.data || []))
+      .catch(() => {});
   }, []);
 
   const addLine = () => setLines([...lines, { product_variant_id: '', product_name: '', qty: 1, unit_cost: 0 }]);
