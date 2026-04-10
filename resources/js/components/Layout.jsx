@@ -16,7 +16,6 @@ const allNavigation = [
   // ── Principale ───────────────────────────────────────────────────
   { section: 'Principale', items: [
     { label: 'POS Cassa',              href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente','dipendente'] },
-    { label: 'Panoramica Generale',    href: '/dashboard',    icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
     { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in',    icon: Fingerprint, roles: ['dipendente'] },
     { label: '📦 Carico Negozio',        href: '/store-loading', icon: Package,  roles: ['dipendente'] },
     { label: 'Clienti',                href: '/customers',    icon: Users,       roles: ['dipendente'] },
@@ -45,10 +44,6 @@ const allNavigation = [
     { label: 'Fatture Fornitori',      href: '/supplier-invoices', icon: FileText, roles: ['superadmin','admin_cliente'] },
   ]},
 
-  // 6. Clienti ──────────────────────────────────────────────────────
-  { section: 'Clienti', items: [
-    { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,       roles: ['superadmin','admin_cliente'] },
-  ]},
 
   // 7. Marketing ────────────────────────────────────────────────────
   { section: 'Marketing', items: [
@@ -63,10 +58,13 @@ const allNavigation = [
     { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
   ]},
 
-  // 9. Amministrazione ──────────────────────────────────────────────
+  // Amministrazione ──────────────────────────────────────────────
   { section: 'Amministrazione', items: [
-    { label: 'Negozi & Punti Vendita', href: '/stores',            icon: Store,         roles: ['superadmin','admin_cliente'] },
-    { label: 'Fatturazione',           href: '/invoices',          icon: FileText,      roles: ['superadmin','admin_cliente'] },
+    { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
+    { label: 'Panoramica Generale',    href: '/dashboard',    icon: Activity,    roles: ['superadmin','admin_cliente'] },
+    { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,       roles: ['superadmin','admin_cliente'] },
+    { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,       roles: ['superadmin','admin_cliente'] },
+    { label: 'Fatturazione',           href: '/invoices',     icon: FileText,    roles: ['superadmin','admin_cliente'] },
   ]},
 
   // 10. Impostazioni ────────────────────────────────────────────────
