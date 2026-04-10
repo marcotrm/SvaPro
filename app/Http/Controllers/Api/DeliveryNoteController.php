@@ -12,35 +12,41 @@ class DeliveryNoteController extends Controller
     /** GET /delivery-notes — lista bolle per il tenant (admin) o per il negozio (dipendente) */
     public function index(Request $request)
     {
-        $tenantId = $request->user()->tenant_id;
-        $storeId  = $request->query('store_id');
-        $status   = $request->query('status');
+        try {
+            $tenantId = $request->user()->tenant_id;
+            $storeId  = $request->query('store_id');
+            $status   = $request->query('status');
 
-        $query = DB::table('delivery_notes as dn')
-            ->where('dn.tenant_id', $tenantId)
-            ->leftJoin('users as creator', 'creator.id', '=', 'dn.created_by')
-            ->leftJoin('users as receiver', 'receiver.id', '=', 'dn.received_by')
-            ->leftJoin('stores as st', 'st.id', '=', 'dn.store_id')
-            ->select(
-                'dn.*',
-                'creator.name as created_by_name',
-                'receiver.name as received_by_name',
-                'st.name as store_name'
-            )
-            ->orderByDesc('dn.created_at');
+            $query = DB::table('delivery_notes as dn')
+                ->where('dn.tenant_id', $tenantId)
+                ->leftJoin('users as creator', 'creator.id', '=', 'dn.created_by')
+                ->leftJoin('users as receiver', 'receiver.id', '=', 'dn.received_by')
+                ->leftJoin('stores as st', 'st.id', '=', 'dn.store_id')
+                ->select(
+                    'dn.*',
+                    'creator.name as created_by_name',
+                    'receiver.name as received_by_name',
+                    'st.name as store_name'
+                )
+                ->orderByDesc('dn.created_at');
 
-        if ($storeId) $query->where('dn.store_id', $storeId);
-        if ($status)  $query->where('dn.status', $status);
+            if ($storeId) $query->where('dn.store_id', $storeId);
+            if ($status)  $query->where('dn.status', $status);
 
-        $notes = $query->get();
+            $notes = $query->get();
 
-        // Aggiungi conteggio articoli
-        foreach ($notes as $note) {
-            $note->items_count = DB::table('delivery_note_items')
-                ->where('delivery_note_id', $note->id)->count();
+            // Aggiungi conteggio articoli
+            foreach ($notes as $note) {
+                $note->items_count = DB::table('delivery_note_items')
+                    ->where('delivery_note_id', $note->id)->count();
+            }
+
+            return response()->json(['data' => $notes]);
+        } catch (\Throwable $e) {
+            // Tabelle non ancora create — restituisce lista vuota senza crash
+            \Log::warning('delivery_notes table not ready: ' . $e->getMessage());
+            return response()->json(['data' => [], 'warning' => 'Sistema in aggiornamento, riprovare tra poco.']);
         }
-
-        return response()->json(['data' => $notes]);
     }
 
     /** GET /delivery-notes/:id — dettaglio con articoli */
