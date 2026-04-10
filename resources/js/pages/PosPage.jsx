@@ -356,12 +356,13 @@ export default function PosPage() {
     const resolvedEmpId = soldByEmployeeId;
     try {
       setPlacingOrder(true);
+      const empId = Number(resolvedEmpId) > 0 ? Number(resolvedEmpId) : null;
       await ordersApi.place({
         channel: 'pos',
-        store_id: selectedStoreId,
-        warehouse_id: Number(warehouseId),
-        employee_id: Number(resolvedEmpId),          // richiesto dal backend POS
-        sold_by_employee_id: Number(resolvedEmpId),  // per commissioni/stats
+        store_id: selectedStoreId || null,
+        warehouse_id: Number(warehouseId) || null,
+        employee_id: empId,
+        sold_by_employee_id: empId,
         customer_id: selectedCustomer?.id ?? null,
         lines: [
           ...cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
