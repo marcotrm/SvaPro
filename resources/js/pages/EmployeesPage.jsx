@@ -51,20 +51,39 @@ export default function EmployeesPage() {
 
   const handleSaveEmployee = async (isNew = false, updatedData = null) => {
     handleCloseModal();
+    toast.success(isNew ? 'Dipendente creato! 🎉' : 'Dipendente aggiornato! ✅');
 
-    // Aggiornamento ottimistico: mostra subito la nuova foto senza aspettare il server
-    if (!isNew && updatedData?.id && updatedData?.photo_url !== undefined) {
+    // Aggiornamento ottimistico istantaneo: mostra subito la nuova foto
+    if (!isNew && updatedData?.id) {
       setEmployeesList(prev => prev.map(e =>
-        e.id === updatedData.id ? { ...e, photo_url: updatedData.photo_url, first_name: updatedData.first_name, last_name: updatedData.last_name } : e
+        e.id === updatedData.id
+          ? { ...e, photo_url: updatedData.photo_url ?? e.photo_url,
+                    first_name: updatedData.first_name ?? e.first_name,
+                    last_name: updatedData.last_name ?? e.last_name }
+          : e
       ));
     }
 
-    // Notifica la dashboard (e altri componenti in ascolto) che un dipendente è cambiato
     window.dispatchEvent(new CustomEvent('employeeUpdated'));
 
-    // Poi aggiorna dal server in background
-    await refreshEmployees();
-    toast.success(isNew ? 'Dipendente creato! 🎉' : 'Dipendente aggiornato! ✅');
+    // Refresh in background — preserva la foto ottimistica se il server è ancora in sync
+    try {
+      const [empRes, anaRes] = await Promise.all([
+        employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 }),
+        employees.getTopPerformers(selectedStoreId ? { store_id: selectedStoreId } : {}),
+      ]);
+      const freshList = empRes.data.data || [];
+      setEmployeesList(freshList.map(e => {
+        // Se il server non ha ancora la nuova foto, teniamo quella ottimistica
+        if (!isNew && updatedData?.id && e.id === updatedData.id && !e.photo_url && updatedData.photo_url) {
+          return { ...e, photo_url: updatedData.photo_url };
+        }
+        return e;
+      }));
+      setAnalytics(anaRes.data || null);
+    } catch (err) {
+      console.error('Refresh silent error:', err);
+    }
   };
 
   const handleDelete = async (employee) => {

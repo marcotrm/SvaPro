@@ -43,8 +43,8 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
     if (fieldErrors[name]) setFieldErrors(prev => ({ ...prev, [name]: null }));
   };
 
-  // Ridimensiona e comprime l'immagine a max 200x200px, qualità 0.80
-  const compressImage = (file) => new Promise((resolve) => {
+  // Ridimensiona a max 200x200px, qualità JPEG 0.82 — funziona con qualsiasi dimensione
+  const compressImage = (file) => new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
@@ -58,24 +58,22 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       canvas.width = width; canvas.height = height;
       canvas.getContext('2d').drawImage(img, 0, 0, width, height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL('image/jpeg', 0.80));
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
     };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Errore caricamento immagine')); };
     img.src = url;
   });
 
   const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Foto troppo grande. Max 5MB.');
-      return;
-    }
+    // Nessun limite di dimensione: comprimiamo sempre automaticamente
     try {
       const compressed = await compressImage(file);
       setPhotoPreview(compressed);
       setFormData(prev => ({ ...prev, photo_url: compressed }));
     } catch {
-      setError('Errore nella lettura della foto.');
+      setError('Impossibile leggere la foto. Prova un altro file.');
     }
   };
 
