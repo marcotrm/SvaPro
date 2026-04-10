@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { inventoryCount, inventory } from '../api.jsx';
+import { inventoryCount, orders as ordersApi } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 
@@ -30,20 +30,13 @@ export default function InventoryCountPage() {
   const fetchAll = async () => {
     try {
       setLoading(true); setError('');
-      const [sessRes, stockRes] = await Promise.all([
+      const [sessRes, optRes] = await Promise.all([
         inventoryCount.getSessions(),
-        inventory.getStock(),
+        ordersApi.getOptions(selectedStoreId ? { store_id: selectedStoreId } : {}),
       ]);
       setSessions(sessRes.data?.data || []);
-      // Extract unique warehouses from stock data
-      const stockData = stockRes.data?.data || [];
-      const whMap = new Map();
-      stockData.forEach(s => {
-        if (s.warehouse_id && s.warehouse_name) {
-          whMap.set(s.warehouse_id, { id: s.warehouse_id, name: s.warehouse_name });
-        }
-      });
-      setWarehouses(Array.from(whMap.values()));
+      // Warehouses reali dalla DB (non dallo stock, che può avere dati obsoleti)
+      setWarehouses(optRes.data?.data?.warehouses || []);
     } catch (err) {
       setError(err);
     } finally { setLoading(false); }

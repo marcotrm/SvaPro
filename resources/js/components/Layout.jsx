@@ -29,17 +29,17 @@ const allNavigation = [
 
   // 2. POS / Cassa ──────────────────────────────────────────────────
   { section: 'POS / Cassa', items: [
-    { label: 'Nuova Vendita',          href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente'] },
+    { label: 'Nuova Vendita',          href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente'], activeKey: '/pos-never-active' },
     { label: 'Resi',                   href: '/returns',      icon: RotateCcw,   roles: ['superadmin','admin_cliente'] },
-    { label: 'Storico Scontrini',      href: '/orders',       icon: Receipt,     roles: ['superadmin','admin_cliente'] },
-    { label: 'Movimenti Cassa',        href: '/reports',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
+    { label: 'Storico Scontrini',      href: '/orders',       icon: Receipt,     roles: ['superadmin','admin_cliente'], activeKey: '/orders-never-active-pos' },
+    { label: 'Movimenti Cassa',        href: '/reports',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'], activeKey: '/reports-never-active-pos' },
   ]},
 
   // 3. Vendite ──────────────────────────────────────────────────────
   { section: 'Vendite', items: [
     { label: 'Ordini Vendita',         href: '/orders',       icon: ShoppingBag, roles: ['superadmin','admin_cliente'] },
     { label: 'Fatturazione',           href: '/invoices',     icon: FileText,    roles: ['superadmin','admin_cliente'] },
-    { label: 'Statistiche Vendite',    href: '/reports',      icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
+    { label: 'Statistiche Vendite',    href: '/reports',      icon: BarChart3,   roles: ['superadmin','admin_cliente'], activeKey: '/reports-never-active-vendite' },
   ]},
 
   // 4. Magazzino ────────────────────────────────────────────────────
