@@ -18,7 +18,7 @@ class CustomerReturnController extends Controller
 
         $query = DB::table('customer_returns as cr')
             ->join('sales_orders as so', 'so.id', '=', 'cr.order_id')
-            ->join('customers as c', 'c.id', '=', 'cr.customer_id')
+            ->leftJoin('customers as c', 'c.id', '=', 'cr.customer_id')
             ->where('cr.tenant_id', $tenantId)
             ->when($request->query('status'), fn ($q, $v) => $q->where('cr.status', $v))
             ->when($request->query('reason'), fn ($q, $v) => $q->where('cr.reason', $v))
@@ -35,7 +35,7 @@ class CustomerReturnController extends Controller
             ->select([
                 'cr.*',
                 'so.order_number',
-                DB::raw("c.first_name || ' ' || c.last_name as customer_name"),
+                DB::raw("COALESCE(c.first_name || ' ' || c.last_name, 'Cliente non registrato') as customer_name"),
             ])
             ->orderByDesc('cr.created_at');
 
@@ -50,14 +50,14 @@ class CustomerReturnController extends Controller
 
         $return = DB::table('customer_returns as cr')
             ->join('sales_orders as so', 'so.id', '=', 'cr.order_id')
-            ->join('customers as c', 'c.id', '=', 'cr.customer_id')
+            ->leftJoin('customers as c', 'c.id', '=', 'cr.customer_id')
             ->leftJoin('users as u', 'u.id', '=', 'cr.processed_by')
             ->where('cr.tenant_id', $tenantId)
             ->where('cr.id', $id)
             ->select([
                 'cr.*',
                 'so.order_number',
-                DB::raw("c.first_name || ' ' || c.last_name as customer_name"),
+                DB::raw("COALESCE(c.first_name || ' ' || c.last_name, 'Cliente non registrato') as customer_name"),
                 'u.name as processed_by_name',
             ])
             ->first();

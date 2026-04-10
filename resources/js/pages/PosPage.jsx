@@ -186,7 +186,7 @@ function CartItem({ line, onUpdateQty, onRemove }) {
 
 /* ─── PosPage ───────────────────────────────────── */
 export default function PosPage() {
-  const { selectedStoreId, displayMode } = useOutletContext();
+  const { selectedStoreId, displayMode, user } = useOutletContext();
   const [loading, setLoading]           = useState(true);
 
   const [products, setProducts]         = useState([]);
@@ -263,6 +263,17 @@ export default function PosPage() {
   }, [selectedStoreId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Auto-precompila operatore se l'utente loggato è un dipendente
+  useEffect(() => {
+    if (!user) return;
+    const empId = user.employee_id || (user.role === 'dipendente' ? user.id : null);
+    if (empId && !soldByEmployeeId) {
+      setSoldByEmployeeId(String(empId));
+      const name = `${user.first_name || user.name || ''}`.trim() || `Operatore #${empId}`;
+      setOperatorName(name);
+    }
+  }, [user]);
 
   // Carica prezzo QScare dalle impostazioni tenant
   useEffect(() => {
@@ -696,23 +707,29 @@ export default function PosPage() {
                     if (e.key === 'Enter' && operatorBarcode.trim()) {
                       const val = operatorBarcode.trim();
                       const valLow = val.toLowerCase();
-                      // Cerca per barcode, employee_code o ID numerico (case-insensitive)
+                      // Cerca barcode per: barcode, employee_code, ID
                       let found = employees.find(em =>
-                        (em.barcode     && em.barcode.toLowerCase()      === valLow) ||
+                        (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
                         (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
                         String(em.id) === val
                       );
-                      // Fallback: cerca via API se non trovato in locale
+                      // Fallback: cerca via API con parametro barcode specifico
                       if (!found) {
                         try {
                           const { employees: empApi } = await import('../api.jsx');
-                          const res = await empApi.getEmployees({ search: val, limit: 5 });
+                          // Prova prima con barcode esatto
+                          const res = await empApi.getEmployees({ search: val, limit: 10 });
                           const list = res.data?.data || [];
                           found = list.find(em =>
-                            (em.barcode      && em.barcode.toLowerCase()      === valLow) ||
+                            (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
                             (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
                             String(em.id) === val
                           );
+                          // Se ancora non trovato, se è numerico considera come ID diretto
+                          if (!found && /^\d+$/.test(val)) {
+                            found = list.find(em => String(em.id) === val) ||
+                                    employees.find(em => String(em.id) === val);
+                          }
                         } catch {}
                       }
                       if (found) {

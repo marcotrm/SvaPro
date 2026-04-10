@@ -32,13 +32,24 @@ class AuthController extends Controller
 
         $tenantCode = DB::table('tenants')->where('id', $user->tenant_id)->value('code');
 
+        // Recupera il record employee collegato all'utente (se esiste)
+        $employee = DB::table('employees')
+            ->where('user_id', $user->id)
+            ->select(['id', 'first_name', 'last_name', 'employee_code', 'barcode'])
+            ->first();
+
         return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'tenant_id' => $user->tenant_id,
-            'tenant_code' => $tenantCode,
-            'roles' => $roles,
+            'id'             => $user->id,
+            'name'           => $user->name,
+            'first_name'     => $employee?->first_name ?? $user->name,
+            'last_name'      => $employee?->last_name ?? '',
+            'email'          => $user->email,
+            'tenant_id'      => $user->tenant_id,
+            'tenant_code'    => $tenantCode,
+            'roles'          => $roles,
+            'role'           => $roles->first() ?? null,
+            'employee_id'    => $employee?->id,
+            'employee_code'  => $employee?->employee_code,
         ];
     }
 
