@@ -52,9 +52,10 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
   const totalPaid = (parseFloat(cashAmount) || 0) + (parseFloat(cardAmount) || 0);
   const change = Math.max(0, totalPaid - finalTotal);
   const remaining = Math.max(0, finalTotal - totalPaid);
+  const isPaid = remaining < 0.005; // tolleranza floating point
 
   const handleSubmit = async () => {
-    if (remaining > 0) {
+    if (!isPaid) {
       return toast.error(`Mancano €${remaining.toFixed(2)} per completare il pagamento`);
     }
 
@@ -305,7 +306,7 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
             className="sp-btn sp-btn-primary" 
             style={{ minWidth: 200, fontSize: 16, fontWeight: 700 }}
             onClick={handleSubmit} 
-            disabled={isProcessing || remaining > 0}
+            disabled={isProcessing || !isPaid}
           >
             {isProcessing ? 'Elaborazione...' : `Conferma e Paga`}
           </button>
