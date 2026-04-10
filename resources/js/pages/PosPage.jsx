@@ -342,8 +342,7 @@ export default function PosPage() {
     });
   }, [cartLines, products, categories]);
 
-  // Reset QScare quando il carrello non ha più dispositivi
-  useEffect(() => { if (!cartHasDevice) setQscareEnabled(false); }, [cartHasDevice]);
+  // QScare: reset ad ogni nuova vendita (già fatto in handleCheckout)
 
   const effectiveQscarePrice = qscarePrice ?? 0;
   const cartTotalWithQscare = cartTotal + (qscareEnabled ? effectiveQscarePrice : 0);
@@ -846,8 +845,8 @@ export default function PosPage() {
           )}
         </div>
 
-        {/* ─── QScare toggle (solo per carrelli con dispositivi) ─── */}
-        {cartLines.length > 0 && cartHasDevice && qscarePrice !== null && (
+        {/* ─── QScare toggle (per qualsiasi acquisto) ─── */}
+        {cartLines.length > 0 && qscarePrice !== null && (
           <div style={{ padding: '0 22px 12px' }}>
             <button
               onClick={() => setQscareEnabled(e => !e)}
