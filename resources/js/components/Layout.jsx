@@ -9,78 +9,89 @@ import {
   Users, Monitor, Truck, Settings, LogOut, Bell,
   FileText, RotateCcw, Gift, Shield, Activity, ChevronDown,
   Receipt, Star, ArrowRightLeft, MapPin, ChevronLeft, ChevronRight,
-  PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store
+  PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store, AlertCircle
 } from 'lucide-react';
 
 const allNavigation = [
-  // Principale — visibile anche ai dipendenti
+  // ── Principale (dipendenti) ─────────────────────────────────────
   { section: 'Principale', items: [
-    { label: 'POS Cassa',              href: '/',            icon: Monitor,      roles: ['superadmin','admin_cliente','dipendente'] },
-    { label: 'Dashboard',              href: '/dashboard',   icon: BarChart3,    roles: ['superadmin','admin_cliente'] },
-    { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in',   icon: Fingerprint,  roles: ['dipendente'] },
-    { label: '📦 Carico Negozio',        href: '/store-loading', icon: Package,    roles: ['dipendente'] },
+    { label: 'POS Cassa',              href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in',    icon: Fingerprint, roles: ['dipendente'] },
+    { label: '📦 Carico Negozio',        href: '/store-loading', icon: Package,  roles: ['dipendente'] },
+    { label: 'Clienti',                href: '/customers',    icon: Users,       roles: ['dipendente'] },
   ]},
 
-  // 2. POS / Cassa — strumenti di cassa avanzati
+  // 1. Dashboard ────────────────────────────────────────────────────
+  { section: 'Dashboard', items: [
+    { label: 'Panoramica Generale',    href: '/dashboard',    icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
+    { label: 'Report & Analisi',       href: '/reports',      icon: Activity,    roles: ['superadmin','admin_cliente'] },
+  ]},
+
+  // 2. POS / Cassa ──────────────────────────────────────────────────
   { section: 'POS / Cassa', items: [
-    { label: 'Vendite POS',            href: '/orders',      icon: ShoppingBag,  roles: ['superadmin','admin_cliente'] },
-    { label: 'Resi',                   href: '/returns',     icon: RotateCcw,    roles: ['superadmin','admin_cliente'] },
-    { label: 'Promozioni',             href: '/promotions',  icon: Gift,         roles: ['superadmin','admin_cliente'] },
+    { label: 'Nuova Vendita',          href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente'] },
+    { label: 'Resi',                   href: '/returns',      icon: RotateCcw,   roles: ['superadmin','admin_cliente'] },
+    { label: 'Storico Scontrini',      href: '/orders',       icon: Receipt,     roles: ['superadmin','admin_cliente'] },
+    { label: 'Movimenti Cassa',        href: '/reports',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
   ]},
 
-  // 3. Magazzino
-  { section: 'Magazzino', items: [
-    { label: 'Prodotti',               href: '/catalog',          icon: Package,        roles: ['superadmin','admin_cliente'] },
-    { label: 'Stock & Giacenze',       href: '/inventory',        icon: Warehouse,      roles: ['superadmin','admin_cliente'] },
-    { label: 'Inventario Guidato',     href: '/inventory/count',  icon: ClipboardList,  roles: ['superadmin','admin_cliente'] },
-    { label: 'Trasferimenti DDT',      href: '/stock-transfers',  icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
-  ]},
-
-  // 4. Vendite
+  // 3. Vendite ──────────────────────────────────────────────────────
   { section: 'Vendite', items: [
-    { label: 'Tutti gli Ordini',       href: '/orders',      icon: ShoppingBag,  roles: ['superadmin','admin_cliente'] },
-    { label: 'Fatturazione',           href: '/invoices',    icon: FileText,     roles: ['superadmin','admin_cliente'] },
-    { label: 'Report & Analisi',       href: '/reports',     icon: Activity,     roles: ['superadmin','admin_cliente'] },
+    { label: 'Ordini Vendita',         href: '/orders',       icon: ShoppingBag, roles: ['superadmin','admin_cliente'] },
+    { label: 'Fatturazione',           href: '/invoices',     icon: FileText,    roles: ['superadmin','admin_cliente'] },
+    { label: 'Statistiche Vendite',    href: '/reports',      icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
   ]},
 
-  // 5. Acquisti / Fornitori
+  // 4. Magazzino ────────────────────────────────────────────────────
+  { section: 'Magazzino', items: [
+    { label: 'Giacenze & Stock',       href: '/inventory',    icon: Warehouse,   roles: ['superadmin','admin_cliente'] },
+    { label: 'Prodotti',               href: '/catalog',      icon: Package,     roles: ['superadmin','admin_cliente'] },
+    { label: 'Carico Merce (DDT)',     href: '/supplier-delivery', icon: Truck,  roles: ['superadmin','admin_cliente'] },
+    { label: 'Trasferimenti',          href: '/stock-transfers', icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
+    { label: 'Inventario Guidato',     href: '/inventory/count', icon: ClipboardList, roles: ['superadmin','admin_cliente'] },
+    { label: 'Prodotti Sotto Scorta',  href: '/inventory',    icon: AlertCircle, roles: ['superadmin','admin_cliente'] },
+  ]},
+
+  // 5. Acquisti / Fornitori ─────────────────────────────────────────
   { section: 'Acquisti / Fornitori', items: [
-    { label: 'Fornitori',              href: '/suppliers',          icon: Truck,    roles: ['superadmin','admin_cliente'] },
-    { label: 'Ordini Acquisto (PO)',   href: '/purchase-orders',    icon: Receipt,  roles: ['superadmin','admin_cliente'] },
-    { label: '📦 DDT Fornitore',         href: '/supplier-delivery',  icon: Truck,    roles: ['superadmin','admin_cliente'] },
-    { label: 'Fatture Fornitori',      href: '/supplier-invoices',  icon: FileText, roles: ['superadmin','admin_cliente'] },
+    { label: 'Ordini Fornitori (PO)',  href: '/purchase-orders',   icon: Receipt,  roles: ['superadmin','admin_cliente'] },
+    { label: 'Ricezione Merce',        href: '/store-loading',     icon: Package,  roles: ['superadmin','admin_cliente'] },
+    { label: 'Anagrafica Fornitori',   href: '/suppliers',         icon: Truck,    roles: ['superadmin','admin_cliente'] },
+    { label: 'Fatture Fornitori',      href: '/supplier-invoices', icon: FileText, roles: ['superadmin','admin_cliente'] },
   ]},
 
-  // 6. Amministrazione
-  { section: 'Amministrazione', items: [
-    { label: 'Negozi',                 href: '/stores',             icon: Store,         roles: ['superadmin','admin_cliente'] },
-    { label: 'Ruoli & Permessi',       href: '/roles-permissions',  icon: Shield,        roles: ['superadmin'] },
-    { label: 'Audit Log',             href: '/audit-log',          icon: ClipboardList, roles: ['superadmin'] },
-    { label: 'Control Tower',         href: '/control-tower',      icon: Activity,      roles: ['superadmin'] },
-  ]},
-
-  // 7. Marketing
-  { section: 'Marketing', items: [
-    { label: 'Promozioni & Bundle',    href: '/promotions',   icon: Gift,         roles: ['superadmin','admin_cliente'] },
-    { label: '🏆 Gamification',         href: '/gamification', icon: Star,         roles: ['superadmin','admin_cliente','dipendente'] },
-  ]},
-
-  // 8. Dipendenti
-  { section: 'Dipendenti', items: [
-    { label: 'Gestione Dipendenti',    href: '/employees',   icon: Users,        roles: ['superadmin','admin_cliente'] },
-    { label: '🕐 Timbrature',            href: '/attendance',  icon: Fingerprint,  roles: ['superadmin','admin_cliente'] },
-    { label: '⏱ Kiosk Timbratura',      href: '/clock-in',    icon: Fingerprint,  roles: ['superadmin','admin_cliente'] },
-  ]},
-
-  // 9. Clienti
+  // 6. Clienti ──────────────────────────────────────────────────────
   { section: 'Clienti', items: [
-    { label: 'Anagrafica Clienti',     href: '/customers',   icon: Users,        roles: ['superadmin','admin_cliente','dipendente'] },
-    { label: 'Resi Clienti',          href: '/returns',     icon: RotateCcw,    roles: ['superadmin','admin_cliente'] },
+    { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,       roles: ['superadmin','admin_cliente'] },
+    { label: 'Resi Clienti',           href: '/returns',      icon: RotateCcw,   roles: ['superadmin','admin_cliente'] },
+    { label: 'Tessere Fedeltà',        href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente'] },
   ]},
 
-  // 10. Impostazioni
+  // 7. Marketing ────────────────────────────────────────────────────
+  { section: 'Marketing', items: [
+    { label: 'Promozioni & Bundle',    href: '/promotions',   icon: Gift,        roles: ['superadmin','admin_cliente'] },
+    { label: 'Fidelity & Punti',       href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente'] },
+  ]},
+
+  // 8. Dipendenti ───────────────────────────────────────────────────
+  { section: 'Dipendenti', items: [
+    { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente'] },
+    { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
+    { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
+    { label: '🏆 Obiettivi & Premi',    href: '/gamification', icon: Activity,    roles: ['superadmin','admin_cliente'] },
+  ]},
+
+  // 9. Amministrazione ──────────────────────────────────────────────
+  { section: 'Amministrazione', items: [
+    { label: 'Negozi & Punti Vendita', href: '/stores',            icon: Store,         roles: ['superadmin','admin_cliente'] },
+    { label: 'Ruoli & Permessi',       href: '/roles-permissions', icon: Shield,        roles: ['superadmin'] },
+    { label: 'Audit Log',              href: '/audit-log',          icon: ClipboardList, roles: ['superadmin'] },
+    { label: 'Control Tower',          href: '/control-tower',      icon: Activity,      roles: ['superadmin'] },
+  ]},
+
+  // 10. Impostazioni ────────────────────────────────────────────────
   { section: 'Impostazioni', items: [
-    { label: 'Configurazione',         href: '/settings',    icon: Settings,     roles: ['superadmin','admin_cliente'] },
+    { label: 'Configurazione',         href: '/settings',     icon: Settings,    roles: ['superadmin','admin_cliente'] },
   ]},
 ];
 
