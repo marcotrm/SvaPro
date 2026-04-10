@@ -34,7 +34,7 @@ class CustomerReturnController extends Controller
             })
             ->select([
                 'cr.*',
-                'so.order_number',
+                DB::raw("CAST(so.id AS TEXT) as order_number"),
                 DB::raw("COALESCE(c.first_name || ' ' || c.last_name, 'Cliente non registrato') as customer_name"),
             ])
             ->orderByDesc('cr.created_at');
@@ -56,7 +56,7 @@ class CustomerReturnController extends Controller
             ->where('cr.id', $id)
             ->select([
                 'cr.*',
-                'so.order_number',
+                DB::raw("CAST(so.id AS TEXT) as order_number"),
                 DB::raw("COALESCE(c.first_name || ' ' || c.last_name, 'Cliente non registrato') as customer_name"),
                 'u.name as processed_by_name',
             ])

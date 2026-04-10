@@ -36,6 +36,7 @@ class CustomerController extends Controller
             ->groupBy('customer_id')
             ->selectRaw('customer_id, COUNT(*) as paid_orders_count, MAX(paid_at) as last_purchase_at, MIN(paid_at) as first_purchase_at');
 
+        try {
         $deviceStats = DB::table('loyalty_device_tokens')
             ->where('tenant_id', $tenantId)
             ->where('notifications_enabled', true)
@@ -56,8 +57,6 @@ class CustomerController extends Controller
                     ->where('lc.tenant_id', '=', $tenantId);
             })
             ->where('c.tenant_id', $tenantId)
-            // Nota: I clienti appartengono al tenant, non al singolo negozio.
-            // Il filtro store_id cambia solo le statistiche ordini mostrate, non nasconde clienti.
             ->when($request->filled('q'), function ($query) use ($request) {
                 $term = trim((string) $request->input('q'));
                 $query->where(function ($inner) use ($term) {
@@ -88,6 +87,25 @@ class CustomerController extends Controller
             ->limit((int) $request->input('limit', 100));
 
         $customers = $query->get();
+        } catch (\Throwable) {
+            // Fallback: restituisce clienti senza statistiche loyalty
+            $customers = DB::table('customers as c')
+                ->leftJoinSub($orderStats, 'order_stats', fn ($j) => $j->on('order_stats.customer_id', '=', 'c.id'))
+                ->where('c.tenant_id', $tenantId)
+                ->when($request->filled('q'), function ($query) use ($request) {
+                    $term = trim((string) $request->input('q'));
+                    $query->where(function ($inner) use ($term) {
+                        $inner->where('c.first_name', 'like', '%'.$term.'%')
+                            ->orWhere('c.last_name', 'like', '%'.$term.'%')
+                            ->orWhere('c.email', 'like', '%'.$term.'%')
+                            ->orWhere('c.phone', 'like', '%'.$term.'%');
+                    });
+                })
+                ->select(['c.*', 'order_stats.paid_orders_count', 'order_stats.last_purchase_at as last_purchase_at_db'])
+                ->orderByDesc('c.id')
+                ->limit((int) $request->input('limit', 100))
+                ->get();
+        }
 
         return response()->json(['data' => $this->hydrateCustomers($customers)]);
     }

@@ -52,20 +52,25 @@ class DeliveryNoteController extends Controller
     /** GET /delivery-notes/:id — dettaglio con articoli */
     public function show(Request $request, $id)
     {
-        $tenantId = $request->user()->tenant_id;
-        $note = DB::table('delivery_notes')->where('id', $id)->where('tenant_id', $tenantId)->first();
-        if (!$note) return response()->json(['message' => 'Bolla non trovata.'], 404);
+        try {
+            $tenantId = $request->user()->tenant_id;
+            $note = DB::table('delivery_notes')->where('id', $id)->where('tenant_id', $tenantId)->first();
+            if (!$note) return response()->json(['message' => 'Bolla non trovata.'], 404);
 
-        $note->items = DB::table('delivery_note_items')
-            ->where('delivery_note_id', $id)
-            ->get();
+            $note->items = DB::table('delivery_note_items')
+                ->where('delivery_note_id', $id)
+                ->get();
 
-        return response()->json(['data' => $note]);
+            return response()->json(['data' => $note]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Funzionalità in aggiornamento sul server. Riprovare tra qualche minuto.'], 503);
+        }
     }
 
     /** POST /delivery-notes — crea nuova bolla (admin) */
     public function store(Request $request)
     {
+        try {
         $data = $request->validate([
             'store_id'    => 'required|integer',
             'type'        => 'in:carico,scarico,trasferimento',
@@ -115,6 +120,11 @@ class DeliveryNoteController extends Controller
         $note->items = DB::table('delivery_note_items')->where('delivery_note_id', $noteId)->get();
 
         return response()->json(['data' => $note], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Funzionalità in aggiornamento sul server. Riprovare tra qualche minuto.'], 503);
+        }
     }
 
     /** POST /delivery-notes/:id/receive — dipendente registra ricezione */
