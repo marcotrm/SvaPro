@@ -65,9 +65,6 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/catalog/products', [CatalogController::class, 'store'])->middleware('permission:catalog.manage');
         Route::put('/catalog/products/{productId}', [CatalogController::class, 'update'])->middleware('permission:catalog.manage');
 
-        Route::get('/customers', [CustomerController::class, 'index']);
-        Route::get('/customers/analytics/return-frequency', [CustomerController::class, 'returnFrequencyAnalytics']);
-        Route::get('/customers/{customerId}', [CustomerController::class, 'show']);
         Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.manage');
         Route::put('/customers/{customerId}', [CustomerController::class, 'update'])->middleware('permission:customers.manage');
         Route::post('/customers/{customerId}/otp/send', [CustomerController::class, 'sendOtp']);
@@ -78,6 +75,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/customers/{customerId}/visura/download', [CustomerController::class, 'downloadVisura'])->middleware('permission:customers.manage');
         Route::post('/customers/{customerId}/send-whatsapp', [CustomerController::class, 'sendWhatsapp']);
         Route::post('/customers/{customerId}/send-email', [CustomerController::class, 'sendEmail']);
+        Route::get('/customers/analytics/return-frequency', [CustomerController::class, 'returnFrequencyAnalytics']);
 
         Route::get('/employees', [EmployeeController::class, 'index']);
         Route::get('/employees/analytics/top-performers', [EmployeeController::class, 'topPerformers']);
@@ -236,7 +234,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/attendance/checkin', [AttendanceController::class, 'checkIn']);
         Route::post('/attendance/checkout', [AttendanceController::class, 'checkOut']);
 
-        // Clienti: i dipendenti possono creare/modificare clienti dal POS
+        // Clienti: GET accessibili a tutti i ruoli (incluso dipendente)
+        // POST/PUT senza permission check perché il dipendente deve poter creare clienti al POS
         Route::get('/customers', [CustomerController::class, 'index']);
         Route::get('/customers/{customerId}', [CustomerController::class, 'show']);
         Route::post('/customers', [CustomerController::class, 'store']);
