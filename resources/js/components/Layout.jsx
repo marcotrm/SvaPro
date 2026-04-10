@@ -218,7 +218,7 @@ export default function Layout({ user, setUser }) {
         {/* Nav */}
         <nav className="sp-sidebar-nav" style={{ padding: collapsed ? '8px 0' : '12px 10px' }}>
           {filteredNav.map((section) => {
-            const isOpen = collapsed || openSections[section.section] !== false;
+            const isOpen = collapsed || openSections[section.section] === true;
             return (
               <div key={section.section} className="sp-nav-section">
                 {/* Section Header (accordion trigger) */}
