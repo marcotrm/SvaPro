@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
@@ -16,6 +16,7 @@ const allNavigation = [
   // ── Principale ───────────────────────────────────────────────────
   { section: 'Principale', items: [
     { label: 'POS Cassa',              href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Panoramica Generale',    href: '/dashboard',    icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
     { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in',    icon: Fingerprint, roles: ['dipendente'] },
     { label: '📦 Carico Negozio',        href: '/store-loading', icon: Package,  roles: ['dipendente'] },
     { label: 'Clienti',                href: '/customers',    icon: Users,       roles: ['dipendente'] },
@@ -61,7 +62,6 @@ const allNavigation = [
   // Amministrazione ──────────────────────────────────────────────
   { section: 'Amministrazione', items: [
     { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
-    { label: 'Panoramica Generale',    href: '/dashboard',    icon: Activity,    roles: ['superadmin','admin_cliente'] },
     { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,       roles: ['superadmin','admin_cliente'] },
     { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,       roles: ['superadmin','admin_cliente'] },
     { label: 'Fatturazione',           href: '/invoices',     icon: FileText,    roles: ['superadmin','admin_cliente'] },
@@ -83,12 +83,30 @@ export default function Layout({ user, setUser }) {
   const [selectedStoreId, setSelectedStoreId] = useState(localStorage.getItem('selectedStoreId') || '');
   const [displayMode, setDisplayMode] = useState(localStorage.getItem('displayMode') || 'name');
 
+  // Flyout hover state
+  const [flyout, setFlyout] = useState(null); // { section, items, top }
+  const flyoutTimer = useRef(null);
+
+  const cancelTimer = useCallback(() => {
+    if (flyoutTimer.current) { clearTimeout(flyoutTimer.current); flyoutTimer.current = null; }
+  }, []);
+
+  const scheduleClose = useCallback(() => {
+    flyoutTimer.current = setTimeout(() => setFlyout(null), 150);
+  }, []);
+
+  const handleSectionEnter = useCallback((section, items, e) => {
+    cancelTimer();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setFlyout({ section, items, top: rect.top });
+  }, [cancelTimer]);
+
   // Sidebar state
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const [openSections, setOpenSections] = useState(() => {
     try {
       const saved = localStorage.getItem('sidebarOpenSections');
-      return saved ? JSON.parse(saved) : { 'Principale': true, 'POS / Cassa': false, 'Magazzino': false, 'Vendite': false, 'Acquisti / Fornitori': false, 'Amministrazione': false, 'Marketing': false, 'Dipendenti': false, 'Clienti': false, 'Impostazioni': false };
+      return saved ? JSON.parse(saved) : { 'Principale': true };
     } catch { return { 'Principale': true }; }
   });
 
@@ -213,7 +231,12 @@ export default function Layout({ user, setUser }) {
           {filteredNav.map((section) => {
             const isOpen = collapsed || openSections[section.section] === true;
             return (
-              <div key={section.section} className="sp-nav-section">
+              <div
+                key={section.section}
+                className="sp-nav-section"
+                onMouseEnter={(e) => handleSectionEnter(section.section, section.items, e)}
+                onMouseLeave={scheduleClose}
+              >
                 {/* Section Header (accordion trigger) */}
                 {!collapsed ? (
                   <button
@@ -285,9 +308,76 @@ export default function Layout({ user, setUser }) {
                 <LogOut size={16} style={{ color: '#666', flexShrink: 0 }} />
               </>
             )}
-          </div>
         </div>
       </aside>
+
+      {/* ── FLYOUT HOVER SUBMENU ── */}
+      {flyout && (
+        <div
+          onMouseEnter={cancelTimer}
+          onMouseLeave={scheduleClose}
+          style={{
+            position: 'fixed',
+            left: sidebarWidth,
+            top: Math.max(8, Math.min(flyout.top, window.innerHeight - (flyout.items.length * 48 + 60))),
+            zIndex: 9999,
+            minWidth: 220,
+            background: '#1C1B2E',
+            borderRadius: '0 12px 12px 0',
+            boxShadow: '4px 4px 24px rgba(0,0,0,0.35)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            borderLeft: 'none',
+            overflow: 'hidden',
+            animation: 'flyoutIn 0.15s ease',
+          }}
+        >
+          {/* Intestazione sezione */}
+          <div style={{
+            padding: '10px 16px 8px',
+            fontSize: 10,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            color: 'rgba(255,255,255,0.35)',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            {flyout.section}
+          </div>
+
+          {/* Voci */}
+          {flyout.items.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href, item.activeKey);
+            return (
+              <button
+                key={item.activeKey ?? item.href}
+                onClick={() => { navigate(item.href); setFlyout(null); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: '100%',
+                  padding: '11px 16px',
+                  background: active ? 'rgba(99,102,241,0.18)' : 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: active ? '#a5b4fc' : 'rgba(255,255,255,0.75)',
+                  fontSize: 13,
+                  fontWeight: active ? 700 : 500,
+                  textAlign: 'left',
+                  transition: 'background 0.12s',
+                  borderLeft: active ? '3px solid #6366f1' : '3px solid transparent',
+                }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <Icon size={15} style={{ flexShrink: 0, opacity: active ? 1 : 0.6 }} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* MAIN */}
       <main

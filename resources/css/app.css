@@ -1165,6 +1165,11 @@ a { text-decoration: none; color: inherit; }
   to { opacity: 1; }
 }
 
+@keyframes flyoutIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
 @keyframes spSlideUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
