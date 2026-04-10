@@ -15,12 +15,39 @@ const STORE_COLORS = ['#6C63AC','#22C55E','#F59E0B','#EF4444','#3B82F6','#EC4899
 
 /* ─── Period tabs ───────────────────────────────────────────── */
 const PERIODS = [
-  { id: 'today',     label: 'Oggi',      chartPeriod: 'daily',   days: 1 },
-  { id: 'yesterday', label: 'Ieri',      chartPeriod: 'daily',   days: 2 },
-  { id: 'week',      label: 'Settimana', chartPeriod: 'daily',   days: 7 },
-  { id: 'month',     label: 'Mese',      chartPeriod: 'weekly',  days: 30 },
-  { id: 'year',      label: 'Anno',      chartPeriod: 'monthly', days: 365 },
+  { id: 'today',     label: 'Oggi',      chartPeriod: 'daily' },
+  { id: 'yesterday', label: 'Ieri',      chartPeriod: 'daily' },
+  { id: 'week',      label: 'Settimana', chartPeriod: 'daily' },
+  { id: 'month',     label: 'Mese',      chartPeriod: 'weekly' },
+  { id: 'year',      label: 'Anno',      chartPeriod: 'monthly' },
 ];
+
+// Calcola date_from e date_to per ogni periodo
+const getPeriodDates = (periodId) => {
+  const today = new Date();
+  const fmt = d => d.toISOString().slice(0, 10);
+  const todayStr = fmt(today);
+
+  if (periodId === 'today') {
+    return { date_from: todayStr, date_to: todayStr, days: 1 };
+  }
+  if (periodId === 'yesterday') {
+    const y = new Date(today); y.setDate(y.getDate() - 1);
+    const yStr = fmt(y);
+    return { date_from: yStr, date_to: yStr, days: 2 };
+  }
+  if (periodId === 'week') {
+    const from = new Date(today); from.setDate(from.getDate() - 6);
+    return { date_from: fmt(from), date_to: todayStr, days: 7 };
+  }
+  if (periodId === 'month') {
+    const from = new Date(today); from.setDate(from.getDate() - 29);
+    return { date_from: fmt(from), date_to: todayStr, days: 30 };
+  }
+  // year
+  const from = new Date(today); from.setDate(from.getDate() - 364);
+  return { date_from: fmt(from), date_to: todayStr, days: 365 };
+};
 
 /* ─── piccoli helpers UI ────────────────────────────────────── */
 const Avatar = ({ name = '', size = 36, color = '#9B8FD4', photoUrl = null }) => {
@@ -164,17 +191,13 @@ export default function DashboardPage() {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
       const period = PERIODS.find(p => p.id === activePeriod) || PERIODS[4];
-
-      // Calcola date_from per il filtro ordini
-      const dateFrom = new Date();
-      dateFrom.setDate(dateFrom.getDate() - period.days);
-      const dateFromStr = dateFrom.toISOString().slice(0, 10);
+      const { date_from, date_to, days } = getPeriodDates(activePeriod);
 
       // Fetch each independently so one failure doesn't break everything
       const [resSummary, resTrend, resOrders, resStock, resCust, resStores] = await Promise.allSettled([
         reports.summary(sp),
-        reports.revenueTrend({ ...sp, period: period.chartPeriod, days: period.days }),
-        ordersApi.getOrders({ ...sp, limit: 200, status: 'paid', date_from: dateFromStr }),
+        reports.revenueTrend({ ...sp, period: period.chartPeriod, days }),
+        ordersApi.getOrders({ ...sp, limit: 200, status: 'paid', date_from, date_to }),
         inventory.getStock({ ...sp, limit: 1000 }),
         customers.getCustomers({ limit: 1 }),
         storesApi.getStores(),
