@@ -845,38 +845,55 @@ export default function PosPage() {
           )}
         </div>
 
-        {/* ─── QScare toggle (per qualsiasi acquisto) ─── */}
-        {cartLines.length > 0 && qscarePrice !== null && (
+        {/* ─── QScare toggle (sempre visibile con prodotti nel carrello) ─── */}
+        {cartLines.length > 0 && (
           <div style={{ padding: '0 22px 12px' }}>
-            <button
-              onClick={() => setQscareEnabled(e => !e)}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                background: qscareEnabled ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
-                border: `1.5px solid ${qscareEnabled ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                borderRadius: 12, padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
-                transition: 'all 0.2s',
-              }}
-            >
-              <span style={{ fontSize: 20 }}>🛡</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: qscareEnabled ? '#86efac' : '#fff' }}>QScare — Assicurazione Dispositivo</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>Copertura guasti e danni accidentali</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                <span style={{ fontSize: 13, fontWeight: 900, color: qscareEnabled ? '#86efac' : 'rgba(255,255,255,0.6)' }}>+{fmt(effectiveQscarePrice)}</span>
-                <div style={{
-                  width: 36, height: 20, borderRadius: 10, background: qscareEnabled ? '#22c55e' : 'rgba(255,255,255,0.15)',
-                  position: 'relative', transition: 'background 0.2s',
-                }}>
-                  <div style={{
-                    position: 'absolute', top: 2, left: qscareEnabled ? 18 : 2,
-                    width: 16, height: 16, borderRadius: '50%', background: '#fff',
-                    transition: 'left 0.2s',
-                  }} />
+            {qscarePrice === null ? (
+              // Prezzo non configurato: mostra banner informativo
+              <div style={{
+                background: 'rgba(234,179,8,0.08)', border: '1.5px solid rgba(234,179,8,0.2)',
+                borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <span style={{ fontSize: 18 }}>🛡</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(234,179,8,0.9)' }}>QScare — Assicurazione Dispositivo</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+                    Configura il prezzo in <strong style={{ color: 'rgba(234,179,8,0.7)' }}>Impostazioni → QScare</strong> per attivare
+                  </div>
                 </div>
               </div>
-            </button>
+            ) : (
+              // Prezzo configurato: toggle funzionante
+              <button
+                onClick={() => setQscareEnabled(e => !e)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                  background: qscareEnabled ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
+                  border: `1.5px solid ${qscareEnabled ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  borderRadius: 12, padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <span style={{ fontSize: 20 }}>🛡</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: qscareEnabled ? '#86efac' : '#fff' }}>QScare — Assicurazione Dispositivo</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>Copertura guasti e danni accidentali</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                  <span style={{ fontSize: 13, fontWeight: 900, color: qscareEnabled ? '#86efac' : 'rgba(255,255,255,0.6)' }}>+{fmt(effectiveQscarePrice)}</span>
+                  <div style={{
+                    width: 36, height: 20, borderRadius: 10, background: qscareEnabled ? '#22c55e' : 'rgba(255,255,255,0.15)',
+                    position: 'relative', transition: 'background 0.2s',
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: 2, left: qscareEnabled ? 18 : 2,
+                      width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                      transition: 'left 0.2s',
+                    }} />
+                  </div>
+                </div>
+              </button>
+            )}
           </div>
         )}
 
