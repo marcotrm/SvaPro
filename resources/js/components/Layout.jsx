@@ -24,31 +24,26 @@ const allNavigation = [
   // 1. Dashboard ────────────────────────────────────────────────────
   { section: 'Dashboard', items: [
     { label: 'Panoramica Generale',    href: '/dashboard',    icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
-    { label: 'Report & Analisi',       href: '/reports',      icon: Activity,    roles: ['superadmin','admin_cliente'] },
   ]},
 
   // 2. POS / Cassa ──────────────────────────────────────────────────
   { section: 'POS / Cassa', items: [
     { label: 'Resi',                   href: '/returns',      icon: RotateCcw,   roles: ['superadmin','admin_cliente'] },
-    { label: 'Storico Scontrini',      href: '/orders',       icon: Receipt,     roles: ['superadmin','admin_cliente'], activeKey: '/orders-never-active-pos' },
-    { label: 'Movimenti Cassa',        href: '/reports',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'], activeKey: '/reports-never-active-pos' },
   ]},
 
   // 3. Vendite ──────────────────────────────────────────────────────
   { section: 'Vendite', items: [
-    { label: 'Ordini Vendita',         href: '/orders',       icon: ShoppingBag, roles: ['superadmin','admin_cliente'] },
     { label: 'Fatturazione',           href: '/invoices',     icon: FileText,    roles: ['superadmin','admin_cliente'] },
-    { label: 'Statistiche Vendite',    href: '/reports',      icon: BarChart3,   roles: ['superadmin','admin_cliente'], activeKey: '/reports-never-active-vendite' },
+    { label: 'Report & Analisi',       href: '/reports',      icon: Activity,    roles: ['superadmin','admin_cliente'] },
   ]},
 
   // 4. Magazzino ────────────────────────────────────────────────────
   { section: 'Magazzino', items: [
-    { label: 'Giacenze & Stock',       href: '/inventory',    icon: Warehouse,   roles: ['superadmin','admin_cliente'], activeKey: '/inventory' },
+    { label: 'Giacenze & Stock',       href: '/inventory',    icon: Warehouse,   roles: ['superadmin','admin_cliente'] },
     { label: 'Prodotti',               href: '/catalog',      icon: Package,     roles: ['superadmin','admin_cliente'] },
     { label: 'Carico Merce (DDT)',     href: '/supplier-delivery', icon: Truck,  roles: ['superadmin','admin_cliente'] },
     { label: 'Trasferimenti',          href: '/stock-transfers', icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
     { label: 'Inventario Guidato',     href: '/inventory/count', icon: ClipboardList, roles: ['superadmin','admin_cliente'] },
-    { label: 'Prodotti Sotto Scorta',  href: '/inventory',    icon: AlertCircle, roles: ['superadmin','admin_cliente'], activeKey: '/inventory/low-stock' },
   ]},
 
   // 5. Acquisti / Fornitori ─────────────────────────────────────────
@@ -63,13 +58,12 @@ const allNavigation = [
   { section: 'Clienti', items: [
     { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,       roles: ['superadmin','admin_cliente'] },
     { label: 'Resi Clienti',           href: '/returns',      icon: RotateCcw,   roles: ['superadmin','admin_cliente'] },
-    { label: 'Tessere Fedeltà',        href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente'] },
   ]},
 
   // 7. Marketing ────────────────────────────────────────────────────
   { section: 'Marketing', items: [
     { label: 'Promozioni & Bundle',    href: '/promotions',   icon: Gift,        roles: ['superadmin','admin_cliente'] },
-    { label: 'Fidelity & Punti',       href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente'] },
+    { label: '🏆 Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
 
   // 8. Dipendenti ───────────────────────────────────────────────────
@@ -77,7 +71,6 @@ const allNavigation = [
     { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente'] },
     { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
     { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
-    { label: '🏆 Obiettivi & Premi',    href: '/gamification', icon: Activity,    roles: ['superadmin','admin_cliente'] },
   ]},
 
   // 9. Amministrazione ──────────────────────────────────────────────
