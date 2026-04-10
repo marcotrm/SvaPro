@@ -4,6 +4,7 @@ import { employees } from '../api.jsx';
 import { EmployeesSkeleton } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import EmployeeModal from '../components/EmployeeModal.jsx';
+import toast from 'react-hot-toast';
 
 export default function EmployeesPage() {
   const { selectedStoreId, selectedStore, storesList } = useOutletContext();
@@ -24,7 +25,6 @@ export default function EmployeesPage() {
         employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 }),
         employees.getTopPerformers(selectedStoreId ? { store_id: selectedStoreId } : {}),
       ]);
-
       setEmployeesList(employeesResponse.data.data || []);
       setAnalytics(analyticsResponse.data || null);
     } catch (err) {
@@ -32,9 +32,27 @@ export default function EmployeesPage() {
     } finally { setLoading(false); }
   };
 
+  // Refresh silenzioso (senza skeleton) dopo salvataggio
+  const refreshEmployees = async () => {
+    try {
+      const [employeesResponse, analyticsResponse] = await Promise.all([
+        employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 }),
+        employees.getTopPerformers(selectedStoreId ? { store_id: selectedStoreId } : {}),
+      ]);
+      setEmployeesList(employeesResponse.data.data || []);
+      setAnalytics(analyticsResponse.data || null);
+    } catch (err) {
+      console.error('Refresh silent error:', err);
+    }
+  };
+
   const handleOpenModal = (employee = null) => { setSelectedEmployee(employee); setShowModal(true); };
   const handleCloseModal = () => { setShowModal(false); setSelectedEmployee(null); };
-  const handleSaveEmployee = async () => { await fetchEmployees(); handleCloseModal(); };
+  const handleSaveEmployee = async (isNew = false) => {
+    handleCloseModal(); // chiude subito il modal
+    await refreshEmployees(); // aggiorna la lista in background
+    toast.success(isNew ? 'Dipendente creato!' : 'Dipendente aggiornato!');
+  };
 
   const handleDelete = async (employee) => {
     if (!window.confirm(`Eliminare il dipendente ${employee.first_name} ${employee.last_name}?\nQuesta azione non può essere annullata.`)) return;
@@ -135,7 +153,7 @@ export default function EmployeesPage() {
               <tr key={employee.id}>
                 <td>
                   <div className="avatar-cell">
-                    <div className="avatar-sm" style={{ overflow: 'hidden', padding: 0 }}>
+                    <div className="avatar-sm" style={{ width: 36, height: 36, minWidth: 36, borderRadius: '50%', overflow: 'hidden', padding: 0, flexShrink: 0 }}>
                       {employee.photo_url ? (
                         <img src={employee.photo_url} alt={`${employee.first_name} ${employee.last_name}`}
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />

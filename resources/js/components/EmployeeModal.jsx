@@ -64,6 +64,8 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       setError('');
       setFieldErrors({});
 
+      const isNew = !employee?.id;
+
       // Salva i dati anagrafici (senza photo_url se useremo upload separato)
       const payload = { ...formData };
       delete payload.photo_url; // la foto viene caricata separatamente
@@ -88,7 +90,7 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
         }
       }
 
-      onSave();
+      onSave(isNew);
     } catch (err) {
       const serverErrors = err.response?.data?.errors;
       if (serverErrors) {

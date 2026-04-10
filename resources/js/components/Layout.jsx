@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
+import { Toaster } from 'react-hot-toast';
 import { 
   BarChart3, Package, Warehouse, ClipboardList, ShoppingBag,
   Users, Monitor, Truck, Settings, LogOut, Bell,
@@ -298,6 +299,16 @@ export default function Layout({ user, setUser }) {
           }} />
         </section>
       </main>
+
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          duration: 3000,
+          style: { background: '#1C1B2E', color: '#fff', borderRadius: 12, fontSize: 14, fontWeight: 600 },
+          success: { iconTheme: { primary: '#22C55E', secondary: '#fff' } },
+          error:   { iconTheme: { primary: '#EF4444', secondary: '#fff' } },
+        }}
+      />
     </div>
   );
 }

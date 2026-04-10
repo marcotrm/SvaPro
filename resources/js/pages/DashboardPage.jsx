@@ -23,8 +23,23 @@ const PERIODS = [
 ];
 
 /* ─── piccoli helpers UI ────────────────────────────────────── */
-const Avatar = ({ name = '', size = 36, color = '#9B8FD4' }) => {
+const Avatar = ({ name = '', size = 36, color = '#9B8FD4', photoUrl = null }) => {
   const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+  if (photoUrl) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: '50%', flexShrink: 0,
+        overflow: 'hidden', background: color,
+      }}>
+        <img
+          src={photoUrl}
+          alt={name}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          onError={e => { e.currentTarget.style.display = 'none'; }}
+        />
+      </div>
+    );
+  }
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', background: color,
@@ -219,14 +234,16 @@ export default function DashboardPage() {
         const ordersList = resOrders.value?.data?.data || [];
         setRecentOrders(ordersList);
 
-        // Employee activity — usa employee_name dal backend
+        // Employee activity — usa employee_name + photo_url dal backend
         const empMap = {};
         ordersList.forEach(o => {
           const name = o.employee_name; // ora restituito dal backend
           if (!name) return;
-          if (!empMap[name]) empMap[name] = { name, sales: 0, revenue: 0 };
+          if (!empMap[name]) empMap[name] = { name, sales: 0, revenue: 0, photoUrl: o.employee_photo_url || null };
           empMap[name].sales++;
           empMap[name].revenue += parseFloat(o.total || o.grand_total || 0);
+          // aggiorna la foto se disponibile
+          if (o.employee_photo_url && !empMap[name].photoUrl) empMap[name].photoUrl = o.employee_photo_url;
         });
         setEmployeeActivity(Object.values(empMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
 
@@ -452,7 +469,7 @@ export default function DashboardPage() {
               {employeeActivity.map((emp, i) => (
                 <div key={emp.name} style={{ display:'flex', alignItems:'center', gap:12 }}>
                   <div style={{ position:'relative' }}>
-                    <Avatar name={emp.name} size={34} color={avatarColors[i % avatarColors.length]} />
+                    <Avatar name={emp.name} size={34} color={avatarColors[i % avatarColors.length]} photoUrl={emp.photoUrl} />
                     {i === 0 && (
                       <Trophy size={12} color="#F59E0B"
                         style={{ position:'absolute', bottom:-2, right:-2, background:'#fff', borderRadius:'50%', padding:1 }} />
