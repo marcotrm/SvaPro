@@ -656,22 +656,36 @@ export default function PosPage() {
                   ref={operatorBarcodeRef}
                   value={operatorBarcode}
                   onChange={e => setOperatorBarcode(e.target.value)}
-                  onKeyDown={e => {
+                  onKeyDown={async e => {
                     if (e.key === 'Enter' && operatorBarcode.trim()) {
                       const val = operatorBarcode.trim();
-                      // Match by: barcode field, employee_code, or numeric ID
-                      const found = employees.find(em =>
-                        (em.barcode && em.barcode === val) ||
-                        (em.employee_code && em.employee_code === val) ||
+                      const valLow = val.toLowerCase();
+                      // Cerca per barcode, employee_code o ID numerico (case-insensitive)
+                      let found = employees.find(em =>
+                        (em.barcode     && em.barcode.toLowerCase()      === valLow) ||
+                        (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
                         String(em.id) === val
                       );
+                      // Fallback: cerca via API se non trovato in locale
+                      if (!found) {
+                        try {
+                          const { employees: empApi } = await import('../api.jsx');
+                          const res = await empApi.getEmployees({ search: val, limit: 5 });
+                          const list = res.data?.data || [];
+                          found = list.find(em =>
+                            (em.barcode      && em.barcode.toLowerCase()      === valLow) ||
+                            (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
+                            String(em.id) === val
+                          );
+                        } catch {}
+                      }
                       if (found) {
                         setSoldByEmployeeId(String(found.id));
-                        setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || found.name || `Operatore #${found.id}`);
+                        setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || `Operatore #${found.id}`);
                         setOperatorError('');
                         setOperatorBarcode('');
                       } else {
-                        setOperatorError(`Codice "${val}" non trovato — prova con l'ID numerico o seleziona sotto`);
+                        setOperatorError(`Codice "${val}" non riconosciuto`);
                         setOperatorBarcode('');
                       }
                     }
@@ -685,33 +699,7 @@ export default function PosPage() {
                     outline: 'none', fontFamily: 'monospace', letterSpacing: '0.1em', boxSizing: 'border-box',
                   }}
                 />
-                {operatorError && <div style={{ fontSize: 11, color: '#fc8181', marginTop: 4 }}>⚠ {operatorError}</div>}
-                {/* Dropdown fallback: selezione manuale per nome */}
-                <select
-                  value=""
-                  onChange={e => {
-                    const found = employees.find(em => String(em.id) === e.target.value);
-                    if (found) {
-                      setSoldByEmployeeId(String(found.id));
-                      setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || `Operatore #${found.id}`);
-                      setOperatorError(''); setOperatorBarcode('');
-                    }
-                  }}
-                  style={{
-                    width: '100%', marginTop: 6,
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 8, padding: '7px 10px', fontSize: 11, color: 'rgba(255,255,255,0.5)',
-                    cursor: 'pointer', outline: 'none',
-                  }}
-                >
-                  <option value="">— oppure seleziona operatore per nome —</option>
-                  {employees.map(em => (
-                    <option key={em.id} value={em.id}>
-                      {`${em.first_name || ''} ${em.last_name || ''}`.trim() || `Operatore #${em.id}`}
-                      {em.employee_code ? ` [${em.employee_code}]` : ''}
-                    </option>
-                  ))}
-                </select>
+                {operatorError && <div style={{ fontSize: 11, color: '#fc8181', marginTop: 6 }}>⚠ {operatorError}</div>}
               </div>
             )}
           </div>

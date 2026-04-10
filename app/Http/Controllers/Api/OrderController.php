@@ -175,6 +175,10 @@ class OrderController extends Controller
                 $join->on('st.id', '=', 'so.store_id')
                     ->where('st.tenant_id', '=', $tenantId);
             })
+            ->leftJoin('employees as emp', function ($join) use ($tenantId) {
+                $join->on('emp.id', '=', 'so.employee_id')
+                    ->where('emp.tenant_id', '=', $tenantId);
+            })
             ->leftJoin('loyalty_ledger as ll', function ($join) {
                 $join->on('ll.order_id', '=', 'so.id')
                     ->where('ll.event_type', '=', 'earn');
@@ -184,6 +188,8 @@ class OrderController extends Controller
             ->groupBy([
                 'so.id',
                 'so.store_id',
+                'so.employee_id',
+                'so.sold_by_employee_id',
                 'so.customer_id',
                 'so.status',
                 'so.grand_total',
@@ -194,10 +200,14 @@ class OrderController extends Controller
                 'c.last_name',
                 'st.id',
                 'st.name',
+                'emp.first_name',
+                'emp.last_name',
             ])
             ->select([
                 'so.id',
                 'so.store_id',
+                'so.employee_id',
+                'so.sold_by_employee_id',
                 'so.customer_id',
                 'so.status',
                 'so.grand_total',
@@ -208,6 +218,9 @@ class OrderController extends Controller
                 'c.last_name as customer_last_name',
                 'st.id as warehouse_id',
                 'st.name as warehouse_name',
+                'st.name as store_name',
+                'emp.first_name as employee_first_name',
+                'emp.last_name as employee_last_name',
                 DB::raw('COALESCE(SUM(ll.points_delta), 0) as loyalty_points_awarded'),
             ])
             ->first();
