@@ -227,18 +227,22 @@ export default function PosPage() {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
 
-      // Carica prodotti + categorie + stock — sempre disponibili per dipendente
-      const [pRes, cRes, stRes] = await Promise.all([
+      // Carica prodotti + categorie — sempre disponibili per dipendente
+      const [pRes, cRes] = await Promise.all([
         catalog.getProducts({ ...sp, limit: 500 }),
         catalog.getCategories(),
-        inventory.getStock({ ...sp, limit: 2000 }),
       ]);
       setProducts(pRes.data?.data || []);
       const allCats = cRes.data?.data || [];
       setCategories(allCats.filter(c => !c.parent_id));
-      const sm = {};
-      (stRes.data?.data || []).forEach(si => { sm[si.product_variant_id] = si; });
-      setStockMap(sm);
+
+      // Carica stock separatamente — se fallisce il POS funziona comunque
+      try {
+        const stRes = await inventory.getStock({ ...sp, limit: 2000 });
+        const sm = {};
+        (stRes.data?.data || []).forEach(si => { sm[si.product_variant_id] = si; });
+        setStockMap(sm);
+      } catch { /* stock non disponibile, POS funziona senza giacenze */ }
 
       // Carica clienti — solo admin, dipendente può ricevere 403
       try {

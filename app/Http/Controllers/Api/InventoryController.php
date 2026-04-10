@@ -20,13 +20,17 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Store non valido per il tenant.'], 422);
         }
 
-        $rows = DB::table('stock_items as si')
+        $baseQuery = DB::table('stock_items as si')
             ->join('warehouses as w', 'w.id', '=', 'si.warehouse_id')
             ->join('product_variants as pv', 'pv.id', '=', 'si.product_variant_id')
             ->join('products as p', 'p.id', '=', 'pv.product_id')
             ->where('si.tenant_id', $tenantId)
             ->when($storeId !== null, fn ($query) => $query->where('w.store_id', $storeId))
-            ->select([
+            ->orderBy('p.name');
+
+        // Prova prima con campi extra (barcode, sku, cost_price)
+        try {
+            $rows = (clone $baseQuery)->select([
                 'si.id',
                 'si.warehouse_id',
                 'w.name as warehouse_name',
@@ -43,9 +47,24 @@ class InventoryController extends Controller
                 'si.reorder_point',
                 'si.safety_stock',
                 DB::raw('(si.on_hand - si.reserved) as available'),
-            ])
-            ->orderBy('p.name')
-            ->get();
+            ])->get();
+        } catch (\Throwable) {
+            // Fallback senza colonne opzionali
+            $rows = (clone $baseQuery)->select([
+                'si.id',
+                'si.warehouse_id',
+                'w.name as warehouse_name',
+                'si.product_variant_id',
+                'p.name as product_name',
+                'pv.flavor',
+                'pv.sale_price',
+                'si.on_hand',
+                'si.reserved',
+                'si.reorder_point',
+                'si.safety_stock',
+                DB::raw('(si.on_hand - si.reserved) as available'),
+            ])->get();
+        }
 
         return response()->json(['data' => $rows]);
     }
