@@ -225,7 +225,7 @@ export default function Layout({ user, setUser }) {
         {/* Nav */}
         <nav className="sp-sidebar-nav" style={{ padding: collapsed ? '8px 0' : '12px 10px' }}>
           {filteredNav.map((section) => {
-            const isOpen = collapsed || openSections[section.section] === true;
+            // Accordions always closed — navigazione solo via flyout hover
             return (
               <div
                 key={section.section}
@@ -233,52 +233,20 @@ export default function Layout({ user, setUser }) {
                 onMouseEnter={(e) => handleSectionEnter(section.section, section.items, e)}
                 onMouseLeave={scheduleClose}
               >
-                {/* Section Header (accordion trigger) */}
+                {/* Section Header — solo label, nessun toggle */}
                 {!collapsed ? (
-                  <button
-                    className="sp-nav-section-header"
-                    onClick={() => toggleSection(section.section)}
-                    aria-expanded={isOpen}
-                  >
+                  <div className="sp-nav-section-header" style={{ cursor: 'default', userSelect: 'none' }}>
                     <span className="sp-nav-section-title" style={{ marginBottom: 0, padding: 0 }}>
                       {section.section}
                     </span>
-                    <ChevronDown
-                      size={12}
-                      className="sp-nav-section-chevron"
-                      style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }}
-                    />
-                  </button>
+                    <ChevronRight size={11} style={{ color: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
+                  </div>
                 ) : (
                   <div className="sp-nav-section-divider" />
                 )}
 
-                {/* Items */}
-                <div
-                  className="sp-nav-section-items"
-                  style={{
-                    maxHeight: isOpen ? '500px' : '0px',
-                    overflow: 'hidden',
-                    transition: 'max-height 0.25s cubic-bezier(0.4,0,0.2,1)',
-                  }}
-                >
-                  {section.items.map((item) => {
-                    const Icon = item.icon;
-                    const active = isActive(item.href, item.activeKey);
-                    return (
-                      <button
-                        key={item.href}
-                        onClick={() => navigate(item.href)}
-                        className={`sp-nav-item ${active ? 'active' : ''} ${collapsed ? 'sp-nav-item-collapsed' : ''}`}
-                        title={collapsed ? item.label : undefined}
-                        style={collapsed ? { justifyContent: 'center', padding: '10px 0', width: '100%' } : {}}
-                      >
-                        <Icon size={18} className="sp-nav-icon" />
-                        {!collapsed && <span>{item.label}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* Items: sempre nascosti — visibili solo nel flyout */}
+                <div style={{ maxHeight: '0px', overflow: 'hidden' }} />
               </div>
             );
           })}
