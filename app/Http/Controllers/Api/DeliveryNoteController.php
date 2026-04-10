@@ -178,6 +178,71 @@ class DeliveryNoteController extends Controller
             DB::table('inventory_discrepancies')->insert($discrepancies);
         }
 
+        // ── Aggiorna stock_items per ogni articolo ricevuto ──────────────────
+        $warehouse = DB::table('warehouses')
+            ->where('store_id', $note->store_id)
+            ->where('tenant_id', $tenantId)
+            ->orderBy('id')
+            ->first();
+
+        if ($warehouse) {
+            foreach ($items as $item) {
+                $noteItem = DB::table('delivery_note_items')
+                    ->where('id', $item['id'])
+                    ->where('delivery_note_id', $id)
+                    ->first();
+
+                if (!$noteItem || !$noteItem->product_variant_id || $item['received_qty'] <= 0) continue;
+
+                // Upsert stock_items — crea o aggiorna on_hand
+                $existing = DB::table('stock_items')
+                    ->where('tenant_id', $tenantId)
+                    ->where('warehouse_id', $warehouse->id)
+                    ->where('product_variant_id', $noteItem->product_variant_id)
+                    ->first();
+
+                if ($existing) {
+                    DB::table('stock_items')
+                        ->where('id', $existing->id)
+                        ->update([
+                            'on_hand'    => $existing->on_hand + $item['received_qty'],
+                            'updated_at' => now(),
+                        ]);
+                } else {
+                    DB::table('stock_items')->insert([
+                        'tenant_id'          => $tenantId,
+                        'warehouse_id'       => $warehouse->id,
+                        'product_variant_id' => $noteItem->product_variant_id,
+                        'on_hand'            => $item['received_qty'],
+                        'reserved'           => 0,
+                        'reorder_point'      => 0,
+                        'safety_stock'       => 0,
+                        'created_at'         => now(),
+                        'updated_at'         => now(),
+                    ]);
+                }
+
+                // Traccia il movimento
+                try {
+                    DB::table('stock_movements')->insert([
+                        'tenant_id'          => $tenantId,
+                        'warehouse_id'       => $warehouse->id,
+                        'product_variant_id' => $noteItem->product_variant_id,
+                        'movement_type'      => 'in',
+                        'qty'                => $item['received_qty'],
+                        'unit_cost'          => $noteItem->unit_cost ?? 0,
+                        'reference_type'     => 'delivery_note',
+                        'reference_id'       => $id,
+                        'employee_id'        => $request->user()->id,
+                        'occurred_at'        => now(),
+                        'created_at'         => now(),
+                        'updated_at'         => now(),
+                    ]);
+                } catch (\Throwable) { /* stock_movements potrebbe non essere ancora migrata */ }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         DB::table('delivery_notes')->where('id', $id)->update([
             'status'      => $hasDiscrepancy ? 'discrepancy' : 'received',
             'received_by' => $request->user()->id,

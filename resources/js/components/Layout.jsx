@@ -44,12 +44,12 @@ const allNavigation = [
 
   // 4. Magazzino ────────────────────────────────────────────────────
   { section: 'Magazzino', items: [
-    { label: 'Giacenze & Stock',       href: '/inventory',    icon: Warehouse,   roles: ['superadmin','admin_cliente'] },
+    { label: 'Giacenze & Stock',       href: '/inventory',    icon: Warehouse,   roles: ['superadmin','admin_cliente'], activeKey: '/inventory' },
     { label: 'Prodotti',               href: '/catalog',      icon: Package,     roles: ['superadmin','admin_cliente'] },
     { label: 'Carico Merce (DDT)',     href: '/supplier-delivery', icon: Truck,  roles: ['superadmin','admin_cliente'] },
     { label: 'Trasferimenti',          href: '/stock-transfers', icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
     { label: 'Inventario Guidato',     href: '/inventory/count', icon: ClipboardList, roles: ['superadmin','admin_cliente'] },
-    { label: 'Prodotti Sotto Scorta',  href: '/inventory',    icon: AlertCircle, roles: ['superadmin','admin_cliente'] },
+    { label: 'Prodotti Sotto Scorta',  href: '/inventory',    icon: AlertCircle, roles: ['superadmin','admin_cliente'], activeKey: '/inventory/low-stock' },
   ]},
 
   // 5. Acquisti / Fornitori ─────────────────────────────────────────
@@ -166,9 +166,10 @@ export default function Layout({ user, setUser }) {
     })).filter(section => section.items.length > 0);
   }, [userRoles]);
 
-  const isActive = (href) => {
-    if (href === '/') return location.pathname === '/';
-    return location.pathname === href; // exact match — evita doppia attivazione parent/child
+  const isActive = (href, activeKey) => {
+    const key = activeKey ?? href;
+    if (key === '/') return location.pathname === '/';
+    return location.pathname === key;
   };
 
   // Auto-open section of active item
@@ -263,7 +264,7 @@ export default function Layout({ user, setUser }) {
                 >
                   {section.items.map((item) => {
                     const Icon = item.icon;
-                    const active = isActive(item.href);
+                    const active = isActive(item.href, item.activeKey);
                     return (
                       <button
                         key={item.href}
