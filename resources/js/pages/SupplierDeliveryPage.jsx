@@ -73,9 +73,9 @@ export default function SupplierDeliveryPage() {
     if (!v) return null;
     return stockItems.find(s =>
       String(s.product_variant_id) === v ||
-      (s.barcode        && s.barcode.trim().toLowerCase()      === v) ||
-      (s.sku            && s.sku.trim().toLowerCase()          === v) ||
-      (s.variant_sku    && s.variant_sku.trim().toLowerCase()  === v)
+      (s.barcode      && s.barcode.trim().toLowerCase()      === v) ||
+      (s.variant_sku  && s.variant_sku.trim().toLowerCase()  === v) ||
+      (s.product_sku  && s.product_sku.trim().toLowerCase()  === v)
     ) || null;
   };
 
