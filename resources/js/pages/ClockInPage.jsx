@@ -450,7 +450,8 @@ function KioskView() {
 ═══════════════════════════════════════════════════════════ */
 export default function ClockInPage() {
   const { user } = useOutletContext() || {};
-  const role = user?.role || '';
-  const isAdmin = role === 'superadmin' || role === 'admin_cliente';
+  // user.roles è un array (es. ['superadmin'] o ['dipendente'])
+  const roles = user?.roles || [];
+  const isAdmin = roles.includes('superadmin') || roles.includes('admin_cliente');
   return isAdmin ? <AdminPresenceView /> : <KioskView />;
 }

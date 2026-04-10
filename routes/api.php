@@ -235,6 +235,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/attendance/employees-for-kiosk', [AttendanceController::class, 'employeesForKiosk']);
         Route::post('/attendance/checkin', [AttendanceController::class, 'checkIn']);
         Route::post('/attendance/checkout', [AttendanceController::class, 'checkOut']);
+
+        // Clienti: i dipendenti possono creare/modificare clienti dal POS
+        Route::get('/customers', [CustomerController::class, 'index']);
+        Route::get('/customers/{customerId}', [CustomerController::class, 'show']);
+        Route::post('/customers', [CustomerController::class, 'store']);
+        Route::put('/customers/{customerId}', [CustomerController::class, 'update']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente,cliente_finale')->group(function () {
