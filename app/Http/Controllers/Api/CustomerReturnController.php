@@ -82,10 +82,28 @@ class CustomerReturnController extends Controller
     {
         $tenantId = $request->attributes->get('tenant_id');
 
-        $validator = Validator::make($request->all(), [
+        // Normalize: accetta sia 'order_id' che 'original_order_id' (POS)
+        $input = $request->all();
+        if (!isset($input['order_id']) && isset($input['original_order_id'])) {
+            $input['order_id'] = $input['original_order_id'];
+        }
+        // Normalize lines: accetta sia 'quantity'/'unit_price' che 'qty'/'unit_refund_amount' (POS)
+        if (!empty($input['lines'])) {
+            $input['lines'] = array_map(function ($l) {
+                if (!isset($l['quantity']) && isset($l['qty'])) {
+                    $l['quantity'] = $l['qty'];
+                }
+                if (!isset($l['unit_price']) && isset($l['unit_refund_amount'])) {
+                    $l['unit_price'] = $l['unit_refund_amount'];
+                }
+                return $l;
+            }, $input['lines']);
+        }
+
+        $validator = Validator::make($input, [
             'order_id'      => 'required|integer',
-            'customer_id'   => 'required|integer',
-            'reason'        => 'required|in:defective,wrong_item,damaged,changed_mind,other',
+            'customer_id'   => 'nullable|integer',
+            'reason'        => 'required|in:customer_request,defective,wrong_item,damaged,changed_mind,other',
             'notes'         => 'nullable|string|max:2000',
             'refund_method' => 'nullable|in:credit,cash,bank_transfer,store_credit',
             'lines'         => 'required|array|min:1',
@@ -96,7 +114,7 @@ class CustomerReturnController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json(['errors' => $validator->errors(), 'message' => $validator->errors()->first()], 422);
         }
 
         $data = $validator->validated();
@@ -111,6 +129,9 @@ class CustomerReturnController extends Controller
             return response()->json(['message' => 'Ordine non trovato.'], 404);
         }
 
+        // Recupera customer_id dall'ordine se non fornito
+        $customerId = $data['customer_id'] ?? $order->customer_id ?? null;
+
         $rma = 'RMA-' . strtoupper(Str::random(8));
         $now = now();
         $refundAmount = collect($data['lines'])->sum(fn ($l) => $l['quantity'] * $l['unit_price']);
@@ -118,7 +139,7 @@ class CustomerReturnController extends Controller
         $returnId = DB::table('customer_returns')->insertGetId([
             'tenant_id'     => $tenantId,
             'order_id'      => $data['order_id'],
-            'customer_id'   => $data['customer_id'],
+            'customer_id'   => $customerId,
             'processed_by'  => null,
             'rma_number'    => $rma,
             'status'        => 'pending',
