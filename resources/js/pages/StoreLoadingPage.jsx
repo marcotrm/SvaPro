@@ -57,15 +57,23 @@ export default function StoreLoadingPage() {
     }
   };
 
-  // Cerca item tramite barcode/SKU/nome
+  // Cerca item nella bolla per barcode, SKU, ID variante o nome parziale
   const resolveBarcode = (val) => {
-    const t = val.trim().toLowerCase();
-    return items.findIndex(i =>
-      (i.barcode && i.barcode.toLowerCase() === t) ||
-      (i.sku && i.sku.toLowerCase() === t) ||
-      (i.product_variant_id && String(i.product_variant_id) === t) ||
-      i.product_name.toLowerCase().includes(t)
+    const t = String(val).trim().toLowerCase();
+    if (!t) return -1;
+
+    // Match esatto prima (barcode, sku, id)
+    let idx = items.findIndex(i =>
+      (i.barcode       && i.barcode.trim().toLowerCase()       === t) ||
+      (i.sku           && i.sku.trim().toLowerCase()           === t) ||
+      (i.variant_sku   && i.variant_sku.trim().toLowerCase()   === t) ||
+      String(i.product_variant_id) === t
     );
+    // Fallback: nome parziale
+    if (idx < 0) {
+      idx = items.findIndex(i => i.product_name?.toLowerCase().includes(t));
+    }
+    return idx;
   };
 
   const handleBarcodeScan = (e) => {

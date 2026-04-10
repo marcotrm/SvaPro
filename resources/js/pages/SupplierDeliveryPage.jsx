@@ -67,24 +67,27 @@ export default function SupplierDeliveryPage() {
 
   const removeLine = (i) => setLines(lines.filter((_, idx) => idx !== i));
 
+  // Helper: cerca uno stock item per barcode, SKU, o ID variante
+  const findStockItem = (val) => {
+    const v = String(val).trim().toLowerCase();
+    if (!v) return null;
+    return stockItems.find(s =>
+      String(s.product_variant_id) === v ||
+      (s.barcode        && s.barcode.trim().toLowerCase()      === v) ||
+      (s.sku            && s.sku.trim().toLowerCase()          === v) ||
+      (s.variant_sku    && s.variant_sku.trim().toLowerCase()  === v)
+    ) || null;
+  };
+
   const updateLine = (i, field, val) => {
     const next = [...lines];
     next[i] = { ...next[i], [field]: val };
-    // Auto-fill product name from stock (by ID or barcode/SKU)
     if (field === 'product_variant_id') {
-      const found = stockItems.find(s =>
-        String(s.product_variant_id) === String(val) ||
-        String(s.variant_id) === String(val) ||
-        (s.barcode && s.barcode.toLowerCase() === val.toString().toLowerCase()) ||
-        (s.sku && s.sku.toLowerCase() === val.toString().toLowerCase())
-      );
+      const found = findStockItem(val);
       if (found) {
-        next[i].product_name = found.product_name || found.name || '';
-        next[i].unit_cost = found.cost_price || found.sale_price || 0;
-        // Se trovato per barcode/SKU, sostituisce l'ID con l'ID reale
-        if (String(found.product_variant_id || found.variant_id) !== String(val)) {
-          next[i].product_variant_id = found.product_variant_id || found.variant_id || val;
-        }
+        next[i].product_name       = found.product_name || '';
+        next[i].unit_cost          = found.cost_price   || found.sale_price || 0;
+        next[i].product_variant_id = found.product_variant_id;
       }
     }
     setLines(next);
@@ -96,27 +99,19 @@ export default function SupplierDeliveryPage() {
     if (e.key !== 'Enter') return;
     const val = barcodeScan.trim();
     if (!val) return;
-    const found = stockItems.find(s =>
-      (s.barcode && s.barcode.toLowerCase() === val.toLowerCase()) ||
-      (s.sku && s.sku.toLowerCase() === val.toLowerCase()) ||
-      String(s.product_variant_id) === String(val) ||
-      String(s.variant_id) === String(val)
-    );
+    const found = findStockItem(val);
     if (found) {
-      const variantId = found.product_variant_id || found.variant_id;
-      // Se riga vuota disponibile, usa quella, altrimenti aggiunge
-      const emptyIdx = lines.findIndex(l => !l.product_variant_id && !l.product_name);
+      const variantId = found.product_variant_id;
+      const emptyIdx  = lines.findIndex(l => !l.product_variant_id && !l.product_name);
+      const newLine   = { product_variant_id: variantId, product_name: found.product_name || '', unit_cost: found.cost_price || found.sale_price || 0, qty: 1 };
       if (emptyIdx >= 0) {
-        const next = [...lines];
-        next[emptyIdx] = { product_variant_id: variantId, product_name: found.product_name || '', unit_cost: found.cost_price || 0, qty: 1 };
-        setLines(next);
+        const next = [...lines]; next[emptyIdx] = newLine; setLines(next);
       } else {
-        setLines([...lines, { product_variant_id: variantId, product_name: found.product_name || '', unit_cost: found.cost_price || 0, qty: 1 }]);
+        setLines([...lines, newLine]);
       }
     } else {
-      // Prodotto non trovato
-      setError(`Barcode/SKU "${val}" non trovato nel catalogo.`);
-      setTimeout(() => setError(''), 3000);
+      setError(`Barcode/SKU "${val}" non trovato. Verifica che il prodotto abbia un barcode nel catalogo.`);
+      setTimeout(() => setError(''), 4000);
     }
     setBarcodeScan('');
   };
