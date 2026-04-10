@@ -25,7 +25,6 @@ const allNavigation = [
 
   // Vendite ─────────────────────────────────────────────────────────
   { section: 'Vendite', items: [
-    { label: 'Fatturazione',           href: '/invoices',     icon: FileText,    roles: ['superadmin','admin_cliente'] },
     { label: 'Report & Analisi',       href: '/reports',      icon: Activity,    roles: ['superadmin','admin_cliente'] },
   ]},
 
@@ -68,14 +67,15 @@ const allNavigation = [
   // 9. Amministrazione ──────────────────────────────────────────────
   { section: 'Amministrazione', items: [
     { label: 'Negozi & Punti Vendita', href: '/stores',            icon: Store,         roles: ['superadmin','admin_cliente'] },
-    { label: 'Ruoli & Permessi',       href: '/roles-permissions', icon: Shield,        roles: ['superadmin'] },
-    { label: 'Audit Log',              href: '/audit-log',          icon: ClipboardList, roles: ['superadmin'] },
-    { label: 'Control Tower',          href: '/control-tower',      icon: Activity,      roles: ['superadmin'] },
+    { label: 'Fatturazione',           href: '/invoices',          icon: FileText,      roles: ['superadmin','admin_cliente'] },
   ]},
 
   // 10. Impostazioni ────────────────────────────────────────────────
   { section: 'Impostazioni', items: [
-    { label: 'Configurazione',         href: '/settings',     icon: Settings,    roles: ['superadmin','admin_cliente'] },
+    { label: 'Configurazione',         href: '/settings',          icon: Settings,      roles: ['superadmin','admin_cliente'] },
+    { label: 'Ruoli & Permessi',       href: '/roles-permissions', icon: Shield,        roles: ['superadmin'] },
+    { label: 'Audit Log',              href: '/audit-log',         icon: ClipboardList, roles: ['superadmin'] },
+    { label: 'Control Tower',          href: '/control-tower',     icon: Activity,      roles: ['superadmin'] },
   ]},
 ];
 
