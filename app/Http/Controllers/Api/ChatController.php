@@ -1,0 +1,101 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class ChatController extends Controller
+{
+    /** GET /chat/messages — messaggi del negozio (con polling) */
+    public function index(Request $request)
+    {
+        $tenantId = $request->user()->tenant_id;
+        $storeId  = $request->query('store_id');
+        $since    = $request->query('since'); // timestamp ISO per prendere solo i nuovi
+
+        $query = DB::table('chat_messages as cm')
+            ->where('cm.tenant_id', $tenantId)
+            ->orderBy('cm.created_at', 'asc')
+            ->limit(100);
+
+        // Filtra per negozio o messaggi broadcast (store_id null)
+        if ($storeId) {
+            $query->where(function ($q) use ($storeId) {
+                $q->where('cm.store_id', $storeId)->orWhereNull('cm.store_id');
+            });
+        }
+
+        if ($since) {
+            $query->where('cm.created_at', '>', $since);
+        }
+
+        $messages = $query->get();
+
+        // Conta non letti
+        $unreadCount = DB::table('chat_messages')
+            ->where('tenant_id', $tenantId)
+            ->whereNull('read_at')
+            ->where('sender_user_id', '!=', $request->user()->id)
+            ->when($storeId, fn($q) => $q->where(fn($q2) => $q2->where('store_id', $storeId)->orWhereNull('store_id')))
+            ->count();
+
+        return response()->json([
+            'data'         => $messages,
+            'unread_count' => $unreadCount,
+        ]);
+    }
+
+    /** POST /chat/messages — invia messaggio */
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'message'  => 'required|string|max:1000',
+            'store_id' => 'nullable|integer',
+        ]);
+
+        $user = $request->user();
+
+        // Ottieni ruolo dell'utente
+        $role = DB::table('user_roles as ur')
+            ->join('roles as r', 'r.id', '=', 'ur.role_id')
+            ->where('ur.user_id', $user->id)
+            ->value('r.code') ?? 'unknown';
+
+        $id = DB::table('chat_messages')->insertGetId([
+            'tenant_id'      => $user->tenant_id,
+            'store_id'       => $data['store_id'] ?? null,
+            'sender_user_id' => $user->id,
+            'sender_name'    => $user->name,
+            'sender_role'    => $role,
+            'message'        => $data['message'],
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]);
+
+        $msg = DB::table('chat_messages')->where('id', $id)->first();
+
+        return response()->json(['data' => $msg], 201);
+    }
+
+    /** POST /chat/messages/read — segna come letti */
+    public function markRead(Request $request)
+    {
+        $user     = $request->user();
+        $storeId  = $request->input('store_id');
+
+        $query = DB::table('chat_messages')
+            ->where('tenant_id', $user->tenant_id)
+            ->whereNull('read_at')
+            ->where('sender_user_id', '!=', $user->id);
+
+        if ($storeId) {
+            $query->where(fn($q) => $q->where('store_id', $storeId)->orWhereNull('store_id'));
+        }
+
+        $query->update(['read_at' => now(), 'read_by' => $user->id, 'updated_at' => now()]);
+
+        return response()->json(['message' => 'Messaggi segnati come letti.']);
+    }
+}

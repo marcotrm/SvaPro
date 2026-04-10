@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
 import { Toaster } from 'react-hot-toast';
+import ChatWidget from './ChatWidget.jsx';
 import { 
   BarChart3, Package, Warehouse, ClipboardList, ShoppingBag,
   Users, Monitor, Truck, Settings, LogOut, Bell,
@@ -17,6 +18,7 @@ const allNavigation = [
     { label: 'Dashboard', href: '/dashboard', icon: BarChart3, roles: ['superadmin','admin_cliente'] },
     { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in', icon: Fingerprint, roles: ['dipendente'] },
     { label: 'Clienti', href: '/customers', icon: Users, roles: ['dipendente'] },
+    { label: '📦 Carico Negozio', href: '/store-loading', icon: Package, roles: ['dipendente'] },
   ]},
   { section: 'Gestione', items: [
     { label: 'Prodotti', href: '/catalog', icon: Package, roles: ['superadmin','admin_cliente'] },
@@ -302,6 +304,7 @@ export default function Layout({ user, setUser }) {
         </section>
       </main>
 
+      <ChatWidget />
       <Toaster
         position="bottom-right"
         toastOptions={{

@@ -41,6 +41,7 @@ const ClockInPage = lazy(() => import('./pages/ClockInPage.jsx'));
 const CustomerDetailPage = lazy(() => import('./pages/CustomerDetailPage.jsx'));
 const GamificationPage = lazy(() => import('./pages/GamificationPage.jsx'));
 const SupplierDeliveryPage = lazy(() => import('./pages/SupplierDeliveryPage.jsx'));
+const StoreLoadingPage     = lazy(() => import('./pages/StoreLoadingPage.jsx'));
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -159,6 +160,7 @@ export default function App() {
               <Route path="/clock-in" element={<ClockInPage />} />
               <Route path="/stock-transfers" element={<StockTransfersPage />} />
               <Route path="/stores" element={<StoresPage />} />
+              <Route path="/store-loading" element={<StoreLoadingPage />} />
             </Route>
           </Route>
 
