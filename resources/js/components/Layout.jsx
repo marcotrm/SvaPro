@@ -17,7 +17,6 @@ const allNavigation = [
   { section: 'Principale', items: [
     { label: 'POS Cassa',              href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente','dipendente'] },
     { label: 'Panoramica Generale',    href: '/dashboard',    icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
-    { label: 'Resi',                   href: '/returns',      icon: RotateCcw,   roles: ['superadmin','admin_cliente'] },
     { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in',    icon: Fingerprint, roles: ['dipendente'] },
     { label: '📦 Carico Negozio',        href: '/store-loading', icon: Package,  roles: ['dipendente'] },
     { label: 'Clienti',                href: '/customers',    icon: Users,       roles: ['dipendente'] },
@@ -33,6 +32,7 @@ const allNavigation = [
     { label: 'Giacenze & Stock',       href: '/inventory',    icon: Warehouse,   roles: ['superadmin','admin_cliente'] },
     { label: 'Prodotti',               href: '/catalog',      icon: Package,     roles: ['superadmin','admin_cliente'] },
     { label: 'Carico Merce (DDT)',     href: '/supplier-delivery', icon: Truck,  roles: ['superadmin','admin_cliente'] },
+    { label: 'Resi',                   href: '/returns',      icon: RotateCcw,   roles: ['superadmin','admin_cliente'] },
     { label: 'Trasferimenti',          href: '/stock-transfers', icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
     { label: 'Inventario Guidato',     href: '/inventory/count', icon: ClipboardList, roles: ['superadmin','admin_cliente'] },
   ]},
@@ -48,7 +48,6 @@ const allNavigation = [
   // 6. Clienti ──────────────────────────────────────────────────────
   { section: 'Clienti', items: [
     { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,       roles: ['superadmin','admin_cliente'] },
-    { label: 'Resi Clienti',           href: '/returns',      icon: RotateCcw,   roles: ['superadmin','admin_cliente'] },
   ]},
 
   // 7. Marketing ────────────────────────────────────────────────────
