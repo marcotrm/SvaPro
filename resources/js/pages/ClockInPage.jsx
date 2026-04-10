@@ -203,7 +203,6 @@ function KioskView() {
   const [lastStatus, setLastStatus]      = useState(null);
   const [todayRecords, setTodayRecords]  = useState([]);
   const [loading, setLoading]            = useState(false);
-  const [loadingEmp, setLoadingEmp]      = useState(true);
   const [message, setMessage]            = useState(null);
   const [barcodeInput, setBarcodeInput]  = useState('');
   const [clockStr, setClockStr]          = useState('');
@@ -222,12 +221,11 @@ function KioskView() {
     return () => clearInterval(id);
   }, []);
 
+  // Carica la lista dipendenti per resolveEmployee (barcode → id)
   useEffect(() => {
-    setLoadingEmp(true);
     attendance.getEmployeesKiosk()
       .then(res => { const list = res.data?.data; setEmployees(Array.isArray(list) ? list : []); })
-      .catch(() => setEmployees([]))
-      .finally(() => setLoadingEmp(false));
+      .catch(() => setEmployees([]));
   }, []);
 
   useEffect(() => {
@@ -438,56 +436,10 @@ function KioskView() {
           />
         </div>
 
-        {/* Griglia dipendenti */}
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12, textAlign: 'center' }}>
-          — oppure scegli il tuo nome —
+        {/* Istruzioni badge */}
+        <div style={{ textAlign: 'center', marginTop: 8, color: 'rgba(255,255,255,0.18)', fontSize: 12 }}>
+          Inserisci il codice del tuo badge e premi <kbd style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace', fontSize: 11 }}>Invio</kbd>
         </div>
-
-        {loadingEmp ? (
-          <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', padding: 24 }}>Caricamento...</div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10, maxHeight: 320, overflowY: 'auto' }}>
-            {employees.map(emp => {
-              const color = avatarColor(emp.id);
-              const name  = `${emp.first_name||''} ${emp.last_name||''}`.trim() || emp.name || `#${emp.id}`;
-              return (
-                <button
-                  key={emp.id}
-                  onClick={() => performClock(emp)}
-                  disabled={loading}
-                  style={{
-                    background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.08)',
-                    borderRadius: 16, padding: '16px 12px', cursor: loading ? 'not-allowed' : 'pointer',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-                    transition: 'all 0.15s', opacity: loading ? 0.5 : 1,
-                  }}
-                  onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = 'rgba(123,111,208,0.15)'; e.currentTarget.style.borderColor = 'rgba(123,111,208,0.4)'; e.currentTarget.style.transform = 'translateY(-2px)'; } }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.transform = ''; }}
-                >
-                  <div style={{
-                    width: 52, height: 52, borderRadius: '50%', background: color,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 18, fontWeight: 900, color: '#fff', flexShrink: 0, overflow: 'hidden',
-                  }}>
-                    {emp.photo_url
-                      ? <img src={emp.photo_url} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                      : initials(emp)
-                    }
-                  </div>
-                  <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, textAlign: 'center', lineHeight: 1.3 }}>{name}</div>
-                  {emp.employee_code && (
-                    <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, fontFamily: 'monospace' }}>#{emp.employee_code}</div>
-                  )}
-                </button>
-              );
-            })}
-            {employees.length === 0 && (
-              <div style={{ gridColumn: '1/-1', color: 'rgba(255,255,255,0.25)', textAlign: 'center', padding: 20 }}>
-                Nessun dipendente trovato
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
