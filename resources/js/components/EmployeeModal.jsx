@@ -91,11 +91,11 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
 
       if (employee?.id) {
         await employees.updateEmployee(employee.id, payload);
+        onSave(isNew, { ...payload, id: employee.id });
       } else {
         await employees.createEmployee(payload);
+        onSave(isNew, null);
       }
-
-      onSave(isNew);
     } catch (err) {
       const serverErrors = err.response?.data?.errors;
       if (serverErrors) {

@@ -48,10 +48,23 @@ export default function EmployeesPage() {
 
   const handleOpenModal = (employee = null) => { setSelectedEmployee(employee); setShowModal(true); };
   const handleCloseModal = () => { setShowModal(false); setSelectedEmployee(null); };
-  const handleSaveEmployee = async (isNew = false) => {
-    handleCloseModal(); // chiude subito il modal
-    await refreshEmployees(); // aggiorna la lista in background
-    toast.success(isNew ? 'Dipendente creato!' : 'Dipendente aggiornato!');
+
+  const handleSaveEmployee = async (isNew = false, updatedData = null) => {
+    handleCloseModal();
+
+    // Aggiornamento ottimistico: mostra subito la nuova foto senza aspettare il server
+    if (!isNew && updatedData?.id && updatedData?.photo_url !== undefined) {
+      setEmployeesList(prev => prev.map(e =>
+        e.id === updatedData.id ? { ...e, photo_url: updatedData.photo_url, first_name: updatedData.first_name, last_name: updatedData.last_name } : e
+      ));
+    }
+
+    // Notifica la dashboard (e altri componenti in ascolto) che un dipendente è cambiato
+    window.dispatchEvent(new CustomEvent('employeeUpdated'));
+
+    // Poi aggiorna dal server in background
+    await refreshEmployees();
+    toast.success(isNew ? 'Dipendente creato! 🎉' : 'Dipendente aggiornato! ✅');
   };
 
   const handleDelete = async (employee) => {

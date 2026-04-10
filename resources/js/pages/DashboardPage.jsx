@@ -320,7 +320,15 @@ export default function DashboardPage() {
     } finally { setLoading(false); }
   }, [selectedStoreId, activePeriod]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Si aggiorna quando main fetchData cambia
+  React.useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Ascolta aggiornamenti dipendenti da altre pagine (es. EmployeesPage)
+  React.useEffect(() => {
+    const handleEmployeeUpdated = () => { fetchData(); };
+    window.addEventListener('employeeUpdated', handleEmployeeUpdated);
+    return () => window.removeEventListener('employeeUpdated', handleEmployeeUpdated);
+  }, [fetchData]);
 
   const fmt  = v  => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
   const fmtN = v  => new Intl.NumberFormat('it-IT').format(v || 0);
