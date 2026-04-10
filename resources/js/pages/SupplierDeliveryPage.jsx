@@ -69,14 +69,13 @@ export default function SupplierDeliveryPage() {
 
   const removeLine = (i) => setLines(lines.filter((_, idx) => idx !== i));
 
-  // Helper: cerca uno stock item per barcode, SKU, o ID variante
+  // Helper: cerca uno stock item per barcode (su prodotto), SKU prodotto, o ID variante numerico
   const findStockItem = (val) => {
     const v = String(val).trim().toLowerCase();
     if (!v) return null;
     return stockItems.find(s =>
       String(s.product_variant_id) === v ||
       (s.barcode      && s.barcode.trim().toLowerCase()      === v) ||
-      (s.variant_sku  && s.variant_sku.trim().toLowerCase()  === v) ||
       (s.product_sku  && s.product_sku.trim().toLowerCase()  === v)
     ) || null;
   };

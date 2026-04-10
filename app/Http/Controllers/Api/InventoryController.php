@@ -28,15 +28,14 @@ class InventoryController extends Controller
             ->when($storeId !== null, fn ($query) => $query->where('w.store_id', $storeId))
             ->orderBy('p.name');
 
-        // Prova prima con campi extra (barcode, sku, cost_price)
+        // Prova prima con campi extra (barcode su p, cost_price su pv)
         try {
             $rows = (clone $baseQuery)->select([
                 'si.id',
                 'si.warehouse_id',
                 'w.name as warehouse_name',
                 'si.product_variant_id',
-                'pv.barcode',
-                'pv.sku as variant_sku',
+                'p.barcode',
                 'p.sku as product_sku',
                 'p.name as product_name',
                 'pv.flavor',
