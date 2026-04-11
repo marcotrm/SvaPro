@@ -18,6 +18,11 @@ export default function CustomerDetailPage() {
   const [newNote, setNewNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Storico ordini: filtri e dettaglio
+  const [orderDateFrom, setOrderDateFrom] = useState('');
+  const [orderDateTo, setOrderDateTo] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState(null); // ordine aperto nel modal dettaglio
+  const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
   // CRM
   const [waMsgTemplate, setWaMsgTemplate] = useState('');
   const [waMsg, setWaMsg] = useState('');
@@ -182,29 +187,131 @@ export default function CustomerDetailPage() {
       )}
 
       {/* ── ORDINI ── */}
-      {activeTab === 'ordini' && (
-        <div className="card-v3 overflow-hidden">
-          <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f1f5f9' }}>
-            <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Storico Ordini ({ordersList.length})</h2>
+      {activeTab === 'ordini' && (() => {
+        // Filtra per data
+        const filteredOrders = ordersList.filter(o => {
+          if (orderDateFrom && new Date(o.created_at) < new Date(orderDateFrom)) return false;
+          if (orderDateTo && new Date(o.created_at) > new Date(orderDateTo + 'T23:59:59')) return false;
+          return true;
+        });
+        const openOrderDetail = async (o) => {
+          setSelectedOrder(o);
+          if (!o.lines) {
+            setLoadingOrderDetail(true);
+            try {
+              const res = await ordersApi.getOrder(o.id);
+              const detail = res.data?.data || res.data;
+              setSelectedOrder(detail);
+            } catch {} finally { setLoadingOrderDetail(false); }
+          }
+        };
+        return (
+          <div className="card-v3 overflow-hidden">
+            {/* Filtri data */}
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Storico Ordini ({filteredOrders.length})</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Dal</label>
+                <input type="date" value={orderDateFrom} onChange={e => setOrderDateFrom(e.target.value)}
+                  style={{ padding: '6px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none' }} />
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Al</label>
+                <input type="date" value={orderDateTo} onChange={e => setOrderDateTo(e.target.value)}
+                  style={{ padding: '6px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none' }} />
+                {(orderDateFrom || orderDateTo) && (
+                  <button onClick={() => { setOrderDateFrom(''); setOrderDateTo(''); }}
+                    style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, background: '#f8fafc', cursor: 'pointer', fontWeight: 600, color: '#64748b' }}>
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
+            {filteredOrders.length === 0 ? (
+              <div style={{ padding: '60px 24px', textAlign: 'center', color: '#cbd5e1' }}>Nessun ordine trovato</div>
+            ) : (
+              <table className="table-v3">
+                <thead><tr>
+                  <th>Ordine</th>
+                  <th>Data</th>
+                  <th>Negozio</th>
+                  <th>Totale</th>
+                  <th>Articoli</th>
+                </tr></thead>
+                <tbody>
+                  {filteredOrders.map(o => (
+                    <tr key={o.id} onClick={() => openOrderDetail(o)}
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                      onMouseLeave={e => e.currentTarget.style.background = ''}>
+                      <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#4f46e5' }}>#{String(o.id).padStart(4, '0')}</span></td>
+                      <td>{fmtDate(o.created_at)}</td>
+                      <td style={{ color: '#64748b', fontSize: 13 }}>{o.store_name || '—'}</td>
+                      <td><strong>{fmt(o.grand_total)}</strong></td>
+                      <td style={{ color: '#64748b' }}>
+                        {(o.items_count ?? o.lines_count ?? (o.lines?.length) ?? '—')} art.
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
-          {ordersList.length === 0 ? (
-            <div style={{ padding: '60px 24px', textAlign: 'center', color: '#cbd5e1' }}>Nessun ordine trovato</div>
-          ) : (
-            <table className="table-v3">
-              <thead><tr><th>Ordine</th><th>Data</th><th>Stato</th><th>Totale</th><th>Articoli</th></tr></thead>
-              <tbody>
-                {ordersList.map(o => (
-                  <tr key={o.id}>
-                    <td><span style={{ fontFamily: 'monospace', fontWeight: 700 }}>#{String(o.id).padStart(4, '0')}</span></td>
-                    <td>{fmtDate(o.created_at)}</td>
-                    <td><span className={`badge-v3 ${o.status === 'paid' ? 'badge-v3-emerald' : 'badge-v3-amber'}`}>{o.status}</span></td>
-                    <td><strong>{fmt(o.grand_total)}</strong></td>
-                    <td style={{ color: '#64748b' }}>{(o.lines || []).length} art.</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        );
+      })()}
+
+      {/* Modal dettaglio ordine */}
+      {selectedOrder && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setSelectedOrder(null)}>
+          <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 560, maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 17 }}>Ordine #{String(selectedOrder.id).padStart(4, '0')}</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+                  {fmtDate(selectedOrder.created_at)} {selectedOrder.store_name ? `• ${selectedOrder.store_name}` : ''}
+                </div>
+              </div>
+              <button onClick={() => setSelectedOrder(null)}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: 10, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 18, color: '#64748b' }}>×</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+              {loadingOrderDetail ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Caricamento dettaglio...</div>
+              ) : (selectedOrder.lines || []).length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Nessun dettaglio disponibile</div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Prodotto</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Qtà</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Prezzo</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Totale</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(selectedOrder.lines || []).map((l, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #f8fafc' }}>
+                        <td style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                          {l.product_name || l.service_name || `Variante #${l.product_variant_id}`}
+                          {l.flavor && <span style={{ fontSize: 11, color: '#8b7fcc', display: 'block' }}>Aroma: {l.flavor}</span>}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#4f46e5' }}>{l.qty}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#64748b', fontSize: 13 }}>{fmt(l.unit_price)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#0f172a', fontSize: 14 }}>{fmt(l.line_total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ borderTop: '2px solid #f1f5f9' }}>
+                      <td colSpan={3} style={{ padding: '12px', fontWeight: 800, fontSize: 14, textAlign: 'right' }}>Totale ordine</td>
+                      <td style={{ padding: '12px', textAlign: 'right', fontWeight: 900, fontSize: 18, color: '#4f46e5' }}>{fmt(selectedOrder.grand_total)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
