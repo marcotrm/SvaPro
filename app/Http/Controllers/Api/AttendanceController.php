@@ -28,8 +28,10 @@ class AttendanceController extends Controller
             ->leftJoin('stores as s', 's.id', '=', 'a.store_id')
             ->where('a.tenant_id', $tenantId)
             ->when($storeId, fn($q) => $q->where('a.store_id', $storeId))
-            ->whereDate('a.checked_in_at', $date)
+            ->when($date !== 'all', fn($q) => $q->whereDate('a.checked_in_at', $date))
+            ->when($request->filled('employee_id'), fn($q) => $q->where('a.employee_id', $request->integer('employee_id')))
             ->orderByDesc('a.checked_in_at')
+            ->limit($date === 'all' ? 100 : null)
             ->select([
                 'a.id',
                 'a.employee_id',

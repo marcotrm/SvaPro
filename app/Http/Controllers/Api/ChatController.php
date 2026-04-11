@@ -11,9 +11,16 @@ class ChatController extends Controller
     /** GET /chat/messages — messaggi del negozio (con polling) */
     public function index(Request $request)
     {
-        $tenantId = $request->user()->tenant_id;
+        $user = $request->user();
+        $tenantId = $user->tenant_id;
         $storeId  = $request->query('store_id');
-        $since    = $request->query('since'); // timestamp ISO per prendere solo i nuovi
+
+        // Enforcement Sicurezza
+        if ($user->role === 'dipendente' && $user->employee_store_id) {
+            $storeId = $user->employee_store_id;
+        }
+
+        $since = $request->query('since');
 
         $query = DB::table('chat_messages as cm')
             ->where('cm.tenant_id', $tenantId)
@@ -63,9 +70,15 @@ class ChatController extends Controller
             ->where('ur.user_id', $user->id)
             ->value('r.code') ?? 'unknown';
 
+        // Enforcement Sicurezza: un dipendente può mandare messaggi solo al suo store
+        $storeId = $data['store_id'] ?? null;
+        if ($role === 'dipendente' && $user->employee_store_id) {
+            $storeId = $user->employee_store_id;
+        }
+
         $id = DB::table('chat_messages')->insertGetId([
             'tenant_id'      => $user->tenant_id,
-            'store_id'       => $data['store_id'] ?? null,
+            'store_id'       => $storeId,
             'sender_user_id' => $user->id,
             'sender_name'    => $user->name,
             'sender_role'    => $role,

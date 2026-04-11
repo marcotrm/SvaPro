@@ -19,6 +19,7 @@ function AdminPresenceView() {
   const [loadingLive, setLoadingLive] = useState(true);
   const [clockStr,    setClockStr]    = useState('');
   const [dateStr,     setDateStr]     = useState('');
+  const [filterDate,  setFilterDate]  = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     const tick = () => {
@@ -35,13 +36,13 @@ function AdminPresenceView() {
     try {
       const [liveRes, histRes] = await Promise.allSettled([
         attendance.getLive(),
-        attendance.getList(),
+        attendance.getList({ date: filterDate }),
       ]);
       if (liveRes.status === 'fulfilled') setLiveList(liveRes.value?.data?.data || []);
       if (histRes.status === 'fulfilled') setTodayList(histRes.value?.data?.data || []);
     } catch {}
     setLoadingLive(false);
-  }, []);
+  }, [filterDate]);
 
   useEffect(() => {
     fetchPresence();
@@ -58,7 +59,7 @@ function AdminPresenceView() {
       <div style={{
         background: 'linear-gradient(135deg, #1C1B2E 0%, #2D2B4E 100%)',
         borderRadius: 24, padding: '32px 40px', marginBottom: 28,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16,
         boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
       }}>
         <div>
@@ -72,12 +73,24 @@ function AdminPresenceView() {
             {dateStr}
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 48, fontWeight: 900, color: '#4ade80', lineHeight: 1 }}>{liveList.length}</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>In servizio ora</div>
+        
+        <div style={{ display: 'flex', gap: 20, alignItems: 'center', textAlign: 'right' }}>
+          <div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>Storico data:</div>
+            <input 
+              type="date" 
+              value={filterDate}
+              onChange={e => setFilterDate(e.target.value)}
+              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: '#fff', outline: 'none' }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 48, fontWeight: 900, color: '#4ade80', lineHeight: 1 }}>{liveList.length}</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>In servizio ora</div>
+          </div>
           <button
             onClick={fetchPresence}
-            style={{ marginTop: 12, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '6px 14px', color: 'rgba(255,255,255,0.5)', fontSize: 12, cursor: 'pointer' }}
+            style={{ alignSelf: 'center', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 14px', color: 'rgba(255,255,255,0.8)', fontSize: 12, cursor: 'pointer', height: 'fit-content' }}
           >
             ↺ Aggiorna
           </button>
@@ -131,14 +144,14 @@ function AdminPresenceView() {
         )}
       </div>
 
-      {/* ── Storico timbrature di oggi ── */}
+      {/* ── Storico timbrature ── */}
       <div>
         <div style={{ fontSize: 13, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
-          📋 Timbrature di oggi ({todayList.length})
+          📋 Timbrature del {new Date(filterDate).toLocaleDateString('it-IT')} ({todayList.length})
         </div>
         {todayList.length === 0 ? (
           <div style={{ background: '#fff', borderRadius: 16, padding: 24, textAlign: 'center', color: '#9ca3af', border: '2px dashed #e5e7eb' }}>
-            Nessuna timbratura oggi
+            Nessuna timbratura in questa data
           </div>
         ) : (
           <div style={{ background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
@@ -305,8 +318,26 @@ function KioskView() {
       barcodeRef.current?.focus();
       return;
     }
+    
+    if (phase === 'ask_history') {
+        setLoading(true);
+        try {
+            const tr = await attendance.getList({ employee_id: found.id, date: 'all' });
+            const all = (tr.data?.data || []);
+            setTodayRecords(all.map(r => ({ clock_in: r.checked_in_at, clock_out: r.checked_out_at })));
+            setEmployee(found);
+            setPhase('history_view');
+        } catch {
+            setMessage({ text: 'Errore nel caricamento storico', type: 'error' });
+            setTimeout(() => { setMessage(null); setPhase('idle'); }, 3000);
+        } finally {
+            setLoading(false);
+        }
+        return;
+    }
+
     await performClock(found);
-  }, [barcodeInput, employees]);
+  }, [barcodeInput, employees, phase]);
 
   /* ── Schermata CONFERMA (dopo timbratura) ── */
   if (phase === 'confirmed' && employee) {
@@ -363,6 +394,68 @@ function KioskView() {
     );
   }
 
+  /* ── Schermata STORICO PERSONALE ── */
+  if (phase === 'history_view' && employee) {
+    const recordsByMonth = todayRecords.reduce((acc, rec) => {
+      const month = new Date(rec.clock_in).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+      if (!acc[month]) acc[month] = [];
+      acc[month].push(rec);
+      return acc;
+    }, {});
+
+    return (
+      <div style={{
+        minHeight: '82vh', display: 'flex', flexDirection: 'column', padding: '40px 24px',
+        background: 'linear-gradient(160deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)',
+        borderRadius: 24, width: '100%', maxWidth: 700, margin: '0 auto',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div>
+            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>Storico Timbrature</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#fff' }}>{employee.first_name} {employee.last_name}</div>
+          </div>
+          <button 
+            onClick={() => { setPhase('idle'); setEmployee(null); setTodayRecords([]); }}
+            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 12, padding: '10px 20px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+          >
+            Chiudi
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', paddingRight: 8 }}>
+          {Object.entries(recordsByMonth).map(([month, recs]) => (
+            <div key={month} style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
+                {month}
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {recs.map((rec, i) => (
+                  <div key={i} style={{
+                    background: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: '12px 16px',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <div style={{ fontSize: 15, color: '#fff', fontWeight: 600 }}>
+                      {new Date(rec.clock_in).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit' })}
+                    </div>
+                    <div style={{ display: 'flex', gap: 16 }}>
+                      <span style={{ color: '#4ade80', fontWeight: 700 }}>🟢 {new Date(rec.clock_in).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span style={{ color: rec.clock_out ? '#f87171' : 'rgba(255,255,255,0.2)', fontWeight: 700 }}>
+                        {rec.clock_out ? `🔴 ${new Date(rec.clock_out).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` : '—'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          {todayRecords.length === 0 && (
+            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', padding: 40 }}>Nessuna timbratura recente trovata.</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   /* ── Schermata kiosk normale ── */
   return (
     <div style={{
@@ -408,16 +501,16 @@ function KioskView() {
           }}
         >
           <div style={{ fontSize: 36, marginBottom: 10 }}>
-            {barcodeInput.length > 0 ? '🔦' : '📲'}
+            {phase === 'ask_history' ? '📅' : (barcodeInput.length > 0 ? '🔦' : '📲')}
           </div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
             {barcodeInput.length > 0
               ? <span style={{ color: '#a5b4fc', fontFamily: 'monospace', letterSpacing: 4 }}>{barcodeInput}</span>
-              : 'Scansiona il tuo badge'
+              : (phase === 'ask_history' ? 'Scansiona per il tuo storico' : 'Scansiona il tuo badge')
             }
           </div>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 16 }}>
-            {barcodeInput.length > 0 ? 'Premi Invio per confermare' : 'oppure seleziona il tuo nome qui sotto'}
+            {barcodeInput.length > 0 ? 'Premi Invio per confermare' : 'oppure digita il tuo ID e premi Invio'}
           </div>
           <input
             ref={barcodeRef}
@@ -436,9 +529,18 @@ function KioskView() {
           />
         </div>
 
-        {/* Istruzioni badge */}
-        <div style={{ textAlign: 'center', marginTop: 8, color: 'rgba(255,255,255,0.18)', fontSize: 12 }}>
-          Inserisci il codice del tuo badge e premi <kbd style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace', fontSize: 11 }}>Invio</kbd>
+        {/* Istruzioni badge & Storico */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+            <div style={{ color: 'rgba(255,255,255,0.18)', fontSize: 12 }}>
+                Inserisci il codice del tuo badge e premi <kbd style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace', fontSize: 11 }}>Invio</kbd>
+            </div>
+            
+            <button 
+               onClick={() => { setPhase(phase === 'ask_history' ? 'idle' : 'ask_history'); barcodeRef.current?.focus(); }}
+               style={{ background: phase === 'ask_history' ? 'rgba(255,255,255,0.15)' : 'transparent', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: 20, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 12, transition: 'all 0.2s' }}
+            >
+               {phase === 'ask_history' ? '🔙 Torna a Timbratura' : '🕒 Vedi Storico'}
+            </button>
         </div>
       </div>
     </div>
