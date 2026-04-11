@@ -197,6 +197,8 @@ function CartItem({ line, onUpdateQty, onRemove }) {
 /* ─── PosPage ───────────────────────────────────── */
 export default function PosPage() {
   const { selectedStoreId, displayMode, user } = useOutletContext();
+  // Controllo ruolo dipendente
+  const isDipendente = (user?.roles || []).includes('dipendente') || user?.role === 'dipendente';
   const [loading, setLoading]           = useState(true);
 
   const [products, setProducts]         = useState([]);
@@ -471,15 +473,14 @@ export default function PosPage() {
     const s = customerSearch.toLowerCase().trim();
     if (!s) return allCustomers.slice(0, 8);
     return allCustomers.filter(c => {
-      const haystack = [
-        c.name, c.email,
-        c.first_name, c.last_name,
-        c.fidelity_card, c.phone,
-        c.code, String(c.id),
-      ].filter(Boolean).join(' ').toLowerCase();
+      // Per i dipendenti, ricerca solo per nome/cognome/codice tessera (no dati sensibili)
+      const fields = isDipendente
+        ? [c.first_name, c.last_name, c.code, String(c.id)]
+        : [c.name, c.email, c.first_name, c.last_name, c.fidelity_card, c.phone, c.code, String(c.id)];
+      const haystack = fields.filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(s);
     }).slice(0, 8);
-  }, [allCustomers, customerSearch]);
+  }, [allCustomers, customerSearch, isDipendente]);
 
   // Auto-selezione cliente: se la ricerca corrisponde esattamente a fidelity/telefono/email/codice
   useEffect(() => {
@@ -880,8 +881,10 @@ export default function PosPage() {
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(123,111,208,0.15)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'none'}
                       >
-                        <div style={{ fontSize: 12, fontWeight: 700 }}>{c.name}</div>
-                        {c.email && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{c.email}</div>}
+                        <div style={{ fontSize: 12, fontWeight: 700 }}>{c.first_name || c.name} {c.last_name || ''}</div>
+                        {/* Per i dipendenti: mostra solo codice tessera, no dati sensibili */}
+                        {!isDipendente && c.email && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{c.email}</div>}
+                        {c.code && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Tessera: {c.code}</div>}
                       </button>
                     ))}
                     {filteredCustomers.length === 0 && <div style={{ padding: 14, fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>Nessun cliente</div>}

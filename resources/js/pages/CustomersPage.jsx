@@ -12,8 +12,12 @@ import {
 } from 'lucide-react';
 
 export default function CustomersPage() {
-  const { selectedStoreId, selectedStore } = useOutletContext();
+  const { selectedStoreId, selectedStore, user } = useOutletContext();
   const navigate = useNavigate();
+  
+  // Controllo ruolo: i dipendenti vedono solo il form inserimento nuovo cliente
+  const isDipendente = (user?.roles || []).includes('dipendente') || user?.role === 'dipendente';
+  const [showNewCustomerModal, setShowNewCustomerModal] = useState(isDipendente);
   const [customersList, setCustomersList] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -77,6 +81,49 @@ export default function CustomersPage() {
   const formatReturnDays = value => value ? `${value} gg` : 'Nuovo';
   
   if (loading) return <CustomersSkeleton />;
+
+  // ─── VISTA DIPENDENTE: solo inserimento cliente ───────────
+  if (isDipendente) {
+    return (
+      <div style={{ maxWidth: 600, margin: '40px auto', padding: '0 16px' }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
+          borderRadius: 20, padding: '28px 32px', marginBottom: 24, color: '#fff',
+        }}>
+          <h1 style={{ fontSize: 22, fontWeight: 900, margin: '0 0 4px' }}>Registra Nuovo Cliente</h1>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', margin: 0 }}>
+            Inserisci i dati del nuovo cliente da registrare
+          </p>
+        </div>
+        <div className="card-v3" style={{ padding: 32, textAlign: 'center' }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #818cf8, #a78bfa)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',
+          }}>
+            <Users size={32} color="#fff" />
+          </div>
+          <h2 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 8px', color: '#1a1a2e' }}>Nuovo Cliente</h2>
+          <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 24px' }}>
+            Premi il pulsante per aprire il modulo di registrazione
+          </p>
+          <button
+            onClick={() => setShowNewCustomerModal(true)}
+            className="sp-btn sp-btn-primary"
+            style={{ padding: '12px 32px', fontSize: 15, fontWeight: 700 }}
+          >
+            <Plus size={16} /> Registra Cliente
+          </button>
+        </div>
+        {showNewCustomerModal && (
+          <CustomerModal
+            customer={null}
+            onClose={() => setShowNewCustomerModal(false)}
+            onSave={() => { setShowNewCustomerModal(false); }}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="animate-v3 space-y-10 px-2 pb-10">
