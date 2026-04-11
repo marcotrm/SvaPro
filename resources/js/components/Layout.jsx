@@ -239,23 +239,23 @@ export default function Layout({ user, setUser }) {
               >
                 {/* Section Header */}
                 {!collapsed ? (
-                  <div className="flex items-center gap-3 px-4 py-4 mt-4 mb-2 mx-2 rounded-2xl cursor-default transition-all hover:bg-slate-800/40" style={{ userSelect: 'none' }}>
-                    {section.icon && React.createElement(section.icon, { size: 24, className: "text-indigo-400" })}
+                  <div className="flex items-center gap-2 px-3 py-2 mt-2 mb-1 mx-2 rounded-xl cursor-default transition-all hover:bg-slate-800/40" style={{ userSelect: 'none' }}>
+                    {section.icon && React.createElement(section.icon, { size: 16, className: "text-indigo-400" })}
                     <span 
-                      className="font-black tracking-wide text-slate-100 uppercase" 
-                      style={{ fontSize: '18px', letterSpacing: '0.05em', padding: '4px 0', flex: 1 }}
+                      className="font-black tracking-wide text-slate-300 uppercase" 
+                      style={{ fontSize: '11px', letterSpacing: '0.05em', padding: '2px 0', flex: 1 }}
                     >
                       {section.section}
                     </span>
-                    <ChevronRight size={16} className="text-slate-500 opacity-50" />
+                    <ChevronRight size={12} className="text-slate-500 opacity-50" />
                   </div>
                 ) : (
                   <div 
-                    className="flex justify-center items-center py-3 mb-2 mx-auto cursor-pointer hover:bg-slate-800/50 rounded-xl transition-all" 
-                    style={{ width: 48, height: 48 }}
+                    className="flex justify-center items-center py-2 mb-1 mx-auto cursor-pointer hover:bg-slate-800/50 rounded-xl transition-all" 
+                    style={{ width: 40, height: 40 }}
                     title={section.section}
                   >
-                    {section.icon ? React.createElement(section.icon, { size: 22, className: "text-indigo-400" }) : <div className="w-1 h-1 rounded-full bg-slate-500" />}
+                    {section.icon ? React.createElement(section.icon, { size: 18, className: "text-indigo-400" }) : <div className="w-1 h-1 rounded-full bg-slate-500" />}
                   </div>
                 )}
 
