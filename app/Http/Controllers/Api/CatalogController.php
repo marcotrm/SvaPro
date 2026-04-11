@@ -298,6 +298,7 @@ class CatalogController extends Controller
             'volume_ml' => ['nullable', 'integer', 'min:0'],
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.sale_price' => ['required', 'numeric', 'min:0'],
+            'qscare_price' => ['nullable', 'numeric', 'min:0'],
             'variants.*.cost_price' => ['nullable', 'numeric', 'min:0'],
             'variants.*.price_list_2' => ['nullable', 'numeric', 'min:0'],
             'variants.*.price_list_3' => ['nullable', 'numeric', 'min:0'],
@@ -409,6 +410,7 @@ class CatalogController extends Controller
             'min_stock_qty' => (int) $request->input('min_stock_qty', 0),
             'nicotine_mg' => $request->input('nicotine_mg'),
             'volume_ml' => $request->input('volume_ml'),
+            'qscare_price' => $request->has('qscare_price') && $request->input('qscare_price') !== '' ? (float) $request->input('qscare_price') : null,
             'is_active' => true,
             'updated_at' => $now,
         ];

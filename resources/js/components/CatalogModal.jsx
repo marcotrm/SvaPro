@@ -147,6 +147,7 @@ const normalizeProduct = (product, storesList, selectedStoreId = '') => {
     min_stock_qty: product?.min_stock_qty ?? 0,
     auto_reorder_enabled: product?.auto_reorder_enabled ?? true,
     description: product?.description || '',
+    qscare_price: product?.qscare_price ?? '',
     store_ids: storeIds.length > 0 ? storeIds : defaultStoreIds,
     variants: product?.variants?.length ? product.variants.map(normalizeVariant) : [createEmptyVariant()],
   };
@@ -414,6 +415,13 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                 <label className="sp-label">Codice PLI (Accise)</label>
                 <input className="sp-input" name="pli_code" value={formData.pli_code} onChange={handleChange} placeholder="Es: 9041" />
               </div>
+              {formData.product_type === 'device' && (
+                <div>
+                  <label className="sp-label">🛡️ QScare Prezzo (€)</label>
+                  <input className="sp-input" type="number" step="0.01" name="qscare_price" value={formData.qscare_price} onChange={handleChange} placeholder="Es: 15.00" />
+                  <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Prezzo dell'estensione di garanzia opzionale QScare per questo hardware.</p>
+                </div>
+              )}
               <div style={{ gridColumn: '1/-1' }}>
                 <label className="sp-label">Foto Prodotto</label>
                 <ProductImageUpload

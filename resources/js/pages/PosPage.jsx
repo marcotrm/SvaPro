@@ -230,9 +230,7 @@ export default function PosPage() {
   const [showCustomerDrop, setShowCustomerDrop] = useState(false);
   const [showProductInfo, setShowProductInfo]   = useState(null);
 
-  // QScare assicurazione dispositivi
   const [qscareEnabled, setQscareEnabled] = useState(false);
-  const [qscarePrice, setQscarePrice]     = useState(null); // null = non configurato
 
   /* Load data */
   const fetchData = useCallback(async () => {
@@ -341,13 +339,7 @@ export default function PosPage() {
     return () => clearTimeout(operatorDebounceRef.current);
   }, [operatorBarcode, employees, soldByEmployeeId]);
 
-  // Carica prezzo QScare dalle impostazioni tenant
-  useEffect(() => {
-    stores.getTenantSettings().then(res => {
-      const sj = res.data?.data?.settings_json;
-      if (sj?.qscare_price) setQscarePrice(parseFloat(sj.qscare_price));
-    }).catch(() => {});
-  }, []);
+
 
   /* Cart logic */
   const addToCart = useCallback((product) => {
@@ -404,10 +396,35 @@ export default function PosPage() {
     });
   }, [cartLines, products, categories]);
 
-  // QScare: reset ad ogni nuova vendita (già fatto in handleCheckout)
+  // QScare: calcolato sui dispositivi hardware nel carrello
+  const cartQscarePrice = useMemo(() => {
+    let total = 0;
+    cartLines.forEach(line => {
+      const p = products.find(prod => prod.variants?.some(v => v.id === line.product_variant_id));
+      if (p) {
+        // Verifica se è un dispositivo (hardware)
+        const cat = categories.find(c => c.id === p.category_id);
+        const isDevice = cat?.name?.toLowerCase().includes('dispositiv') ||
+                         cat?.name?.toLowerCase().includes('device') ||
+                         cat?.name?.toLowerCase().includes('mod') ||
+                         p.product_type === 'device';
+        if (isDevice) {
+           total += (parseFloat(p.qscare_price) || 0) * line.qty;
+        }
+      }
+    });
+    return total;
+  }, [cartLines, products, categories]);
 
-  const effectiveQscarePrice = qscarePrice ?? 0;
+  const effectiveQscarePrice = cartQscarePrice;
   const cartTotalWithQscare = cartTotal + (qscareEnabled ? effectiveQscarePrice : 0);
+  
+  // Disabilita QScare se il prezzo totale applicabile scende a 0 (es. rimuovendo i dispositivi dal carrello)
+  useEffect(() => {
+    if (cartQscarePrice <= 0 && qscareEnabled) {
+      setQscareEnabled(false);
+    }
+  }, [cartQscarePrice, qscareEnabled]);
 
   /* Checkout */
   const handleCheckout = async (payload) => {
@@ -927,11 +944,11 @@ export default function PosPage() {
           )}
         </div>
 
-        {/* ─── QScare toggle (sempre visibile con prodotti nel carrello) ─── */}
-        {cartLines.length > 0 && (
+        {/* ─── QScare toggle (visibile solo se ci sono dispositivi con prezzo qscare nel carrello) ─── */}
+        {cartLines.length > 0 && cartHasDevice && (
           <div style={{ padding: '0 22px 12px' }}>
-            {qscarePrice === null ? (
-              // Prezzo non configurato: mostra banner informativo
+            {effectiveQscarePrice <= 0 ? (
+              // Dispositivi senza prezzo QScare configurato o non valido: banner informativo
               <div style={{
                 background: 'rgba(234,179,8,0.08)', border: '1.5px solid rgba(234,179,8,0.2)',
                 borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10,
@@ -940,7 +957,7 @@ export default function PosPage() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(234,179,8,0.9)' }}>QScare — Assicurazione Dispositivo</div>
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
-                    Configura il prezzo in <strong style={{ color: 'rgba(234,179,8,0.7)' }}>Impostazioni → QScare</strong> per attivare
+                    Nessun prezzo QScare impostato in anagrafica per questi hardware.
                   </div>
                 </div>
               </div>
