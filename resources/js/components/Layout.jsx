@@ -10,7 +10,7 @@ import {
   FileText, RotateCcw, Gift, Shield, Activity, ChevronDown,
   Receipt, Star, ArrowRightLeft, MapPin, ChevronLeft, ChevronRight,
   PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store, AlertCircle,
-  LayoutDashboard, ShoppingCart, Megaphone
+  LayoutDashboard, ShoppingCart, Megaphone, HandCoins
 } from 'lucide-react';
 
 const allNavigation = [
@@ -58,6 +58,7 @@ const allNavigation = [
 
   // Amministrazione ──────────────────────────────────────────────
   { section: 'Amministrazione', icon: Shield, items: [
+    { label: 'Tesoreria & Cassa',      href: '/tesoreria',    icon: HandCoins,   roles: ['superadmin','admin_cliente','dipendente'] },
     { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
     { label: 'Dashboard QScare',       href: '/qscare-dashboard', icon: Shield,  roles: ['superadmin','admin_cliente'] },
     { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,       roles: ['superadmin','admin_cliente'] },

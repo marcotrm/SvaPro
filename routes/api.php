@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\WooCommerceWebhookController;
 use App\Http\Controllers\Api\StockTransferController;
 use App\Http\Controllers\Api\DeliveryNoteController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\CashMovementController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/loyalty-card/{uuid}', [LoyaltyCardController::class, 'show']);
@@ -245,6 +246,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/pos/active', [PosSessionController::class, 'active']);
         Route::post('/pos/open', [PosSessionController::class, 'open'])->middleware('permission:pos_sessions.manage');
         Route::post('/pos/sessions/{sessionId}/close', [PosSessionController::class, 'close'])->middleware('permission:pos_sessions.manage');
+
+        // Tesoreria - Cash Movements
+        Route::get('/cash-movements', [CashMovementController::class, 'index']);
+        Route::post('/cash-movements', [CashMovementController::class, 'store']);
 
         // Attendance - accessibile anche ai dipendenti (per timbrare se stessi)
         Route::get('/attendance/live', [AttendanceController::class, 'live']);

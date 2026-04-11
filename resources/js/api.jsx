@@ -636,6 +636,11 @@ export const pos = {
   close: (sessionId) => api.post(`/pos/sessions/${sessionId}/close`),
 };
 
+export const cashMovements = {
+  get: (params = {}) => api.get('/cash-movements', { params }),
+  create: (data) => api.post('/cash-movements', data),
+};
+
 // Promotion APIs
 export const promotions = {
   getAll: (params = {}) => cachedGet('/promotions', params, 15000, 120000),
