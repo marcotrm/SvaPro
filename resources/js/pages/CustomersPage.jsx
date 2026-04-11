@@ -58,9 +58,11 @@ export default function CustomersPage() {
     e.stopPropagation();
     const newStatus = customer.status === 'active' ? 'inactive' : 'active';
     try {
-      await customers.updateCustomer(customer.id, { status: newStatus });
+      await customers.updateCustomer(customer.id, { ...customer, status: newStatus });
       setCustomersList(prev => prev.map(c => c.id === customer.id ? { ...c, status: newStatus } : c));
-    } catch { /* ignore */ }
+    } catch (error) {
+      console.error('Toggle status error:', error);
+    }
   };
 
   const filtered = customersList.filter(c =>

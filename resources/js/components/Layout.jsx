@@ -9,12 +9,13 @@ import {
   Users, Monitor, Truck, Settings, LogOut, Bell,
   FileText, RotateCcw, Gift, Shield, Activity, ChevronDown,
   Receipt, Star, ArrowRightLeft, MapPin, ChevronLeft, ChevronRight,
-  PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store, AlertCircle
+  PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store, AlertCircle,
+  LayoutDashboard, ShoppingCart, Megaphone
 } from 'lucide-react';
 
 const allNavigation = [
   // ── Principale ───────────────────────────────────────────────────
-  { section: 'Principale', items: [
+  { section: 'Principale', icon: LayoutDashboard, items: [
     { label: 'POS Cassa',              href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente','dipendente'] },
     { label: 'Panoramica Generale',    href: '/dashboard',    icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
     { label: 'Report & Analisi',       href: '/reports',      icon: Activity,    roles: ['superadmin','admin_cliente'] },
@@ -24,7 +25,7 @@ const allNavigation = [
   ]},
 
   // 4. Magazzino ────────────────────────────────────────────────────
-  { section: 'Magazzino', items: [
+  { section: 'Magazzino', icon: Warehouse, items: [
     { label: 'Giacenze & Stock',       href: '/inventory',    icon: Warehouse,   roles: ['superadmin','admin_cliente'] },
     { label: 'Prodotti',               href: '/catalog',      icon: Package,     roles: ['superadmin','admin_cliente'] },
     { label: 'Carico Merce (DDT)',     href: '/supplier-delivery', icon: Truck,  roles: ['superadmin','admin_cliente'] },
@@ -34,7 +35,7 @@ const allNavigation = [
   ]},
 
   // 5. Acquisti / Fornitori ─────────────────────────────────────────
-  { section: 'Acquisti / Fornitori', items: [
+  { section: 'Acquisti / Fornitori', icon: ShoppingCart, items: [
     { label: 'Ordini Fornitori (PO)',  href: '/purchase-orders',   icon: Receipt,  roles: ['superadmin','admin_cliente'] },
     { label: 'Ricezione Merce',        href: '/store-loading',     icon: Package,  roles: ['superadmin','admin_cliente'] },
     { label: 'Anagrafica Fornitori',   href: '/suppliers',         icon: Truck,    roles: ['superadmin','admin_cliente'] },
@@ -43,20 +44,20 @@ const allNavigation = [
 
 
   // 7. Marketing ────────────────────────────────────────────────────
-  { section: 'Marketing', items: [
+  { section: 'Marketing', icon: Megaphone, items: [
     { label: 'Promozioni & Bundle',    href: '/promotions',   icon: Gift,        roles: ['superadmin','admin_cliente'] },
     { label: '🏆 Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
 
   // 8. Dipendenti ───────────────────────────────────────────────────
-  { section: 'Dipendenti', items: [
+  { section: 'Dipendenti', icon: Users, items: [
     { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente'] },
     { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
     { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
   ]},
 
   // Amministrazione ──────────────────────────────────────────────
-  { section: 'Amministrazione', items: [
+  { section: 'Amministrazione', icon: Shield, items: [
     { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
     { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,       roles: ['superadmin','admin_cliente'] },
     { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,       roles: ['superadmin','admin_cliente'] },
@@ -64,7 +65,7 @@ const allNavigation = [
   ]},
 
   // 10. Impostazioni ────────────────────────────────────────────────
-  { section: 'Impostazioni', items: [
+  { section: 'Impostazioni', icon: Settings, items: [
     { label: 'Configurazione',         href: '/settings',          icon: Settings,      roles: ['superadmin','admin_cliente'] },
     { label: 'Ruoli & Permessi',       href: '/roles-permissions', icon: Shield,        roles: ['superadmin'] },
     { label: 'Audit Log',              href: '/audit-log',         icon: ClipboardList, roles: ['superadmin'] },
@@ -236,16 +237,26 @@ export default function Layout({ user, setUser }) {
                 onMouseEnter={(e) => handleSectionEnter(section.section, section.items, e)}
                 onMouseLeave={scheduleClose}
               >
-                {/* Section Header — solo label, nessun toggle */}
+                {/* Section Header */}
                 {!collapsed ? (
-                  <div className="sp-nav-section-header" style={{ cursor: 'default', userSelect: 'none' }}>
-                    <span className="sp-nav-section-title" style={{ marginBottom: 0, padding: 0 }}>
+                  <div className="flex items-center gap-3 px-4 py-4 mt-4 mb-2 mx-2 rounded-2xl cursor-default transition-all hover:bg-slate-800/40" style={{ userSelect: 'none' }}>
+                    {section.icon && React.createElement(section.icon, { size: 24, className: "text-indigo-400" })}
+                    <span 
+                      className="font-black tracking-wide text-slate-100 uppercase" 
+                      style={{ fontSize: '18px', letterSpacing: '0.05em', padding: '4px 0', flex: 1 }}
+                    >
                       {section.section}
                     </span>
-                    <ChevronRight size={11} style={{ color: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
+                    <ChevronRight size={16} className="text-slate-500 opacity-50" />
                   </div>
                 ) : (
-                  <div className="sp-nav-section-divider" />
+                  <div 
+                    className="flex justify-center items-center py-3 mb-2 mx-auto cursor-pointer hover:bg-slate-800/50 rounded-xl transition-all" 
+                    style={{ width: 48, height: 48 }}
+                    title={section.section}
+                  >
+                    {section.icon ? React.createElement(section.icon, { size: 22, className: "text-indigo-400" }) : <div className="w-1 h-1 rounded-full bg-slate-500" />}
+                  </div>
                 )}
 
                 {/* Items: sempre nascosti — visibili solo nel flyout */}
