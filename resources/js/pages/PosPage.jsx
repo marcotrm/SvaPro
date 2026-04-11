@@ -218,6 +218,7 @@ export default function PosPage() {
   const [operatorName, setOperatorName]   = useState('');
   const [operatorError, setOperatorError] = useState('');
   const operatorBarcodeRef = useRef(null);
+  const operatorDebounceRef = useRef(null);
   const [note, setNote]                   = useState('');
   const [showResoModal, setShowResoModal] = useState(false);
 
@@ -288,6 +289,50 @@ export default function PosPage() {
       setOperatorName(name);
     }
   }, [user]);
+
+  // Auto-rilevamento operatore: cerca match esatto senza premere Invio
+  useEffect(() => {
+    if (soldByEmployeeId || !operatorBarcode.trim()) return;
+    const val = operatorBarcode.trim();
+    const valLow = val.toLowerCase();
+
+    // Cerca match esatto nella lista già caricata
+    const found = employees.find(em =>
+      (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
+      (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
+      String(em.id) === val
+    );
+    if (found) {
+      setSoldByEmployeeId(String(found.id));
+      setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || `Operatore #${found.id}`);
+      setOperatorError('');
+      setOperatorBarcode('');
+      return;
+    }
+
+    // Debounce: se non trovato localmente, dopo 600ms cerca via API
+    clearTimeout(operatorDebounceRef.current);
+    operatorDebounceRef.current = setTimeout(async () => {
+      if (!operatorBarcode.trim() || soldByEmployeeId) return;
+      try {
+        const { employees: empApi } = await import('../api.jsx');
+        const res = await empApi.getEmployees({ search: val, limit: 10 });
+        const list = res.data?.data || [];
+        const apiFound = list.find(em =>
+          (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
+          (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
+          String(em.id) === val
+        ) || (/^\d+$/.test(val) && (list.find(em => String(em.id) === val) || employees.find(em => String(em.id) === val)));
+        if (apiFound) {
+          setSoldByEmployeeId(String(apiFound.id));
+          setOperatorName(`${apiFound.first_name || ''} ${apiFound.last_name || ''}`.trim() || `Operatore #${apiFound.id}`);
+          setOperatorError('');
+          setOperatorBarcode('');
+        }
+      } catch {}
+    }, 600);
+    return () => clearTimeout(operatorDebounceRef.current);
+  }, [operatorBarcode, employees, soldByEmployeeId]);
 
   // Carica prezzo QScare dalle impostazioni tenant
   useEffect(() => {
@@ -406,23 +451,49 @@ export default function PosPage() {
     const f = flavorTerm.toLowerCase().trim();
     const matchS = !s || p.name?.toLowerCase().includes(s) || p.sku?.toLowerCase().includes(s)
       || p.variants?.some(v => v.barcode?.toLowerCase().includes(s));
-    const matchF = !f || p.variants?.some(v => v.flavor?.toLowerCase().includes(f)) || p.name?.toLowerCase().includes(f);
+    // Fix ricerca aroma: controlla anche description e tags, normalizza accenti
+    const normalize = str => (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const fNorm = normalize(f);
+    const matchF = !f || p.variants?.some(v =>
+      normalize(v.flavor)?.includes(fNorm) ||
+      normalize(v.description)?.includes(fNorm)
+    ) || normalize(p.name)?.includes(fNorm) || normalize(p.description)?.includes(fNorm);
     const matchC = !activeCategory || p.category_id === activeCategory;
     return matchS && matchF && matchC;
   }), [products, searchTerm, flavorTerm, activeCategory]);
 
   const filteredCustomers = useMemo(() => {
-    const s = customerSearch.toLowerCase();
+    const s = customerSearch.toLowerCase().trim();
     if (!s) return allCustomers.slice(0, 8);
     return allCustomers.filter(c => {
       const haystack = [
         c.name, c.email,
         c.first_name, c.last_name,
         c.fidelity_card, c.phone,
+        c.code, String(c.id),
       ].filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(s);
     }).slice(0, 8);
   }, [allCustomers, customerSearch]);
+
+  // Auto-selezione cliente: se la ricerca corrisponde esattamente a fidelity/telefono/email/codice
+  useEffect(() => {
+    if (!customerSearch.trim() || selectedCustomer) return;
+    const s = customerSearch.trim().toLowerCase();
+    const exactMatch = allCustomers.find(c =>
+      (c.fidelity_card && c.fidelity_card.toLowerCase() === s) ||
+      (c.phone         && c.phone.toLowerCase()         === s) ||
+      (c.email         && c.email.toLowerCase()         === s) ||
+      (c.code          && c.code.toLowerCase()          === s) ||
+      String(c.id) === s
+    );
+    if (exactMatch) {
+      setSelectedCustomer(exactMatch);
+      setCustomerSearch('');
+      setShowCustomerDrop(false);
+      toast.success(`Cliente: ${exactMatch.name || `${exactMatch.first_name} ${exactMatch.last_name}`}`, { icon: '👤' });
+    }
+  }, [customerSearch, allCustomers, selectedCustomer]);
 
   /* Cross-sell */
   const crossSell = useMemo(() => {
@@ -716,34 +787,27 @@ export default function PosPage() {
                 <input
                   ref={operatorBarcodeRef}
                   value={operatorBarcode}
-                  onChange={e => setOperatorBarcode(e.target.value)}
+                  onChange={e => { setOperatorBarcode(e.target.value); setOperatorError(''); }}
                   onKeyDown={async e => {
+                    // Invio come fallback manuale (per barcode scanner lenti)
                     if (e.key === 'Enter' && operatorBarcode.trim()) {
                       const val = operatorBarcode.trim();
                       const valLow = val.toLowerCase();
-                      // Cerca barcode per: barcode, employee_code, ID
                       let found = employees.find(em =>
                         (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
                         (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
                         String(em.id) === val
                       );
-                      // Fallback: cerca via API con parametro barcode specifico
                       if (!found) {
                         try {
                           const { employees: empApi } = await import('../api.jsx');
-                          // Prova prima con barcode esatto
                           const res = await empApi.getEmployees({ search: val, limit: 10 });
                           const list = res.data?.data || [];
                           found = list.find(em =>
                             (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
                             (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
                             String(em.id) === val
-                          );
-                          // Se ancora non trovato, se è numerico considera come ID diretto
-                          if (!found && /^\d+$/.test(val)) {
-                            found = list.find(em => String(em.id) === val) ||
-                                    employees.find(em => String(em.id) === val);
-                          }
+                          ) || (/^\d+$/.test(val) && (list.find(em => String(em.id) === val) || employees.find(em => String(em.id) === val)));
                         } catch {}
                       }
                       if (found) {
@@ -757,7 +821,7 @@ export default function PosPage() {
                       }
                     }
                   }}
-                  placeholder="Scansiona badge o digita ID operatore + Invio"
+                  placeholder="Scansiona badge o digita ID operatore..."
                   autoFocus
                   style={{
                     width: '100%', background: operatorError ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.06)',
