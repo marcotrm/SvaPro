@@ -164,10 +164,13 @@ export default function StoreLoadingPage() {
                 <div style={{ flexShrink: 0 }}>
                   <span style={{
                     display: 'inline-block', padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-                    background: note.status === 'in_progress' ? '#fef3c7' : '#dcfce7',
-                    color: note.status === 'in_progress' ? '#92400e' : '#065f46',
+                    background: note.status === 'in_progress' ? '#fef3c7' : note.status === 'pending' ? '#dbeafe' : note.status === 'received' ? '#dcfce7' : '#fee2e2',
+                    color: note.status === 'in_progress' ? '#92400e' : note.status === 'pending' ? '#1d4ed8' : note.status === 'received' ? '#065f46' : '#991b1b',
                   }}>
-                    {note.status === 'in_progress' ? '🔄 In corso' : '⏳ In attesa'}
+                    {note.status === 'in_progress' ? '🔄 In controllo' : 
+                     note.status === 'pending'     ? '📦 In consegna' :
+                     note.status === 'received'    ? '✅ Controllata' :
+                     note.status === 'discrepancy' ? '⚠️ Arrivata (Discrepanze)' : note.status}
                   </span>
                 </div>
                 <div style={{ fontSize: 20, color: 'var(--muted)' }}>›</div>
@@ -286,10 +289,10 @@ export default function StoreLoadingPage() {
                       {item.received_qty === null || item.received_qty === undefined
                         ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>—</span>
                         : ok
-                        ? <span style={{ color: '#22c55e', fontWeight: 800, fontSize: 16 }}>✓</span>
+                        ? <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}><span style={{ fontSize: 16 }}>🟢</span><span style={{ color: '#22c55e', fontWeight: 800, fontSize: 11 }}>PERFETTO</span></div>
                         : over
-                        ? <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: 12 }}>+{diff} in più</span>
-                        : <span style={{ color: '#ef4444', fontWeight: 700, fontSize: 12 }}>{diff} mancanti</span>
+                        ? <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}><span style={{ fontSize: 16 }}>🟠</span><span style={{ color: '#f59e0b', fontWeight: 800, fontSize: 11 }}>+{diff} IN ECCESSO</span></div>
+                        : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}><span style={{ fontSize: 16 }}>🔴</span><span style={{ color: '#ef4444', fontWeight: 800, fontSize: 11 }}>{diff} MANCANTI</span></div>
                       }
                     </td>
                   </tr>

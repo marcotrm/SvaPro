@@ -694,12 +694,13 @@ export { clearApiCache };
 
 // ── Delivery Notes (Bolle di Carico) ──────────────────────────────
 export const deliveryNotes = {
-  getAll:              (params = {}) => api.get('/delivery-notes', { params }),
-  getOne:              (id)          => api.get(`/delivery-notes/${id}`),
-  create:              (data)        => api.post('/delivery-notes', data),
-  receive:             (id, data)    => api.post(`/delivery-notes/${id}/receive`, data),
-  getDiscrepancies:    (params = {}) => api.get('/delivery-notes/discrepancies', { params }),
-  resolveDiscrepancy:  (id, data)    => api.post(`/delivery-notes/discrepancies/${id}/resolve`, data),
+  getAll: (params = {}) => api.get('/delivery-notes', { params }),
+  getOne: (id) => api.get(`/delivery-notes/${id}`),
+  create: (data) => api.post('/delivery-notes', data),
+  receive: (id, data) => api.post(`/delivery-notes/${id}/receive`, data),
+  syncBrt: (id) => api.post(`/delivery-notes/${id}/brt-sync`),
+  getDiscrepancies: (params = {}) => api.get('/delivery-notes/discrepancies', { params }),
+  resolveDiscrepancy: (id, data) => api.post(`/delivery-notes/discrepancies/${id}/resolve`, data),
 };
 
 // ── Chat (polling) ───────────────────────────────────────────────

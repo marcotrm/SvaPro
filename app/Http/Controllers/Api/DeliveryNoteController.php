@@ -116,6 +116,64 @@ class DeliveryNoteController extends Controller
             ]);
         }
 
+        // Deduct from Main Warehouse
+        $mainWarehouse = DB::table('warehouses')
+            ->join('stores', 'stores.id', '=', 'warehouses.store_id')
+            ->where('warehouses.tenant_id', $tenantId)
+            ->where('stores.is_main', 1)
+            ->select('warehouses.id')
+            ->first();
+
+        if ($mainWarehouse) {
+            foreach ($data['items'] as $item) {
+                if (!empty($item['product_variant_id']) && $item['expected_qty'] > 0) {
+                    $existing = DB::table('stock_items')
+                        ->where('tenant_id', $tenantId)
+                        ->where('warehouse_id', $mainWarehouse->id)
+                        ->where('product_variant_id', $item['product_variant_id'])
+                        ->first();
+                    
+                    if ($existing) {
+                        DB::table('stock_items')
+                            ->where('id', $existing->id)
+                            ->update([
+                                'on_hand' => $existing->on_hand - $item['expected_qty'],
+                                'updated_at' => now(),
+                            ]);
+                    } else {
+                        DB::table('stock_items')->insert([
+                            'tenant_id' => $tenantId,
+                            'warehouse_id' => $mainWarehouse->id,
+                            'product_variant_id' => $item['product_variant_id'],
+                            'on_hand' => -$item['expected_qty'],
+                            'reserved' => 0,
+                            'reorder_point' => 0,
+                            'safety_stock' => 0,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+
+                    try {
+                        DB::table('stock_movements')->insert([
+                            'tenant_id'          => $tenantId,
+                            'warehouse_id'       => $mainWarehouse->id,
+                            'product_variant_id' => $item['product_variant_id'],
+                            'movement_type'      => 'out',
+                            'qty'                => $item['expected_qty'],
+                            'unit_cost'          => $item['unit_cost'] ?? 0,
+                            'reference_type'     => 'delivery_note',
+                            'reference_id'       => $noteId,
+                            'employee_id'        => $request->user()->id,
+                            'occurred_at'        => now(),
+                            'created_at'         => now(),
+                            'updated_at'         => now(),
+                        ]);
+                    } catch (\Throwable $e) {}
+                }
+            }
+        }
+
         $note = DB::table('delivery_notes')->where('id', $noteId)->first();
         $note->items = DB::table('delivery_note_items')->where('delivery_note_id', $noteId)->get();
 
@@ -299,5 +357,33 @@ class DeliveryNoteController extends Controller
             ]);
 
         return response()->json(['message' => 'Discrepanza aggiornata.']);
+    }
+
+    /** POST /delivery-notes/:id/brt-sync — Simula sincronizzazione API BRT */
+    public function syncBrt(Request $request, $id)
+    {
+        $tenantId = $request->user()->tenant_id;
+        $note = DB::table('delivery_notes')->where('id', $id)->where('tenant_id', $tenantId)->first();
+        if (!$note) return response()->json(['message' => 'Bolla non trovata.'], 404);
+
+        // Simulazione
+        $tracking = $note->tracking_number ?: 'BRT-' . strtoupper(Str::random(10));
+        
+        $statuses = ['In Hub', 'In Consegna', 'Consegnato'];
+        $status = $statuses[array_rand($statuses)];
+
+        DB::table('delivery_notes')->where('id', $id)->update([
+            'tracking_number' => $tracking,
+            'carrier_status'  => $status,
+            'updated_at'      => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Sincronizzazione BRT riuscita',
+            'data'    => [
+                'tracking_number' => $tracking,
+                'carrier_status'  => $status,
+            ]
+        ]);
     }
 }

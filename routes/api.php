@@ -209,10 +209,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
 
         // Delivery Notes (Bolle di Carico) — admin crea, gestisce discrepanze
         Route::get('/delivery-notes', [DeliveryNoteController::class, 'index']);
-        Route::post('/delivery-notes', [DeliveryNoteController::class, 'store']);
         Route::get('/delivery-notes/discrepancies', [DeliveryNoteController::class, 'discrepancies']);
         Route::post('/delivery-notes/discrepancies/{id}/resolve', [DeliveryNoteController::class, 'resolveDiscrepancy']);
         Route::get('/delivery-notes/{id}', [DeliveryNoteController::class, 'show']);
+        Route::post('/delivery-notes', [DeliveryNoteController::class, 'store']);
+        Route::post('/delivery-notes/{id}/receive', [DeliveryNoteController::class, 'receive']);
+        Route::post('/delivery-notes/{id}/brt-sync', [DeliveryNoteController::class, 'syncBrt']);
 
         // Chat — admin (area manager) vede tutti i messaggi
         Route::get('/chat/messages', [ChatController::class, 'index']);
