@@ -5,19 +5,33 @@ import { Search, Plus, AlertTriangle, Package, ArrowLeftRight, ChevronRight } fr
 import { toast } from 'react-hot-toast';
 
 const STATUS_LABELS = {
-  requested: 'Richiesto',
-  approved: 'Approvato',
-  refunded: 'Rimborsato',
-  rejected: 'Rifiutato',
-  exchanged: 'Scambiato',
+  pending:            'In attesa',
+  requested:          'Richiesto',
+  approved:           'Approvato',
+  received:           'Ricevuto',
+  refunded:           'Rimborsato',
+  denied:             'Rifiutato',
+  rejected:           'Rifiutato',
+  exchanged:          'Scambiato',
+  on_hold:            '⏸ In Attesa',
+  repaired:           '🔧 Riparato',
+  scrapped:           '🗑 Smaltimento',
+  sent_to_supplier:   '📦 Al Produttore',
 };
 
 const STATUS_BADGE = {
-  requested: 'sp-badge-warning',
-  approved: 'sp-badge-info',
-  refunded: 'sp-badge-success',
-  rejected: 'sp-badge-error',
-  exchanged: 'sp-badge-neutral',
+  pending:          'sp-badge-warning',
+  requested:        'sp-badge-warning',
+  approved:         'sp-badge-info',
+  received:         'sp-badge-info',
+  refunded:         'sp-badge-success',
+  denied:           'sp-badge-error',
+  rejected:         'sp-badge-error',
+  exchanged:        'sp-badge-neutral',
+  on_hold:          'sp-badge-warning',
+  repaired:         'sp-badge-success',
+  scrapped:         'sp-badge-neutral',
+  sent_to_supplier: 'sp-badge-info',
 };
 
 export default function ReturnsPage() {
@@ -373,9 +387,10 @@ export default function ReturnsPage() {
             <table className="sp-table">
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>Negozio</th>
                   <th>Ordine</th>
                   <th>Cliente</th>
+                  <th>Dipendente</th>
                   <th>Motivo</th>
                   <th>Stato</th>
                   <th>Valore</th>
@@ -386,13 +401,14 @@ export default function ReturnsPage() {
               <tbody>
                 {list.length > 0 ? list.map(r => (
                   <tr key={r.id}>
-                    <td className="sp-font-mono sp-cell-secondary">#{r.id}</td>
+                    <td className="sp-cell-secondary" style={{ fontSize: 12 }}>{r.store_name || '—'}</td>
                     <td className="sp-font-mono">
                       <span style={{ color: 'var(--color-accent)', fontWeight: 600 }}>
                         #{r.order_id || r.sales_order_id || '–'}
                       </span>
                     </td>
                     <td className="sp-cell-primary">{r.customer_name || 'Cliente non registrato'}</td>
+                    <td className="sp-cell-secondary" style={{ fontSize: 12 }}>{r.employee_name || '—'}</td>
                     <td className="sp-cell-secondary">{r.reason || '–'}</td>
                     <td>
                       <span className={`sp-badge ${STATUS_BADGE[r.status] || 'sp-badge-neutral'}`}>
@@ -403,40 +419,25 @@ export default function ReturnsPage() {
                     <td style={{ fontWeight: 600 }}>{fmtCurrency(r.refund_amount || r.total_value)}</td>
                     <td className="sp-cell-secondary">{fmtDate(r.created_at)}</td>
                     <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                        {r.status === 'requested' && (
-                          <>
-                            <button
-                              className="sp-btn sp-btn-success sp-btn-sm"
-                              onClick={() => handleStatusChange(r.id, 'approved')}
-                            >
-                              Approva
-                            </button>
-                            <button
-                              className="sp-btn sp-btn-ghost sp-btn-sm"
-                              style={{ color: 'var(--color-error)' }}
-                              onClick={() => handleStatusChange(r.id, 'rejected')}
-                            >
-                              Rifiuta
-                            </button>
-                          </>
-                        )}
-                        {r.status === 'approved' && (
-                          <>
-                            <button
-                              className="sp-btn sp-btn-primary sp-btn-sm"
-                              onClick={() => handleStatusChange(r.id, 'refunded')}
-                            >
-                              Rimborsa
-                            </button>
-                            <button
-                              className="sp-btn sp-btn-secondary sp-btn-sm"
-                              onClick={() => handleStatusChange(r.id, 'exchanged')}
-                            >
-                              <ArrowLeftRight size={14} /> Cambio
-                            </button>
-                          </>
-                        )}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, flexWrap: 'wrap' }}>
+                        {/* Da Richiesto/Pending: approva o nega */}
+                        {(r.status === 'requested' || r.status === 'pending') && (<>
+                          <button className="sp-btn sp-btn-success sp-btn-sm" onClick={() => handleStatusChange(r.id, 'approved')}>Approva</button>
+                          <button className="sp-btn sp-btn-ghost sp-btn-sm" style={{ color: 'var(--color-error)' }} onClick={() => handleStatusChange(r.id, 'denied')}>Nega</button>
+                          <button className="sp-btn sp-btn-secondary sp-btn-sm" onClick={() => handleStatusChange(r.id, 'on_hold')}>⏸ Attesa</button>
+                        </>)}
+                        {/* Da Approvato: ricevuto o rimborso o smaltimento o produttore */}
+                        {r.status === 'approved' && (<>
+                          <button className="sp-btn sp-btn-primary sp-btn-sm" onClick={() => handleStatusChange(r.id, 'refunded')}>Rimborsa</button>
+                          <button className="sp-btn sp-btn-secondary sp-btn-sm" onClick={() => handleStatusChange(r.id, 'repaired')}>🔧 Riparato</button>
+                          <button className="sp-btn sp-btn-secondary sp-btn-sm" onClick={() => handleStatusChange(r.id, 'scrapped')}>🗑 Smaltimento</button>
+                          <button className="sp-btn sp-btn-secondary sp-btn-sm" onClick={() => handleStatusChange(r.id, 'sent_to_supplier')}>📦 Produttore</button>
+                        </>)}
+                        {/* Da In Attesa: approva o nega */}
+                        {r.status === 'on_hold' && (<>
+                          <button className="sp-btn sp-btn-success sp-btn-sm" onClick={() => handleStatusChange(r.id, 'approved')}>Approva</button>
+                          <button className="sp-btn sp-btn-ghost sp-btn-sm" style={{ color: 'var(--color-error)' }} onClick={() => handleStatusChange(r.id, 'denied')}>Nega</button>
+                        </>)}
                       </div>
                     </td>
                   </tr>
