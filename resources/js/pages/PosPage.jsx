@@ -310,19 +310,24 @@ export default function PosPage() {
       return;
     }
 
-    // Debounce: se non trovato localmente, dopo 600ms cerca via API
+    // Se la lista locale è vuota (fetchOptions fallito), cerca subito via API con debounce ridotto
+    // altrimenti aspetta più a lungo (l'utente sta ancora digitando)
+    const delay = employees.length === 0 ? 400 : 700;
     clearTimeout(operatorDebounceRef.current);
     operatorDebounceRef.current = setTimeout(async () => {
-      if (!operatorBarcode.trim() || soldByEmployeeId) return;
+      const currentVal = operatorBarcode.trim();
+      if (!currentVal || soldByEmployeeId) return;
+      const currentLow = currentVal.toLowerCase();
       try {
         const { employees: empApi } = await import('../api.jsx');
-        const res = await empApi.getEmployees({ search: val, limit: 10 });
+        // Cerca per barcode esatto o per ID numerico
+        const res = await empApi.getEmployees({ search: currentVal, limit: 20 });
         const list = res.data?.data || [];
         const apiFound = list.find(em =>
-          (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
-          (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
-          String(em.id) === val
-        ) || (/^\d+$/.test(val) && (list.find(em => String(em.id) === val) || employees.find(em => String(em.id) === val)));
+          (em.barcode       && em.barcode.toLowerCase()       === currentLow) ||
+          (em.employee_code && em.employee_code.toLowerCase() === currentLow) ||
+          String(em.id) === currentVal
+        ) || (/^\d+$/.test(currentVal) && list.find(em => String(em.id) === currentVal));
         if (apiFound) {
           setSoldByEmployeeId(String(apiFound.id));
           setOperatorName(`${apiFound.first_name || ''} ${apiFound.last_name || ''}`.trim() || `Operatore #${apiFound.id}`);
@@ -330,7 +335,7 @@ export default function PosPage() {
           setOperatorBarcode('');
         }
       } catch {}
-    }, 600);
+    }, delay);
     return () => clearTimeout(operatorDebounceRef.current);
   }, [operatorBarcode, employees, soldByEmployeeId]);
 
