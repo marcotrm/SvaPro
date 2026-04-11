@@ -115,7 +115,16 @@ export default function Layout({ user, setUser }) {
   const loadStores = async () => {
     try {
       const response = await stores.getStores();
-      setStoresList(response.data?.data || []);
+      let slist = response.data?.data || [];
+      // Se è un dipendente e ha un negozio assegnato, mostra solo quello
+      if (user?.roles?.includes('dipendente') && user?.employee_store_id) {
+        slist = slist.filter(s => String(s.id) === String(user.employee_store_id));
+        if (slist.length > 0 && String(selectedStoreId) !== String(user.employee_store_id)) {
+          setSelectedStoreId(user.employee_store_id);
+          localStorage.setItem('selectedStoreId', user.employee_store_id);
+        }
+      }
+      setStoresList(slist);
     } catch (err) { console.error('Failed to load stores'); }
   };
 
