@@ -251,14 +251,14 @@ export default function Layout({ user, setUser }) {
                 {/* Section Header */}
                 {!collapsed ? (
                   <div className="flex items-center gap-2 px-3 py-2 mt-2 mb-1 mx-2 rounded-xl cursor-default transition-all hover:bg-slate-800/40" style={{ userSelect: 'none' }}>
-                    {section.icon && React.createElement(section.icon, { size: 16, className: "text-indigo-400" })}
+                    {section.icon && React.createElement(section.icon, { size: 18, className: "text-indigo-400" })}
                     <span 
-                      className="font-black tracking-wide text-slate-300 uppercase" 
-                      style={{ fontSize: '11px', letterSpacing: '0.05em', padding: '2px 0', flex: 1 }}
+                      className="font-black tracking-wide text-slate-200 uppercase" 
+                      style={{ fontSize: '12px', letterSpacing: '0.05em', padding: '2px 0', flex: 1 }}
                     >
                       {section.section}
                     </span>
-                    <ChevronRight size={12} className="text-slate-500 opacity-50" />
+                    <ChevronRight size={14} className="text-slate-400 opacity-60" />
                   </div>
                 ) : (
                   <div 
@@ -324,11 +324,11 @@ export default function Layout({ user, setUser }) {
           {/* Intestazione sezione */}
           <div style={{
             padding: '10px 16px 8px',
-            fontSize: 10,
-            fontWeight: 700,
+            fontSize: 12,
+            fontWeight: 800,
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
-            color: 'rgba(255,255,255,0.35)',
+            color: 'rgba(255,255,255,0.4)',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
           }}>
             {flyout.section}
@@ -345,14 +345,14 @@ export default function Layout({ user, setUser }) {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 10,
+                  gap: 12,
                   width: '100%',
-                  padding: '11px 16px',
+                  padding: '12px 18px',
                   background: active ? 'rgba(99,102,241,0.18)' : 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  color: active ? '#a5b4fc' : 'rgba(255,255,255,0.75)',
-                  fontSize: 13,
+                  color: active ? '#a5b4fc' : 'rgba(255,255,255,0.85)',
+                  fontSize: 14,
                   fontWeight: active ? 700 : 500,
                   textAlign: 'left',
                   transition: 'background 0.12s',
@@ -361,7 +361,7 @@ export default function Layout({ user, setUser }) {
                 onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
                 onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
               >
-                <Icon size={15} style={{ flexShrink: 0, opacity: active ? 1 : 0.6 }} />
+                <Icon size={16} style={{ flexShrink: 0, opacity: active ? 1 : 0.6 }} />
                 <span>{item.label}</span>
               </button>
             );
