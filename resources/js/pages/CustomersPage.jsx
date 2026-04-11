@@ -258,6 +258,7 @@ export default function CustomersPage() {
                  <th>Anagrafica Cliente</th>
                  <th>Residenza</th>
                  <th>Ciclo Vendita</th>
+                 <th>Registrato da</th>
                  <th>Status</th>
                  <th>Status Fidelity</th>
                  <th>App Loyalty</th>
@@ -297,6 +298,12 @@ export default function CustomersPage() {
                            <Clock size={12} className="text-slate-300" /> {formatDate(customer.last_purchase_at)}
                         </div>
                         <div className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.1em]">Freq: {formatReturnDays(customer.return_frequency_days)}</div>
+                     </div>
+                   </td>
+                   {/* Colonna Operatore Registrante */}
+                   <td>
+                     <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>
+                       {customer.registered_by_name?.trim() || '—'}
                      </div>
                    </td>
                    {/* Colonna Status Attivo/Inattivo */}

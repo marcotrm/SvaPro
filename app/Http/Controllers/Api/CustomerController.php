@@ -56,6 +56,7 @@ class CustomerController extends Controller
                 $join->on('lc.customer_id', '=', 'c.id')
                     ->where('lc.tenant_id', '=', $tenantId);
             })
+            ->leftJoin('employees as emp_reg', 'emp_reg.id', '=', 'c.created_by_employee_id')
             ->where('c.tenant_id', $tenantId)
             ->when($request->filled('q'), function ($query) use ($request) {
                 $term = trim((string) $request->input('q'));
@@ -82,6 +83,7 @@ class CustomerController extends Controller
                 'device_stats.loyalty_last_seen_at',
                 'push_stats.last_push_sent_at',
                 'push_stats.push_notifications_last_7d',
+                DB::raw("CONCAT(COALESCE(emp_reg.first_name, ''), ' ', COALESCE(emp_reg.last_name, '')) as registered_by_name"),
             ])
             ->orderByDesc('c.id')
             ->limit((int) $request->input('limit', 100));
@@ -360,6 +362,7 @@ class CustomerController extends Controller
             'country' => $request->input('country', 'IT'),
             'marketing_consent' => (bool) $request->boolean('marketing_consent'),
             'status' => 'active', // Auto-attivazione: ogni nuovo cliente è attivo di default
+            'created_by_employee_id' => $request->user()->employee_id ?? null, // Operatore registrante
             'total_orders' => 0,
             'total_spent' => 0,
             'avg_days_between_purchases' => null,
@@ -524,6 +527,9 @@ class CustomerController extends Controller
                     'return_frequency_days' => $returnFrequencyDays,
                     'created_at' => $customer->created_at,
                     'updated_at' => $customer->updated_at,
+                    // Operatore registrante
+                    'created_by_employee_id' => $customer->created_by_employee_id ?? null,
+                    'registered_by_name' => $customer->registered_by_name ?? null,
                 ];
             })
             ->all();
