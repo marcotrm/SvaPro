@@ -359,6 +359,7 @@ class CustomerController extends Controller
             'zip_code' => $request->input('zip_code'),
             'country' => $request->input('country', 'IT'),
             'marketing_consent' => (bool) $request->boolean('marketing_consent'),
+            'status' => 'active', // Auto-attivazione: ogni nuovo cliente è attivo di default
             'total_orders' => 0,
             'total_spent' => 0,
             'avg_days_between_purchases' => null,
@@ -413,6 +414,8 @@ class CustomerController extends Controller
                 'marketing_consent' => $request->has('marketing_consent')
                     ? (bool) $request->boolean('marketing_consent')
                     : (bool) ($old->marketing_consent ?? false),
+                // Permette aggiornamento esplicito dello status (attivo/disattivo)
+                'status' => $request->has('status') ? $request->input('status') : ($old->status ?? 'active'),
                 'updated_at' => now(),
             ]);
 
@@ -498,6 +501,7 @@ class CustomerController extends Controller
                     'phone' => $customer->phone,
                     'phone_verified' => (bool) ($customer->phone_verified ?? false),
                     'marketing_consent' => (bool) $customer->marketing_consent,
+                    'status' => $customer->status ?? 'active', // attivo di default
                     // Indirizzo
                     'address' => $customer->address ?? null,
                     'city' => $customer->city ?? null,

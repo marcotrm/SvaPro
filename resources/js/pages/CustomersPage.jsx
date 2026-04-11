@@ -8,7 +8,7 @@ import CustomerModal from '../components/CustomerModal.jsx';
 import { 
   Users, CreditCard, RefreshCcw, Smartphone, Clock, 
   Search, Plus, Filter, Download, MoreHorizontal,
-  Edit2, Trash2, Mail, Phone, MapPin
+  Edit2, Trash2, Mail, Phone, MapPin, ToggleLeft, ToggleRight
 } from 'lucide-react';
 
 export default function CustomersPage() {
@@ -49,6 +49,15 @@ export default function CustomersPage() {
   const handleOpenModal = (customer = null) => { setSelectedCustomer(customer); setShowModal(true); };
   const handleCloseModal = () => { setShowModal(false); setSelectedCustomer(null); };
   const handleSaveCustomer = async () => { await fetchCustomers(); handleCloseModal(); };
+
+  const handleToggleStatus = async (customer, e) => {
+    e.stopPropagation();
+    const newStatus = customer.status === 'active' ? 'inactive' : 'active';
+    try {
+      await customers.updateCustomer(customer.id, { status: newStatus });
+      setCustomersList(prev => prev.map(c => c.id === customer.id ? { ...c, status: newStatus } : c));
+    } catch { /* ignore */ }
+  };
 
   const filtered = customersList.filter(c =>
     (
@@ -202,6 +211,7 @@ export default function CustomersPage() {
                  <th>Anagrafica Cliente</th>
                  <th>Residenza</th>
                  <th>Ciclo Vendita</th>
+                 <th>Status</th>
                  <th>Status Fidelity</th>
                  <th>App Loyalty</th>
                  <th className="text-right">Azioni</th>
@@ -242,6 +252,12 @@ export default function CustomersPage() {
                         <div className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.1em]">Freq: {formatReturnDays(customer.return_frequency_days)}</div>
                      </div>
                    </td>
+                   {/* Colonna Status Attivo/Inattivo */}
+                   <td>
+                     <div className={`badge-v3 ${customer.status !== 'inactive' ? 'badge-v3-emerald' : 'badge-v3-slate'}`}>
+                       {customer.status !== 'inactive' ? '● Attivo' : '○ Inattivo'}
+                     </div>
+                   </td>
                    <td>
                      <div className={`badge-v3 ${customer.card_code ? 'badge-v3-emerald' : 'badge-v3-amber'}`}>
                        <CreditCard size={12} />
@@ -263,6 +279,18 @@ export default function CustomersPage() {
                    </td>
                    <td>
                      <div className="flex items-center justify-end gap-2">
+                       {/* Toggle stato attivo/inattivo */}
+                       <button
+                         onClick={(e) => handleToggleStatus(customer, e)}
+                         title={customer.status === 'active' ? 'Cliente attivo — clicca per disattivare' : 'Cliente inattivo — clicca per attivare'}
+                         className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-95 ${
+                           customer.status === 'active'
+                             ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white'
+                             : 'bg-red-50 text-red-400 hover:bg-red-500 hover:text-white'
+                         }`}
+                       >
+                         {customer.status === 'active' ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                       </button>
                        <button 
                          onClick={(e) => { e.stopPropagation(); navigate(`/customers/${customer.id}`); }}
                          className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95"
