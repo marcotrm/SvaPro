@@ -1227,8 +1227,11 @@ function PosResoModal({ storeId, onClose, onDone }) {
                 <select value={reason} onChange={e => setReason(e.target.value)}
                   style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e5e7eb', borderRadius: 10, fontSize: 13, outline: 'none' }}>
                   <option value="customer_request">Richiesta cliente</option>
-                  <option value="defective">Prodotto difettoso</option>
-                  <option value="wrong_item">Articolo sbagliato</option>
+                  <option value="bottiglia_danneggiata">Bottiglia danneggiata</option>
+                  <option value="sigaretta_non_accende">Sigaretta non si accende</option>
+                  <option value="sigaretta_graffiata">Sigaretta graffiata</option>
+                  <option value="resistenza_difettosa">Resistenza difettosa</option>
+                  <option value="atomizzatore_perde">Atomizzatore perde liquido</option>
                   <option value="other">Altro</option>
                 </select>
               </div>
