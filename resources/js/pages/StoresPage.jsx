@@ -378,6 +378,9 @@ function StoreCard({ store, onEdit, onDelete }) {
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-text-secondary)' }}>
           🕐 Oggi: {hoursDisplay}
         </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--color-accent)' }} title="Calcolato automaticamente per eventuali conteggi e premi KPI.">
+          💰 Fatturato (h18): € {(store.revenue_18 || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+        </span>
       </div>
 
       {/* Orari accordion */}

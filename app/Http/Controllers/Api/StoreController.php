@@ -26,7 +26,23 @@ class StoreController extends Controller
                 'opening_hours', 'default_start_time', 'late_tolerance_minutes',
                 'auto_reorder_enabled',
             ])
-            ->map(fn($s) => $this->formatStore($s));
+            ->map(function ($s) use ($tenantId) {
+                // Calcola il fatturato di "oggi" entro le ore 18
+                $todayAuth = now()->toDateString();
+                $targetTime = now()->setTime(18, 0, 0);
+
+                $revenue18 = DB::table('sales_orders')
+                    ->where('tenant_id', $tenantId)
+                    ->where('store_id', $s->id)
+                    ->whereDate('created_at', $todayAuth)
+                    ->where('created_at', '<=', $targetTime)
+                    ->where('status', 'completed')
+                    ->sum('grand_total');
+
+                $formatted = $this->formatStore($s);
+                $formatted['revenue_18'] = (float) $revenue18;
+                return $formatted;
+            });
 
         return response()->json(['data' => $stores]);
     }
@@ -60,9 +76,22 @@ class StoreController extends Controller
                 'late_minutes'  => $r->late_minutes,
             ]);
 
+        $todayAuth = now()->toDateString();
+        $targetTime = now()->setTime(18, 0, 0);
+        $revenue18 = DB::table('sales_orders')
+            ->where('tenant_id', $tenantId)
+            ->where('store_id', $storeId)
+            ->whereDate('created_at', $todayAuth)
+            ->where('created_at', '<=', $targetTime)
+            ->where('status', 'completed')
+            ->sum('grand_total');
+
+        $formattedStore = $this->formatStore($store);
+        $formattedStore['revenue_18'] = (float) $revenue18;
+
         return response()->json([
             'data' => array_merge(
-                (array) $this->formatStore($store),
+                (array) $formattedStore,
                 ['live_attendance' => $liveAttendance]
             ),
         ]);
