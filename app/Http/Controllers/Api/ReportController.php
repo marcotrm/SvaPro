@@ -197,4 +197,60 @@ class ReportController extends Controller
             'low_stock'       => $lowStock,
         ]]);
     }
+
+    /**
+     * QScare Dashboard: returns QScare orders and summary.
+     */
+    public function qscareDashboard(Request $request)
+    {
+        $tenantId = $request->attributes->get('tenant_id');
+        $storeId  = $request->input('store_id');
+        $employeeId = $request->input('employee_id');
+        $dateFrom = $request->input('date_from');
+        $dateTo   = $request->input('date_to');
+
+        $query = DB::table('sales_order_lines')
+            ->join('sales_orders', 'sales_order_lines.sales_order_id', '=', 'sales_orders.id')
+            ->leftJoin('users as employees', 'sales_orders.sold_by_employee_id', '=', 'employees.id')
+            ->leftJoin('stores', 'sales_orders.store_id', '=', 'stores.id')
+            ->where('sales_orders.tenant_id', $tenantId)
+            ->where('sales_orders.status', 'paid')
+            ->where('sales_order_lines.is_service', true)
+            ->where('sales_order_lines.service_name', 'like', '%QScare%')
+            ->select(
+                'sales_orders.id as order_id',
+                'sales_orders.created_at',
+                'sales_order_lines.qty',
+                DB::raw('COALESCE(sales_order_lines.line_total, sales_order_lines.qty * sales_order_lines.unit_price) as line_total'),
+                'sales_order_lines.unit_price',
+                'stores.name as store_name',
+                DB::raw("concat(employees.first_name, ' ', employees.last_name) as employee_name")
+            );
+
+        if ($storeId) {
+            $query->where('sales_orders.store_id', $storeId);
+        }
+        if ($employeeId) {
+            $query->where('sales_orders.sold_by_employee_id', $employeeId);
+        }
+        if ($dateFrom) {
+            $query->whereRaw("(sales_orders.created_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom]);
+        }
+        if ($dateTo) {
+            $query->whereRaw("(sales_orders.created_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]);
+        }
+        
+        $lines = $query->orderByDesc('sales_orders.created_at')->get();
+
+        $totalRevenue = $lines->sum('line_total');
+        $totalQty = $lines->sum('qty');
+
+        return response()->json([
+            'data' => $lines,
+            'summary' => [
+                'total_revenue' => $totalRevenue,
+                'total_qty' => $totalQty
+            ]
+        ]);
+    }
 }

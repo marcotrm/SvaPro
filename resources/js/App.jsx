@@ -43,6 +43,7 @@ const GamificationPage = lazy(() => import('./pages/GamificationPage.jsx'));
 const SupplierDeliveryPage = lazy(() => import('./pages/SupplierDeliveryPage.jsx'));
 const StoreLoadingPage     = lazy(() => import('./pages/StoreLoadingPage.jsx'));
 const AdminPanelPage       = lazy(() => import('./pages/AdminPanelPage.jsx'));
+const QscareDashboardPage  = lazy(() => import('./pages/QscareDashboardPage.jsx'));
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -146,6 +147,7 @@ export default function App() {
               <Route path="/roles-permissions" element={<RolesPermissionsPage />} />
               <Route path="/invoices" element={<InvoicesPage />} />
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/qscare-dashboard" element={<QscareDashboardPage />} />
               <Route path="/suppliers" element={<SuppliersPage />} />
               <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
               <Route path="/returns" element={<ReturnsPage />} />

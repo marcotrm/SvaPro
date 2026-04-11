@@ -661,6 +661,7 @@ export const reports = {
   topProducts: (params = {}) => cachedGet('/reports/top-products', params, 30000, 300000),
   customerAcquisition: (params = {}) => cachedGet('/reports/customer-acquisition', params, 30000, 300000),
   summary: (params = {}) => cachedGet('/reports/summary', params, 30000, 300000),
+  qscareDashboard: (params = {}) => cachedGet('/reports/qscare-dashboard', params, 10000, 60000),
 };
 
 // Attendance APIs (timbrature dipendenti)

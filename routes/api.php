@@ -167,6 +167,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/reports/top-products', [ReportController::class, 'topProducts']);
         Route::get('/reports/customer-acquisition', [ReportController::class, 'customerAcquisition']);
         Route::get('/reports/summary', [ReportController::class, 'summary']);
+        Route::get('/reports/qscare-dashboard', [ReportController::class, 'qscareDashboard']);
 
         // Promotions & Bundles
         Route::get('/promotions', [PromotionController::class, 'index']);

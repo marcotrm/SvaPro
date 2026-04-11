@@ -59,6 +59,7 @@ const allNavigation = [
   // Amministrazione ──────────────────────────────────────────────
   { section: 'Amministrazione', icon: Shield, items: [
     { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
+    { label: 'Dashboard QScare',       href: '/qscare-dashboard', icon: Shield,  roles: ['superadmin','admin_cliente'] },
     { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,       roles: ['superadmin','admin_cliente'] },
     { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,       roles: ['superadmin','admin_cliente'] },
     { label: 'Fatturazione',           href: '/invoices',     icon: FileText,    roles: ['superadmin','admin_cliente'] },
