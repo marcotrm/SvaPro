@@ -75,14 +75,15 @@ class WooCommerceSyncService
 
     private function getTenantCredentials(int $tenantId): ?array
     {
-        $settings = DB::table('tenant_settings')
-            ->where('tenant_id', $tenantId)
-            ->whereIn('setting_key', [
-                'woocommerce_api_url',
-                'woocommerce_consumer_key',
-                'woocommerce_consumer_secret'
-            ])
-            ->pluck('setting_value', 'setting_key');
+        $settingsJson = DB::table('tenants')
+            ->where('id', $tenantId)
+            ->value('settings_json');
+
+        if (!$settingsJson) {
+            return null;
+        }
+
+        $settings = json_decode($settingsJson, true);
 
         if (
             !isset($settings['woocommerce_api_url']) || 

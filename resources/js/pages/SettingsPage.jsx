@@ -33,6 +33,9 @@ export default function SettingsPage() {
   const [tenantErr, setTenantErr] = useState('');
   const [savingTenant, setSavingTenant] = useState(false);
   const [qscarePrice, setQscarePrice] = useState('');
+  const [woocommerceApiUrl, setWoocommerceApiUrl] = useState('');
+  const [woocommerceKey, setWoocommerceKey] = useState('');
+  const [woocommerceSecret, setWoocommerceSecret] = useState('');
 
   useEffect(() => {
     if (isAdmin) {
@@ -45,6 +48,9 @@ export default function SettingsPage() {
           setTenantLicense(t.license_code || '');
           const sj = t.settings_json;
           if (sj?.qscare_price !== undefined) setQscarePrice(String(sj.qscare_price));
+          if (sj?.woocommerce_api_url) setWoocommerceApiUrl(sj.woocommerce_api_url);
+          if (sj?.woocommerce_consumer_key) setWoocommerceKey(sj.woocommerce_consumer_key);
+          if (sj?.woocommerce_consumer_secret) setWoocommerceSecret(sj.woocommerce_consumer_secret);
         }
       }).catch(() => {});
     }
@@ -91,6 +97,9 @@ export default function SettingsPage() {
         license_code: tenantLicense,
         settings_json: {
           qscare_price: qscarePrice !== '' ? parseFloat(qscarePrice) : null,
+          woocommerce_api_url: woocommerceApiUrl,
+          woocommerce_consumer_key: woocommerceKey,
+          woocommerce_consumer_secret: woocommerceSecret,
         },
       });
       clearApiCache();
@@ -407,6 +416,55 @@ export default function SettingsPage() {
                          <p className="text-[10px] font-bold text-slate-400 ml-1">
                            Lascia vuoto per disabilitare QScare. Il toggle apparirà nel POS Cassa per ogni vendita.
                          </p>
+                       </div>
+                     </div>
+     
+                     {/* ─── Integrazione WooCommerce ─── */}
+                     <div className="mt-2 p-6 rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50 to-white" style={{ gridColumn: '1/-1' }}>
+                       <div className="flex items-center gap-4 mb-4">
+                         <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center text-xl">🛍</div>
+                         <div>
+                           <div className="font-black text-slate-900 tracking-tight">Connettività Negozio WooCommerce</div>
+                           <div className="text-xs font-bold text-slate-400">Inserisci le chiavi API REST per spingere prodotti e magazzino online in automatico.</div>
+                         </div>
+                       </div>
+                       
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div className="space-y-2" style={{ gridColumn: '1/-1' }}>
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">URL Negozio Online</label>
+                           <input
+                             type="url"
+                             className="w-full bg-white border-2 border-indigo-200 rounded-2xl px-4 py-3.5 font-bold text-slate-900 focus:border-indigo-500 transition-all outline-none"
+                             value={woocommerceApiUrl}
+                             onChange={e => setWoocommerceApiUrl(e.target.value)}
+                             placeholder="Es: https://www.ilmiosvapo.it"
+                           />
+                         </div>
+                         <div className="space-y-2">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Consumer Key (ck_...)</label>
+                           <input
+                             type="text"
+                             className="w-full bg-white border-2 border-indigo-200 rounded-2xl px-4 py-3.5 font-bold text-slate-900 focus:border-indigo-500 transition-all outline-none font-mono text-sm"
+                             value={woocommerceKey}
+                             onChange={e => setWoocommerceKey(e.target.value)}
+                             placeholder="ck_xxx"
+                           />
+                         </div>
+                         <div className="space-y-2">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Consumer Secret (cs_...)</label>
+                           <input
+                             type="password"
+                             className="w-full bg-white border-2 border-indigo-200 rounded-2xl px-4 py-3.5 font-bold text-slate-900 focus:border-indigo-500 transition-all outline-none font-mono text-sm"
+                             value={woocommerceSecret}
+                             onChange={e => setWoocommerceSecret(e.target.value)}
+                             placeholder="cs_xxx"
+                           />
+                         </div>
+	                   <div className="pt-2" style={{ gridColumn: '1/-1' }}>
+                           <p className="text-[10px] font-bold text-slate-400 ml-1">
+                             Le sincronizzazioni si attiveranno automaticamente a ogni salvataggio del profilo o ai cambi automatici d'inventario.
+                           </p>
+                         </div>
                        </div>
                      </div>
 

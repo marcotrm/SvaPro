@@ -36,11 +36,10 @@ class SyncWooCommerce extends Command
 
         $this->info('Avvio sincronizzazione WooCommerce per tutti i tenant configurati...');
 
-        $tenants = \Illuminate\Support\Facades\DB::table('tenant_settings')
-            ->where('setting_key', 'woocommerce_api_url')
-            ->whereNotNull('setting_value')
-            ->where('setting_value', '!=', '')
-            ->pluck('tenant_id');
+        $tenants = \Illuminate\Support\Facades\DB::table('tenants')
+            ->whereNotNull('settings_json')
+            ->where('settings_json', 'like', '%"woocommerce_api_url"%')
+            ->pluck('id');
 
         foreach ($tenants as $tId) {
             $this->info("Sincronizzazione tenant: {$tId}");
