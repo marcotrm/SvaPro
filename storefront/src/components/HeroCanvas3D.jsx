@@ -235,13 +235,13 @@ export default function HeroCanvas3D({ scrollRef }) {
 
     const st = ScrollTrigger.create({
       trigger: scrollRef.current,
+      pin: scrollRef.current.querySelector('.hero3d-sticky'),
       start: 'top top',
       end: '+=300%',
       scrub: 1.5,
-      pin: true,
+      anticipatePin: 1,
       onUpdate: (self) => {
-        const progress = self.progress;
-        p.value = progress;
+        p.value = self.progress;
       },
     });
 

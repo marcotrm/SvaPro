@@ -60,14 +60,13 @@ export default function Hero3D({ onShopClick }) {
       ref={sectionRef}
       style={{
         position: 'relative',
-        height: '400vh', // 4× viewport tall → scroll travel for GSAP pin
+        height: '400vh',
         background: '#050505',
       }}
     >
-      {/* ── Sticky container that stays in view during scroll ── */}
-      <div style={{
-        position: 'sticky',
-        top: 0,
+      {/* ── GSAP will pin .hero3d-sticky during scroll ── */}
+      <div className="hero3d-sticky" style={{
+        position: 'relative',
         height: '100vh',
         overflow: 'hidden',
         display: 'flex',
