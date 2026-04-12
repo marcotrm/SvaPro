@@ -102,7 +102,7 @@ export default function Hero3D({ onShopClick }) {
       scrollTrigger: {
         trigger: wrapRef.current,
         pin: true,
-        pinSpacing: false, // 🔑 ELIMINA IL GAP NERO DOPO LA HERO
+        // pinSpacing: true (default) → riserva spazio scroll, i prodotti compaiono DOPO la hero
         scrub: 1.2,
         start: 'top top',
         end: '+=600%',

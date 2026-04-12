@@ -198,51 +198,65 @@ const PRODUCTS = [
 ];
 
 function ScrollProducts({ navigate }) {
-  const sectionRef = useRef(null);
-  const imgRef = useRef(null);
-  const glowRef = useRef(null);
-  const textPanels = useRef([]);
+  const sectionRef  = useRef(null);
+  const imgRefs     = useRef([]);   // 3 img separate per il crossfade
+  const glowRefs    = useRef([]);
+  const textPanels  = useRef([]);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      PRODUCTS.forEach((prod, i) => {
-        const panel = textPanels.current[i];
-        if (!panel) return;
 
-        gsap.set(panel, { opacity: 0, x: 100 });
+      // Stato iniziale: solo il primo prodotto visibile
+      imgRefs.current.forEach((el, i) => gsap.set(el,  { opacity: i === 0 ? 1 : 0, scale: i === 0 ? 1 : 0.88 }));
+      glowRefs.current.forEach((el, i) => gsap.set(el, { opacity: i === 0 ? 1 : 0 }));
+      textPanels.current.forEach((el, i) => gsap.set(el, { opacity: i === 0 ? 0 : 0, x: i === 0 ? 0 : 90 }));
 
-        // Each panel ties to a portion of the section scroll
-        ScrollTrigger.create({
+      // Timeline unica scrubbed sull'intera sezione
+      const tl = gsap.timeline({
+        scrollTrigger: {
           trigger: sectionRef.current,
-          start: `top+=${i * window.innerHeight * 0.85} top`,
-          end: `top+=${(i + 0.85) * window.innerHeight * 0.85} top`,
-          scrub: 0.8,
-          onUpdate: (self) => {
-            const p = self.progress;
-            // Fade in 0→0.35, hold, fade out 0.75→1
-            let opacity;
-            if (p < 0.35) opacity = p / 0.35;
-            else if (p < 0.75) opacity = 1;
-            else opacity = 1 - (p - 0.75) / 0.25;
-
-            const x = p < 0.35 ? (1 - p / 0.35) * 80 : p > 0.75 ? -(( p - 0.75) / 0.25) * 80 : 0;
-            gsap.set(panel, { opacity: Math.max(0, opacity), x });
-
-            // Update image glow on active panel
-            if (p > 0.15 && p < 0.85 && imgRef.current) {
-              gsap.to(imgRef.current, {
-                src: prod.img,
-                filter: `drop-shadow(0 0 80px ${prod.accent}66)`,
-                duration: 0.5,
-              });
-              gsap.to(glowRef.current, {
-                background: `radial-gradient(circle, ${prod.accent}18 0%, transparent 60%)`,
-                duration: 0.5,
-              });
-            }
-          },
-        });
+          start: 'top top',
+          end: 'bottom bottom',
+          scrub: 1.0,
+        },
       });
+
+      // Total duration = 1 (0 → 1)
+      // Prodotto 0:  0.00 → 0.33
+      // Prodotto 1:  0.33 → 0.66
+      // Prodotto 2:  0.66 → 1.00
+      const STEP = 1 / PRODUCTS.length; // 0.333
+
+      PRODUCTS.forEach((_, i) => {
+        const start    = i * STEP;
+        const midStart = start + STEP * 0.15;  // testo entra
+        const midEnd   = start + STEP * 0.75;  // testo esce
+        const end      = start + STEP;         // prossimo step
+
+        // Testo IN
+        tl.to(textPanels.current[i], {
+          opacity: 1, x: 0, duration: STEP * 0.18, ease: 'power3.out'
+        }, midStart);
+
+        if (i < PRODUCTS.length - 1) {
+          // Testo OUT
+          tl.to(textPanels.current[i], {
+            opacity: 0, x: -70, duration: STEP * 0.12, ease: 'power3.in'
+          }, midEnd);
+
+          // Immagine crossfade: corrente esce, prossima entra
+          tl.to(imgRefs.current[i], {
+            opacity: 0, scale: 1.1, duration: STEP * 0.18, ease: 'power2.in'
+          }, midEnd);
+          tl.to(glowRefs.current[i], { opacity: 0, duration: STEP * 0.15 }, midEnd);
+
+          tl.to(imgRefs.current[i + 1], {
+            opacity: 1, scale: 1, duration: STEP * 0.22, ease: 'power2.out'
+          }, midEnd + STEP * 0.08);
+          tl.to(glowRefs.current[i + 1], { opacity: 1, duration: STEP * 0.2 }, midEnd + STEP * 0.08);
+        }
+      });
+
     }, sectionRef);
     return () => ctx.revert();
   }, []);
@@ -250,61 +264,71 @@ function ScrollProducts({ navigate }) {
   return (
     <section
       ref={sectionRef}
-      style={{
-        background: '#000',
-        position: 'relative',
-        height: `${PRODUCTS.length * 90}vh`,
-      }}
+      style={{ background: '#000', position: 'relative', height: `${PRODUCTS.length * 100}vh` }}
     >
+      {/* Sticky viewport */}
       <div style={{
-        position: 'sticky',
-        top: 0,
-        height: '100vh',
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        alignItems: 'center',
-        overflow: 'hidden',
+        position: 'sticky', top: 0, height: '100vh',
+        display: 'grid', gridTemplateColumns: '1fr 1fr',
+        alignItems: 'center', overflow: 'hidden',
+        background: '#000',
       }}>
-        {/* LEFT — 3D Product floating */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', position: 'relative' }}>
-          <div ref={glowRef} style={{
-            position: 'absolute', top: '50%', left: '50%',
-            transform: 'translate(-50%,-50%)',
-            width: '50%', height: '50%',
-            background: `radial-gradient(circle, ${PRODUCTS[0].accent}18 0%, transparent 60%)`,
-            filter: 'blur(70px)',
-          }} />
-          <img
-            ref={imgRef}
-            src={PRODUCTS[0].img}
-            alt="product"
-            style={{
-              width: '65%', maxWidth: 400,
-              objectFit: 'contain',
-              mixBlendMode: 'screen',
-              filter: `drop-shadow(0 0 80px ${PRODUCTS[0].accent}66)`,
-              animation: 'float 4s ease-in-out infinite',
-            }}
-          />
+
+        {/* ── LEFT: tutti e 3 i prodotti sovrapposti, crossfade ── */}
+        <div style={{ height: '100%', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {PRODUCTS.map((prod, i) => (
+            <React.Fragment key={i}>
+              {/* Glow */}
+              <div
+                ref={el => (glowRefs.current[i] = el)}
+                style={{
+                  position: 'absolute', top: '50%', left: '50%',
+                  transform: 'translate(-50%,-50%)',
+                  width: '55%', height: '55%',
+                  background: `radial-gradient(circle, ${prod.accent}22 0%, transparent 65%)`,
+                  filter: 'blur(70px)',
+                  pointerEvents: 'none',
+                }}
+              />
+              {/* Prodotto — NO sfondo, screen blend su div nero */}
+              <img
+                ref={el => (imgRefs.current[i] = el)}
+                src={prod.img}
+                alt={prod.label}
+                style={{
+                  position: 'absolute',
+                  width: '62%', maxWidth: 380,
+                  objectFit: 'contain',
+                  mixBlendMode: 'screen',        // magia: sfondo nero sparisce
+                  filter: `drop-shadow(0 0 60px ${prod.accent}55)`,
+                  animation: 'float 4s ease-in-out infinite',
+                  animationDelay: `${i * 0.4}s`,
+                }}
+              />
+            </React.Fragment>
+          ))}
         </div>
 
-        {/* RIGHT — Text panels stacked */}
-        <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', paddingRight: '6vw' }}>
+        {/* ── RIGHT: pannelli testo sovrapposti ── */}
+        <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
           {PRODUCTS.map((prod, i) => (
             <div
               key={i}
               ref={el => (textPanels.current[i] = el)}
-              style={{ position: 'absolute', left: 0, right: 0, padding: '0 5vw 0 2vw' }}
+              style={{ position: 'absolute', left: 0, right: 0, padding: '0 6vw 0 2vw' }}
             >
+              {/* Numero / tagline */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1.8rem' }}>
-                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#444' }}>{prod.tagline.split('—')[0]}</span>
+                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#3a3a3a', letterSpacing: '1px' }}>
+                  {prod.tagline.split('—')[0].trim()}
+                </span>
                 <span style={{ width: 28, height: 1, background: prod.accent }} />
                 <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', color: prod.accent, letterSpacing: '2px' }}>
                   {prod.tagline.split('—')[1]?.trim()}
                 </span>
               </div>
 
-              <div style={{ fontSize: '0.72rem', color: '#444', fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.7rem', color: '#3a3a3a', fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
                 {prod.label}
               </div>
 
@@ -312,18 +336,20 @@ function ScrollProducts({ navigate }) {
                 {prod.headline}
               </h2>
 
-              <p style={{ color: '#777', fontSize: '1rem', lineHeight: 1.75, maxWidth: 400, marginBottom: '2.5rem', fontWeight: 400 }}>
+              <p style={{ color: '#666', fontSize: '1rem', lineHeight: 1.8, maxWidth: 400, marginBottom: '2.5rem', fontWeight: 400 }}>
                 {prod.body}
               </p>
 
+              {/* Specs */}
               <div style={{ display: 'flex', gap: '2.4rem', marginBottom: '3rem' }}>
                 {prod.specs.map((s, si) => (
                   <div key={si} style={{ borderLeft: `2px solid ${prod.accent}55`, paddingLeft: 12 }}>
-                    <div style={{ fontSize: '0.72rem', color: prod.accent, fontWeight: 800, letterSpacing: '0.5px' }}>{s}</div>
+                    <div style={{ fontSize: '0.7rem', color: prod.accent, fontWeight: 800 }}>{s}</div>
                   </div>
                 ))}
               </div>
 
+              {/* CTA */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.8rem' }}>
                 <div style={{ fontSize: '2rem', color: prod.accent, fontWeight: 900, letterSpacing: '-1px' }}>{prod.price}</div>
                 <button
@@ -337,7 +363,8 @@ function ScrollProducts({ navigate }) {
           ))}
         </div>
       </div>
-      <style>{`@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-18px)} }`}</style>
+
+      <style>{`@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-16px)} }`}</style>
     </section>
   );
 }
