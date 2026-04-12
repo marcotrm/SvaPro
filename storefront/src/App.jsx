@@ -206,54 +206,65 @@ function ScrollProducts({ navigate }) {
   useEffect(() => {
     const ctx = gsap.context(() => {
 
-      // Stato iniziale: solo il primo prodotto visibile
-      imgRefs.current.forEach((el, i) => gsap.set(el,  { opacity: i === 0 ? 1 : 0, scale: i === 0 ? 1 : 0.88 }));
+      // Stato iniziale
+      imgRefs.current.forEach((el, i) => gsap.set(el,  { opacity: i === 0 ? 1 : 0, scale: i === 0 ? 1 : 0.92 }));
       glowRefs.current.forEach((el, i) => gsap.set(el, { opacity: i === 0 ? 1 : 0 }));
-      textPanels.current.forEach((el, i) => gsap.set(el, { opacity: i === 0 ? 0 : 0, x: i === 0 ? 0 : 90 }));
+      // Tutti i testi partono invisibili — il primo entra subito
+      textPanels.current.forEach((el) => gsap.set(el, { opacity: 0, x: 60 }));
 
-      // Timeline unica scrubbed sull'intera sezione
+      // Timeline scrubbed con inertia alta = movimento morbidissimo
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
           start: 'top top',
           end: 'bottom bottom',
-          scrub: 1.0,
+          scrub: 2.5,   // ← Alta inertia = tutte le animazioni scivolano morbido
         },
       });
 
-      // Total duration = 1 (0 → 1)
-      // Prodotto 0:  0.00 → 0.33
-      // Prodotto 1:  0.33 → 0.66
-      // Prodotto 2:  0.66 → 1.00
-      const STEP = 1 / PRODUCTS.length; // 0.333
+      // Fade-in section opening: entra dal nero
+      // (la hero finisce nera, i prodotti emergence dal nero = seamless)
+      const S = 1 / PRODUCTS.length; // 0.333 per step
 
       PRODUCTS.forEach((_, i) => {
-        const start    = i * STEP;
-        const midStart = start + STEP * 0.15;  // testo entra
-        const midEnd   = start + STEP * 0.75;  // testo esce
-        const end      = start + STEP;         // prossimo step
+        const base = i * S;
 
-        // Testo IN
+        // ─ Testo: entra piano da destra ─
         tl.to(textPanels.current[i], {
-          opacity: 1, x: 0, duration: STEP * 0.18, ease: 'power3.out'
-        }, midStart);
+          opacity: 1, x: 0,
+          duration: S * 0.25,
+          ease: 'power2.out',
+        }, base + S * 0.08);
 
         if (i < PRODUCTS.length - 1) {
-          // Testo OUT
+          const exit = base + S * 0.70; // esce prima della fine dello step
+
+          // ─ Testo: esce verso sinistra ─
           tl.to(textPanels.current[i], {
-            opacity: 0, x: -70, duration: STEP * 0.12, ease: 'power3.in'
-          }, midEnd);
+            opacity: 0, x: -60,
+            duration: S * 0.20,
+            ease: 'power2.in',
+          }, exit);
 
-          // Immagine crossfade: corrente esce, prossima entra
+          // ─ Immagine corrente: si dissolve scalando lievemente ─
           tl.to(imgRefs.current[i], {
-            opacity: 0, scale: 1.1, duration: STEP * 0.18, ease: 'power2.in'
-          }, midEnd);
-          tl.to(glowRefs.current[i], { opacity: 0, duration: STEP * 0.15 }, midEnd);
+            opacity: 0, scale: 1.06,
+            duration: S * 0.25,
+            ease: 'power1.inOut',
+          }, exit);
+          tl.to(glowRefs.current[i], {
+            opacity: 0, duration: S * 0.25, ease: 'power1.inOut',
+          }, exit);
 
+          // ─ Immagine successiva: emerge scalando da piccola (con overlap) ─
           tl.to(imgRefs.current[i + 1], {
-            opacity: 1, scale: 1, duration: STEP * 0.22, ease: 'power2.out'
-          }, midEnd + STEP * 0.08);
-          tl.to(glowRefs.current[i + 1], { opacity: 1, duration: STEP * 0.2 }, midEnd + STEP * 0.08);
+            opacity: 1, scale: 1,
+            duration: S * 0.28,
+            ease: 'power1.inOut',
+          }, exit + S * 0.05); // ← legger overlap con l'uscita
+          tl.to(glowRefs.current[i + 1], {
+            opacity: 1, duration: S * 0.28, ease: 'power1.inOut',
+          }, exit + S * 0.05);
         }
       });
 

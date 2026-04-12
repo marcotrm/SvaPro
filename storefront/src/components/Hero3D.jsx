@@ -53,6 +53,7 @@ export default function Hero3D({ onShopClick }) {
   const wrapRef = useRef(null);
   const textRefs = useRef([]);
   const imagesRef = useRef([]);
+  const fadeOverlayRef = useRef(null); // Overlay nero per dissolvenza finale
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -131,6 +132,10 @@ export default function Hero3D({ onShopClick }) {
     
     // Scena 3 (Rimane visibile)
     tl.to(textRefs.current[2], { opacity: 1, y: 0, duration: 0.08, ease: 'power2.out' }, 0.80);
+
+    // ── Dissolvenza verso il nero negli ultimi 12% dello scroll ──
+    gsap.set(fadeOverlayRef.current, { opacity: 0 });
+    tl.to(fadeOverlayRef.current, { opacity: 1, duration: 0.12, ease: 'power2.inOut' }, 0.88);
 
     // Navbar Overlay Logic
     const navbar = document.getElementById('main-navbar');
@@ -244,6 +249,17 @@ export default function Hero3D({ onShopClick }) {
             )}
         </div>
       ))}
+
+      {/* Overlay fade-to-black — appare alla fine dello scroll hero */}
+      <div
+        ref={fadeOverlayRef}
+        style={{
+          position: 'absolute', inset: 0, zIndex: 20,
+          background: '#000000',
+          pointerEvents: 'none',
+          opacity: 0,
+        }}
+      />
 
       {/* Indicatore Scroll */}
       <div style={{
