@@ -50,23 +50,45 @@ const errorMap = [
   {
     match: msg => msg.includes('404'),
     userMessage: 'Risorsa non trovata.'
-  },
-  {
-    match: msg => msg.includes('422'),
-    userMessage: 'Dati non validi o mancanti. Controlla i campi e riprova.'
-  },
+  }
 ];
 
 api.interceptors.response.use(
   response => response,
   error => {
+    const status = error.response?.status;
     let msg = error?.response?.data?.message || error?.message || 'Errore sconosciuto.';
+    
+    // Mostra in modo esplicito gli errori di validazione dei campi (422)
+    if (status === 422 && error.response?.data?.errors) {
+      const fieldErrors = error.response.data.errors;
+      const errorStrings = [];
+      for (const key in fieldErrors) {
+        errorStrings.push(fieldErrors[key].join(' '));
+      }
+      error.userFriendlyMessage = `Errore nei dati: ${errorStrings.join(' | ')}`;
+      return Promise.reject(error);
+    }
+
+    // Se il backend ci restituisce un messaggio parlante (e non è una generica stringa di errore),
+    // usiamo quello a meno che non ci sia una regola fissa preimpostata
+    let mappedMessage = null;
     for (const rule of errorMap) {
       if (msg && rule.match(msg)) {
-        error.userFriendlyMessage = rule.userMessage;
+        mappedMessage = rule.userMessage;
         break;
       }
     }
+    
+    // Applica il custom message solo se c'è un mapping, altrimenti mostra l'errore reale se di senso compiuto (o fallback)
+    if (mappedMessage) {
+      error.userFriendlyMessage = mappedMessage;
+    } else {
+      error.userFriendlyMessage = status === 500 
+        ? `Errore di sistema (500): ${msg.length < 150 ? msg : 'Si è verificato un problema interno, contatta l\'assistenza.'}` 
+        : msg;
+    }
+    
     return Promise.reject(error);
   }
 );

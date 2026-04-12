@@ -155,8 +155,7 @@ class InventoryCountController extends Controller
                 ->where(function ($q) use ($barcodeScanned, $isNumeric) {
                     $q->where('pv.barcode', $barcodeScanned)
                       ->orWhere('p.barcode', $barcodeScanned)
-                      ->orWhere('p.sku', $barcodeScanned)
-                      ->orWhere('pv.sku', $barcodeScanned);
+                      ->orWhere('p.sku', $barcodeScanned);
                     if ($isNumeric) {
                         $q->orWhere('pv.id', (int) $barcodeScanned);
                     }
@@ -257,7 +256,8 @@ class InventoryCountController extends Controller
                     'product_variant_id' => $line->product_variant_id,
                     'movement_type' => 'inventory_count',
                     'qty' => $line->difference,
-                    'reason' => 'Inventario guidato #' . $sessionId,
+                    'reference_type' => 'inventory_count_session',
+                    'reference_id' => $sessionId,
                     'occurred_at' => now(),
                     'created_at' => now(),
                     'updated_at' => now(),

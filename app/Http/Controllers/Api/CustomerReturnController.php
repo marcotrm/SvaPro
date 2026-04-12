@@ -76,7 +76,7 @@ class CustomerReturnController extends Controller
             ->join('product_variants as pv', 'pv.id', '=', 'crl.product_variant_id')
             ->join('products as p', 'p.id', '=', 'pv.product_id')
             ->where('crl.customer_return_id', $id)
-            ->select(['crl.*', 'pv.sku', 'pv.name as variant_name', 'p.name as product_name'])
+            ->select(['crl.*', 'p.sku', 'pv.flavor as variant_name', 'p.name as product_name'])
             ->get();
 
         $return->lines = $lines;
@@ -316,22 +316,24 @@ class CustomerReturnController extends Controller
         }
 
         foreach ($lines as $line) {
-            DB::table('inventory_movements')->insert([
+            DB::table('stock_movements')->insert([
                 'tenant_id'          => $tenantId,
                 'product_variant_id' => $line->product_variant_id,
                 'warehouse_id'       => $warehouse->id,
-                'quantity'           => $line->quantity,
-                'type'               => 'return',
-                'reference'          => $return->rma_number,
+                'qty'                => $line->quantity,
+                'movement_type'      => 'return',
+                'reference_type'     => 'customer_return',
+                'reference_id'       => $return->id,
+                'occurred_at'        => now(),
                 'created_at'         => now(),
                 'updated_at'         => now(),
             ]);
 
-            DB::table('inventory_stock')
+            DB::table('stock_items')
                 ->where('tenant_id', $tenantId)
                 ->where('product_variant_id', $line->product_variant_id)
                 ->where('warehouse_id', $warehouse->id)
-                ->increment('quantity', $line->quantity);
+                ->increment('on_hand', $line->quantity);
         }
     }
 }
