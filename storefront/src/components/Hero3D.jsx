@@ -111,20 +111,20 @@ export default function Hero3D({ onShopClick }) {
       }, 0);
 
       /* Phase 0.18→0.38 — Scene 1 slides in, product tilts right */
-      tl.to(imgWrapRef.current, { rotationY: 10, duration: 0.10, ease: 'power2.inOut' }, 0.18);
-      tl.to(sceneRefs.current[0], { opacity: 1, x: 0, duration: 0.09, ease: 'power3.out' }, 0.19);
-      /* Scene 1 exits */
-      tl.to(sceneRefs.current[0], { opacity: 0, x: -50, duration: 0.07, ease: 'power2.in' }, 0.36);
+      tl.to(imgWrapRef.current, { rotationY: 10, duration: 0.08, ease: 'power2.inOut' }, 0.20);
+      tl.to(sceneRefs.current[0], { opacity: 1, x: 0, duration: 0.08, ease: 'power3.out' }, 0.20);
+      /* Scene 1 exits — solid gap before scene 2 */
+      tl.to(sceneRefs.current[0], { opacity: 0, x: -50, duration: 0.06, ease: 'power2.in' }, 0.38);
 
-      /* Phase 0.38→0.58 — Scene 2, product tilts left */
-      tl.to(imgWrapRef.current, { rotationY: -10, duration: 0.10, ease: 'power2.inOut' }, 0.39);
-      tl.to(sceneRefs.current[1], { opacity: 1, x: 0, duration: 0.09, ease: 'power3.out' }, 0.40);
-      tl.to(sceneRefs.current[1], { opacity: 0, x: -50, duration: 0.07, ease: 'power2.in' }, 0.57);
+      /* Phase 0.44→0.62 — Scene 2, product tilts left */
+      tl.to(imgWrapRef.current, { rotationY: -10, duration: 0.08, ease: 'power2.inOut' }, 0.46);
+      tl.to(sceneRefs.current[1], { opacity: 1, x: 0, duration: 0.08, ease: 'power3.out' }, 0.46);
+      tl.to(sceneRefs.current[1], { opacity: 0, x: -50, duration: 0.06, ease: 'power2.in' }, 0.62);
 
-      /* Phase 0.58→0.84 — Scene 3 (CTA), product straightens + tiny zoom */
-      tl.to(imgWrapRef.current, { rotationY: 0, scale: 1.04, duration: 0.12, ease: 'power2.inOut' }, 0.59);
-      tl.to(sceneRefs.current[2], { opacity: 1, x: 0, duration: 0.10, ease: 'power3.out' }, 0.61);
-      /* stays visible — no exit */
+      /* Phase 0.68→0.84 — Scene 3 (CTA), product straightens + tiny zoom */
+      tl.to(imgWrapRef.current, { rotationY: 0, scale: 1.05, duration: 0.10, ease: 'power2.inOut' }, 0.70);
+      tl.to(sceneRefs.current[2], { opacity: 1, x: 0, duration: 0.10, ease: 'power3.out' }, 0.70);
+      /* stays visible */
     }, wrapRef);
 
     return () => {
@@ -177,7 +177,7 @@ export default function Hero3D({ onShopClick }) {
         {/* ── Product Image ── */}
         <div ref={imgWrapRef} style={{
           position: 'relative', zIndex: 10,
-          width: 'min(520px, 46vw)',
+          width: 'min(560px, 50vw)',
           transformStyle: 'preserve-3d',
           perspective: '1000px',
         }}>
@@ -197,8 +197,11 @@ export default function Hero3D({ onShopClick }) {
               display: 'block',
               mixBlendMode: 'screen',
               filter: `
-                drop-shadow(0 0 60px ${GOLD}55)
-                drop-shadow(0 30px 80px rgba(0,0,0,0.8))
+                brightness(1.35)
+                contrast(1.4)
+                saturate(1.1)
+                drop-shadow(0 0 80px ${GOLD}66)
+                drop-shadow(0 40px 100px rgba(0,0,0,0.95))
               `,
             }}
           />
