@@ -1,15 +1,16 @@
 /**
- * Hero3D.jsx
- * ──────────────────────────────────────────────────────────────────────────────
- * Scroll-driven product reveal hero.
+ * Hero3D.jsx  —  Apple-style fullscreen scroll hero
+ * ─────────────────────────────────────────────────
+ *  • Product image centered, full-screen, with white bg (multiply blend removes it)
+ *  • Pinned 500vh section gives lots of scroll travel
+ *  • GSAP ScrollTrigger drives 3 text panels + product transforms
  *
- * SEQUENCE (while section is pinned over 3×100vh of scroll travel):
- *   0%  – 30%  → Product enters from bottom, spinning + scaling up, cinematic glow builds
- *   30% – 65%  → Product rotates 360° with particle burst
- *   65% – 90%  → Product settles center-right, glow fades into brand color
- *   90% – 100% → Headline + CTA + header navbar fade in (AFTER animation)
- *
- * Navbar is hidden (opacity 0) until progress ≥ 0.85.
+ *  Scroll sequence:
+ *    0–20%   Product starts dark/blurred/small → brightens and grows
+ *    20–45%  PANEL 1: "Ingegneria di Precisione."  slides in left
+ *    45–70%  PANEL 2: "Portalo Ovunque."           slides in left (prev fades)
+ *    70–92%  PANEL 3: "Acquistalo Ora."  + CTA     slides in left (prev fades)
+ *    92–100% Navbar fades in
  */
 
 import React, { useRef, useEffect } from 'react';
@@ -19,214 +20,263 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 gsap.registerPlugin(ScrollTrigger);
 
 const GOLD = '#C8963C';
-const SCROLL_HEIGHT = '400vh'; // How much the section occupies in scroll distance
+
+const PANELS = [
+  {
+    eyebrow: 'Design',
+    headline: 'Ingegneria\ndi Precisione.',
+    body: 'Ogni componente scelto con cura. Ogni dettaglio pensato per durare.',
+  },
+  {
+    eyebrow: 'Portabilità',
+    headline: 'Tascabile.\nSempre con te.',
+    body: 'Compatto al punto giusto. Perfetto per ogni momento della giornata.',
+  },
+  {
+    eyebrow: 'Collezione 2025',
+    headline: 'Il Futuro\ndello Svapo.',
+    body: null, // shows CTA instead
+    cta: 'Scopri la Collezione →',
+  },
+];
 
 export default function Hero3D({ onShopClick }) {
-  const wrapRef = useRef(null);   // outer 400vh wrapper
-  const stickyRef = useRef(null); // 100vh sticky panel
-  const imgRef = useRef(null);    // product image
-  const glowRef = useRef(null);
-  const glowInnerRef = useRef(null);
-  const copyRef = useRef(null);   // headline + CTA
+  const wrapRef   = useRef(null);
+  const stickyRef = useRef(null);
+  const imgRef    = useRef(null);
+  const glowRef   = useRef(null);
+  const panelRefs = useRef([]);
 
   useEffect(() => {
-    // Hide navbar until animation ends
+    // Hide navbar initially
     const navbar = document.getElementById('main-navbar');
-    if (navbar) {
-      gsap.set(navbar, { opacity: 0, y: -20, pointerEvents: 'none' });
-    }
+    if (navbar) gsap.set(navbar, { opacity: 0, y: -16, pointerEvents: 'none' });
 
     const ctx = gsap.context(() => {
-
       /* ── Initial states ── */
-      gsap.set(imgRef.current,  { y: 140, scale: 0.55, rotationY: -180, opacity: 0, rotationX: 20 });
+      gsap.set(imgRef.current, { scale: 0.42, filter: 'brightness(0) blur(22px)', rotationY: -30 });
       gsap.set(glowRef.current, { scale: 0, opacity: 0 });
-      gsap.set(copyRef.current, { y: 40, opacity: 0 });
+      panelRefs.current.forEach(p => gsap.set(p, { x: -80, opacity: 0 }));
 
-      /* ── Scroll timeline ── */
+      /* ── Main scrollTrigger: pin the sticky div ── */
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: wrapRef.current,
           pin: stickyRef.current,
           start: 'top top',
-          end: '+=300%',
-          scrub: 2,
+          end: '+=450%',
+          scrub: 1.8,
           anticipatePin: 1,
           onUpdate: (self) => {
-            const p = self.progress;
-
-            // Show navbar + copy after 85%
+            // Navbar fades in at 90%+
             if (navbar) {
-              const navOpacity = p >= 0.85 ? Math.min(1, (p - 0.85) / 0.1) : 0;
-              gsap.set(navbar, { opacity: navOpacity, y: navOpacity === 0 ? -20 : 0, pointerEvents: navOpacity > 0 ? 'all' : 'none' });
+              const p = self.progress;
+              const v = p >= 0.90 ? Math.min(1, (p - 0.90) / 0.08) : 0;
+              navbar.style.opacity = v;
+              navbar.style.transform = `translateY(${v === 0 ? -16 : 0}px)`;
+              navbar.style.pointerEvents = v > 0 ? 'all' : 'none';
             }
-          },
-          onLeaveBack: () => {
-            if (navbar) gsap.set(navbar, { opacity: 0, y: -20, pointerEvents: 'none' });
           },
         },
       });
 
-      /* Phase 1 (0→0.35): Device rises and unspins */
+      // Phase 0→0.22: product emerges
       tl.to(imgRef.current, {
-        y: 0, scale: 1, rotationY: 0, rotationX: 0, opacity: 1,
-        duration: 0.35, ease: 'power3.out',
+        scale: 1,
+        filter: 'brightness(1) blur(0px)',
+        rotationY: 0,
+        duration: 0.22,
+        ease: 'power3.out',
       }, 0);
       tl.to(glowRef.current, {
-        scale: 1, opacity: 1, duration: 0.35, ease: 'power2.out',
+        scale: 1, opacity: 1, duration: 0.22, ease: 'power2.out',
       }, 0);
 
-      /* Phase 2 (0.35→0.65): Slow proud full rotation */
+      // Phase 0.20→0.44: product slight rotation + PANEL 1 IN
       tl.to(imgRef.current, {
-        rotationY: 360, duration: 0.3, ease: 'none',
-      }, 0.35);
+        rotationY: 8, duration: 0.12, ease: 'power2.inOut',
+      }, 0.22);
+      tl.to(panelRefs.current[0], {
+        x: 0, opacity: 1, duration: 0.1, ease: 'power3.out',
+      }, 0.22);
+      // Panel 1 lingers until 0.44
+      tl.to(panelRefs.current[0], {
+        x: -60, opacity: 0, duration: 0.07, ease: 'power2.in',
+      }, 0.44);
 
-      /* Phase 3 (0.65→0.85): Settle right + glow shifts to gold */
+      // Phase 0.44→0.68: product rotates other way + PANEL 2 IN
       tl.to(imgRef.current, {
-        x: '12vw', scale: 0.88, duration: 0.2, ease: 'power2.inOut',
-      }, 0.65);
-      tl.to(glowInnerRef.current, {
-        background: `radial-gradient(circle, ${GOLD}55 0%, transparent 65%)`,
-        duration: 0.2,
-      }, 0.65);
+        rotationY: -8, duration: 0.12, ease: 'power2.inOut',
+      }, 0.45);
+      tl.to(panelRefs.current[1], {
+        x: 0, opacity: 1, duration: 0.1, ease: 'power3.out',
+      }, 0.45);
+      tl.to(panelRefs.current[1], {
+        x: -60, opacity: 0, duration: 0.07, ease: 'power2.in',
+      }, 0.68);
 
-      /* Phase 4 (0.85→1): Copy fades in */
-      tl.to(copyRef.current, {
-        y: 0, opacity: 1, duration: 0.15, ease: 'power3.out',
-      }, 0.85);
-    }, wrapRef);
+      // Phase 0.68→0.90: product straightens + PANEL 3 IN
+      tl.to(imgRef.current, {
+        rotationY: 0, scale: 0.95, duration: 0.12, ease: 'power2.inOut',
+      }, 0.69);
+      tl.to(panelRefs.current[2], {
+        x: 0, opacity: 1, duration: 0.1, ease: 'power3.out',
+      }, 0.70);
+      // Panel 3 stays visible (no fadeout — CTA is the end state)
+    });
 
     return () => {
       ctx.revert();
-      // Restore navbar on unmount
-      const navbar = document.getElementById('main-navbar');
-      if (navbar) gsap.set(navbar, { opacity: 1, y: 0, pointerEvents: 'all' });
+      if (navbar) {
+        navbar.style.opacity = '1';
+        navbar.style.transform = 'translateY(0)';
+        navbar.style.pointerEvents = 'all';
+      }
     };
   }, []);
 
   return (
-    <div ref={wrapRef} style={{ height: SCROLL_HEIGHT, background: '#050505', position: 'relative' }}>
-
-      {/* ── Sticky panel ── */}
+    <div ref={wrapRef} style={{ height: '550vh', position: 'relative', background: '#fff' }}>
+      {/* ── Sticky fullscreen panel ── */}
       <div ref={stickyRef} style={{
         position: 'relative',
         height: '100vh',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         overflow: 'hidden',
-        background: '#050505',
       }}>
 
-        {/* Subtle grid */}
+        {/* Subtle warm vignette at edges */}
         <div style={{
-          position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none',
-          backgroundImage: [
-            'linear-gradient(rgba(200,150,60,0.025) 1px, transparent 1px)',
-            'linear-gradient(90deg, rgba(200,150,60,0.025) 1px, transparent 1px)',
-          ].join(','),
-          backgroundSize: '72px 72px',
+          position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none',
+          background: 'radial-gradient(ellipse at center, transparent 40%, rgba(230,220,210,0.6) 100%)',
         }} />
 
-        {/* Ambient glow container */}
+        {/* Ambient glow behind product */}
         <div ref={glowRef} style={{
           position: 'absolute', top: '50%', left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: '60vw', height: '60vw',
-          maxWidth: 720, maxHeight: 720,
-          zIndex: 1, pointerEvents: 'none',
-        }}>
-          <div ref={glowInnerRef} style={{
-            width: '100%', height: '100%',
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(180,180,255,0.25) 0%, transparent 65%)',
-            filter: 'blur(40px)',
-          }} />
-        </div>
+          width: '55vw', height: '55vw',
+          maxWidth: 700, maxHeight: 700,
+          background: `radial-gradient(circle, ${GOLD}22 0%, transparent 68%)`,
+          filter: 'blur(50px)',
+          zIndex: 2, pointerEvents: 'none',
+          transformOrigin: 'center center',
+        }} />
 
-        {/* Product image — CSS 3D transforms driven by GSAP */}
+        {/* ── Center product ── */}
         <div ref={imgRef} style={{
-          position: 'relative', zIndex: 10,
-          width: 'min(440px, 42vw)',
+          position: 'relative', zIndex: 5,
+          width: 'min(460px, 44vw)',
           transformStyle: 'preserve-3d',
           perspective: '1200px',
         }}>
-          {/* Shadow reflection under device */}
+          {/* Soft shadow under */}
           <div style={{
-            position: 'absolute', bottom: -40, left: '10%', right: '10%',
-            height: 60, borderRadius: '50%',
-            background: GOLD,
-            filter: 'blur(24px)',
-            opacity: 0.3,
+            position: 'absolute', bottom: -30, left: '15%', right: '15%',
+            height: 50, borderRadius: '50%',
+            background: 'rgba(180,140,60,0.18)',
+            filter: 'blur(20px)',
           }} />
-
           <img
             src="/img/hero_device.png"
-            alt="Premium Vape Device"
+            alt="Vaporesso ECO One Pro"
             style={{
-              width: '100%',
-              display: 'block',
-              filter: `drop-shadow(0 40px 80px ${GOLD}55) drop-shadow(0 0 60px rgba(100,140,255,0.3))`,
-              mixBlendMode: 'lighten',
+              width: '100%', display: 'block',
+              mixBlendMode: 'multiply',   // removes white bg on white page
+              filter: 'drop-shadow(0 30px 60px rgba(180,140,60,0.2))',
             }}
           />
         </div>
 
-        {/* Copy — appears last */}
-        <div ref={copyRef} style={{
-          position: 'absolute', left: '5vw',
-          top: '50%', transform: 'translateY(-50%)',
-          zIndex: 20, maxWidth: 520,
-        }}>
-          <h1 style={{
-            fontSize: 'clamp(3rem, 6vw, 5.5rem)',
-            fontWeight: 900, lineHeight: 1.04,
-            letterSpacing: '-0.04em', marginBottom: '1.5rem',
-            color: '#fff',
-          }}>
-            Il Futuro<br />
-            dello <span style={{
-              background: `linear-gradient(120deg, ${GOLD} 0%, #f0d070 50%, ${GOLD} 100%)`,
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-            }}>Svapo.</span>
-          </h1>
-
-          <p style={{
-            color: '#555', fontSize: '1.05rem', lineHeight: 1.7,
-            marginBottom: '2.5rem', maxWidth: 380,
-          }}>
-            Dispositivi premium, design senza compromessi.
-          </p>
-
-          <button
-            onClick={onShopClick}
+        {/* ── 3 Text Panels (abs-positioned left side) ── */}
+        {PANELS.map((p, i) => (
+          <div
+            key={i}
+            ref={el => (panelRefs.current[i] = el)}
             style={{
-              background: `linear-gradient(135deg, ${GOLD} 0%, #f0d070 100%)`,
-              border: 'none', borderRadius: 100,
-              padding: '1.1rem 2.6rem',
-              fontWeight: 900, fontSize: '1rem',
-              cursor: 'pointer', fontFamily: 'inherit',
-              color: '#0a0a0a',
-              boxShadow: `0 0 50px ${GOLD}44`,
-              transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+              position: 'absolute',
+              left: '5vw', top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 10,
+              maxWidth: 420,
+              opacity: 0,
             }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 14px 60px ${GOLD}66`; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = `0 0 50px ${GOLD}44`; }}
           >
-            Acquista Ora →
-          </button>
-        </div>
+            {/* Eyebrow */}
+            <div style={{
+              fontSize: '0.68rem', fontWeight: 800, letterSpacing: '3px',
+              textTransform: 'uppercase', color: GOLD,
+              marginBottom: '1.2rem',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <span style={{ width: 24, height: 1, background: GOLD, display: 'inline-block' }} />
+              {p.eyebrow}
+            </div>
 
-        {/* Scroll hint — visible only at start */}
-        <div id="hero-scroll-hint" style={{
+            {/* Headline */}
+            <h2 style={{
+              fontSize: 'clamp(2.4rem, 5vw, 4.2rem)',
+              fontWeight: 900, lineHeight: 1.04,
+              letterSpacing: '-0.04em',
+              color: '#111',
+              whiteSpace: 'pre-line',
+              marginBottom: '1.4rem',
+            }}>
+              {p.headline}
+            </h2>
+
+            {/* Body or CTA */}
+            {p.body && (
+              <p style={{ color: '#888', fontSize: '1rem', lineHeight: 1.7, maxWidth: 320 }}>
+                {p.body}
+              </p>
+            )}
+            {p.cta && (
+              <button
+                onClick={onShopClick}
+                style={{
+                  marginTop: '0.5rem',
+                  background: '#111', border: 'none', borderRadius: 100,
+                  padding: '1rem 2.4rem',
+                  fontWeight: 800, fontSize: '0.95rem',
+                  cursor: 'pointer', fontFamily: 'inherit', color: '#fff',
+                  transition: 'background 0.25s ease',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = GOLD)}
+                onMouseLeave={e => (e.currentTarget.style.background = '#111')}
+              >
+                {p.cta}
+              </button>
+            )}
+          </div>
+        ))}
+
+        {/* ── Scroll hint (fades out as user scrolls) ── */}
+        <div style={{
           position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)',
           zIndex: 20, textAlign: 'center',
-          color: '#333', fontSize: '0.72rem', fontWeight: 700,
+          color: '#bbb', fontSize: '0.68rem', fontWeight: 700,
           letterSpacing: '2px', textTransform: 'uppercase',
         }}>
           <div style={{
-            width: 1, height: 48, background: 'linear-gradient(to bottom, transparent, #444)',
-            margin: '0 auto 10px',
+            width: 1, height: 40, background: 'linear-gradient(to bottom, transparent, #ccc)',
+            margin: '0 auto 8px',
           }} />
           Scorri
+        </div>
+
+        {/* ── Small product name badge bottom-right ── */}
+        <div style={{
+          position: 'absolute', bottom: 40, right: '5vw',
+          zIndex: 20,
+          textAlign: 'right',
+        }}>
+          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ccc', letterSpacing: '2px', textTransform: 'uppercase' }}>ECO ONE PRO</div>
+          <div style={{ fontSize: '0.8rem', color: '#999', fontWeight: 600, marginTop: 2 }}>Pod 2ml · 25W · USB-C</div>
+          <div style={{ fontSize: '1rem', color: GOLD, fontWeight: 900, marginTop: 4 }}>€ 39.90</div>
         </div>
 
       </div>
