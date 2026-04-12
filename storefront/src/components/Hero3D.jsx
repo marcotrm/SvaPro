@@ -1,16 +1,14 @@
 /**
- * Hero3D.jsx — Apple-style cinematic scroll hero
- * ──────────────────────────────────────────────
- *  Pure black background, product centered and large.
- *  GSAP ScrollTrigger scrubs 5 phases:
+ * Hero3D.jsx — "Google Anti-Gravity" Canvas Image Sequence Scrubber
+ * ──────────────────────────────────────────────────────────────────
+ * Implementazione ESATTA del tutorial Apple-Style 3D (GSAP + Canvas).
  *
- *  Phase 0 → 0.18  Product emerges from dark (scale + brightness)
- *  Phase 0.18→0.38  TEXT 1:  "Il Futuro del Vaping."
- *  Phase 0.38→0.58  TEXT 2:  "Ogni Dettaglio. Perfetto."
- *  Phase 0.58→0.80  TEXT 3:  "Vaporesso ECO One Pro" + price + CTA
- *  Phase 0.82→1.00  Navbar fades in
- *
- *  Product rotates ±12° between panels for a breathing feel.
+ * ISTRUZIONI PER I FRAME REALI:
+ * 1. Vai su Google Labs (VideoFX), Luma o Kling AI.
+ * 2. Genera un video di 3 secondi del prodotto che si monta ("exploded view").
+ * 3. Usa un tool per estrarre il video in frame (es. 90 immagini).
+ * 4. Salvali in `storefront/public/frames/` nominandoli `frame_0001.webp`, `frame_0002.webp`, ecc.
+ * 5. Imposta `USE_REAL_SEQUENCE = true` qui sotto.
  */
 import React, { useRef, useEffect } from 'react';
 import gsap from 'gsap';
@@ -18,308 +16,277 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const GOLD = '#C8963C';
+// Cambia in TRUE quando hai inserito le immagini estratte nella cartella public/frames!
+const USE_REAL_SEQUENCE = false;
+const FRAME_COUNT = 90; 
+const FRAME_FORMAT = (i) => `/frames/frame_${String(i).padStart(4, '0')}.webp`;
 
-/* ── Line-by-line split text helper ── */
-function SplitText({ text, style }) {
-  return (
-    <span style={style}>
-      {text.split('').map((ch, i) => (
-        <span
-          key={i}
-          className={`hero-char char-${i}`}
-          style={{ display: 'inline-block', whiteSpace: ch === ' ' ? 'pre' : undefined }}
-        >
-          {ch}
-        </span>
-      ))}
-    </span>
-  );
-}
+const GOLD = '#C8963C';
 
 const SCENES = [
   {
     label: '01',
-    tagline: '— Design',
+    tagline: 'Google Anti-Gravity',
     headline: ['Il Futuro', 'del Vaping.'],
     sub: null,
     cta: null,
   },
   {
     label: '02',
-    tagline: '— Qualità',
+    tagline: 'Assemblaggio',
     headline: ['Ogni Dettaglio.', 'Perfetto.'],
     sub: null,
     cta: null,
   },
   {
     label: '03',
-    tagline: '— Collezione 2025',
-    headline: ['Vaporesso', 'ECO One Pro.'],
-    sub: 'Pod 2ml · 25W · USB-C · 1000mAh',
+    tagline: 'Collezione 2025',
+    headline: ['Vaporesso', 'ECO One Pro'],
+    sub: 'Pod 2ml · 25W · USB-C',
     cta: true,
   },
 ];
 
 export default function Hero3D({ onShopClick }) {
-  const wrapRef   = useRef(null);
-  const stickyRef = useRef(null);
-  const imgWrapRef = useRef(null);
-  const glowRef   = useRef(null);
-  const sceneRefs = useRef([]);   // one per scene
+  const wrapRef = useRef(null);
+  const canvasRef = useRef(null);
+  const textRefs = useRef([]);
 
   useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    // Auto-resize canvas
+    const setCanvasSize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    setCanvasSize();
+    window.addEventListener('resize', setCanvasSize);
+
+    // Hide navbar logic
     const navbar = document.getElementById('main-navbar');
-    if (navbar) {
-      gsap.set(navbar, { opacity: 0, y: -14, pointerEvents: 'none' });
-    }
+    if (navbar) gsap.set(navbar, { opacity: 0, y: -14, pointerEvents: 'none' });
 
-    const ctx = gsap.context(() => {
+    // GSAP Context
+    const gsCtx = gsap.context(() => {
+      const seq = { frame: 0 };
+      const images = [];
+      const singleImageFallback = new Image();
 
-      /* ── Initial state ── */
-      gsap.set(imgWrapRef.current,  { scale: 0.5, filter: 'brightness(0) saturate(0)', rotationY: -15 });
-      gsap.set(glowRef.current,     { scale: 0, opacity: 0 });
-      sceneRefs.current.forEach(el => el && gsap.set(el, { opacity: 0, x: -60 }));
+      // Drow function per coprire il canvas (tipo object-fit: cover)
+      const renderRealFrame = (index) => {
+        if (!images[index] || !images[index].complete) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const img = images[index];
+        const hRatio = canvas.width / img.width;
+        const vRatio = canvas.height / img.height;
+        const ratio = Math.max(hRatio, vRatio);
+        const centerShift_x = (canvas.width - img.width * ratio) / 2;
+        const centerShift_y = (canvas.height - img.height * ratio) / 2;
+        ctx.drawImage(img, 0, 0, img.width, img.height,
+          centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
+      };
 
-      /* ── ScrollTrigger timeline ── */
+      // Simulazione 3D mozzafiato per riempire il vuoto finché non metti i veri frame
+      const renderFallback = (progress) => {
+        if (!singleImageFallback.complete) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+
+        // Background puro nero
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Effetto "Anti-Gravity": rotazione + scala + blur basati sul progresso
+        const scale = 2.5 - (progress * 1.5);
+        const rotation = (1 - progress) * (Math.PI / 2); // da 90° a 0°
+        const yOffset = (1 - progress) * -300;
+        
+        ctx.translate(canvas.width / 2, (canvas.height / 2) + yOffset);
+        ctx.rotate(rotation);
+        ctx.scale(scale, scale);
+
+        // Simulazione glow
+        ctx.shadowColor = GOLD;
+        ctx.shadowBlur = 80 - (progress * 40);
+        ctx.globalCompositeOperation = 'screen';
+
+        const w = Math.min(canvas.width * 0.4, 500);
+        const ratio = singleImageFallback.height / singleImageFallback.width;
+        const h = w * ratio;
+
+        // Contrasto aggiuntivo per eliminare aloni scuri
+        ctx.filter = `brightness(${1 + progress * 0.4}) contrast(1.4)`;
+        ctx.drawImage(singleImageFallback, -w / 2, -h / 2, w, h);
+
+        ctx.restore();
+      };
+
+      const render = () => {
+        if (USE_REAL_SEQUENCE) {
+          renderRealFrame(Math.round(seq.frame));
+        } else {
+          renderFallback(seq.frame / (FRAME_COUNT - 1));
+        }
+      };
+
+      if (USE_REAL_SEQUENCE) {
+        for (let i = 1; i <= FRAME_COUNT; i++) {
+          const img = new Image();
+          img.src = FRAME_FORMAT(i);
+          images.push(img);
+        }
+        images[0].onload = render;
+      } else {
+        singleImageFallback.src = '/img/hero_device.png';
+        singleImageFallback.onload = () => renderFallback(0);
+      }
+
+      /* ── TIMELINE SCRUB ── */
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: wrapRef.current,
-          pin: stickyRef.current,
+          pin: true,
+          scrub: 1.2,
           start: 'top top',
-          end: '+=500%',
-          scrub: 2.2,
-          anticipatePin: 1,
+          end: '+=500%', // Lunghezza scroll
           onUpdate: ({ progress: p }) => {
-            if (!navbar) return;
-            const v = p >= 0.84 ? Math.min(1, (p - 0.84) / 0.10) : 0;
-            gsap.set(navbar, { opacity: v, y: v === 0 ? -14 : 0, pointerEvents: v > 0 ? 'all' : 'none' });
-          },
-        },
+            // Navbar fader
+            if (navbar) {
+              const v = p > 0.85 ? Math.min(1, (p - 0.85) / 0.1) : 0;
+              gsap.set(navbar, { opacity: v, y: v === 0 ? -14 : 0, pointerEvents: v > 0 ? 'all' : 'none' });
+            }
+          }
+        }
       });
 
-      /* Phase 0→0.18 — Product emerges */
-      tl.to(imgWrapRef.current, {
-        scale: 1,
-        filter: 'brightness(1) saturate(1)',
-        rotationY: 0,
-        duration: 0.18,
-        ease: 'power3.out',
-      }, 0);
-      tl.to(glowRef.current, {
-        scale: 1, opacity: 1, duration: 0.18, ease: 'power2.out',
+      // Animazione dei Frame(0 -> 89) lungo tutto lo scroll
+      tl.to(seq, {
+        frame: FRAME_COUNT - 1,
+        snap: "frame",
+        ease: "none",
+        onUpdate: render,
+        duration: 1, // Durata base mappata sulla timeline
       }, 0);
 
-      /* Phase 0.18→0.38 — Scene 1 slides in, product tilts right */
-      tl.to(imgWrapRef.current, { rotationY: 10, duration: 0.08, ease: 'power2.inOut' }, 0.20);
-      tl.to(sceneRefs.current[0], { opacity: 1, x: 0, duration: 0.08, ease: 'power3.out' }, 0.20);
-      /* Scene 1 exits — solid gap before scene 2 */
-      tl.to(sceneRefs.current[0], { opacity: 0, x: -50, duration: 0.06, ease: 'power2.in' }, 0.38);
+      /* ── ANIMAZIONE TESTI SOPRA AL CANVAS (Timeline relativa) ── */
+      textRefs.current.forEach((el) => gsap.set(el, { opacity: 0, y: 40 }));
 
-      /* Phase 0.44→0.62 — Scene 2, product tilts left */
-      tl.to(imgWrapRef.current, { rotationY: -10, duration: 0.08, ease: 'power2.inOut' }, 0.46);
-      tl.to(sceneRefs.current[1], { opacity: 1, x: 0, duration: 0.08, ease: 'power3.out' }, 0.46);
-      tl.to(sceneRefs.current[1], { opacity: 0, x: -50, duration: 0.06, ease: 'power2.in' }, 0.62);
+      // Scena 1
+      tl.to(textRefs.current[0], { opacity: 1, y: 0, duration: 0.08, ease: 'power2.out' }, 0.1);
+      tl.to(textRefs.current[0], { opacity: 0, y: -40, duration: 0.05, ease: 'power2.in' }, 0.3);
 
-      /* Phase 0.68→0.84 — Scene 3 (CTA), product straightens + tiny zoom */
-      tl.to(imgWrapRef.current, { rotationY: 0, scale: 1.05, duration: 0.10, ease: 'power2.inOut' }, 0.70);
-      tl.to(sceneRefs.current[2], { opacity: 1, x: 0, duration: 0.10, ease: 'power3.out' }, 0.70);
-      /* stays visible */
+      // Scena 2
+      tl.to(textRefs.current[1], { opacity: 1, y: 0, duration: 0.08, ease: 'power2.out' }, 0.4);
+      tl.to(textRefs.current[1], { opacity: 0, y: -40, duration: 0.05, ease: 'power2.in' }, 0.6);
+
+      // Scena 3
+      tl.to(textRefs.current[2], { opacity: 1, y: 0, duration: 0.08, ease: 'power2.out' }, 0.7);
+      // Non usciamo la scena 3, resta visibile per il tasto acquista!
+
     }, wrapRef);
 
     return () => {
-      ctx.revert();
-      if (navbar) {
-        gsap.set(navbar, { opacity: 1, y: 0, pointerEvents: 'all' });
-      }
+      gsCtx.revert();
+      window.removeEventListener('resize', setCanvasSize);
+      if (navbar) gsap.set(navbar, { opacity: 1, y: 0, pointerEvents: 'all' });
     };
   }, []);
 
   return (
-    <div ref={wrapRef} style={{ height: '600vh', background: '#000', position: 'relative' }}>
+    <div ref={wrapRef} style={{ position: 'relative', height: '100vh', background: '#000', overflow: 'hidden' }}>
+      
+      {/* BACKGROUND CANVAS FRAME SCRUBBER */}
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: 'absolute',
+          top: 0, left: 0,
+          width: '100vw', height: '100vh',
+          zIndex: 1,
+        }}
+      />
 
-      {/* ── Sticky fullscreen ── */}
-      <div ref={stickyRef} style={{
-        position: 'relative',
-        height: '100vh',
-        background: '#000',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-      }}>
+      {/* OVERLAY EFFETTI LUMINOSI */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none',
+        background: 'radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.8) 100%)'
+      }} />
 
-        {/* Very subtle grain overlay */}
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', opacity: 0.025,
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-          backgroundRepeat: 'repeat',
-        }} />
-
-        {/* Soft vignette */}
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none',
-          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7) 100%)',
-        }} />
-
-        {/* Ambient gold glow behind product */}
-        <div ref={glowRef} style={{
-          position: 'absolute', top: '50%', left: '50%',
-          transform: 'translate(-50%,-50%)',
-          width: '50vw', height: '50vw',
-          maxWidth: 680, maxHeight: 680,
-          background: `radial-gradient(circle, ${GOLD}1a 0%, transparent 65%)`,
-          filter: 'blur(48px)',
-          zIndex: 3, pointerEvents: 'none',
-          transformOrigin: 'center center',
-        }} />
-
-        {/* ── Product Image ── */}
-        <div ref={imgWrapRef} style={{
-          position: 'relative', zIndex: 10,
-          width: 'min(560px, 50vw)',
-          transformStyle: 'preserve-3d',
-          perspective: '1000px',
-        }}>
-          {/* Ground shadow */}
-          <div style={{
-            position: 'absolute', bottom: -40, left: '15%', right: '15%',
-            height: 60, borderRadius: '50%',
-            background: `${GOLD}`,
-            filter: 'blur(28px)', opacity: 0.12,
-          }} />
-
-          <img
-            src="/img/hero_device.png"
-            alt="Vaporesso ECO One Pro"
-            style={{
-              width: '100%',
-              display: 'block',
-              mixBlendMode: 'screen',
-              filter: `
-                brightness(1.35)
-                contrast(1.4)
-                saturate(1.1)
-                drop-shadow(0 0 80px ${GOLD}66)
-                drop-shadow(0 40px 100px rgba(0,0,0,0.95))
-              `,
-            }}
-          />
-        </div>
-
-        {/* ── Scene Panels ── */}
-        {SCENES.map((scene, i) => (
-          <div
-            key={i}
-            ref={el => (sceneRefs.current[i] = el)}
-            style={{
-              position: 'absolute',
-              left: '5.5vw',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 20,
-              maxWidth: 500,
-            }}
-          >
-            {/* Scene number + tagline */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              marginBottom: '1.6rem',
-            }}>
-              <span style={{
-                fontSize: '0.62rem', fontWeight: 700, color: '#333',
-                letterSpacing: '1px',
-              }}>{scene.label}</span>
-              <span style={{ width: 28, height: 1, background: GOLD }} />
-              <span style={{
-                fontSize: '0.62rem', fontWeight: 700, color: GOLD,
-                letterSpacing: '2px', textTransform: 'uppercase',
-              }}>{scene.tagline.replace('— ', '')}</span>
-            </div>
-
-            {/* Headlines */}
-            {scene.headline.map((line, li) => (
-              <div key={li} style={{
-                fontSize: 'clamp(2.8rem, 6vw, 5.2rem)',
-                fontWeight: 900,
-                lineHeight: 1.0,
-                letterSpacing: '-0.05em',
-                color: li === 1 && i === 2 ? GOLD : '#fff',
-                whiteSpace: 'nowrap',
-              }}>
-                {line}
-              </div>
-            ))}
-
-            {/* Sub-line */}
-            {scene.sub && (
-              <p style={{
-                marginTop: '1.2rem',
-                fontSize: '0.85rem', fontWeight: 600,
-                color: '#444', letterSpacing: '1px',
-              }}>
-                {scene.sub}
-              </p>
-            )}
-
-            {/* Price + CTA */}
-            {scene.cta && (
-              <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                <div>
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#444', letterSpacing: '1px', textTransform: 'uppercase' }}>Prezzo</div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: GOLD, lineHeight: 1, marginTop: 2 }}>€ 39<span style={{ fontSize: '1rem' }}>.90</span></div>
-                </div>
-                <button
-                  onClick={onShopClick}
-                  style={{
-                    background: '#fff',
-                    border: 'none', borderRadius: 100,
-                    padding: '1rem 2.2rem',
-                    fontWeight: 900, fontSize: '0.9rem',
-                    cursor: 'pointer', fontFamily: 'inherit',
-                    color: '#000',
-                    transition: 'background 0.25s ease, color 0.25s ease',
-                    letterSpacing: '-0.01em',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = GOLD; e.currentTarget.style.color = '#000'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#000'; }}
-                >
-                  Acquista →
-                </button>
-              </div>
-            )}
+      {/* PANNELLI TESTO (Stile Apple / Minimalist Overlay) */}
+      {SCENES.map((scene, i) => (
+        <div
+          key={i}
+          ref={el => (textRefs.current[i] = el)}
+          style={{
+            position: 'absolute',
+            left: '6vw',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 10,
+            maxWidth: 450,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem' }}>
+            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#444' }}>{scene.label}</span>
+            <span style={{ width: 24, height: 1, background: GOLD }} />
+            <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: GOLD }}>{scene.tagline}</span>
           </div>
-        ))}
 
-        {/* ── Scene counter indicator — right side ── */}
-        <div style={{
-          position: 'absolute', right: '4vw', top: '50%', transform: 'translateY(-50%)',
-          zIndex: 20, display: 'flex', flexDirection: 'column', gap: 16,
-        }}>
-          {SCENES.map((_, i) => (
-            <div key={i} style={{
-              width: 1, height: 32,
-              background: 'rgba(255,255,255,0.08)',
-            }} />
+          {scene.headline.map((line, li) => (
+            <div key={li} style={{
+              fontSize: 'clamp(3rem, 6vw, 5.5rem)',
+              fontWeight: 900, lineHeight: 1.05,
+              letterSpacing: '-0.04em',
+              color: '#fff',
+            }}>
+              {line}
+            </div>
           ))}
-        </div>
 
-        {/* ── Scroll hint ── */}
-        <div style={{
-          position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 20, textAlign: 'center',
-          color: '#2a2a2a', fontSize: '0.65rem', fontWeight: 700,
-          letterSpacing: '2px', textTransform: 'uppercase',
-        }}>
-          <div style={{
-            width: 1, height: 44,
-            background: 'linear-gradient(to bottom, transparent, #333)',
-            margin: '0 auto 8px',
-          }} />
-          Scorri
-        </div>
+          {scene.sub && (
+             <p style={{ marginTop: '1.5rem', color: '#888', fontSize: '0.9rem', fontWeight: 600 }}>
+             {scene.sub}
+           </p>
+          )}
 
+          {scene.cta && (
+            <div style={{ marginTop: '2.5rem', display: 'flex', alignItems: 'center', gap: '2rem' }}>
+              <div>
+                <div style={{ fontSize: '0.65rem', color: '#555', fontWeight: 800, textTransform: 'uppercase' }}>Prezzo Base</div>
+                <div style={{ fontSize: '2rem', color: GOLD, fontWeight: 900, lineHeight: 1, marginTop: 4 }}>
+                  €39<span style={{ fontSize: '1rem' }}>.90</span>
+                </div>
+              </div>
+              <button
+                onClick={onShopClick}
+                style={{
+                  background: '#fff', color: '#000',
+                  border: 'none', borderRadius: 100,
+                  padding: '1.2rem 2.5rem',
+                  fontWeight: 900, fontSize: '0.9rem',
+                  cursor: 'pointer', transition: 'transform 0.2s, background 0.2s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = GOLD; e.currentTarget.style.transform = 'scale(1.05)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                Acquista Ora
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* MOUSE SCROLL INDICATOR */}
+      <div style={{
+        position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)',
+        zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10
+      }}>
+        <div style={{ width: 1, height: 60, background: 'linear-gradient(to bottom, transparent, #FFFFFF44)' }} />
+        <span style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '2px', color: '#FFFFFF66' }}>SCROLL</span>
       </div>
+
     </div>
   );
 }
