@@ -101,10 +101,11 @@ export default function Hero3D({ onShopClick }) {
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: wrapRef.current,
-        pin: true,           // Blocca la sezione finché non scorri tutto il video
-        scrub: 1.2,          // Inerzia dell'animazione
+        pin: true,
+        pinSpacing: false, // 🔑 ELIMINA IL GAP NERO DOPO LA HERO
+        scrub: 1.2,
         start: 'top top',
-        end: '+=600%',       // Quantità di rotellina da girare per vedere tutta l'animazione
+        end: '+=600%',
       }
     });
 

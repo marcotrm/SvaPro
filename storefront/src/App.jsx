@@ -163,6 +163,213 @@ function CategoryCard({ cat, idx, navigate }) {
   );
 }
 
+/* ──────────────────────────────── Scroll Products ── */
+const PRODUCTS = [
+  {
+    label: 'ECO One Pro',
+    tagline: '01 — Bestseller',
+    headline: 'Design che non\ncompromette.',
+    body: 'Pod compatta da 2ml, potenza fino a 25W, ricarica USB-C in 45 minuti. Realizzata in alluminio aeronautico di grado 6061.',
+    specs: ['25W Max Output', 'Batteria 1000mAh', '0.6Ω / 1.2Ω'],
+    price: '€39.90',
+    accent: '#C8963C',
+    img: '/img/hero_vape_1.png',
+  },
+  {
+    label: 'Nexus Pod Kit',
+    tagline: '02 — Nuovissimo',
+    headline: 'Tecnologia.\nRidefinita.',
+    body: 'Sistema dual-coil con airflow a doppio canale. Il vapore più denso della sua categoria, con zero leaking garantito.',
+    specs: ['Airflow Regolabile', 'Pod da 3ml', 'Draw-activated'],
+    price: '€54.90',
+    accent: '#5B8CFF',
+    img: '/img/hero_vape_2.png',
+  },
+  {
+    label: 'Zeus Sub-Ohm',
+    tagline: '03 — Pro Series',
+    headline: 'Potenza senza\ncompromessi.',
+    body: 'Mod 80W con schermo OLED, controllo temperatura avanzato e protezioni complete. Per i vaper più esigenti.',
+    specs: ['80W Output', 'Schermo OLED', 'Temp Control'],
+    price: '€89.90',
+    accent: '#FF6B6B',
+    img: '/img/hero_vape_1.png',
+  },
+];
+
+function ScrollProducts({ navigate }) {
+  const sectionRef = useRef(null);
+  const imgRef = useRef(null);
+  const glowRef = useRef(null);
+  const textPanels = useRef([]);
+
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      PRODUCTS.forEach((prod, i) => {
+        const panel = textPanels.current[i];
+        if (!panel) return;
+
+        gsap.set(panel, { opacity: 0, x: 100 });
+
+        // Each panel ties to a portion of the section scroll
+        ScrollTrigger.create({
+          trigger: sectionRef.current,
+          start: `top+=${i * window.innerHeight * 0.85} top`,
+          end: `top+=${(i + 0.85) * window.innerHeight * 0.85} top`,
+          scrub: 0.8,
+          onUpdate: (self) => {
+            const p = self.progress;
+            // Fade in 0→0.35, hold, fade out 0.75→1
+            let opacity;
+            if (p < 0.35) opacity = p / 0.35;
+            else if (p < 0.75) opacity = 1;
+            else opacity = 1 - (p - 0.75) / 0.25;
+
+            const x = p < 0.35 ? (1 - p / 0.35) * 80 : p > 0.75 ? -(( p - 0.75) / 0.25) * 80 : 0;
+            gsap.set(panel, { opacity: Math.max(0, opacity), x });
+
+            // Update image glow on active panel
+            if (p > 0.15 && p < 0.85 && imgRef.current) {
+              gsap.to(imgRef.current, {
+                src: prod.img,
+                filter: `drop-shadow(0 0 80px ${prod.accent}66)`,
+                duration: 0.5,
+              });
+              gsap.to(glowRef.current, {
+                background: `radial-gradient(circle, ${prod.accent}18 0%, transparent 60%)`,
+                duration: 0.5,
+              });
+            }
+          },
+        });
+      });
+    }, sectionRef);
+    return () => ctx.revert();
+  }, []);
+
+  return (
+    <section
+      ref={sectionRef}
+      style={{
+        background: '#000',
+        position: 'relative',
+        height: `${PRODUCTS.length * 90}vh`,
+      }}
+    >
+      <div style={{
+        position: 'sticky',
+        top: 0,
+        height: '100vh',
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        alignItems: 'center',
+        overflow: 'hidden',
+      }}>
+        {/* LEFT — 3D Product floating */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', position: 'relative' }}>
+          <div ref={glowRef} style={{
+            position: 'absolute', top: '50%', left: '50%',
+            transform: 'translate(-50%,-50%)',
+            width: '50%', height: '50%',
+            background: `radial-gradient(circle, ${PRODUCTS[0].accent}18 0%, transparent 60%)`,
+            filter: 'blur(70px)',
+          }} />
+          <img
+            ref={imgRef}
+            src={PRODUCTS[0].img}
+            alt="product"
+            style={{
+              width: '65%', maxWidth: 400,
+              objectFit: 'contain',
+              mixBlendMode: 'screen',
+              filter: `drop-shadow(0 0 80px ${PRODUCTS[0].accent}66)`,
+              animation: 'float 4s ease-in-out infinite',
+            }}
+          />
+        </div>
+
+        {/* RIGHT — Text panels stacked */}
+        <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', paddingRight: '6vw' }}>
+          {PRODUCTS.map((prod, i) => (
+            <div
+              key={i}
+              ref={el => (textPanels.current[i] = el)}
+              style={{ position: 'absolute', left: 0, right: 0, padding: '0 5vw 0 2vw' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1.8rem' }}>
+                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#444' }}>{prod.tagline.split('—')[0]}</span>
+                <span style={{ width: 28, height: 1, background: prod.accent }} />
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', color: prod.accent, letterSpacing: '2px' }}>
+                  {prod.tagline.split('—')[1]?.trim()}
+                </span>
+              </div>
+
+              <div style={{ fontSize: '0.72rem', color: '#444', fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                {prod.label}
+              </div>
+
+              <h2 style={{ fontSize: 'clamp(2.2rem, 3.8vw, 3.5rem)', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-0.04em', color: '#fff', marginBottom: '1.8rem', whiteSpace: 'pre-line' }}>
+                {prod.headline}
+              </h2>
+
+              <p style={{ color: '#777', fontSize: '1rem', lineHeight: 1.75, maxWidth: 400, marginBottom: '2.5rem', fontWeight: 400 }}>
+                {prod.body}
+              </p>
+
+              <div style={{ display: 'flex', gap: '2.4rem', marginBottom: '3rem' }}>
+                {prod.specs.map((s, si) => (
+                  <div key={si} style={{ borderLeft: `2px solid ${prod.accent}55`, paddingLeft: 12 }}>
+                    <div style={{ fontSize: '0.72rem', color: prod.accent, fontWeight: 800, letterSpacing: '0.5px' }}>{s}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.8rem' }}>
+                <div style={{ fontSize: '2rem', color: prod.accent, fontWeight: 900, letterSpacing: '-1px' }}>{prod.price}</div>
+                <button
+                  onClick={() => navigate('/shop')}
+                  style={{ background: '#fff', color: '#000', border: 'none', borderRadius: 100, padding: '1rem 2.2rem', fontWeight: 900, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = prod.accent; e.currentTarget.style.transform = 'scale(1.05)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.transform = 'scale(1)'; }}
+                >Acquista Ora</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <style>{`@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-18px)} }`}</style>
+    </section>
+  );
+}
+
+/* ──────────────────────────────── Categories Section ── */
+function CategoriesSection({ navigate }) {
+  const CATS = [
+    { label: 'Hardware',    desc: 'Pod, mod e kit',     accent: '#C8963C', img: '/img/hero_vape_1.png' },
+    { label: 'Liquidi',     desc: 'Aromi e shortfill',  accent: '#5B8CFF', img: '/img/liquidi.png' },
+    { label: 'Accessori',   desc: 'Coil e ricambi',     accent: '#FF6B6B', img: '/img/accessori.png' },
+    { label: 'Usa e Getta', desc: 'Zero config',        accent: '#1BC47D', img: '/img/hero_vape_2.png' },
+  ];
+
+  return (
+    <section style={{ background: '#000', padding: '8rem 5vw 10rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ maxWidth: 1240, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: '5rem' }}>
+          <div style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '3px', color: '#C8963C', textTransform: 'uppercase', marginBottom: '1rem' }}>— Esplora</div>
+          <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3.2rem)', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em' }}>
+            La tua categoria.
+          </h2>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '2rem' }}>
+          {CATS.map((cat, idx) => (
+            <CategoryCard key={cat.label} cat={cat} idx={idx} navigate={navigate} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ─────────────────────────────────────────── Home ── */
 function Home({ onCartOpen }) {
   const navigate = useNavigate();
@@ -172,90 +379,11 @@ function Home({ onCartOpen }) {
       <Navbar onCartOpen={onCartOpen} />
       <Hero3D onShopClick={() => navigate('/shop')} />
 
-      {/* ── Bestselling 3D Products Section ── */}
-      <section style={{ background: '#000000', padding: '6rem 5vw 4rem', position: 'relative', zIndex: 10 }}>
-        <div style={{ maxWidth: 1240, margin: '0 auto' }}>
-          
-          <div style={{ marginBottom: '4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <div>
-              <div style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '3px', color: '#C8963C', textTransform: 'uppercase', marginBottom: '1rem' }}>
-                — In Evidenza
-              </div>
-              <h2 style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1.04 }}>
-                Capolavori<br />
-                <span style={{ color: '#aaa' }}>Senza Tempo.</span>
-              </h2>
-            </div>
-            <Link to="/shop" style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 800, textDecoration: 'none', borderBottom: '1px solid #C8963C', paddingBottom: 4 }}>
-              Vedi Tutti →
-            </Link>
-          </div>
+      {/* ── Scroll Storytelling Products ── */}
+      <ScrollProducts navigate={navigate} />
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '3rem' }}>
-            {[
-              { label: 'ECO One Pro', desc: 'Edizione Limitata', accent: '#C8963C', img: '/img/hero_vape_1.png', price: '€39.90' },
-              { label: 'Nexus Pod', desc: 'Titanio Spaziale', accent: '#5B8CFF', img: '/img/hero_vape_2.png', price: '€45.00' },
-              // Uso gli asset Hero come campione puro 3D
-              { label: 'Zeus Sub-Ohm', desc: 'Flusso Pieno', accent: '#FF6B6B', img: '/img/hero_vape_1.png', price: '€29.90' },
-            ].map((prod, idx) => (
-              <div key={idx} onClick={() => navigate('/shop')} style={{ cursor: 'pointer', textAlign: 'center', transition: 'transform 0.3s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-10px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
-                <div style={{
-                  width: '100%', aspectRatio: '1 / 1.3', position: 'relative',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '50%', height: '50%', background: `radial-gradient(circle, ${prod.accent}15 0%, transparent 60%)`, filter: 'blur(40px)' }} />
-                  <img src={prod.img} alt={prod.label} style={{ width: '90%', height: '90%', objectFit: 'contain', mixBlendMode: 'screen', position: 'relative', zIndex: 2, filter: 'drop-shadow(0 30px 40px rgba(0,0,0,0.9))' }} />
-                </div>
-                <div style={{ marginTop: '1rem' }}>
-                  <div style={{ fontWeight: 900, fontSize: '1.4rem', color: '#fff', letterSpacing: '-1px' }}>{prod.label}</div>
-                  <div style={{ fontSize: '0.85rem', color: '#666', fontWeight: 600, marginTop: 4 }}>{prod.desc}</div>
-                  <div style={{ fontSize: '1.1rem', color: '#C8963C', fontWeight: 800, marginTop: 12 }}>{prod.price}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── Dark Categories Section ── */}
-      <section style={{ background: '#000000', padding: '6rem 5vw 10rem' }}>
-        <div style={{ maxWidth: 1240, margin: '0 auto' }}>
-
-          <div style={{ width: '100%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)', marginBottom: '6rem' }} />
-
-          {/* Header */}
-          <div style={{ marginBottom: '5rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '3px', color: '#C8963C', textTransform: 'uppercase', marginBottom: '1rem' }}>
-              — Esplora
-            </div>
-            <h2 style={{
-              fontSize: 'clamp(2rem, 4vw, 3rem)',
-              fontWeight: 900, color: '#fff',
-              letterSpacing: '-0.04em', lineHeight: 1.04,
-            }}>
-              Scegli la tua categoria.
-            </h2>
-          </div>
-
-          {/* Grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-            gap: '2.5rem',
-          }}>
-            {[
-              { label: 'Hardware',    desc: 'Pod, mod e kit', accent: '#C8963C', img: '/img/hero_vape_1.png' },
-              { label: 'Liquidi',     desc: 'Aromi e shortfill', accent: '#5B8CFF', img: '/img/liquidi.png' },
-              { label: 'Accessori',   desc: 'Coil e ricambi', accent: '#FF6B6B', img: '/img/accessori.png' },
-              { label: 'Usa e Getta', desc: 'Zero config', accent: '#1BC47D', img: '/img/hero_vape_2.png' },
-            ].map((cat, idx) => (
-              <CategoryCard key={cat.label} cat={cat} idx={idx} navigate={navigate} />
-            ))}
-          </div>
-
-        </div>
-      </section>
+      {/* ── Categories Section ── */}
+      <CategoriesSection navigate={navigate} />
     </main>
   );
 }
