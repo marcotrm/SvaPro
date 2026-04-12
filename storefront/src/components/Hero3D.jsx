@@ -12,8 +12,8 @@ gsap.registerPlugin(ScrollTrigger);
  * e avrai esportato le singole foto 4K, imposta LOCAL_FRAMES = true 
  * e mettile nella cartella /public/frames/.
  */
-const IS_LOCAL_FRAMES = false; // Metti a true quando importi le tue foto
-const FRAME_COUNT = 147; // Numero di frame del video
+const IS_LOCAL_FRAMES = true; // Impostato a true per usare i tuoi 200 frames sfusi
+const FRAME_COUNT = 200; // Numero esatto di frame caricati nella cartella
 
 const getFramePath = (index) => {
   if (IS_LOCAL_FRAMES) {
