@@ -110,54 +110,65 @@ function CategoryCard({ cat, idx, navigate }) {
         transformStyle: 'preserve-3d',
         opacity: 0,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        padding: '0 8px',
+        padding: '0 12px',
       }}
     >
-      {/* Floating product image — dark bg card with screen blend */}
+      {/* Floating product — zero background */}
       <div ref={imgRef} style={{
-        width: '100%', aspectRatio: '1 / 1.2',
+        width: '100%', aspectRatio: '1 / 1.15',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         position: 'relative',
-        background: 'transparent', // Rimossa la card dietro
-        marginBottom: '1.2rem',
+        marginBottom: '1.8rem',
       }}>
-        {/* Colored glow behind product */}
         <div style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
           width: '60%', height: '60%',
-          background: `radial-gradient(circle, ${cat.accent}22 0%, transparent 70%)`,
-          filter: 'blur(30px)'
+          background: `radial-gradient(circle, ${cat.accent}20 0%, transparent 70%)`,
+          filter: 'blur(35px)',
         }} />
         <img
           src={cat.img}
           alt={cat.label}
           style={{
-            width: '85%', height: '85%', objectFit: 'contain',
+            width: '88%', height: '88%', objectFit: 'contain',
             position: 'relative', zIndex: 2,
-            filter: `drop-shadow(0 20px 40px rgba(0,0,0,0.8))`,
             mixBlendMode: 'screen',
+            filter: `drop-shadow(0 20px 50px rgba(0,0,0,0.85))`,
+            transition: 'transform 0.4s ease',
           }}
         />
       </div>
 
-      {/* Minimal label */}
-      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#fff', letterSpacing: '-0.02em' }}>
-            {cat.label}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#444', fontWeight: 600, marginTop: 2 }}>
-            {cat.desc}
-          </div>
+      {/* Clean text — no button */}
+      <div style={{ width: '100%', textAlign: 'center' }}>
+        <div style={{
+          fontWeight: 900,
+          fontSize: 'clamp(1.3rem, 2vw, 1.7rem)',
+          color: '#fff',
+          letterSpacing: '-0.03em',
+          lineHeight: 1.1,
+          marginBottom: '0.5rem',
+        }}>
+          {cat.label}
         </div>
         <div style={{
-          width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-          border: `1px solid ${cat.accent}50`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: cat.accent, fontWeight: 900, fontSize: '0.8rem',
-          background: `${cat.accent}0f`,
-          transition: 'all 0.2s',
-        }}>→</div>
+          fontSize: '0.8rem',
+          color: '#444',
+          fontWeight: 600,
+          letterSpacing: '1px',
+          textTransform: 'uppercase',
+        }}>
+          {cat.desc}
+        </div>
+        {/* Accent underline indicator */}
+        <div style={{
+          width: 24, height: 2,
+          background: cat.accent,
+          margin: '1rem auto 0',
+          borderRadius: 2,
+          opacity: 0.6,
+          transition: 'width 0.3s ease, opacity 0.3s ease',
+        }} />
       </div>
     </div>
   );
