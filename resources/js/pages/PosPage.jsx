@@ -816,21 +816,21 @@ export default function PosPage() {
                     if (e.key === 'Enter' && operatorBarcode.trim()) {
                       const val = operatorBarcode.trim();
                       const valLow = val.toLowerCase();
-                      let found = employees.find(em =>
-                        (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
-                        (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
-                        String(em.id) === val
+                      const em = employees.find(em => 
+                        (em.barcode && em.barcode.toLowerCase() === valLow) ||
+                        (em.id.toString() === valLow)
                       );
+                      let found = em;
                       if (!found) {
                         try {
                           const { employees: empApi } = await import('../api.jsx');
                           const res = await empApi.getEmployees({ search: val, limit: 10 });
                           const list = res.data?.data || [];
-                          found = list.find(em =>
-                            (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
-                            (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
-                            String(em.id) === val
-                          ) || (/^\d+$/.test(val) && (list.find(em => String(em.id) === val) || employees.find(em => String(em.id) === val)));
+                          const chkEm = list.find(em => 
+                            (em.barcode && em.barcode.toLowerCase() === valLow) ||
+                            (em.id.toString() === valLow)
+                          );
+                          found = chkEm || (/^\d+$/.test(val) && (list.find(em => String(em.id) === val) || employees.find(em => String(em.id) === val)));
                         } catch {}
                       }
                       if (found) {

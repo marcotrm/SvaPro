@@ -273,7 +273,7 @@ class OrderController extends Controller
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->limit(300)
-            ->get(['id', 'first_name', 'last_name', 'barcode', 'employee_code']);
+            ->get(['id', 'first_name', 'last_name', 'barcode']);
 
         $warehouses = DB::table('warehouses')
             ->where('tenant_id', $tenantId)

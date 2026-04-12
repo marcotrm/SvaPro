@@ -37,7 +37,7 @@ class AuthController extends Controller
         try {
             $employee = DB::table('employees')
                 ->where('user_id', $user->id)
-                ->select(['id', 'first_name', 'last_name', 'employee_code', 'store_id'])
+                ->select(['id', 'first_name', 'last_name', 'barcode', 'store_id'])
                 ->first();
         } catch (\Throwable) {
             // La tabella o colonna potrebbe non esistere ancora — ignora
@@ -54,7 +54,7 @@ class AuthController extends Controller
             'roles'          => $roles,
             'role'           => $roles->first() ?? null,
             'employee_id'    => $employee?->id,
-            'employee_code'  => $employee?->employee_code,
+            'employee_barcode'  => $employee?->barcode,
             'employee_store_id' => $employee?->store_id,
         ];
     }
