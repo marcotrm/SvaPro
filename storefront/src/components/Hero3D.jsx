@@ -4,7 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
 
-export default function Hero3D() {
+export default function Hero3D({ onShopClick }) {
   const containerRef = useRef(null);
   const textRef = useRef(null);
   const modelRef = useRef(null);
@@ -57,7 +57,7 @@ export default function Hero3D() {
             Il Futuro<br/>Dello Svapo.
           </h1>
           <p className="subtitle">Scopri le nostre collezioni esclusive con un'esperienza premium.</p>
-          <button className="btn-primary">Esplora Ora</button>
+          <button className="btn-primary" onClick={onShopClick}>Esplora il Negozio →</button>
         </div>
       </div>
 
