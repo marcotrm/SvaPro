@@ -1,293 +1,272 @@
 import React, { useRef, useEffect } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import HeroCanvas3D from './HeroCanvas3D';
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function Hero3D({ onShopClick }) {
-  const containerRef = useRef(null);
-  const textRef = useRef(null);
-  const deviceRef = useRef(null);
-  const glowRef = useRef(null);
-  const particlesRef = useRef(null);
-  const badgeRef = useRef(null);
+  const sectionRef = useRef(null);
+  const overlayRef = useRef(null);
+  const titleWordsRef = useRef([]);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-
-      // 1. Entrance sequence
-      const tl = gsap.timeline({ delay: 0.2 });
-      tl.fromTo('.hero-eyebrow',
+      // ── Text entrance (on load) ────────────────────────────────────────────
+      gsap.fromTo('.hero3d-eyebrow',
         { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.7, ease: 'power3.out' }
-      )
-      .fromTo('.hero-title-word',
-        { y: 80, opacity: 0, rotationX: -40 },
-        { y: 0, opacity: 1, rotationX: 0, duration: 0.9, stagger: 0.12, ease: 'power4.out' },
-        '-=0.3'
-      )
-      .fromTo('.hero-subtitle',
+        { y: 0, opacity: 1, duration: 0.8, delay: 0.3, ease: 'power3.out' }
+      );
+      gsap.fromTo('.hero3d-word',
+        { y: 60, opacity: 0 },
+        { y: 0, opacity: 1, duration: 1, stagger: 0.13, delay: 0.5, ease: 'power4.out' }
+      );
+      gsap.fromTo('.hero3d-sub',
         { y: 20, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, ease: 'power3.out' },
-        '-=0.4'
-      )
-      .fromTo('.hero-cta-group',
+        { y: 0, opacity: 1, duration: 0.8, delay: 0.9, ease: 'power3.out' }
+      );
+      gsap.fromTo('.hero3d-cta',
         { y: 20, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, ease: 'power3.out' },
-        '-=0.3'
+        { y: 0, opacity: 1, duration: 0.8, delay: 1.1, ease: 'power3.out' }
       );
 
-      // 2. Device floating
-      gsap.fromTo(deviceRef.current,
-        { x: 150, opacity: 0, rotationY: -40 },
-        { x: 0, opacity: 1, rotationY: 0, duration: 1.4, delay: 0.5, ease: 'power4.out' }
-      );
-      gsap.to(deviceRef.current, {
-        y: -18, duration: 2.8, repeat: -1, yoyo: true, ease: 'sine.inOut',
-      });
+      // ── Overlay text fades out as user scrolls + "Assembled" message fades in
+      ScrollTrigger.create({
+        trigger: sectionRef.current,
+        start: 'top top',
+        end: '+=300%',
+        scrub: 0.8,
+        onUpdate: (self) => {
+          const p = self.progress;
+          // Intro text fades out in first 20% of scroll
+          const overlayOpacity = Math.max(0, 1 - p * 5);
+          if (overlayRef.current) overlayRef.current.style.opacity = overlayOpacity;
 
-      // 3. Glow pulse
-      gsap.to(glowRef.current, {
-        scale: 1.2, opacity: 0.65, duration: 2.5, repeat: -1, yoyo: true, ease: 'sine.inOut',
+          // Show final CTA when assembly is complete (>90%)
+          const finalEl = document.getElementById('hero3d-final-cta');
+          if (finalEl) {
+            finalEl.style.opacity = Math.max(0, (p - 0.9) * 10);
+            finalEl.style.transform = `translateY(${Math.max(0, (1 - (p - 0.9) * 10) * 30)}px)`;
+          }
+        },
       });
-
-      // 4. Badge pop
-      gsap.fromTo(badgeRef.current,
-        { scale: 0, opacity: 0 },
-        { scale: 1, opacity: 1, duration: 0.8, delay: 1.2, ease: 'back.out(2)' }
-      );
-
-      // 5. Scroll parallax
-      gsap.to(textRef.current, {
-        scrollTrigger: { trigger: containerRef.current, start: 'top top', end: 'bottom top', scrub: 1.2 },
-        y: -180, opacity: 0, ease: 'none',
-      });
-      gsap.to(deviceRef.current, {
-        scrollTrigger: { trigger: containerRef.current, start: 'top top', end: 'bottom top', scrub: 1 },
-        y: 120, rotationY: 40, rotationX: 20, scale: 1.3, ease: 'none',
-      });
-
-      // 6. Vapor particles float up
-      if (particlesRef.current) {
-        const dots = particlesRef.current.querySelectorAll('.vapor-dot');
-        dots.forEach((p, i) => {
-          gsap.set(p, { y: 0, opacity: 0 });
-          gsap.to(p, {
-            y: -(280 + Math.random() * 180),
-            x: (Math.random() - 0.5) * 100,
-            opacity: 0.5,
-            scale: 0.6 + Math.random(),
-            duration: 4 + Math.random() * 3,
-            delay: i * 0.35,
-            repeat: -1,
-            yoyo: true,
-            ease: 'power1.inOut',
-          });
-        });
-      }
-    }, containerRef);
+    }, sectionRef);
 
     return () => ctx.revert();
   }, []);
 
   return (
-    <section ref={containerRef} style={{
-      position: 'relative',
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      overflow: 'hidden',
-      background: 'radial-gradient(ellipse 80% 60% at 65% 40%, rgba(181,141,61,0.08) 0%, transparent 70%), #050505',
-    }}>
-
-      {/* Grid lines */}
+    <div
+      ref={sectionRef}
+      style={{
+        position: 'relative',
+        height: '400vh', // 4× viewport tall → scroll travel for GSAP pin
+        background: '#050505',
+      }}
+    >
+      {/* ── Sticky container that stays in view during scroll ── */}
       <div style={{
-        position: 'absolute', inset: 0, zIndex: 1,
-        backgroundImage: `linear-gradient(rgba(181,141,61,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(181,141,61,0.04) 1px, transparent 1px)`,
-        backgroundSize: '60px 60px',
-      }} />
-
-      {/* Glow orb */}
-      <div ref={glowRef} style={{
-        position: 'absolute', right: '12%', top: '50%',
-        transform: 'translate(0, -50%)',
-        width: '44vw', height: '44vw',
-        maxWidth: 580, maxHeight: 580,
-        background: 'radial-gradient(circle, rgba(181,141,61,0.18) 0%, transparent 70%)',
-        borderRadius: '50%', zIndex: 2, filter: 'blur(30px)',
-        transformOrigin: 'center center',
-      }} />
-
-      {/* Vapor particles */}
-      <div ref={particlesRef} style={{ position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none' }}>
-        {Array.from({ length: 14 }, (_, i) => (
-          <div key={i} className="vapor-dot" style={{
-            position: 'absolute',
-            left: `${30 + (i * 4) % 40}%`,
-            bottom: '12%',
-            width: `${4 + (i % 3) * 4}px`,
-            height: `${4 + (i % 3) * 4}px`,
-            borderRadius: '50%',
-            background: i % 2 === 0 ? '#B58D3D' : 'rgba(255,255,255,0.35)',
-            filter: 'blur(2px)',
-          }} />
-        ))}
-      </div>
-
-      {/* Left: Text */}
-      <div ref={textRef} style={{
-        position: 'relative', zIndex: 10,
-        maxWidth: 680, padding: '0 5vw',
-        flex: 1, paddingTop: 80,
+        position: 'sticky',
+        top: 0,
+        height: '100vh',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'stretch',
       }}>
+        {/* Background gradient */}
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 0,
+          background: 'radial-gradient(ellipse 70% 70% at 70% 50%, rgba(181,141,61,0.06) 0%, transparent 70%), #050505',
+        }} />
 
-        {/* Eyebrow */}
-        <div className="hero-eyebrow" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 10,
-          background: 'rgba(181,141,61,0.1)',
-          border: '1px solid rgba(181,141,61,0.3)',
-          borderRadius: 100, padding: '6px 18px',
-          marginBottom: '2rem',
-          opacity: 0,
+        {/* Grid lines */}
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none',
+          backgroundImage: [
+            'linear-gradient(rgba(181,141,61,0.03) 1px, transparent 1px)',
+            'linear-gradient(90deg, rgba(181,141,61,0.03) 1px, transparent 1px)',
+          ].join(','),
+          backgroundSize: '70px 70px',
+        }} />
+
+        {/* 3D Canvas — right side */}
+        <div style={{
+          position: 'absolute', right: 0, top: 0,
+          width: '55%', height: '100%',
+          zIndex: 5,
         }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#B58D3D', display: 'block', boxShadow: '0 0 8px #B58D3D' }} />
-          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#B58D3D', letterSpacing: '2.5px', textTransform: 'uppercase' }}>
-            Nuova Collezione 2025
-          </span>
+          <HeroCanvas3D scrollRef={sectionRef} />
         </div>
 
-        {/* Title */}
-        <h1 style={{
-          fontSize: 'clamp(3rem, 7.5vw, 6.5rem)',
-          fontWeight: 900,
-          lineHeight: 1.02,
-          letterSpacing: '-0.04em',
-          marginBottom: '1.5rem',
-        }}>
-          {['Svapa', 'in', 'Stile.'].map((word, i) => (
-            <span key={i} className="hero-title-word" style={{
-              display: 'inline-block', marginRight: '0.28em',
-              background: i === 2
-                ? 'linear-gradient(120deg, #B58D3D 0%, #e8c97a 50%, #B58D3D 100%)'
-                : 'linear-gradient(135deg, #ffffff 0%, #aaaaaa 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              opacity: 0,
-            }}>{word}</span>
-          ))}
-        </h1>
+        {/* Left overlay text — fades out with scroll */}
+        <div
+          ref={overlayRef}
+          style={{
+            position: 'relative', zIndex: 10,
+            width: '50%', maxWidth: 640,
+            display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            padding: '0 5vw',
+          }}
+        >
+          {/* Eyebrow */}
+          <div className="hero3d-eyebrow" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 10,
+            background: 'rgba(181,141,61,0.1)',
+            border: '1px solid rgba(181,141,61,0.3)',
+            borderRadius: 100, padding: '6px 18px',
+            width: 'fit-content', marginBottom: '2rem', opacity: 0,
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: '#B58D3D', display: 'block',
+              boxShadow: '0 0 10px #B58D3D',
+            }} />
+            <span style={{
+              fontSize: '0.7rem', fontWeight: 800, color: '#B58D3D',
+              letterSpacing: '2.5px', textTransform: 'uppercase',
+            }}>
+              Nuova Collezione 2025
+            </span>
+          </div>
 
-        {/* Subtitle */}
-        <p className="hero-subtitle" style={{
-          fontSize: 'clamp(1rem, 2vw, 1.2rem)',
-          color: '#666',
-          lineHeight: 1.75,
-          maxWidth: 500,
-          marginBottom: '2.5rem',
-          opacity: 0,
-        }}>
-          Dispositivi premium, liquidi artigianali e accessori curati.<br />
-          Il punto di riferimento del vaping in Italia —{' '}
-          <span style={{ color: '#B58D3D', fontWeight: 700 }}>oltre 20 negozi</span> in tutta la penisola.
-        </p>
+          {/* Title */}
+          <h1 style={{
+            fontSize: 'clamp(2.8rem, 6.5vw, 5.5rem)',
+            fontWeight: 900, lineHeight: 1.05,
+            letterSpacing: '-0.04em',
+            marginBottom: '1.5rem',
+          }}>
+            {[
+              { text: 'Il',    gold: false },
+              { text: 'Futuro', gold: false },
+              { text: 'dello', gold: false },
+              { text: 'Svapo', gold: true  },
+              { text: 'è',     gold: false },
+              { text: 'Qui.', gold: true  },
+            ].map(({ text, gold }, i) => (
+              <span
+                key={i}
+                className="hero3d-word"
+                style={{
+                  display: 'inline-block',
+                  marginRight: '0.28em',
+                  opacity: 0,
+                  ...(gold ? {
+                    background: 'linear-gradient(120deg, #B58D3D 0%, #e8c97a 50%, #B58D3D 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  } : {
+                    color: '#ffffff',
+                  })
+                }}
+              >
+                {text}
+              </span>
+            ))}
+          </h1>
 
-        {/* CTAs */}
-        <div className="hero-cta-group" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', opacity: 0 }}>
-          <button
-            onClick={onShopClick}
-            style={{
-              background: 'linear-gradient(135deg, #B58D3D 0%, #e8c97a 100%)',
-              border: 'none', borderRadius: 100,
-              padding: '1rem 2.4rem',
-              fontWeight: 800, fontSize: '1rem',
-              cursor: 'pointer', fontFamily: 'inherit',
-              color: '#0a0a0a',
-              boxShadow: '0 0 40px rgba(181,141,61,0.4)',
-              transition: 'all 0.3s ease',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px) scale(1.03)'; e.currentTarget.style.boxShadow = '0 12px 50px rgba(181,141,61,0.55)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0) scale(1)'; e.currentTarget.style.boxShadow = '0 0 40px rgba(181,141,61,0.4)'; }}
-          >
-            Scopri i Prodotti →
-          </button>
-          <button
-            style={{
-              background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 100, padding: '1rem 2.4rem',
-              fontWeight: 600, fontSize: '1rem',
-              cursor: 'pointer', fontFamily: 'inherit', color: '#777',
-              transition: 'all 0.3s ease',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(181,141,61,0.5)'; e.currentTarget.style.color = '#B58D3D'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#777'; }}
-          >
-            Trova un Negozio
-          </button>
+          <p className="hero3d-sub" style={{
+            fontSize: 'clamp(1rem, 1.8vw, 1.2rem)',
+            color: '#666', lineHeight: 1.75,
+            maxWidth: 460, marginBottom: '2.5rem',
+            opacity: 0,
+          }}>
+            Scorri per assistere all'assemblaggio del nostro dispositivo di punta.
+            Ingegneria di precisione, design senza compromessi.
+          </p>
+
+          <div className="hero3d-cta" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', opacity: 0 }}>
+            <button
+              onClick={onShopClick}
+              style={{
+                background: 'linear-gradient(135deg, #B58D3D 0%, #e8c97a 100%)',
+                border: 'none', borderRadius: 100,
+                padding: '1rem 2.4rem',
+                fontWeight: 800, fontSize: '1rem',
+                cursor: 'pointer', fontFamily: 'inherit',
+                color: '#0a0a0a',
+                boxShadow: '0 0 40px rgba(181,141,61,0.4)',
+                transition: 'all 0.3s ease',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 50px rgba(181,141,61,0.55)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 0 40px rgba(181,141,61,0.4)'; }}
+            >
+              Scopri i Prodotti →
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#555', fontSize: '0.85rem', fontWeight: 600 }}>
+              <span>↓ Scorri per l'anteprima 3D</span>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div style={{ display: 'flex', gap: '2.5rem', marginTop: '3rem', flexWrap: 'wrap' }}>
+            {[['20+', 'Negozi'], ['500+', 'Prodotti'], ['50K+', 'Clienti']].map(([n, l]) => (
+              <div key={l}>
+                <div style={{ fontSize: '1.7rem', fontWeight: 900, color: '#B58D3D', lineHeight: 1 }}>{n}</div>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#444', textTransform: 'uppercase', letterSpacing: '1.5px', marginTop: 3 }}>{l}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Stats */}
-        <div style={{ display: 'flex', gap: '2.5rem', marginTop: '3rem', flexWrap: 'wrap' }}>
-          {[['20+', 'Negozi'], ['500+', 'Prodotti'], ['50K+', 'Clienti']].map(([num, label]) => (
-            <div key={label}>
-              <div style={{ fontSize: '1.7rem', fontWeight: 900, color: '#B58D3D', lineHeight: 1 }}>{num}</div>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#444', textTransform: 'uppercase', letterSpacing: '1.5px', marginTop: 3 }}>{label}</div>
+        {/* Final assembled CTA — appears when device is fully built */}
+        <div
+          id="hero3d-final-cta"
+          style={{
+            position: 'absolute',
+            bottom: '8%', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 20,
+            textAlign: 'center',
+            opacity: 0,
+            transition: 'none',
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{
+            background: 'rgba(8,8,8,0.85)', backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(181,141,61,0.3)',
+            borderRadius: 24, padding: '1.5rem 3rem',
+            boxShadow: '0 20px 80px rgba(181,141,61,0.2)',
+          }}>
+            <div style={{ color: '#B58D3D', fontSize: '0.7rem', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', marginBottom: 8 }}>
+              ✅ Assemblaggio Completato
+            </div>
+            <div style={{ color: '#fff', fontSize: '1.3rem', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 4 }}>
+              Vaporesso ECO One Pro
+            </div>
+            <div style={{ color: '#555', fontSize: '0.85rem', marginBottom: '1.2rem' }}>
+              Pod da 2ml · Potenza 25W · Ricarica USB-C · Autonomia 1000mAh
+            </div>
+            <button
+              onClick={onShopClick}
+              style={{
+                background: 'linear-gradient(135deg, #B58D3D, #e8c97a)',
+                border: 'none', borderRadius: 100,
+                padding: '0.9rem 2.2rem',
+                fontWeight: 800, fontSize: '0.95rem',
+                cursor: 'pointer', fontFamily: 'inherit',
+                color: '#0a0a0a', pointerEvents: 'all',
+              }}
+            >
+              Acquista Ora — €39.90 →
+            </button>
+          </div>
+        </div>
+
+        {/* Scroll progress indicator */}
+        <div style={{
+          position: 'absolute', right: '2rem', top: '50%', transform: 'translateY(-50%)',
+          zIndex: 20, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center',
+        }}>
+          {['Corpo', 'Bocchino', 'Anelli', 'Pulsanti', 'Completo'].map((step, i) => (
+            <div key={step} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(181,141,61,0.3)' }} />
+              <span style={{ fontSize: '0.6rem', color: '#333', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{step}</span>
             </div>
           ))}
         </div>
       </div>
-
-      {/* Right: Device */}
-      <div style={{
-        position: 'absolute', right: '5%', top: '50%',
-        transform: 'translateY(-50%)',
-        zIndex: 8,
-        width: 'clamp(260px, 36vw, 500px)',
-        perspective: '1000px',
-      }}>
-        <div ref={deviceRef} style={{ position: 'relative', transformStyle: 'preserve-3d' }}>
-
-          {/* Product image */}
-          <img
-            src="https://images.unsplash.com/photo-1560707303-4e980ce876ad?w=700&q=90"
-            alt="Premium Vape Device"
-            style={{
-              width: '100%',
-              borderRadius: 24,
-              filter: 'drop-shadow(0 40px 100px rgba(181,141,61,0.45)) drop-shadow(0 0 40px rgba(181,141,61,0.2))',
-            }}
-          />
-
-          {/* Product badge */}
-          <div ref={badgeRef} style={{
-            position: 'absolute', top: '8%', left: '-18%',
-            background: 'rgba(8,8,8,0.9)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(181,141,61,0.35)',
-            borderRadius: 18, padding: '14px 20px',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-            opacity: 0,
-          }}>
-            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#B58D3D', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: 5 }}>🏆 Bestseller</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff' }}>Vaporesso ECO One Pro</div>
-            <div style={{ fontSize: '1rem', color: '#B58D3D', fontWeight: 900, marginTop: 4 }}>€ 39.90</div>
-          </div>
-
-          {/* Review badge */}
-          <div style={{
-            position: 'absolute', bottom: '10%', right: '-14%',
-            background: 'rgba(8,8,8,0.85)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: 16, padding: '10px 18px',
-            fontSize: '0.8rem', color: '#fff', fontWeight: 700,
-            boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
-          }}>
-            ⭐ 4.9 &nbsp;<span style={{ color: '#555', fontWeight: 400 }}>· 2.341 recensioni</span>
-          </div>
-        </div>
-      </div>
-    </section>
+    </div>
   );
 }
