@@ -20,7 +20,7 @@ function Navbar({ onCartOpen }) {
       {/* Logo */}
       <div onClick={() => navigate('/')} style={{
         fontSize: '1.45rem', fontWeight: 900, letterSpacing: '-1px',
-        cursor: 'pointer', color: '#111',
+        cursor: 'pointer', color: '#fff',
       }}>
         Sva<span style={{ color: '#C8963C' }}>Pro</span><span style={{ color: '#C8963C', fontWeight: 400 }}>.</span>
       </div>
@@ -28,9 +28,9 @@ function Navbar({ onCartOpen }) {
       {/* Links */}
       <div style={{ display: 'flex', gap: '2rem', fontSize: '0.86rem', fontWeight: 600 }}>
         {['Hardware', 'Liquidi', 'Accessori', 'Novità'].map(label => (
-          <Link key={label} to="/shop" style={{ color: '#999', textDecoration: 'none', transition: 'color 0.2s' }}
-            onMouseEnter={e => (e.target.style.color = '#111')}
-            onMouseLeave={e => (e.target.style.color = '#999')}
+          <Link key={label} to="/shop" style={{ color: '#666', textDecoration: 'none', transition: 'color 0.2s' }}
+            onMouseEnter={e => (e.target.style.color = '#fff')}
+            onMouseLeave={e => (e.target.style.color = '#666')}
           >{label}</Link>
         ))}
       </div>

@@ -1,18 +1,17 @@
 /**
- * Hero3D.jsx  —  Apple-style fullscreen scroll hero
- * ─────────────────────────────────────────────────
- *  • Product image centered, full-screen, with white bg (multiply blend removes it)
- *  • Pinned 500vh section gives lots of scroll travel
- *  • GSAP ScrollTrigger drives 3 text panels + product transforms
+ * Hero3D.jsx — Apple-style cinematic scroll hero
+ * ──────────────────────────────────────────────
+ *  Pure black background, product centered and large.
+ *  GSAP ScrollTrigger scrubs 5 phases:
  *
- *  Scroll sequence:
- *    0–20%   Product starts dark/blurred/small → brightens and grows
- *    20–45%  PANEL 1: "Ingegneria di Precisione."  slides in left
- *    45–70%  PANEL 2: "Portalo Ovunque."           slides in left (prev fades)
- *    70–92%  PANEL 3: "Acquistalo Ora."  + CTA     slides in left (prev fades)
- *    92–100% Navbar fades in
+ *  Phase 0 → 0.18  Product emerges from dark (scale + brightness)
+ *  Phase 0.18→0.38  TEXT 1:  "Il Futuro del Vaping."
+ *  Phase 0.38→0.58  TEXT 2:  "Ogni Dettaglio. Perfetto."
+ *  Phase 0.58→0.80  TEXT 3:  "Vaporesso ECO One Pro" + price + CTA
+ *  Phase 0.82→1.00  Navbar fades in
+ *
+ *  Product rotates ±12° between panels for a breathing feel.
  */
-
 import React, { useRef, useEffect } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -21,262 +20,300 @@ gsap.registerPlugin(ScrollTrigger);
 
 const GOLD = '#C8963C';
 
-const PANELS = [
+/* ── Line-by-line split text helper ── */
+function SplitText({ text, style }) {
+  return (
+    <span style={style}>
+      {text.split('').map((ch, i) => (
+        <span
+          key={i}
+          className={`hero-char char-${i}`}
+          style={{ display: 'inline-block', whiteSpace: ch === ' ' ? 'pre' : undefined }}
+        >
+          {ch}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+const SCENES = [
   {
-    eyebrow: 'Design',
-    headline: 'Ingegneria\ndi Precisione.',
-    body: 'Ogni componente scelto con cura. Ogni dettaglio pensato per durare.',
+    label: '01',
+    tagline: '— Design',
+    headline: ['Il Futuro', 'del Vaping.'],
+    sub: null,
+    cta: null,
   },
   {
-    eyebrow: 'Portabilità',
-    headline: 'Tascabile.\nSempre con te.',
-    body: 'Compatto al punto giusto. Perfetto per ogni momento della giornata.',
+    label: '02',
+    tagline: '— Qualità',
+    headline: ['Ogni Dettaglio.', 'Perfetto.'],
+    sub: null,
+    cta: null,
   },
   {
-    eyebrow: 'Collezione 2025',
-    headline: 'Il Futuro\ndello Svapo.',
-    body: null, // shows CTA instead
-    cta: 'Scopri la Collezione →',
+    label: '03',
+    tagline: '— Collezione 2025',
+    headline: ['Vaporesso', 'ECO One Pro.'],
+    sub: 'Pod 2ml · 25W · USB-C · 1000mAh',
+    cta: true,
   },
 ];
 
 export default function Hero3D({ onShopClick }) {
   const wrapRef   = useRef(null);
   const stickyRef = useRef(null);
-  const imgRef    = useRef(null);
+  const imgWrapRef = useRef(null);
   const glowRef   = useRef(null);
-  const panelRefs = useRef([]);
+  const sceneRefs = useRef([]);   // one per scene
 
   useEffect(() => {
-    // Hide navbar initially
     const navbar = document.getElementById('main-navbar');
-    if (navbar) gsap.set(navbar, { opacity: 0, y: -16, pointerEvents: 'none' });
+    if (navbar) {
+      gsap.set(navbar, { opacity: 0, y: -14, pointerEvents: 'none' });
+    }
 
     const ctx = gsap.context(() => {
-      /* ── Initial states ── */
-      gsap.set(imgRef.current, { scale: 0.42, filter: 'brightness(0) blur(22px)', rotationY: -30 });
-      gsap.set(glowRef.current, { scale: 0, opacity: 0 });
-      panelRefs.current.forEach(p => gsap.set(p, { x: -80, opacity: 0 }));
 
-      /* ── Main scrollTrigger: pin the sticky div ── */
+      /* ── Initial state ── */
+      gsap.set(imgWrapRef.current,  { scale: 0.5, filter: 'brightness(0) saturate(0)', rotationY: -15 });
+      gsap.set(glowRef.current,     { scale: 0, opacity: 0 });
+      sceneRefs.current.forEach(el => el && gsap.set(el, { opacity: 0, x: -60 }));
+
+      /* ── ScrollTrigger timeline ── */
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: wrapRef.current,
           pin: stickyRef.current,
           start: 'top top',
-          end: '+=450%',
-          scrub: 1.8,
+          end: '+=500%',
+          scrub: 2.2,
           anticipatePin: 1,
-          onUpdate: (self) => {
-            // Navbar fades in at 90%+
-            if (navbar) {
-              const p = self.progress;
-              const v = p >= 0.90 ? Math.min(1, (p - 0.90) / 0.08) : 0;
-              navbar.style.opacity = v;
-              navbar.style.transform = `translateY(${v === 0 ? -16 : 0}px)`;
-              navbar.style.pointerEvents = v > 0 ? 'all' : 'none';
-            }
+          onUpdate: ({ progress: p }) => {
+            if (!navbar) return;
+            const v = p >= 0.84 ? Math.min(1, (p - 0.84) / 0.10) : 0;
+            gsap.set(navbar, { opacity: v, y: v === 0 ? -14 : 0, pointerEvents: v > 0 ? 'all' : 'none' });
           },
         },
       });
 
-      // Phase 0→0.22: product emerges
-      tl.to(imgRef.current, {
+      /* Phase 0→0.18 — Product emerges */
+      tl.to(imgWrapRef.current, {
         scale: 1,
-        filter: 'brightness(1) blur(0px)',
+        filter: 'brightness(1) saturate(1)',
         rotationY: 0,
-        duration: 0.22,
+        duration: 0.18,
         ease: 'power3.out',
       }, 0);
       tl.to(glowRef.current, {
-        scale: 1, opacity: 1, duration: 0.22, ease: 'power2.out',
+        scale: 1, opacity: 1, duration: 0.18, ease: 'power2.out',
       }, 0);
 
-      // Phase 0.20→0.44: product slight rotation + PANEL 1 IN
-      tl.to(imgRef.current, {
-        rotationY: 8, duration: 0.12, ease: 'power2.inOut',
-      }, 0.22);
-      tl.to(panelRefs.current[0], {
-        x: 0, opacity: 1, duration: 0.1, ease: 'power3.out',
-      }, 0.22);
-      // Panel 1 lingers until 0.44
-      tl.to(panelRefs.current[0], {
-        x: -60, opacity: 0, duration: 0.07, ease: 'power2.in',
-      }, 0.44);
+      /* Phase 0.18→0.38 — Scene 1 slides in, product tilts right */
+      tl.to(imgWrapRef.current, { rotationY: 10, duration: 0.10, ease: 'power2.inOut' }, 0.18);
+      tl.to(sceneRefs.current[0], { opacity: 1, x: 0, duration: 0.09, ease: 'power3.out' }, 0.19);
+      /* Scene 1 exits */
+      tl.to(sceneRefs.current[0], { opacity: 0, x: -50, duration: 0.07, ease: 'power2.in' }, 0.36);
 
-      // Phase 0.44→0.68: product rotates other way + PANEL 2 IN
-      tl.to(imgRef.current, {
-        rotationY: -8, duration: 0.12, ease: 'power2.inOut',
-      }, 0.45);
-      tl.to(panelRefs.current[1], {
-        x: 0, opacity: 1, duration: 0.1, ease: 'power3.out',
-      }, 0.45);
-      tl.to(panelRefs.current[1], {
-        x: -60, opacity: 0, duration: 0.07, ease: 'power2.in',
-      }, 0.68);
+      /* Phase 0.38→0.58 — Scene 2, product tilts left */
+      tl.to(imgWrapRef.current, { rotationY: -10, duration: 0.10, ease: 'power2.inOut' }, 0.39);
+      tl.to(sceneRefs.current[1], { opacity: 1, x: 0, duration: 0.09, ease: 'power3.out' }, 0.40);
+      tl.to(sceneRefs.current[1], { opacity: 0, x: -50, duration: 0.07, ease: 'power2.in' }, 0.57);
 
-      // Phase 0.68→0.90: product straightens + PANEL 3 IN
-      tl.to(imgRef.current, {
-        rotationY: 0, scale: 0.95, duration: 0.12, ease: 'power2.inOut',
-      }, 0.69);
-      tl.to(panelRefs.current[2], {
-        x: 0, opacity: 1, duration: 0.1, ease: 'power3.out',
-      }, 0.70);
-      // Panel 3 stays visible (no fadeout — CTA is the end state)
-    });
+      /* Phase 0.58→0.84 — Scene 3 (CTA), product straightens + tiny zoom */
+      tl.to(imgWrapRef.current, { rotationY: 0, scale: 1.04, duration: 0.12, ease: 'power2.inOut' }, 0.59);
+      tl.to(sceneRefs.current[2], { opacity: 1, x: 0, duration: 0.10, ease: 'power3.out' }, 0.61);
+      /* stays visible — no exit */
+    }, wrapRef);
 
     return () => {
       ctx.revert();
       if (navbar) {
-        navbar.style.opacity = '1';
-        navbar.style.transform = 'translateY(0)';
-        navbar.style.pointerEvents = 'all';
+        gsap.set(navbar, { opacity: 1, y: 0, pointerEvents: 'all' });
       }
     };
   }, []);
 
   return (
-    <div ref={wrapRef} style={{ height: '550vh', position: 'relative', background: '#fff' }}>
-      {/* ── Sticky fullscreen panel ── */}
+    <div ref={wrapRef} style={{ height: '600vh', background: '#000', position: 'relative' }}>
+
+      {/* ── Sticky fullscreen ── */}
       <div ref={stickyRef} style={{
         position: 'relative',
         height: '100vh',
-        background: '#fff',
+        background: '#000',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
       }}>
 
-        {/* Subtle warm vignette at edges */}
+        {/* Very subtle grain overlay */}
         <div style={{
-          position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none',
-          background: 'radial-gradient(ellipse at center, transparent 40%, rgba(230,220,210,0.6) 100%)',
+          position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', opacity: 0.025,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+          backgroundRepeat: 'repeat',
         }} />
 
-        {/* Ambient glow behind product */}
+        {/* Soft vignette */}
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none',
+          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7) 100%)',
+        }} />
+
+        {/* Ambient gold glow behind product */}
         <div ref={glowRef} style={{
           position: 'absolute', top: '50%', left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '55vw', height: '55vw',
-          maxWidth: 700, maxHeight: 700,
-          background: `radial-gradient(circle, ${GOLD}22 0%, transparent 68%)`,
-          filter: 'blur(50px)',
-          zIndex: 2, pointerEvents: 'none',
+          transform: 'translate(-50%,-50%)',
+          width: '50vw', height: '50vw',
+          maxWidth: 680, maxHeight: 680,
+          background: `radial-gradient(circle, ${GOLD}1a 0%, transparent 65%)`,
+          filter: 'blur(48px)',
+          zIndex: 3, pointerEvents: 'none',
           transformOrigin: 'center center',
         }} />
 
-        {/* ── Center product ── */}
-        <div ref={imgRef} style={{
-          position: 'relative', zIndex: 5,
-          width: 'min(460px, 44vw)',
+        {/* ── Product Image ── */}
+        <div ref={imgWrapRef} style={{
+          position: 'relative', zIndex: 10,
+          width: 'min(520px, 46vw)',
           transformStyle: 'preserve-3d',
-          perspective: '1200px',
+          perspective: '1000px',
         }}>
-          {/* Soft shadow under */}
+          {/* Ground shadow */}
           <div style={{
-            position: 'absolute', bottom: -30, left: '15%', right: '15%',
-            height: 50, borderRadius: '50%',
-            background: 'rgba(180,140,60,0.18)',
-            filter: 'blur(20px)',
+            position: 'absolute', bottom: -40, left: '15%', right: '15%',
+            height: 60, borderRadius: '50%',
+            background: `${GOLD}`,
+            filter: 'blur(28px)', opacity: 0.12,
           }} />
+
           <img
             src="/img/hero_device.png"
             alt="Vaporesso ECO One Pro"
             style={{
-              width: '100%', display: 'block',
-              mixBlendMode: 'multiply',   // removes white bg on white page
-              filter: 'drop-shadow(0 30px 60px rgba(180,140,60,0.2))',
+              width: '100%',
+              display: 'block',
+              mixBlendMode: 'screen',
+              filter: `
+                drop-shadow(0 0 60px ${GOLD}55)
+                drop-shadow(0 30px 80px rgba(0,0,0,0.8))
+              `,
             }}
           />
         </div>
 
-        {/* ── 3 Text Panels (abs-positioned left side) ── */}
-        {PANELS.map((p, i) => (
+        {/* ── Scene Panels ── */}
+        {SCENES.map((scene, i) => (
           <div
             key={i}
-            ref={el => (panelRefs.current[i] = el)}
+            ref={el => (sceneRefs.current[i] = el)}
             style={{
               position: 'absolute',
-              left: '5vw', top: '50%',
+              left: '5.5vw',
+              top: '50%',
               transform: 'translateY(-50%)',
-              zIndex: 10,
-              maxWidth: 420,
-              opacity: 0,
+              zIndex: 20,
+              maxWidth: 500,
             }}
           >
-            {/* Eyebrow */}
+            {/* Scene number + tagline */}
             <div style={{
-              fontSize: '0.68rem', fontWeight: 800, letterSpacing: '3px',
-              textTransform: 'uppercase', color: GOLD,
-              marginBottom: '1.2rem',
-              display: 'flex', alignItems: 'center', gap: 8,
+              display: 'flex', alignItems: 'center', gap: 12,
+              marginBottom: '1.6rem',
             }}>
-              <span style={{ width: 24, height: 1, background: GOLD, display: 'inline-block' }} />
-              {p.eyebrow}
+              <span style={{
+                fontSize: '0.62rem', fontWeight: 700, color: '#333',
+                letterSpacing: '1px',
+              }}>{scene.label}</span>
+              <span style={{ width: 28, height: 1, background: GOLD }} />
+              <span style={{
+                fontSize: '0.62rem', fontWeight: 700, color: GOLD,
+                letterSpacing: '2px', textTransform: 'uppercase',
+              }}>{scene.tagline.replace('— ', '')}</span>
             </div>
 
-            {/* Headline */}
-            <h2 style={{
-              fontSize: 'clamp(2.4rem, 5vw, 4.2rem)',
-              fontWeight: 900, lineHeight: 1.04,
-              letterSpacing: '-0.04em',
-              color: '#111',
-              whiteSpace: 'pre-line',
-              marginBottom: '1.4rem',
-            }}>
-              {p.headline}
-            </h2>
+            {/* Headlines */}
+            {scene.headline.map((line, li) => (
+              <div key={li} style={{
+                fontSize: 'clamp(2.8rem, 6vw, 5.2rem)',
+                fontWeight: 900,
+                lineHeight: 1.0,
+                letterSpacing: '-0.05em',
+                color: li === 1 && i === 2 ? GOLD : '#fff',
+                whiteSpace: 'nowrap',
+              }}>
+                {line}
+              </div>
+            ))}
 
-            {/* Body or CTA */}
-            {p.body && (
-              <p style={{ color: '#888', fontSize: '1rem', lineHeight: 1.7, maxWidth: 320 }}>
-                {p.body}
+            {/* Sub-line */}
+            {scene.sub && (
+              <p style={{
+                marginTop: '1.2rem',
+                fontSize: '0.85rem', fontWeight: 600,
+                color: '#444', letterSpacing: '1px',
+              }}>
+                {scene.sub}
               </p>
             )}
-            {p.cta && (
-              <button
-                onClick={onShopClick}
-                style={{
-                  marginTop: '0.5rem',
-                  background: '#111', border: 'none', borderRadius: 100,
-                  padding: '1rem 2.4rem',
-                  fontWeight: 800, fontSize: '0.95rem',
-                  cursor: 'pointer', fontFamily: 'inherit', color: '#fff',
-                  transition: 'background 0.25s ease',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = GOLD)}
-                onMouseLeave={e => (e.currentTarget.style.background = '#111')}
-              >
-                {p.cta}
-              </button>
+
+            {/* Price + CTA */}
+            {scene.cta && (
+              <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#444', letterSpacing: '1px', textTransform: 'uppercase' }}>Prezzo</div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: GOLD, lineHeight: 1, marginTop: 2 }}>€ 39<span style={{ fontSize: '1rem' }}>.90</span></div>
+                </div>
+                <button
+                  onClick={onShopClick}
+                  style={{
+                    background: '#fff',
+                    border: 'none', borderRadius: 100,
+                    padding: '1rem 2.2rem',
+                    fontWeight: 900, fontSize: '0.9rem',
+                    cursor: 'pointer', fontFamily: 'inherit',
+                    color: '#000',
+                    transition: 'background 0.25s ease, color 0.25s ease',
+                    letterSpacing: '-0.01em',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = GOLD; e.currentTarget.style.color = '#000'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#000'; }}
+                >
+                  Acquista →
+                </button>
+              </div>
             )}
           </div>
         ))}
 
-        {/* ── Scroll hint (fades out as user scrolls) ── */}
+        {/* ── Scene counter indicator — right side ── */}
+        <div style={{
+          position: 'absolute', right: '4vw', top: '50%', transform: 'translateY(-50%)',
+          zIndex: 20, display: 'flex', flexDirection: 'column', gap: 16,
+        }}>
+          {SCENES.map((_, i) => (
+            <div key={i} style={{
+              width: 1, height: 32,
+              background: 'rgba(255,255,255,0.08)',
+            }} />
+          ))}
+        </div>
+
+        {/* ── Scroll hint ── */}
         <div style={{
           position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)',
           zIndex: 20, textAlign: 'center',
-          color: '#bbb', fontSize: '0.68rem', fontWeight: 700,
+          color: '#2a2a2a', fontSize: '0.65rem', fontWeight: 700,
           letterSpacing: '2px', textTransform: 'uppercase',
         }}>
           <div style={{
-            width: 1, height: 40, background: 'linear-gradient(to bottom, transparent, #ccc)',
+            width: 1, height: 44,
+            background: 'linear-gradient(to bottom, transparent, #333)',
             margin: '0 auto 8px',
           }} />
           Scorri
-        </div>
-
-        {/* ── Small product name badge bottom-right ── */}
-        <div style={{
-          position: 'absolute', bottom: 40, right: '5vw',
-          zIndex: 20,
-          textAlign: 'right',
-        }}>
-          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ccc', letterSpacing: '2px', textTransform: 'uppercase' }}>ECO ONE PRO</div>
-          <div style={{ fontSize: '0.8rem', color: '#999', fontWeight: 600, marginTop: 2 }}>Pod 2ml · 25W · USB-C</div>
-          <div style={{ fontSize: '1rem', color: GOLD, fontWeight: 900, marginTop: 4 }}>€ 39.90</div>
         </div>
 
       </div>
