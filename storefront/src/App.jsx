@@ -115,27 +115,27 @@ function CategoryCard({ cat, idx, navigate }) {
     >
       {/* Floating product image — dark bg card with screen blend */}
       <div ref={imgRef} style={{
-        width: '100%', aspectRatio: '1 / 1',
+        width: '100%', aspectRatio: '1 / 1.2',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         position: 'relative',
-        background: '#0d0d0d',
-        borderRadius: 20,
-        overflow: 'hidden',
+        background: 'transparent', // Rimossa la card dietro
         marginBottom: '1.2rem',
       }}>
         {/* Colored glow behind product */}
         <div style={{
-          position: 'absolute', inset: 0,
-          background: `radial-gradient(circle at 50% 60%, ${cat.accent}22 0%, transparent 70%)`,
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          width: '60%', height: '60%',
+          background: `radial-gradient(circle, ${cat.accent}22 0%, transparent 70%)`,
+          filter: 'blur(30px)'
         }} />
         <img
           src={cat.img}
           alt={cat.label}
           style={{
-            width: '72%', height: '72%', objectFit: 'contain',
+            width: '85%', height: '85%', objectFit: 'contain',
             position: 'relative', zIndex: 2,
-            filter: `drop-shadow(0 16px 32px ${cat.accent}55)`,
-            mixBlendMode: 'screen',    // black bg disappears → product floats
+            filter: `drop-shadow(0 20px 40px rgba(0,0,0,0.8))`,
+            mixBlendMode: 'screen',
           }}
         />
       </div>
@@ -172,22 +172,69 @@ function Home({ onCartOpen }) {
       <Navbar onCartOpen={onCartOpen} />
       <Hero3D onShopClick={() => navigate('/shop')} />
 
+      {/* ── Bestselling 3D Products Section ── */}
+      <section style={{ background: '#000000', padding: '6rem 5vw 4rem', position: 'relative', zIndex: 10 }}>
+        <div style={{ maxWidth: 1240, margin: '0 auto' }}>
+          
+          <div style={{ marginBottom: '4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '3px', color: '#C8963C', textTransform: 'uppercase', marginBottom: '1rem' }}>
+                — In Evidenza
+              </div>
+              <h2 style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1.04 }}>
+                Capolavori<br />
+                <span style={{ color: '#aaa' }}>Senza Tempo.</span>
+              </h2>
+            </div>
+            <Link to="/shop" style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 800, textDecoration: 'none', borderBottom: '1px solid #C8963C', paddingBottom: 4 }}>
+              Vedi Tutti →
+            </Link>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '3rem' }}>
+            {[
+              { label: 'ECO One Pro', desc: 'Edizione Limitata', accent: '#C8963C', img: '/img/hero_vape_1.png', price: '€39.90' },
+              { label: 'Nexus Pod', desc: 'Titanio Spaziale', accent: '#5B8CFF', img: '/img/hero_vape_2.png', price: '€45.00' },
+              // Uso gli asset Hero come campione puro 3D
+              { label: 'Zeus Sub-Ohm', desc: 'Flusso Pieno', accent: '#FF6B6B', img: '/img/hero_vape_1.png', price: '€29.90' },
+            ].map((prod, idx) => (
+              <div key={idx} onClick={() => navigate('/shop')} style={{ cursor: 'pointer', textAlign: 'center', transition: 'transform 0.3s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-10px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                <div style={{
+                  width: '100%', aspectRatio: '1 / 1.3', position: 'relative',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '50%', height: '50%', background: `radial-gradient(circle, ${prod.accent}15 0%, transparent 60%)`, filter: 'blur(40px)' }} />
+                  <img src={prod.img} alt={prod.label} style={{ width: '90%', height: '90%', objectFit: 'contain', mixBlendMode: 'screen', position: 'relative', zIndex: 2, filter: 'drop-shadow(0 30px 40px rgba(0,0,0,0.9))' }} />
+                </div>
+                <div style={{ marginTop: '1rem' }}>
+                  <div style={{ fontWeight: 900, fontSize: '1.4rem', color: '#fff', letterSpacing: '-1px' }}>{prod.label}</div>
+                  <div style={{ fontSize: '0.85rem', color: '#666', fontWeight: 600, marginTop: 4 }}>{prod.desc}</div>
+                  <div style={{ fontSize: '1.1rem', color: '#C8963C', fontWeight: 800, marginTop: 12 }}>{prod.price}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      </section>
+
       {/* ── Dark Categories Section ── */}
-      <section style={{ background: '#070707', padding: '8rem 5vw 10rem' }}>
+      <section style={{ background: '#000000', padding: '6rem 5vw 10rem' }}>
         <div style={{ maxWidth: 1240, margin: '0 auto' }}>
 
+          <div style={{ width: '100%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)', marginBottom: '6rem' }} />
+
           {/* Header */}
-          <div style={{ marginBottom: '5rem' }}>
+          <div style={{ marginBottom: '5rem', textAlign: 'center' }}>
             <div style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '3px', color: '#C8963C', textTransform: 'uppercase', marginBottom: '1rem' }}>
-              — Catalogo
+              — Esplora
             </div>
             <h2 style={{
-              fontSize: 'clamp(2.5rem, 5vw, 4rem)',
+              fontSize: 'clamp(2rem, 4vw, 3rem)',
               fontWeight: 900, color: '#fff',
               letterSpacing: '-0.04em', lineHeight: 1.04,
             }}>
-              Scegli la tua<br />
-              <span style={{ color: '#C8963C' }}>categoria.</span>
+              Scegli la tua categoria.
             </h2>
           </div>
 
@@ -198,10 +245,10 @@ function Home({ onCartOpen }) {
             gap: '2.5rem',
           }}>
             {[
-              { label: 'Hardware',    desc: 'Pod, mod e kit', accent: '#C8963C', img: '/img/hardware.png' },
+              { label: 'Hardware',    desc: 'Pod, mod e kit', accent: '#C8963C', img: '/img/hero_vape_1.png' },
               { label: 'Liquidi',     desc: 'Aromi e shortfill', accent: '#5B8CFF', img: '/img/liquidi.png' },
               { label: 'Accessori',   desc: 'Coil e ricambi', accent: '#FF6B6B', img: '/img/accessori.png' },
-              { label: 'Usa e Getta', desc: 'Zero config', accent: '#1BC47D', img: '/img/usa_getta.png' },
+              { label: 'Usa e Getta', desc: 'Zero config', accent: '#1BC47D', img: '/img/hero_vape_2.png' },
             ].map((cat, idx) => (
               <CategoryCard key={cat.label} cat={cat} idx={idx} navigate={navigate} />
             ))}
