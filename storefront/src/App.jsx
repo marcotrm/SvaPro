@@ -90,38 +90,74 @@ function Navbar({ onCartOpen }) {
 function Category3DCard({ cat, idx, navigate }) {
   const cardRef = useRef(null);
   const imgRef = useRef(null);
+  const glowRef = useRef(null);
+  const floatTlRef = useRef(null);
 
   useEffect(() => {
     // Scroll-triggered stagger entrance
     gsap.fromTo(cardRef.current,
-      { y: 60, opacity: 0 },
+      { y: 80, opacity: 0, scale: 0.92 },
       {
         scrollTrigger: {
           trigger: cardRef.current,
-          start: 'top 85%',
+          start: 'top 88%',
           once: true,
         },
-        y: 0, opacity: 1, duration: 0.8, delay: idx * 0.12, ease: 'power3.out',
+        y: 0, opacity: 1, scale: 1,
+        duration: 0.9, delay: idx * 0.14, ease: 'power4.out',
       }
     );
+
+    // Perpetual subtle floating animation
+    floatTlRef.current = gsap.to(imgRef.current, {
+      y: -10, duration: 2.5 + idx * 0.3, repeat: -1, yoyo: true,
+      ease: 'sine.inOut',
+    });
+
+    return () => floatTlRef.current?.kill();
   }, []);
 
+  // 3D magnetic tilt on mouse move
   const handleMouseMove = (e) => {
     const card = cardRef.current;
     const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
-    const rx = ((y - cy) / cy) * -10;
-    const ry = ((x - cx) / cx) * 10;
-    gsap.to(card, { rotateX: rx, rotateY: ry, transformPerspective: 900, duration: 0.3, ease: 'power2.out' });
-    gsap.to(imgRef.current, { scale: 1.06, duration: 0.5, ease: 'power2.out' });
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    gsap.to(card, {
+      rotateX: -y * 16,
+      rotateY: x * 16,
+      transformPerspective: 1000,
+      duration: 0.4,
+      ease: 'power2.out',
+    });
+    // Move image slightly in opposite direction for depth illusion
+    gsap.to(imgRef.current, {
+      x: x * 18,
+      y: y * 18 - 10,
+      duration: 0.5,
+      ease: 'power2.out',
+    });
+    // Glow tracks mouse
+    if (glowRef.current) {
+      gsap.to(glowRef.current, {
+        left: `${(x + 0.5) * 100}%`,
+        top: `${(y + 0.5) * 100}%`,
+        opacity: 0.8,
+        duration: 0.3,
+      });
+    }
   };
 
   const handleMouseLeave = () => {
-    gsap.to(cardRef.current, { rotateX: 0, rotateY: 0, duration: 0.6, ease: 'power3.out' });
-    gsap.to(imgRef.current, { scale: 1, duration: 0.5, ease: 'power2.out' });
+    gsap.to(cardRef.current, {
+      rotateX: 0, rotateY: 0, duration: 0.7, ease: 'elastic.out(1, 0.6)',
+    });
+    gsap.to(imgRef.current, {
+      x: 0, y: -10, duration: 0.7, ease: 'elastic.out(1, 0.5)',
+    });
+    if (glowRef.current) {
+      gsap.to(glowRef.current, { opacity: 0, duration: 0.4 });
+    }
   };
 
   return (
@@ -132,88 +168,124 @@ function Category3DCard({ cat, idx, navigate }) {
       onClick={() => navigate('/shop')}
       style={{
         position: 'relative',
-        background: 'rgba(255,255,255,0.025)',
-        border: `1px solid rgba(255,255,255,0.06)`,
-        borderRadius: 28, overflow: 'hidden',
         cursor: 'pointer',
+        // No card background — pure floating content
         willChange: 'transform',
         transformStyle: 'preserve-3d',
-        transition: 'box-shadow 0.3s ease, border-color 0.3s ease',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.boxShadow = `0 30px 80px -10px ${cat.accent}33`;
-        e.currentTarget.style.borderColor = `${cat.accent}44`;
-      }}
-      onMouseOut={e => {
-        e.currentTarget.style.boxShadow = 'none';
-        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+        opacity: 0, // set by gsap
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '0 10px 24px',
       }}
     >
-      {/* Background image with parallax */}
-      <div style={{ height: 180, overflow: 'hidden' }}>
+      {/* Radial glow that follows cursor */}
+      <div ref={glowRef} style={{
+        position: 'absolute',
+        width: 200, height: 200,
+        borderRadius: '50%',
+        background: `radial-gradient(circle, ${cat.accent}55 0%, transparent 70%)`,
+        transform: 'translate(-50%, -50%)',
+        left: '50%', top: '50%',
+        pointerEvents: 'none',
+        opacity: 0,
+        filter: 'blur(20px)',
+        zIndex: 0,
+      }} />
+
+      {/* Product image — floating, no background */}
+      <div ref={imgRef} style={{
+        width: '80%',
+        aspectRatio: '1/1',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        zIndex: 2,
+        marginBottom: '0.5rem',
+      }}>
+        {/* Soft glow under image */}
+        <div style={{
+          position: 'absolute',
+          bottom: -20, left: '15%', right: '15%',
+          height: 40,
+          background: cat.accent,
+          filter: 'blur(18px)',
+          opacity: 0.35,
+          borderRadius: '50%',
+        }} />
         <img
-          ref={imgRef}
           src={cat.img}
           alt={cat.label}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease' }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: `drop-shadow(0 20px 40px ${cat.accent}66) drop-shadow(0 5px 15px rgba(0,0,0,0.6))`,
+            mixBlendMode: 'lighten',
+          }}
         />
-        {/* Gradient overlay */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: 180,
-          background: `linear-gradient(to bottom, rgba(5,5,5,0.1) 0%, rgba(5,5,5,0.7) 100%)`,
-        }} />
+      </div>
+
+      {/* Text content area — thin border bottom attachment feeling */}
+      <div style={{
+        width: '100%',
+        background: 'rgba(255,255,255,0.02)',
+        backdropFilter: 'blur(10px)',
+        border: `1px solid ${cat.accent}22`,
+        borderTop: `2px solid ${cat.accent}`,
+        borderRadius: '0 0 20px 20px',
+        padding: '1.4rem 1.5rem',
+        position: 'relative',
+        zIndex: 2,
+        transition: 'border-color 0.3s ease',
+      }}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = `${cat.accent}88`)}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = `${cat.accent}22`)}
+      >
         {/* Badge */}
         <div style={{
-          position: 'absolute', top: 14, left: 14,
+          display: 'inline-block',
           background: cat.accent,
-          color: '#000', fontSize: '0.6rem', fontWeight: 900,
-          padding: '4px 12px', borderRadius: 100,
+          color: '#000',
+          fontSize: '0.58rem', fontWeight: 900,
+          padding: '3px 10px', borderRadius: 100,
           letterSpacing: '1.5px', textTransform: 'uppercase',
+          marginBottom: '0.7rem',
         }}>
           {cat.badge}
         </div>
-        {/* Icon */}
-        <div style={{
-          position: 'absolute', top: 12, right: 14,
-          fontSize: '1.8rem', filter: 'drop-shadow(0 0 8px rgba(0,0,0,0.5))',
-        }}>
-          {cat.icon}
-        </div>
-      </div>
 
-      {/* Content */}
-      <div style={{ padding: '1.5rem' }}>
-        <h3 style={{ fontWeight: 900, fontSize: '1.25rem', color: '#fff', marginBottom: '0.6rem', letterSpacing: '-0.02em' }}>
-          {cat.label}
+        <h3 style={{
+          fontWeight: 900, fontSize: '1.35rem', color: '#fff',
+          marginBottom: '0.5rem', letterSpacing: '-0.02em',
+        }}>
+          {cat.icon} {cat.label}
         </h3>
-        <p style={{ color: '#666', fontSize: '0.85rem', lineHeight: 1.6, marginBottom: '1.2rem' }}>
+
+        <p style={{ color: '#555', fontSize: '0.82rem', lineHeight: 1.65, marginBottom: '1rem' }}>
           {cat.desc}
         </p>
 
-        {/* Mini product list */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: '1.5rem' }}>
+        {/* Mini product pills */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '1.2rem' }}>
           {cat.products.map(p => (
-            <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 4, height: 4, borderRadius: '50%', background: cat.accent, flexShrink: 0 }} />
-              <span style={{ fontSize: '0.78rem', color: '#555', fontWeight: 600 }}>{p}</span>
-            </div>
+            <span key={p} style={{
+              fontSize: '0.68rem', fontWeight: 700, color: cat.accent,
+              background: `${cat.accent}15`,
+              border: `1px solid ${cat.accent}30`,
+              padding: '3px 10px', borderRadius: 100,
+            }}>{p}</span>
           ))}
         </div>
 
-        {/* CTA */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: cat.accent }}>
-            Sfoglia categoria →
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: cat.accent }}>
+            Sfoglia →
           </span>
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: `${cat.accent}18`,
-            border: `1px solid ${cat.accent}44`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1rem',
-          }}>
-            {cat.icon}
-          </div>
+          <span style={{ fontSize: '1.2rem' }}>{cat.icon}</span>
         </div>
       </div>
     </div>
@@ -264,10 +336,10 @@ function Home({ onCartOpen }) {
               label: 'Hardware',
               icon: '⚡',
               desc: 'Pod mod, box mod e kit completi per ogni livello di esperienza.',
-              accent: '#B58D3D',
+              accent: '#C8963C',
               products: ['Vaporesso ECO One Pro', 'Uwell Caliburn G3', 'GeekVape Aegis'],
               badge: 'Più Venduto',
-              img: 'https://images.unsplash.com/photo-1534802046520-4f27db7f3ae5?w=400&q=80',
+              img: '/img/hardware.png',
             },
             {
               label: 'Liquidi',
@@ -276,25 +348,25 @@ function Home({ onCartOpen }) {
               accent: '#5B8CFF',
               products: ['Suprem-e One', 'TNT Booms', 'Svaponext'],
               badge: 'Nuovi Arrivi',
-              img: 'https://images.unsplash.com/photo-1614483888-c84fdaae28b2?w=400&q=80',
+              img: '/img/liquidi.png',
             },
             {
               label: 'Accessori',
               icon: '🔧',
-              desc: 'Coil di ricambio, pod, batterie e tutto per personalizzare il tuo setup.',
+              desc: 'Coil di ricambio, pod, batterie e tutto il necessario per il tuo setup.',
               accent: '#FF6B6B',
               products: ['Coil Mesh 0.2Ω', 'Batteria 18650', 'Pod di ricambio'],
               badge: 'Essenziali',
-              img: 'https://images.unsplash.com/photo-1603903631918-a3c0ee7db0f2?w=400&q=80',
+              img: '/img/accessori.png',
             },
             {
               label: 'Usa e Getta',
               icon: '🌬️',
-              desc: 'Dispositivi usa e getta compatti, senza manutenzione, pronti all\'uso.',
+              desc: 'Dispositivi compatti, zero manutenzione, pronti all\'uso immediato.',
               accent: '#1BC47D',
               products: ['Elf Bar', 'Lost Mary', 'Vozol Star'],
               badge: 'Zero Config',
-              img: 'https://images.unsplash.com/photo-1574871864461-b2a2a5a0ac2b?w=400&q=80',
+              img: '/img/usa_getta.png',
             },
           ].map((cat, idx) => (
             <Category3DCard key={cat.label} cat={cat} idx={idx} navigate={navigate} />

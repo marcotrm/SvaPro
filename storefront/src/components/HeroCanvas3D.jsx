@@ -60,37 +60,46 @@ export default function HeroCanvas3D({ scrollRef }) {
     cameraRef.current = camera;
 
     // ── Materials ─────────────────────────────────────────────────────────────
-    const matBody = new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#1a1a1a'),
-      metalness: 0.85,
-      roughness: 0.15,
+    const matBody = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color('#3a3a42'),
+      metalness: 0.9,
+      roughness: 0.12,
+      reflectivity: 1,
+      clearcoat: 0.5,
+      clearcoatRoughness: 0.1,
     });
-    const matMouth = new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#111111'),
+    const matMouth = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color('#2a2a30'),
       metalness: 0.95,
-      roughness: 0.1,
+      roughness: 0.08,
+      clearcoat: 0.8,
+      reflectivity: 1,
     });
-    const matAccent = new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#B58D3D'),
+    const matAccent = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color('#C8963C'),
       metalness: 1,
-      roughness: 0.05,
-      emissive: new THREE.Color('#B58D3D'),
-      emissiveIntensity: 0.2,
+      roughness: 0.04,
+      emissive: new THREE.Color('#C8963C'),
+      emissiveIntensity: 0.5,
+      clearcoat: 1,
+      reflectivity: 1,
     });
-    const matGlass = new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#aaddff'),
-      metalness: 0.1,
+    const matGlass = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color('#99ccff'),
+      metalness: 0.0,
       roughness: 0,
+      transmission: 0.88,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.4,
       side: THREE.DoubleSide,
+      ior: 1.5,
     });
     const matScreen = new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#0a1628'),
-      metalness: 0.3,
-      roughness: 0.6,
-      emissive: new THREE.Color('#1a4080'),
-      emissiveIntensity: 0.3,
+      color: new THREE.Color('#112244'),
+      metalness: 0.2,
+      roughness: 0.5,
+      emissive: new THREE.Color('#1a55bb'),
+      emissiveIntensity: 0.8,
     });
     materialCache.current = [matBody, matMouth, matAccent, matGlass, matScreen];
 
@@ -204,31 +213,40 @@ export default function HeroCanvas3D({ scrollRef }) {
     logoMat.opacity = 0;
 
     // ── Lights ────────────────────────────────────────────────────────────────
-
-    const ambientLight = new THREE.AmbientLight('#ffffff', 0.3);
+    const ambientLight = new THREE.AmbientLight('#ffffff', 0.8);
     scene.add(ambientLight);
 
-    // Key light — warm golden from upper right
-    const keyLight = new THREE.DirectionalLight('#fff8e7', 3);
-    keyLight.position.set(3, 6, 5);
+    // Key light — strong warm white from upper right
+    const keyLight = new THREE.DirectionalLight('#fff8f0', 8);
+    keyLight.position.set(4, 6, 6);
     keyLight.castShadow = true;
     scene.add(keyLight);
 
-    // Rim light — cool blue from behind
-    const rimLight = new THREE.DirectionalLight('#4488ff', 1.5);
-    rimLight.position.set(-4, 2, -5);
+    // Second fill key from left
+    const fillKey = new THREE.DirectionalLight('#e0e8ff', 4);
+    fillKey.position.set(-5, 2, 4);
+    scene.add(fillKey);
+
+    // Rim light — strong cool blue from behind for silhouette pop
+    const rimLight = new THREE.DirectionalLight('#6699ff', 5);
+    rimLight.position.set(-2, 3, -6);
     scene.add(rimLight);
 
     // Gold point light — floats near device for accent
-    const goldLight = new THREE.PointLight('#B58D3D', 4, 6);
-    goldLight.position.set(0, 0, 2.5);
+    const goldLight = new THREE.PointLight('#C8963C', 12, 8);
+    goldLight.position.set(1.5, 0, 3);
     scene.add(goldLight);
     lightsRef.current.gold = goldLight;
 
-    // Fill light from below
-    const fillLight = new THREE.PointLight('#2244aa', 2, 8);
-    fillLight.position.set(0, -4, 2);
+    // Under fill
+    const fillLight = new THREE.PointLight('#4466cc', 4, 10);
+    fillLight.position.set(0, -5, 2);
     scene.add(fillLight);
+
+    // Top fill for clearcoat reflection
+    const topLight = new THREE.DirectionalLight('#ffffff', 3);
+    topLight.position.set(0, 10, 2);
+    scene.add(topLight);
 
     // ── GSAP ScrollTrigger Assembly ───────────────────────────────────────────
     const p = progressRef.current;
