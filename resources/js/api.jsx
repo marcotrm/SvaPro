@@ -715,6 +715,15 @@ export const attendance = {
   checkOut:          (data)        => api.post('/attendance/checkout', data),
 };
 
+// Shifts APIs (Pianificazione Turni)
+export const shifts = {
+  getAll:         (params = {}) => api.get('/shifts', { params }),
+  bulkSave:       (data)        => api.post('/shifts/bulk', data),
+  getTemplates:   ()            => api.get('/shifts/templates'),
+  saveTemplate:   (data)        => api.post('/shifts/templates', data),
+  deleteTemplate: (id)          => api.delete(`/shifts/templates/${id}`),
+};
+
 // Stock Transfers / DDT
 export const stockTransfers = {
   getAll:  (params = {}) => api.get('/stock-transfers', { params }),

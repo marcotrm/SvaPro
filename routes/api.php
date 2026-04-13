@@ -205,6 +205,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/attendance', [AttendanceController::class, 'index']);
         Route::get('/attendance/history', [AttendanceController::class, 'history']);
 
+        // Shifts & Rostering
+        Route::get('/shifts', [\App\Http\Controllers\Api\ShiftController::class, 'index']);
+        Route::post('/shifts/bulk', [\App\Http\Controllers\Api\ShiftController::class, 'bulkSave'])->middleware('permission:employees.manage');
+        Route::get('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'getTemplates']);
+        Route::post('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'saveTemplate'])->middleware('permission:employees.manage');
+        Route::delete('/shifts/templates/{id}', [\App\Http\Controllers\Api\ShiftController::class, 'deleteTemplate'])->middleware('permission:employees.manage');
+
         // Stock Transfers / DDT
         Route::get('/stock-transfers', [StockTransferController::class, 'index']);
         Route::post('/stock-transfers', [StockTransferController::class, 'store']);
@@ -300,6 +307,15 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/chat/messages', [ChatController::class, 'index']);
         Route::post('/chat/messages', [ChatController::class, 'store']);
         Route::post('/chat/messages/read', [ChatController::class, 'markRead']);
+
+        // Gamification
+        Route::get('/gamification/missions', [GamificationController::class, 'missions']);
+        Route::get('/gamification/team-challenges', [GamificationController::class, 'teamChallenges']);
+        Route::get('/gamification/leaderboard', [GamificationController::class, 'leaderboard']);
+        Route::get('/gamification/player-stats', [GamificationController::class, 'playerStats']);
+
+        // Employee's own shifts
+        Route::get('/employee/my-shifts', [\App\Http\Controllers\Api\ShiftController::class, 'myShifts']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente,cliente_finale')->group(function () {

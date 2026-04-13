@@ -43,6 +43,7 @@ const GamificationPage = lazy(() => import('./pages/GamificationPage.jsx'));
 const SupplierDeliveryPage = lazy(() => import('./pages/SupplierDeliveryPage.jsx'));
 const StoreLoadingPage     = lazy(() => import('./pages/StoreLoadingPage.jsx'));
 const AdminPanelPage       = lazy(() => import('./pages/AdminPanelPage.jsx'));
+const ShiftsPage = lazy(() => import('./pages/ShiftsPage.jsx'));
 const QscareDashboardPage  = lazy(() => import('./pages/QscareDashboardPage.jsx'));
 const TesoreriaPage        = lazy(() => import('./pages/TesoreriaPage.jsx'));
 const AdminDeliveryNotesPage = lazy(() => import('./pages/AdminDeliveryNotesPage.jsx'));
@@ -165,7 +166,9 @@ export default function App() {
               <Route path="/loyalty/tiers" element={<LoyaltyTiersPage />} />
               <Route path="/employees/kpi" element={<EmployeeKpiPage />} />
               <Route path="/inventory/count" element={<InventoryCountPage />} />
+              {/* Turni & Timbrature (admin view) */}
               <Route path="/attendance" element={<AttendancePage />} />
+              <Route path="/shifts" element={<ShiftsPage />} />
               <Route path="/clock-in" element={<ClockInPage />} />
               <Route path="/stock-transfers" element={<StockTransfersPage />} />
               <Route path="/stores" element={<StoresPage />} />

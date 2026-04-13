@@ -12,7 +12,7 @@ import {
   Receipt, Star, ArrowRightLeft, MapPin, ChevronLeft, ChevronRight,
   PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store, AlertCircle,
   LayoutDashboard, ShoppingCart, Megaphone, HandCoins,
-  Menu, X, Home, ChevronRight as ChevRight
+  Menu, X, Home, ChevronRight as ChevRight, Calendar
 } from 'lucide-react';
 
 const allNavigation = [
@@ -49,7 +49,6 @@ const allNavigation = [
   // 7. Marketing ────────────────────────────────────────────────────
   { section: 'Marketing', icon: Megaphone, items: [
     { label: 'Promozioni & Bundle',    href: '/promotions',   icon: Gift,        roles: ['superadmin','admin_cliente'] },
-    { label: '🏆 Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
 
   // 8. Dipendenti ───────────────────────────────────────────────────
@@ -57,6 +56,8 @@ const allNavigation = [
     { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente'] },
     { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
     { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
+    { label: 'Pianificazione Turni',   href: '/shifts',       icon: Calendar,    roles: ['superadmin','admin_cliente'] },
+    { label: '🏆 Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
 
   // Amministrazione ──────────────────────────────────────────────
