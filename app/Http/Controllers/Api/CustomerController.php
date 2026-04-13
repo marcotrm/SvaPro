@@ -448,7 +448,6 @@ class CustomerController extends Controller
                     'customer_id' => $customerId,
                     'card_code'   => $newCardCode,
                     'status'      => 'active',
-                    'uuid'        => (string) \Illuminate\Support\Str::uuid(),
                     'created_at'  => now(),
                     'updated_at'  => now(),
                 ]);
