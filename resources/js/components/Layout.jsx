@@ -4,6 +4,7 @@ import { auth, stores, clearApiCache } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
 import { Toaster } from 'react-hot-toast';
 import ChatWidget from './ChatWidget.jsx';
+import StoreStatsDrawer from './StoreStatsDrawer.jsx';
 import { 
   BarChart3, Package, Warehouse, ClipboardList, ShoppingBag,
   Users, Monitor, Truck, Settings, LogOut, Bell,
@@ -226,6 +227,7 @@ export default function Layout({ user, setUser }) {
 
   // Conta prodotti sotto soglia dai dati caricati (placeholder per ora)
   const [lowStockCount, setLowStockCount] = React.useState(0);
+  const [showStoreStats, setShowStoreStats] = React.useState(false);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
@@ -413,6 +415,26 @@ export default function Layout({ user, setUser }) {
                 ))}
               </select>
             )}
+            {/* Bottone riepilogo vendite */}
+            <button
+              onClick={() => setShowStoreStats(true)}
+              title={selectedStore ? `Vendite: ${selectedStore.name}` : 'Riepilogo vendite'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 14px', borderRadius: 10,
+                background: 'linear-gradient(135deg, #7B6FD0, #5B50B0)',
+                color: '#fff', border: 'none', cursor: 'pointer',
+                fontSize: 12, fontWeight: 700,
+                boxShadow: '0 2px 8px rgba(123,111,208,0.35)',
+                transition: 'all 0.15s',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <BarChart3 size={14} />
+              Vendite
+            </button>
             <button
               className="sp-btn sp-btn-ghost sp-btn-icon"
               title={lowStockCount > 0 ? `${lowStockCount} alert stock` : 'Notifiche'}
@@ -441,6 +463,14 @@ export default function Layout({ user, setUser }) {
           }} />
         </section>
       </main>
+
+      {/* DRAWER Vendite Negozio */}
+      {showStoreStats && (
+        <StoreStatsDrawer
+          store={selectedStore || (storesList.length === 1 ? storesList[0] : null)}
+          onClose={() => setShowStoreStats(false)}
+        />
+      )}
 
       <ChatWidget />
       <Toaster
