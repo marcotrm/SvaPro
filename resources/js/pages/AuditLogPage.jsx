@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { audit } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
+import DatePicker from '../components/DatePicker.jsx';
 
 const actionLabels = {
   create: 'Creazione',
@@ -106,22 +107,12 @@ export default function AuditLogPage() {
             ))}
           </select>
 
-          <input
-            type="date"
-            className="form-select"
-            value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
-            style={{ minWidth: 130 }}
-            title="Data da"
-          />
-          <input
-            type="date"
-            className="form-select"
-            value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-            style={{ minWidth: 130 }}
-            title="Data a"
-          />
+          <div style={{ minWidth: 180 }}>
+            <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Data da..." />
+          </div>
+          <div style={{ minWidth: 180 }}>
+            <DatePicker value={dateTo} onChange={setDateTo} placeholder="Data a..." />
+          </div>
 
           {(actionFilter || entityFilter || dateFrom || dateTo) && (
             <button

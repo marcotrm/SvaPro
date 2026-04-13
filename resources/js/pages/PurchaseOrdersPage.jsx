@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DatePicker from '../components/DatePicker.jsx';
 import { useOutletContext } from 'react-router-dom';
 import { purchaseOrders, suppliers as suppliersApi, stores as storesApi } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
@@ -358,7 +359,7 @@ export default function PurchaseOrdersPage() {
             </div>
             <div>
               <label className="field-label">Data prevista consegna</label>
-              <input className="field-input" type="date" value={form.expected_at} onChange={e => setForm({ ...form, expected_at: e.target.value })} />
+              <DatePicker value={form.expected_at} onChange={v => setForm({ ...form, expected_at: v })} placeholder="Seleziona data consegna" />
             </div>
             <div>
               <label className="field-label">Note</label>

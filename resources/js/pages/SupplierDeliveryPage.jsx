@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import DatePicker from '../components/DatePicker.jsx';
 import { useOutletContext } from 'react-router-dom';
 import { suppliers as suppliersApi, inventory, stores } from '../api.jsx';
 
@@ -321,7 +322,7 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
             </div>
             <div>
               <label className="field-label">Data Consegna</label>
-              <input className="field-input" type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} />
+              <DatePicker value={deliveryDate} onChange={setDeliveryDate} placeholder="Seleziona data" />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label className="field-label">Note DDT</label>

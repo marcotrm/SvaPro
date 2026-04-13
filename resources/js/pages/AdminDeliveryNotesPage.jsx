@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import DatePicker from '../components/DatePicker.jsx';
 import { useOutletContext } from 'react-router-dom';
 import { deliveryNotes, stores, catalog } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
@@ -147,7 +148,7 @@ export default function AdminDeliveryNotesPage() {
                         </div>
                         <div>
                             <label className="field-label">Data Trasporto Attesa</label>
-                            <input className="field-input" type="date" value={form.expected_at} onChange={e => setForm({...form, expected_at: e.target.value})} />
+                            <DatePicker value={form.expected_at} onChange={v => setForm({...form, expected_at: v})} placeholder="Seleziona data" />
                         </div>
                     </div>
 

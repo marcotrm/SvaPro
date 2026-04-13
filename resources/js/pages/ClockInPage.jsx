@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { attendance, stores } from '../api.jsx';
+import DatePicker from '../components/DatePicker.jsx';
 
 /* ─── Helpers ─────────────────────────────────────────── */
 const fmtTime  = v => v ? new Date(v).toLocaleTimeString('it-IT',  { hour: '2-digit', minute: '2-digit' }) : '—';
@@ -136,14 +137,8 @@ function AdminPresenceView() {
         </div>
         
         <div style={{ display: 'flex', gap: 20, alignItems: 'center', textAlign: 'right' }}>
-          <div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>Storico data:</div>
-            <input 
-              type="date" 
-              value={filterDate}
-              onChange={e => setFilterDate(e.target.value)}
-              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: '#fff', outline: 'none' }}
-            />
+            <div style={{ display: 'inline-block', minWidth: 200 }}>
+              <DatePicker value={filterDate} onChange={v => setFilterDate(v || new Date().toISOString().split('T')[0])} />
           </div>
           <div>
             <div style={{ fontSize: 48, fontWeight: 900, color: '#4ade80', lineHeight: 1 }}>{liveList.length}</div>
@@ -272,14 +267,10 @@ function AdminPresenceView() {
       {/* Filtri */}
       <div style={{ background: 'var(--color-surface)', borderRadius: 16, padding: '20px', border: '1px solid var(--color-border)', marginBottom: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14 }}>
         <div>
-          <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Dal</label>
-          <input type="date" value={histDateFrom} onChange={e => setHistDateFrom(e.target.value)}
-            style={{ width: '100%', padding: '8px 12px', border: '1.5px solid var(--color-border)', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+          <DatePicker label="Dal" value={histDateFrom} onChange={setHistDateFrom} />
         </div>
         <div>
-          <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Al</label>
-          <input type="date" value={histDateTo} onChange={e => setHistDateTo(e.target.value)}
-            style={{ width: '100%', padding: '8px 12px', border: '1.5px solid var(--color-border)', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+          <DatePicker label="Al" value={histDateTo} onChange={setHistDateTo} />
         </div>
         <div>
           <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Cerca Dipendente</label>

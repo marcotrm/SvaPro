@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import DatePicker from '../components/DatePicker.jsx';
 import { deliveryNotes, stores as storesApi, catalog } from '../api.jsx';
 import { toast } from 'react-hot-toast';
 import { Package, X, CheckCircle, AlertTriangle, Truck, RefreshCw, Edit3, Search } from 'lucide-react';
@@ -684,7 +685,7 @@ function CreateNoteModal({ storesList, onClose, onCreated }) {
           </div>
           <div>
             <label className="field-label">Data Trasporto Attesa</label>
-            <input className="field-input" type="date" value={form.expected_at} onChange={e => setForm({ ...form, expected_at: e.target.value })} />
+            <DatePicker value={form.expected_at} onChange={v => setForm({ ...form, expected_at: v })} placeholder="Seleziona data" />
           </div>
         </div>
 

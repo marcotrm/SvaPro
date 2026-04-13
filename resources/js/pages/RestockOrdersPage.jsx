@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import DatePicker from '../components/DatePicker.jsx';
 import { restockOrders, stores as storesApi, catalog, deliveryNotes } from '../api.jsx';
 import { toast } from 'react-hot-toast';
 import { Package, Plus, ChevronRight, Search, Truck, ClipboardList, CheckCircle, Clock, Trash2, Edit2, X, ArrowRight } from 'lucide-react';
@@ -348,7 +349,7 @@ function CreateOrderModal({ storesList, onClose, onCreated }) {
           </div>
           <div>
             <label className="field-label">Data Consegna Attesa</label>
-            <input className="field-input" type="date" value={form.expected_delivery_date} onChange={e => setForm({ ...form, expected_delivery_date: e.target.value })} />
+            <DatePicker value={form.expected_delivery_date} onChange={v => setForm({ ...form, expected_delivery_date: v })} placeholder="Seleziona data consegna" />
           </div>
         </div>
 

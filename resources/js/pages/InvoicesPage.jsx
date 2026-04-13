@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { invoices, orders, stockTransfers } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
+import DatePicker from '../components/DatePicker.jsx';
 import {
   FileText, Plus, Download, Search, Filter,
-  Calendar, CreditCard, ChevronRight, FileDown,
+  CreditCard, ChevronRight, FileDown,
   Clock, AlertCircle, CheckCircle2
 } from 'lucide-react';
 
@@ -259,13 +260,12 @@ export default function InvoicesPage() {
                 value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-1">
-                <Calendar size={16} className="text-slate-400" />
-                <input type="date" className="bg-transparent py-2 font-bold text-slate-600 outline-none text-sm cursor-pointer"
-                  value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-                <span className="text-slate-300 mx-1">—</span>
-                <input type="date" className="bg-transparent py-2 font-bold text-slate-600 outline-none text-sm cursor-pointer"
-                  value={dateTo} onChange={e => setDateTo(e.target.value)} />
+              <div style={{ minWidth: 160 }}>
+                <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Da..." />
+              </div>
+              <span className="text-slate-300 font-black">—</span>
+              <div style={{ minWidth: 160 }}>
+                <DatePicker value={dateTo} onChange={setDateTo} placeholder="A..." />
               </div>
               <button onClick={fetchInvoices} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-sm hover:bg-slate-800 transition-all shadow-lg active:scale-95 flex items-center gap-2">
                 <Filter size={16} /> Filtra

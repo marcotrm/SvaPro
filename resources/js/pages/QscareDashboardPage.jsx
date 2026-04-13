@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { reports, stores, orders } from '../api.jsx';
-import { Shield, Loader2, Calendar, Store, UserCircle, Euro, LayoutDashboard, Activity } from 'lucide-react';
+import { Shield, Loader2, Store, UserCircle, Euro, LayoutDashboard, Activity } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import DatePicker from '../components/DatePicker.jsx';
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 const fmtDate = (d) => new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -99,18 +100,10 @@ export default function QscareDashboardPage() {
         {/* Filtri */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, background: '#f8fafc' }}>
           <div>
-            <label className="sp-label" style={{ fontSize: 11 }}>Dal</label>
-            <div className="sp-input" style={{ padding: 0, paddingLeft: 38, position: 'relative' }}>
-              <Calendar size={14} style={{ position: 'absolute', left: 12, top: 11, color: '#9ca3af' }} />
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ border: 'none', width: '100%', height: '100%', padding: '0 12px 0 0', outline: 'none', background: 'transparent' }} />
-            </div>
+            <DatePicker label="Dal" value={dateFrom} onChange={setDateFrom} />
           </div>
           <div>
-            <label className="sp-label" style={{ fontSize: 11 }}>Al</label>
-            <div className="sp-input" style={{ padding: 0, paddingLeft: 38, position: 'relative' }}>
-              <Calendar size={14} style={{ position: 'absolute', left: 12, top: 11, color: '#9ca3af' }} />
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ border: 'none', width: '100%', height: '100%', padding: '0 12px 0 0', outline: 'none', background: 'transparent' }} />
-            </div>
+            <DatePicker label="Al" value={dateTo} onChange={setDateTo} />
           </div>
           <div>
             <label className="sp-label" style={{ fontSize: 11 }}>Negozio</label>

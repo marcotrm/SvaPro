@@ -7,6 +7,7 @@ import {
   User, Search, CheckCircle, AlertCircle, Banknote, CreditCard
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import DatePicker from '../components/DatePicker.jsx';
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
@@ -355,11 +356,11 @@ export default function TesoreriaPage() {
             <Filter size={16} color="var(--color-text-secondary)" />
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>Da:</span>
-              <input type="date" className="sp-input" style={{ fontSize: 12 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+              <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Da..." style={{ minWidth: 140 }} />
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>A:</span>
-              <input type="date" className="sp-input" style={{ fontSize: 12 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+              <DatePicker value={dateTo} onChange={setDateTo} placeholder="A..." style={{ minWidth: 140 }} />
             </div>
             {(dateFrom || dateTo) && (
               <button onClick={() => { setDateFrom(''); setDateTo(''); }} style={{ fontSize: 12, fontWeight: 700, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Reset</button>
