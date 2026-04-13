@@ -696,13 +696,13 @@ export const inventoryCount = {
   finalize: (sessionId, data = {}) => api.post(`/inventory-counts/${sessionId}/finalize`, data),
 };
 
-// Report APIs
+// Report APIs — NO cache: i report sono sempre date-filtered e devono essere freschi
 export const reports = {
-  revenueTrend: (params = {}) => cachedGet('/reports/revenue-trend', params, 30000, 300000),
-  topProducts: (params = {}) => cachedGet('/reports/top-products', params, 30000, 300000),
-  customerAcquisition: (params = {}) => cachedGet('/reports/customer-acquisition', params, 30000, 300000),
-  summary: (params = {}) => cachedGet('/reports/summary', params, 30000, 300000),
-  qscareDashboard: (params = {}) => cachedGet('/reports/qscare-dashboard', params, 10000, 60000),
+  revenueTrend:        (params = {}) => api.get('/reports/revenue-trend', { params }),
+  topProducts:         (params = {}) => api.get('/reports/top-products', { params }),
+  customerAcquisition: (params = {}) => api.get('/reports/customer-acquisition', { params }),
+  summary:             (params = {}) => api.get('/reports/summary', { params }),
+  qscareDashboard:     (params = {}) => api.get('/reports/qscare-dashboard', { params }),
 };
 
 // Attendance APIs (timbrature dipendenti)

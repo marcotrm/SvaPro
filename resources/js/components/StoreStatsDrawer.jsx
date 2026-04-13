@@ -102,27 +102,39 @@ export default function StoreStatsDrawer({ store, onClose }) {
     const params = { ...baseParams, date_from, date_to, limit: 50 };
 
     try {
-      const [summRes, ordRes] = await Promise.all([
+      // calls devono essere separate — se ordini fallisce vogliamo comunque i KPI
+      const [summRes, ordRes] = await Promise.allSettled([
         reports.summary({ ...baseParams, date_from, date_to }),
         ordersApi.getOrders(params),
       ]);
 
-      const s = summRes.data?.data || summRes.data || {};
-      setKpi({
-        revenue:     parseFloat(s.total_revenue || s.revenue || 0),
-        orders:      parseInt(s.total_orders || s.orders || 0),
-        avg_ticket:  parseFloat(s.avg_ticket || s.avg_order || 0),
-        customers:   parseInt(s.unique_customers || s.total_customers || 0),
-        cash:        parseFloat(s.cash_total || 0),
-        card:        parseFloat(s.card_total || 0),
-        other:       parseFloat(s.other_total || 0),
-        items_sold:  parseInt(s.items_sold || 0),
-        upt:         parseFloat(s.upt || 0),
-      });
+      if (summRes.status === 'fulfilled') {
+        const s = summRes.value.data?.data || summRes.value.data || {};
+        setKpi({
+          revenue:     parseFloat(s.total_revenue || s.revenue || 0),
+          orders:      parseInt(s.total_orders || s.orders || 0),
+          avg_ticket:  parseFloat(s.avg_ticket || s.avg_order || 0),
+          customers:   parseInt(s.unique_customers || s.total_customers || 0),
+          cash:        parseFloat(s.cash_total || 0),
+          card:        parseFloat(s.card_total || 0),
+          other:       parseFloat(s.other_total || 0),
+          items_sold:  parseInt(s.items_sold || 0),
+          upt:         parseFloat(s.upt || 0),
+        });
+      } else {
+        console.error('[StoreStatsDrawer] summary failed:', summRes.reason?.response?.data || summRes.reason?.message);
+        setKpi(null);
+      }
 
-      const orderList = ordRes.data?.data || ordRes.data || [];
-      setRecentOrders(Array.isArray(orderList) ? orderList : []);
-    } catch {
+      if (ordRes.status === 'fulfilled') {
+        const orderList = ordRes.value.data?.data || ordRes.value.data || [];
+        setRecentOrders(Array.isArray(orderList) ? orderList : []);
+      } else {
+        console.error('[StoreStatsDrawer] getOrders failed:', ordRes.reason?.response?.data || ordRes.reason?.message);
+        setRecentOrders([]);
+      }
+    } catch (err) {
+      console.error('[StoreStatsDrawer] load error:', err);
       setKpi(null);
     } finally {
       setLoading(false);
@@ -246,7 +258,14 @@ export default function StoreStatsDrawer({ store, onClose }) {
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 0', color: '#9ca3af' }}>
               <BarChart3 size={48} style={{ opacity: 0.15, margin: '0 auto 12px', display: 'block' }} />
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Dati non disponibili</div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Dati non disponibili</div>
+              <div style={{ fontSize: 12, marginBottom: 16 }}>Verifica la connessione al server</div>
+              <button
+                onClick={load}
+                style={{ background: '#7B6FD0', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              >
+                🔄 Riprova
+              </button>
             </div>
           )}
         </div>

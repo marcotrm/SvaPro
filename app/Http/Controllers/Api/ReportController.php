@@ -126,9 +126,9 @@ class ReportController extends Controller
         $days     = min((int) ($request->input('days', 180) ?: 180), 365);
 
         $dateExpr = match ($period) {
-            'weekly'  => DB::raw("to_char(date_trunc('week', created_at), 'YYYY-MM-DD') as period"),
-            'monthly' => DB::raw("to_char(date_trunc('month', created_at), 'YYYY-MM') as period"),
-            default   => DB::raw("to_char(created_at::date, 'YYYY-MM-DD') as period"),
+            'weekly'  => DB::raw("strftime('%Y-%W', created_at) as period"),
+            'monthly' => DB::raw("strftime('%Y-%m', created_at) as period"),
+            default   => DB::raw("strftime('%Y-%m-%d', created_at) as period"),
         };
 
         $rows = DB::table('customers')
@@ -286,19 +286,17 @@ class ReportController extends Controller
             ->leftJoin('stores', 'sales_orders.store_id', '=', 'stores.id')
             ->where('sales_orders.tenant_id', $tenantId)
             ->where('sales_orders.status', 'paid')
-            // Le righe QScare vengono salvate con product_variant_id = NULL
-            // e tax_snapshot_json->product_type = 'service'
+            // Le righe QScare: product_variant_id = NULL e tax_snapshot_json contiene product_type=service
             ->whereNull('sales_order_lines.product_variant_id')
             ->whereRaw(
-                "sales_order_lines.tax_snapshot_json IS NOT NULL AND (sales_order_lines.tax_snapshot_json::jsonb->>'product_type') = 'service'"
+                "sales_order_lines.tax_snapshot_json IS NOT NULL AND json_extract(sales_order_lines.tax_snapshot_json, '$.product_type') = 'service'"
             )
             ->select(
                 'sales_orders.id as order_id',
                 'sales_orders.created_at',
                 'sales_order_lines.qty',
                 'sales_order_lines.unit_price',
-                // Il nome servizio è codificato nel tax_snapshot_json (campo service_name non esiste nella tabella)
-                DB::raw("COALESCE(sales_order_lines.tax_snapshot_json::jsonb->>'service_name', 'QScare') as service_name"),
+                DB::raw("COALESCE(json_extract(sales_order_lines.tax_snapshot_json, '$.service_name'), 'QScare') as service_name"),
                 DB::raw('COALESCE(sales_order_lines.line_total, sales_order_lines.qty * sales_order_lines.unit_price) as line_total'),
                 'stores.name as store_name',
                 DB::raw("COALESCE(employees.first_name || ' ' || employees.last_name, '—') as employee_name")
@@ -311,10 +309,10 @@ class ReportController extends Controller
             $query->where('sales_orders.sold_by_employee_id', $employeeId);
         }
         if ($dateFrom) {
-            $query->whereRaw("(sales_orders.created_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom]);
+            $query->whereRaw("strftime('%Y-%m-%d', sales_orders.created_at) >= ?", [$dateFrom]);
         }
         if ($dateTo) {
-            $query->whereRaw("(sales_orders.created_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]);
+            $query->whereRaw("strftime('%Y-%m-%d', sales_orders.created_at) <= ?", [$dateTo]);
         }
         
         $lines = $query->orderByDesc('sales_orders.created_at')->get();

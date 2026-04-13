@@ -5,53 +5,96 @@ $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 use Illuminate\Support\Facades\DB;
 
 $tenantId = 1;
-$storeId = 4;
+$days = 30;
 
-// Step 1: Products query (same as CatalogController)
-$products = DB::table('products')
-    ->where('tenant_id', $tenantId)
-    ->orderByDesc('id')
-    ->limit(200)
-    ->get();
-echo "Step1: " . count($products) . " products from DB\n";
+// Simulate exactly what ReportController.summary does, step by step
+echo "=== Step 1: orderBase query ===\n";
+try {
+    $orderBase = DB::table('sales_orders')
+        ->where('tenant_id', $tenantId)
+        ->where('status', 'paid')
+        ->where('created_at', '>=', now()->subDays($days));
 
-// Step 2: Variants with store join
-$productIds = $products->pluck('id')->all();
-$variants = DB::table('product_variants')
-    ->where('product_variants.tenant_id', $tenantId)
-    ->whereIn('product_id', $productIds ?: [0])
-    ->join('store_product_variants as spv', function ($join) use ($tenantId, $storeId) {
-        $join->on('spv.product_variant_id', '=', 'product_variants.id')
-             ->where('spv.tenant_id', '=', $tenantId)
-             ->where('spv.store_id', '=', $storeId)
-             ->where('spv.is_enabled', '=', true);
-    })
-    ->select('product_variants.*')
-    ->get()
-    ->groupBy('product_id');
+    $current = (clone $orderBase)->select(
+        DB::raw('count(*) as orders'),
+        DB::raw('coalesce(sum(grand_total), 0) as revenue'),
+        DB::raw('coalesce(avg(grand_total), 0) as avg_order')
+    )->first();
+    echo "current: orders={$current->orders}, revenue={$current->revenue}\n";
+} catch (\Throwable $e) {
+    echo "ERROR Step1: " . $e->getMessage() . "\n";
+}
 
-echo "Step2: {$variants->count()} products have variants for store $storeId\n";
+echo "\n=== Step 2: payments query ===\n";
+try {
+    // Check if payments table exists
+    $tables = DB::select("SELECT name FROM sqlite_master WHERE type='table'");
+    $tableNames = array_map(fn($t) => $t->name, $tables);
+    echo "Tables with 'payment': " . implode(', ', array_filter($tableNames, fn($t) => str_contains($t, 'payment'))) . "\n";
+    
+    $paymentBase = DB::table('payments as pay')
+        ->join('sales_orders as so2', 'so2.id', '=', 'pay.sales_order_id')
+        ->where('so2.tenant_id', $tenantId)
+        ->where('so2.status', 'paid')
+        ->where('so2.created_at', '>=', now()->subDays($days));
 
-// Step 3: Filter
-$data = $products->map(function ($product) use ($variants) {
-    $product->variants = $variants->get($product->id, collect())->values();
-    return $product;
-})->filter(fn ($product) => $product->variants->count() > 0)->values();
+    $cashTotal = (clone $paymentBase)->where('pay.method', 'cash')->sum('pay.amount');
+    echo "cashTotal: $cashTotal\n";
+} catch (\Throwable $e) {
+    echo "ERROR Step2 (payments): " . $e->getMessage() . "\n";
+}
 
-echo "Step3 (after filter): {$data->count()} products\n";
+echo "\n=== Step 3: customers query ===\n";
+try {
+    $customerCount = DB::table('customers')->where('tenant_id', $tenantId)->count();
+    echo "customerCount: $customerCount\n";
+} catch (\Throwable $e) {
+    echo "ERROR Step3: " . $e->getMessage() . "\n";
+}
 
-// Also check is_enabled values
-$isEnabledTrue = DB::table('store_product_variants')->where('tenant_id', 1)->where('store_id', 4)->where('is_enabled', true)->count();
-$isEnabledOne = DB::table('store_product_variants')->where('tenant_id', 1)->where('store_id', 4)->where('is_enabled', 1)->count();
-$isEnabledRaw = DB::table('store_product_variants')->where('tenant_id', 1)->where('store_id', 4)->count();
-echo "\nis_enabled=true: $isEnabledTrue\nis_enabled=1: $isEnabledOne\ntotal: $isEnabledRaw\n";
+echo "\n=== Step 4: stock_items query ===\n";
+try {
+    $lowStock = DB::table('stock_items')
+        ->where('tenant_id', $tenantId)
+        ->whereColumn('on_hand', '<', 'reorder_point')
+        ->count();
+    echo "lowStock: $lowStock\n";
+} catch (\Throwable $e) {
+    echo "ERROR Step4 (stock): " . $e->getMessage() . "\n";
+}
 
-// Check first few rows
-$rows = DB::table('store_product_variants')->where('tenant_id', 1)->where('store_id', 4)->take(3)->get(['id','product_variant_id','is_enabled']);
-echo "\nSample rows: " . json_encode($rows) . "\n";
+echo "\n=== Step 5: itemsSold query ===\n";
+try {
+    $itemsSoldQuery = DB::table('sales_order_lines as sol')
+        ->join('sales_orders as so', 'so.id', '=', 'sol.sales_order_id')
+        ->where('so.tenant_id', $tenantId)
+        ->where('so.status', 'paid')
+        ->where('so.created_at', '>=', now()->subDays($days));
+    $itemsSold = $itemsSoldQuery->sum('sol.qty');
+    echo "itemsSold: $itemsSold\n";
+} catch (\Throwable $e) {
+    echo "ERROR Step5 (lines): " . $e->getMessage() . "\n";
+}
 
-// Fix barcode for operator 5555
-echo "\n--- Fixing barcode for Operatore Caivano ---\n";
-DB::table('employees')->where('id', 6)->update(['barcode' => '5555']);
-$check = DB::table('employees')->where('id', 6)->first(['id','first_name','last_name','barcode']);
-echo "Updated: " . json_encode($check) . "\n";
+echo "\n=== Check what StoreStatsDrawer sends ===\n";
+// The drawer typically sends date_from and date_to
+$dateFrom = date('Y-m-d'); // today
+$dateTo   = date('Y-m-d');
+try {
+    $cnt = DB::table('sales_orders')
+        ->where('tenant_id', $tenantId)
+        ->where('status', 'paid')
+        ->whereRaw("strftime('%Y-%m-%d', created_at) >= ?", [$dateFrom])
+        ->whereRaw("strftime('%Y-%m-%d', created_at) <= ?", [$dateTo])
+        ->count();
+    echo "Orders today with strftime: $cnt\n";
+} catch (\Throwable $e) {
+    echo "ERROR dateFilter: " . $e->getMessage() . "\n";
+}
+
+echo "\n=== Check getSecureStoreId logic ===\n";
+// Does employees table have store_id?
+$emps = DB::table('employees')->where('tenant_id', $tenantId)->get(['id','store_id','user_id']);
+foreach ($emps as $e) {
+    echo "  emp_id:{$e->id}, store_id:{$e->store_id}, user_id:{$e->user_id}\n";
+}
