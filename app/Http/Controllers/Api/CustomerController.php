@@ -393,7 +393,12 @@ class CustomerController extends Controller
         $customerType = $request->input('customer_type', $old->customer_type ?? 'privato');
         $isAzienda = $customerType === 'azienda';
 
-        $updated = DB::table('customers')
+        // Determina lo status: se il request lo esplicita, usalo; altrimenti mantieni il valore attuale
+        $newStatus = $request->has('status')
+            ? (string) $request->input('status')
+            : ($old->status ?? 'active');
+
+        DB::table('customers')
             ->where('tenant_id', $tenantId)
             ->where('id', $customerId)
             ->update([
@@ -417,15 +422,62 @@ class CustomerController extends Controller
                 'marketing_consent' => $request->has('marketing_consent')
                     ? (bool) $request->boolean('marketing_consent')
                     : (bool) ($old->marketing_consent ?? false),
-                // Permette aggiornamento esplicito dello status (attivo/disattivo)
-                'status' => $request->has('status') ? $request->input('status') : ($old->status ?? 'active'),
+                'status' => $newStatus,
                 'updated_at' => now(),
             ]);
+
+        // ── Aggiorna/crea tessera fedeltà (loyalty_cards) se viene inviato un codice ──
+        // Il campo `code` del form è usato come codice della tessera fidelity (card_code in loyalty_cards)
+        if ($request->has('code') && $request->input('code') !== null && trim($request->input('code')) !== '') {
+            $newCardCode = trim((string) $request->input('code'));
+            $existingCard = DB::table('loyalty_cards')
+                ->where('customer_id', $customerId)
+                ->where('tenant_id', $tenantId)
+                ->first();
+
+            if ($existingCard) {
+                DB::table('loyalty_cards')
+                    ->where('id', $existingCard->id)
+                    ->update([
+                        'card_code' => $newCardCode,
+                        'updated_at' => now(),
+                    ]);
+            } else {
+                DB::table('loyalty_cards')->insert([
+                    'tenant_id'   => $tenantId,
+                    'customer_id' => $customerId,
+                    'card_code'   => $newCardCode,
+                    'status'      => 'active',
+                    'uuid'        => (string) \Illuminate\Support\Str::uuid(),
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ]);
+                // Crea anche il wallet loyalty se non esiste
+                $walletExists = DB::table('loyalty_wallets')
+                    ->where('tenant_id', $tenantId)
+                    ->where('customer_id', $customerId)
+                    ->exists();
+                if (! $walletExists) {
+                    DB::table('loyalty_wallets')->insert([
+                        'tenant_id'      => $tenantId,
+                        'customer_id'    => $customerId,
+                        'points_balance' => 0,
+                        'tier_code'      => 'base',
+                        'created_at'     => now(),
+                        'updated_at'     => now(),
+                    ]);
+                }
+            }
+
+            // Sincronizza il campo code nella tabella customers (codice tessera visibile)
+            DB::table('customers')->where('id', $customerId)->update(['code' => $newCardCode, 'updated_at' => now()]);
+        }
 
         AuditLogger::log($request, 'update', 'customer', $customerId, ($old->company_name ?? $old->first_name.' '.$old->last_name));
 
         return response()->json(['message' => 'Cliente aggiornato.']);
     }
+
 
     public function sendOtp(Request $request, int $customerId): JsonResponse
     {
@@ -643,4 +695,131 @@ class CustomerController extends Controller
             "visura_{$customer->company_name}.pdf"
         );
     }
+
+    /**
+     * Invia WhatsApp bulk a una lista di clienti selezionati con filtri opzionali.
+     * POST /customers/bulk/whatsapp
+     */
+    public function bulkWhatsapp(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $request->validate([
+            'message'      => ['required', 'string', 'max:1600'],
+            'customer_ids' => ['nullable', 'array'],
+            'customer_ids.*' => ['integer'],
+            'filter_city'  => ['nullable', 'string', 'max:100'],
+            'filter_consent' => ['nullable', 'boolean'],
+        ]);
+
+        $query = DB::table('customers')
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'active')
+            ->whereNotNull('phone')
+            ->where('phone', '<>', '');
+
+        // Filtra per IDs espliciti o per filtri
+        if ($request->filled('customer_ids') && count($request->input('customer_ids')) > 0) {
+            $query->whereIn('id', $request->input('customer_ids'));
+        } else {
+            if ($request->filled('filter_city')) {
+                $query->where('city', $request->input('filter_city'));
+            }
+            if ($request->has('filter_consent')) {
+                $query->where('marketing_consent', (bool) $request->boolean('filter_consent'));
+            }
+        }
+
+        $customers = $query->select(['id', 'first_name', 'last_name', 'phone'])->get();
+
+        if ($customers->isEmpty()) {
+            return response()->json(['message' => 'Nessun cliente trovato con i criteri selezionati.'], 422);
+        }
+
+        $sent = 0;
+        $errors = [];
+        $whatsapp = app(WhatsAppService::class);
+        $message = $request->input('message');
+
+        foreach ($customers as $c) {
+            try {
+                $whatsapp->send($c->phone, $message);
+                $sent++;
+            } catch (\Throwable $e) {
+                $errors[] = "ID {$c->id}: " . $e->getMessage();
+            }
+        }
+
+        AuditLogger::log($request, 'bulk_whatsapp', 'customer', null, "Inviati: {$sent}");
+
+        return response()->json([
+            'message' => "WhatsApp inviato a {$sent} clienti" . (count($errors) > 0 ? " ({$sent} successi, " . count($errors). " errori)" : '.'),
+            'sent' => $sent,
+            'errors' => $errors,
+        ]);
+    }
+
+    /**
+     * Invia Email bulk a una lista di clienti selezionati con filtri opzionali.
+     * POST /customers/bulk/email
+     */
+    public function bulkEmail(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $request->validate([
+            'subject'      => ['required', 'string', 'max:255'],
+            'body'         => ['required', 'string'],
+            'customer_ids' => ['nullable', 'array'],
+            'customer_ids.*' => ['integer'],
+            'filter_city'  => ['nullable', 'string', 'max:100'],
+            'filter_consent' => ['nullable', 'boolean'],
+        ]);
+
+        $query = DB::table('customers')
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'active')
+            ->whereNotNull('email')
+            ->where('email', '<>', '');
+
+        if ($request->filled('customer_ids') && count($request->input('customer_ids')) > 0) {
+            $query->whereIn('id', $request->input('customer_ids'));
+        } else {
+            if ($request->filled('filter_city')) {
+                $query->where('city', $request->input('filter_city'));
+            }
+            if ($request->has('filter_consent')) {
+                $query->where('marketing_consent', (bool) $request->boolean('filter_consent'));
+            }
+        }
+
+        $customers = $query->select(['id', 'first_name', 'last_name', 'email'])->get();
+
+        if ($customers->isEmpty()) {
+            return response()->json(['message' => 'Nessun cliente trovato con i criteri selezionati.'], 422);
+        }
+
+        $sent = 0;
+        $errors = [];
+        $subject = $request->input('subject');
+        $body = $request->input('body');
+
+        foreach ($customers as $c) {
+            try {
+                Mail::raw($body, fn ($msg) => $msg->to($c->email)->subject($subject));
+                $sent++;
+            } catch (\Throwable $e) {
+                $errors[] = "ID {$c->id}: " . $e->getMessage();
+            }
+        }
+
+        AuditLogger::log($request, 'bulk_email', 'customer', null, "Inviati: {$sent}");
+
+        return response()->json([
+            'message' => "Email inviata a {$sent} clienti" . (count($errors) > 0 ? " ({$sent} successi, " . count($errors). " errori)" : '.'),
+            'sent' => $sent,
+            'errors' => $errors,
+        ]);
+    }
 }
+

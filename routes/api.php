@@ -83,6 +83,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/customers/{customerId}/send-whatsapp', [CustomerController::class, 'sendWhatsapp']);
         Route::post('/customers/{customerId}/send-email', [CustomerController::class, 'sendEmail']);
         Route::get('/customers/analytics/return-frequency', [CustomerController::class, 'returnFrequencyAnalytics']);
+        // Marketing bulk
+        Route::post('/customers/bulk/whatsapp', [CustomerController::class, 'bulkWhatsapp']);
+        Route::post('/customers/bulk/email', [CustomerController::class, 'bulkEmail']);
 
         Route::get('/employees', [EmployeeController::class, 'index']);
         Route::get('/employees/analytics/top-performers', [EmployeeController::class, 'topPerformers']);

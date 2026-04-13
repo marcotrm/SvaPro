@@ -525,9 +525,13 @@ export const customers = {
   downloadVisura: (customerId) => api.get(`/customers/${customerId}/visura/download`, { responseType: 'blob' }),
   sendWhatsapp: (customerId, message) => api.post(`/customers/${customerId}/send-whatsapp`, { message }),
   sendEmail: (customerId, subject, body) => api.post(`/customers/${customerId}/send-email`, { subject, body }),
+  // Bulk marketing
+  bulkWhatsapp: (payload) => api.post('/customers/bulk/whatsapp', payload),
+  bulkEmail: (payload) => api.post('/customers/bulk/email', payload),
   // Metodo generico POST per usi avanzati
   post_: (path, data) => api.post(path, data),
 };
+
 
 // Employee APIs
 export const employees = {
