@@ -256,24 +256,7 @@ export default function CustomersPage() {
     }
   };
 
-  // Selezione checkbox
-  const toggleSelectOne = (id, e) => {
-    e.stopPropagation();
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filtered.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filtered.map(c => c.id)));
-    }
-  };
-  const allSelected = selectedIds.size > 0 && selectedIds.size === filtered.length;
-  const someSelected = selectedIds.size > 0;
+
 
   const filtered = useMemo(() => {
     let result = customersList.filter(c => {
@@ -324,6 +307,25 @@ export default function CustomersPage() {
       return { key, direction: 'desc' };
     });
   };
+
+  // Selezione checkbox DOPO la dichiarazione di `filtered`
+  const toggleSelectOne = (id, e) => {
+    e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.size > 0 && selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(c => c.id)));
+    }
+  };
+  const allSelected = selectedIds.size > 0 && selectedIds.size === filtered.length;
+  const someSelected = selectedIds.size > 0;
 
   const initials = c => `${c.first_name?.[0] || ''}${c.last_name?.[0] || ''}`.toUpperCase() || c.company_name?.[0]?.toUpperCase() || '?';
   const cityOptions = analytics?.city_breakdown || [];

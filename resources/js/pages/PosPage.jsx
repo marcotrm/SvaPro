@@ -308,55 +308,6 @@ export default function PosPage() {
     }
   }, [user]);
 
-  // Auto-rilevamento operatore: cerca match esatto senza premere Invio
-  useEffect(() => {
-    if (soldByEmployeeId || !operatorBarcode.trim()) return;
-    const val = operatorBarcode.trim();
-    const valLow = val.toLowerCase();
-
-    // Cerca match esatto nella lista già caricata
-    const found = employees.find(em =>
-      (em.barcode       && em.barcode.toLowerCase()       === valLow) ||
-      (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
-      String(em.id) === val
-    );
-    if (found) {
-      setSoldByEmployeeId(String(found.id));
-      setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || `Operatore #${found.id}`);
-      setOperatorError('');
-      setOperatorBarcode('');
-      return;
-    }
-
-    // Se la lista locale è vuota (fetchOptions fallito), cerca subito via API con debounce ridotto
-    // altrimenti aspetta più a lungo (l'utente sta ancora digitando)
-    const delay = employees.length === 0 ? 400 : 700;
-    clearTimeout(operatorDebounceRef.current);
-    operatorDebounceRef.current = setTimeout(async () => {
-      const currentVal = operatorBarcode.trim();
-      if (!currentVal || soldByEmployeeId) return;
-      const currentLow = currentVal.toLowerCase();
-      try {
-        const { employees: empApi } = await import('../api.jsx');
-        // Cerca per barcode esatto o per ID numerico
-        const res = await empApi.getEmployees({ search: currentVal, limit: 20 });
-        const list = res.data?.data || [];
-        const apiFound = list.find(em =>
-          (em.barcode       && em.barcode.toLowerCase()       === currentLow) ||
-          (em.employee_code && em.employee_code.toLowerCase() === currentLow) ||
-          String(em.id) === currentVal
-        ) || (/^\d+$/.test(currentVal) && list.find(em => String(em.id) === currentVal));
-        if (apiFound) {
-          setSoldByEmployeeId(String(apiFound.id));
-          setOperatorName(`${apiFound.first_name || ''} ${apiFound.last_name || ''}`.trim() || `Operatore #${apiFound.id}`);
-          setOperatorError('');
-          setOperatorBarcode('');
-        }
-      } catch {}
-    }, delay);
-    return () => clearTimeout(operatorDebounceRef.current);
-  }, [operatorBarcode, employees, soldByEmployeeId]);
-
 
   /* Cart logic */
 
