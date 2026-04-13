@@ -210,6 +210,7 @@ class OrderController extends Controller
                 'so.sold_by_employee_id',
                 'so.customer_id',
                 'so.status',
+                'so.channel',
                 'so.grand_total',
                 'so.currency',
                 'so.created_at',
@@ -253,6 +254,21 @@ class OrderController extends Controller
 
         $data = $this->mapOrderListRow($row);
         $data['lines'] = $lines;
+
+        // Carica i pagamenti dell'ordine (cash/card/split)
+        $payments = DB::table('payments')
+            ->where('sales_order_id', $orderId)
+            ->get(['method', 'amount']);
+        $data['payments'] = $payments;
+
+        // Calcola metodo di pagamento leggibile
+        if ($payments->isEmpty()) {
+            $data['payment_summary'] = $data['channel'] ?? 'pos';
+        } elseif ($payments->count() === 1) {
+            $data['payment_summary'] = $payments->first()->method;
+        } else {
+            $data['payment_summary'] = 'mixed';
+        }
 
         return response()->json(['data' => $data]);
     }

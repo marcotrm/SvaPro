@@ -212,12 +212,25 @@ class ReportController extends Controller
             ? round(($current->orders - $previous->orders) / $previous->orders * 100, 1)
             : null;
 
-        // Breakdown per metodo di pagamento
-        $cashTotal = (clone $orderBase)->where('channel', 'cash')->sum('grand_total');
-        $cardTotal = (clone $orderBase)->where('channel', 'card')->sum('grand_total');
-        $otherTotal = (clone $orderBase)
-            ->whereNotIn('channel', ['cash', 'card'])
-            ->sum('grand_total');
+        // Breakdown per metodo di pagamento (dalla tabella payments)
+        $paymentBase = DB::table('payments as pay')
+            ->join('sales_orders as so2', 'so2.id', '=', 'pay.sales_order_id')
+            ->where('so2.tenant_id', $tenantId)
+            ->where('so2.status', 'paid');
+
+        if ($storeId) {
+            $paymentBase->where('so2.store_id', $storeId);
+        }
+        if ($dateFrom && $dateTo) {
+            $paymentBase->whereRaw("(so2.created_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom])
+                        ->whereRaw("(so2.created_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]);
+        } else {
+            $paymentBase->where('so2.created_at', '>=', now()->subDays($days));
+        }
+
+        $cashTotal  = (clone $paymentBase)->where('pay.method', 'cash')->sum('pay.amount');
+        $cardTotal  = (clone $paymentBase)->where('pay.method', 'card')->sum('pay.amount');
+        $otherTotal = (clone $paymentBase)->whereNotIn('pay.method', ['cash', 'card'])->sum('pay.amount');
 
         // Items sold (totale quantità linee)
         $itemsSold = DB::table('sales_order_lines as sol')

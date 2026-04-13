@@ -121,7 +121,23 @@ function OrderDetailModal({ orderId, orders, onClose, onNavigate }) {
     cancelled: { bg: 'rgba(239,68,68,0.12)',  color: '#EF4444', label: '✗ Annullato' },
     refunded:  { bg: 'rgba(99,102,241,0.12)', color: '#6366F1', label: '↩ Rimborsato' },
   };
-  const paymentLabel = (ch) => ({ cash: 'Contanti 💵', card: 'Carta / POS 💳', transfer: 'Bonifico', mixed: 'Misto' }[ch] || ch || '—');
+  const paymentLabel = (data) => {
+    const pmts = Array.isArray(data?.payments) ? data.payments : [];
+    const label = (m) => ({ cash: '💵 Contanti', card: '💳 Carta / POS', transfer: '🏦 Bonifico', mixed: '🔄 Misto', pos: '🖥 POS', web: '🌐 Online' }[m] || m || '—');
+    if (pmts.length === 0) return label(data?.channel);
+    if (pmts.length === 1) return label(pmts[0].method);
+    return pmts.map(p => `${label(p.method)} ${fmt(p.amount)}`).join(' + ');
+  };
+  const paymentMethodBadge = (data) => {
+    const pmts = Array.isArray(data?.payments) ? data.payments : [];
+    const label = (m) => ({ cash: '💵 Contanti', card: '💳 Carta / POS', transfer: '🏦 Bonifico', pos: '🖥 POS', web: '🌐 Online' }[m] || m || '—');
+    if (pmts.length === 0) return <span style={{ padding: '4px 10px', borderRadius: 8, background: '#f3f4f6', color: '#6b7280', fontSize: 12, fontWeight: 600 }}>{label(data?.channel)}</span>;
+    return <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{pmts.map((p, i) => (
+      <span key={i} style={{ padding: '4px 10px', borderRadius: 8, background: p.method === 'cash' ? 'rgba(16,185,129,0.1)' : p.method === 'card' ? 'rgba(59,130,246,0.1)' : '#f3f4f6', color: p.method === 'cash' ? '#10b981' : p.method === 'card' ? '#3B82F6' : '#6b7280', fontSize: 12, fontWeight: 700 }}>
+        {label(p.method)} {fmt(p.amount)}
+      </span>
+    ))}</div>;
+  };
 
   return (
     <>
@@ -214,7 +230,7 @@ function OrderDetailModal({ orderId, orders, onClose, onNavigate }) {
                 {/* Status + meta */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
                   <div style={{ padding: '5px 12px', borderRadius: 8, background: sc.bg, color: sc.color, fontWeight: 700, fontSize: 13 }}>{sc.label}</div>
-                  {data.channel && <div style={{ padding: '5px 12px', borderRadius: 8, background: '#f3f4f6', color: '#6b7280', fontWeight: 600, fontSize: 12 }}>{paymentLabel(data.channel)}</div>}
+                  {paymentMethodBadge(data)}
                   <div style={{ padding: '5px 12px', borderRadius: 8, background: '#f3f4f6', color: '#6b7280', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
                     <Clock size={11} />
                     {data.created_at ? new Date(data.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
@@ -318,8 +334,8 @@ function OrderDetailModal({ orderId, orders, onClose, onNavigate }) {
                     <span style={{ fontSize: 15, fontWeight: 700 }}>TOTALE</span>
                     <span style={{ fontSize: 26, fontWeight: 900 }}>{fmt(data.grand_total)}</span>
                   </div>
-                  <div style={{ textAlign: 'right', fontSize: 11, opacity: 0.7, marginTop: 4 }}>
-                    {paymentLabel(data.channel)}
+                  <div style={{ textAlign: 'right', fontSize: 12, opacity: 0.85, marginTop: 4, fontWeight: 600 }}>
+                    {paymentLabel(data)}
                   </div>
                   {data.loyalty_points_awarded > 0 && (
                     <div style={{ marginTop: 10, padding: '7px 12px', background: 'rgba(255,255,255,0.15)', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
