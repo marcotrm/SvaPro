@@ -83,11 +83,28 @@ class ChatController extends Controller
             $storeId = $user->employee_store_id;
         }
 
+        // Risolvi nome mittente: prova name, poi first+last da employees
+        $senderName = trim($user->name ?? '');
+        if (!$senderName) {
+            $emp = DB::table('employees')
+                ->where('user_id', $user->id)
+                ->first(['first_name', 'last_name']);
+            if ($emp) {
+                $senderName = trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? ''));
+            }
+        }
+        if (!$senderName) {
+            $senderName = $user->email ?? 'Operatore';
+        }
+
+        // Nome negozio del mittente
+        $storeName = $storeId ? DB::table('stores')->where('id', $storeId)->value('name') : null;
+
         $id = DB::table('chat_messages')->insertGetId([
             'tenant_id'      => $user->tenant_id,
             'store_id'       => $storeId,
             'sender_user_id' => $user->id,
-            'sender_name'    => $user->name,
+            'sender_name'    => $senderName,
             'sender_role'    => $role,
             'message'        => $data['message'],
             'priority'       => $priority,

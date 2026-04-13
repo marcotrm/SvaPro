@@ -132,17 +132,15 @@ function ChatPanel({ user, selectedStoreId, priority, onClose }) {
               const isMe = msg.sender_user_id === user?.id;
               return (
                 <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', marginBottom: 6 }}>
-                  {!isMe && (
-                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 700, marginBottom: 2 }}>
-                      {msg.sender_name}
-                      {msg.store_name && (
-                        <span style={{ marginLeft: 5, padding: '1px 6px', borderRadius: 5, background: 'rgba(123,111,208,0.1)', color: '#7B6FD0', fontWeight: 700 }}>
-                          🏪 {msg.store_name}
-                        </span>
-                      )}
-                      <span style={{ marginLeft: 5, opacity: 0.6 }}>· {roleLabel(msg.sender_role)}</span>
-                    </div>
-                  )}
+                  <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 700, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>{isMe ? 'Tu' : (msg.sender_name || 'Operatore')}</span>
+                    {msg.store_name && (
+                      <span style={{ padding: '1px 6px', borderRadius: 5, background: isMe ? 'rgba(123,111,208,0.1)' : 'rgba(123,111,208,0.1)', color: '#7B6FD0', fontWeight: 700 }}>
+                        🏪 {msg.store_name}
+                      </span>
+                    )}
+                    <span style={{ opacity: 0.6 }}>· {roleLabel(msg.sender_role)}</span>
+                  </div>
                   <div style={{
                     maxWidth: '80%', padding: '8px 12px',
                     borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
