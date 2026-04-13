@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { catalog, suppliers, inventory, orders as ordersApi } from '../api.jsx';
 import { getImageUrl } from '../api.jsx';
+import api from '../api.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
-import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, PackagePlus } from 'lucide-react';
+import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, PackagePlus, Upload, X, CheckCircle, Loader2, ShoppingBag } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function CatalogPage() {
@@ -20,6 +21,7 @@ export default function CatalogPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockPopover, setStockPopover] = useState(null);
   const [warehousesList, setWarehousesList] = useState([]);
+  const [showPsImport, setShowPsImport] = useState(false);;
 
   useEffect(() => { fetchData(); }, [selectedStoreId]);
 
@@ -109,6 +111,14 @@ export default function CatalogPage() {
         <div className="sp-page-actions">
           <button className="sp-btn sp-btn-secondary" onClick={() => navigate('/catalog/categories')}>
             <Layers size={16} /> Categorie
+          </button>
+          <button
+            className="sp-btn sp-btn-secondary"
+            onClick={() => setShowPsImport(true)}
+            title="Importa prodotti da PrestaShop"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Upload size={16} /> Importa PrestaShop
           </button>
           <button className="sp-btn sp-btn-primary" onClick={() => { setSelectedProduct(null); setShowModal(true); }}>
             <Plus size={16} /> Nuovo Prodotto
@@ -293,6 +303,192 @@ export default function CatalogPage() {
           onSave={() => { setShowModal(false); setSelectedProduct(null); fetchData(); }}
         />
       )}
+
+      {showPsImport && (
+        <PrestashopImportModal
+          onClose={() => setShowPsImport(false)}
+          onImported={() => { setShowPsImport(false); fetchData(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─── Modale Importa da PrestaShop ───────────────────────────────────────── */
+function PrestashopImportModal({ onClose, onImported }) {
+  const [psUrl, setPsUrl]       = useState('');
+  const [apiKey, setApiKey]     = useState('');
+  const [status, setStatus]     = useState('idle'); // idle | testing | importing | done | error
+  const [progress, setProgress] = useState({ imported: 0, total: 0, errors: 0 });
+  const [log, setLog]           = useState([]);
+  const [testOk, setTestOk]     = useState(false);
+  const abortRef = useRef(false);
+
+  const addLog = (msg, type = 'info') => setLog(prev => [...prev, { msg, type, ts: Date.now() }]);
+
+  const cleanUrl = (u) => u.trim().replace(/\/$/, '');
+
+  const testConnection = async () => {
+    if (!psUrl || !apiKey) { toast.error('Inserisci URL PrestaShop e API Key'); return; }
+    setStatus('testing'); setTestOk(false); setLog([]);
+    addLog('Connessione a PrestaShop in corso...');
+    try {
+      const res = await api.post('/prestashop/test', {
+        url: cleanUrl(psUrl),
+        api_key: apiKey,
+      });
+      addLog(`✅ Connessione riuscita! (tempo: ${res.data?.response_ms ?? '?'}ms)`, 'success');
+      addLog(`Trovati ${res.data?.products_count ?? '?'} prodotti nel catalogo PrestaShop.`, 'info');
+      setTestOk(true);
+      setStatus('idle');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Impossibile connettersi a PrestaShop';
+      addLog(`❌ ${msg}`, 'error');
+      setStatus('error');
+    }
+  };
+
+  const startImport = async () => {
+    if (!testOk) { toast.error('Prima testa la connessione'); return; }
+    abortRef.current = false;
+    setStatus('importing');
+    setProgress({ imported: 0, total: 0, errors: 0 });
+    addLog('Avvio importazione da PrestaShop...');
+    try {
+      const res = await api.post('/prestashop/import', {
+        url: cleanUrl(psUrl),
+        api_key: apiKey,
+      });
+      const result = res.data;
+      setProgress({ imported: result.imported ?? 0, total: result.total ?? 0, errors: result.errors ?? 0 });
+      addLog(`✅ Importazione completata: ${result.imported} prodotti importati su ${result.total} totali.`, 'success');
+      if (result.errors > 0) addLog(`⚠ ${result.errors} prodotti non importati (duplicati SKU o dati incompleti).`, 'warn');
+      setStatus('done');
+      toast.success(`Importati ${result.imported} prodotti da PrestaShop!`);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Errore durante l\'importazione';
+      addLog(`❌ ${msg}`, 'error');
+      setStatus('error');
+    }
+  };
+
+  const isBusy = status === 'testing' || status === 'importing';
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: 'var(--color-surface)', borderRadius: 20, width: '100%', maxWidth: 560, boxShadow: '0 24px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(123,111,208,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShoppingBag size={18} color="#7B6FD0" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--color-text)' }}>Importa da PrestaShop</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Importa l'intero catalogo via API. Funziona con 4500+ prodotti.</div>
+            </div>
+          </div>
+          <button onClick={onClose} disabled={isBusy} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 6 }}>URL del negozio PrestaShop</label>
+            <input
+              className="sp-input"
+              placeholder="es. https://tuonegozio.com"
+              value={psUrl}
+              onChange={e => { setPsUrl(e.target.value); setTestOk(false); }}
+              disabled={isBusy}
+            />
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Inserisci l'URL base del tuo sito PrestaShop (senza /api)</div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 6 }}>API Key PrestaShop</label>
+            <input
+              className="sp-input sp-font-mono"
+              placeholder="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+              value={apiKey}
+              onChange={e => { setApiKey(e.target.value); setTestOk(false); }}
+              disabled={isBusy}
+              type="password"
+            />
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+              Vai su PrestaShop → Parametri Avanzati → Webservice → Aggiungi chiave con permesso <strong>prodotti GET</strong>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          {status === 'importing' && (
+            <div style={{ background: 'var(--color-bg)', borderRadius: 10, padding: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, fontWeight: 600 }}>
+                <span>Importazione in corso...</span>
+                <span style={{ color: 'var(--color-accent)' }}>{progress.imported} / {progress.total || '?'}</span>
+              </div>
+              <div style={{ height: 6, background: 'var(--color-border)', borderRadius: 6, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', background: 'linear-gradient(90deg, #7B6FD0, #5B50B0)',
+                  borderRadius: 6, transition: 'width 0.4s',
+                  width: progress.total ? `${Math.min(100, (progress.imported / progress.total) * 100)}%` : '60%',
+                  animation: progress.total ? 'none' : 'pulse 1.5s ease-in-out infinite',
+                }} />
+              </div>
+            </div>
+          )}
+
+          {/* Log */}
+          {log.length > 0 && (
+            <div style={{ background: '#0f172a', borderRadius: 10, padding: 12, fontFamily: 'monospace', fontSize: 12, maxHeight: 150, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {log.map((entry, i) => (
+                <div key={i} style={{ color: entry.type === 'error' ? '#fc8181' : entry.type === 'success' ? '#86efac' : entry.type === 'warn' ? '#fbbf24' : '#94a3b8' }}>
+                  {entry.msg}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {status === 'done' && (
+            <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <CheckCircle size={18} color="#10b981" />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#10b981' }}>Importazione completata!</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                  {progress.imported} prodotti importati · {progress.errors} errori
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--color-border)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          {status === 'done' ? (
+            <button className="sp-btn sp-btn-primary" onClick={onImported}>
+              <CheckCircle size={15} /> Chiudi e aggiorna catalogo
+            </button>
+          ) : (
+            <>
+              <button className="sp-btn sp-btn-secondary" onClick={testConnection} disabled={isBusy || !psUrl || !apiKey}>
+                {status === 'testing' ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Test...</> : 'Testa connessione'}
+              </button>
+              <button
+                className="sp-btn sp-btn-primary"
+                onClick={startImport}
+                disabled={isBusy || !testOk}
+                style={{ opacity: testOk ? 1 : 0.5 }}
+              >
+                {status === 'importing'
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Importazione...</>
+                  : <><Upload size={14} /> Avvia importazione</>}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

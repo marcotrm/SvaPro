@@ -32,6 +32,8 @@ use App\Http\Controllers\Api\DeliveryNoteController;
 use App\Http\Controllers\Api\RestockOrderController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\CashMovementController;
+use App\Http\Controllers\Api\GamificationController;
+use App\Http\Controllers\Api\PrestashopController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/loyalty-card/{uuid}', [LoyaltyCardController::class, 'show']);
@@ -72,6 +74,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/catalog/categories', [CatalogController::class, 'storeCategory'])->middleware('permission:catalog.manage');
         Route::put('/catalog/categories/{categoryId}', [CatalogController::class, 'updateCategory'])->middleware('permission:catalog.manage');
         Route::delete('/catalog/categories/{categoryId}', [CatalogController::class, 'destroyCategory'])->middleware('permission:catalog.manage');
+
+        // PrestaShop Import - solo admin
+        Route::post('/prestashop/test', [PrestashopController::class, 'test']);
+        Route::post('/prestashop/import', [PrestashopController::class, 'import']);
 
         Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.manage');
         Route::put('/customers/{customerId}', [CustomerController::class, 'update'])->middleware('permission:customers.manage');

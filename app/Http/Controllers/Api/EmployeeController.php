@@ -31,8 +31,8 @@ class EmployeeController extends Controller
                 ->where(function($q) use ($barcode) {
                     $q->where('barcode', $barcode)
                       ->orWhere('id', (int) $barcode)
-                      ->orWhere('first_name', 'ilike', '%' . $barcode . '%')
-                      ->orWhere('last_name', 'ilike', '%' . $barcode . '%');
+                      ->orWhere('first_name', 'like', '%' . $barcode . '%')
+                      ->orWhere('last_name', 'like', '%' . $barcode . '%');
                 })
                 ->select(['id', 'first_name', 'last_name', 'barcode', 'store_id'])
                 ->first();
