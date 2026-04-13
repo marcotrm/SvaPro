@@ -3033,6 +3033,34 @@ a { text-decoration: none; color: inherit; }
   to   { transform: translateX(0); }
 }
 
+/* ══════════════════════════════════════════════
+   POS Cassa Layout (Desktop)
+   ══════════════════════════════════════════════ */
+.sp-pos-layout {
+  display: flex;
+  height: calc(100vh - 64px);
+  margin: -24px -32px -40px;
+  overflow: hidden;
+  background: #f5f4ff;
+  gap: 0;
+}
+.sp-pos-products {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px 20px 0;
+}
+.sp-pos-cart {
+  width: 380px;
+  flex-shrink: 0;
+  background: #0f172a;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(255,255,255,0.05);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.15);
+}
+
 /* ── Mobile Topbar adjustments ── */
 .sp-mobile-topbar-menu {
   display: none;
@@ -3126,20 +3154,22 @@ a { text-decoration: none; color: inherit; }
 
   /* POS layout: stack vertically on mobile */
   .sp-pos-layout {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     height: auto;
     margin: -16px -14px -24px;
+    align-items: stretch;
   }
-  /* POS cart on mobile: expandable bottom sheet style */
+  /* POS cart on mobile */
   .sp-pos-cart {
+    width: 100% !important;
+    max-width: 100vw !important;
     border-left: none;
     border-top: 1px solid rgba(255,255,255,0.12);
-    max-height: 60vh;
   }
   .sp-pos-products {
     padding: 12px;
-    /* limit height so cart remains accessible */
-    max-height: 50vh;
+    /* Limit height on mobile to let scroll happen without pushing entire UI */
+    max-height: calc(100vh - 350px);
     overflow-y: auto;
   }
 

@@ -639,18 +639,9 @@ export default function PosPage() {
   );
 
   return (
-    <div style={{
-      display: 'flex',
-      height: 'calc(100vh - 64px)',
-      /* Neutralizza il padding di .sp-content (24px top, 32px sides, 40px bottom) */
-      margin: '-24px -32px -40px',
-      overflow: 'hidden',
-      background: '#f5f4ff',
-      gap: 0,
-    }}>
-
+    <div className="sp-pos-layout">
       {/* ─── SINISTRA: Catalogo ─────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '20px 20px 0' }}>
+      <div className="sp-pos-products">
 
         {/* Search bar + flavor */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
@@ -818,13 +809,7 @@ export default function PosPage() {
       </div>
 
       {/* ─── DESTRA: Carrello ───────────────────────────────── */}
-      <div style={{
-        width: 380, flexShrink: 0,
-        background: '#0f172a',
-        display: 'flex', flexDirection: 'column',
-        borderLeft: '1px solid rgba(255,255,255,0.05)',
-        boxShadow: '-8px 0 32px rgba(0,0,0,0.15)',
-      }}>
+      <div className="sp-pos-cart">
 
         {/* Cart Header */}
         <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
