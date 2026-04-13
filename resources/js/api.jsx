@@ -516,8 +516,16 @@ export const inventory = {
 export const customers = {
   getCustomers: (params = {}) => cachedGet('/customers', params, 30000, 300000),
   getCustomer: (id) => api.get(`/customers/${id}`),
-  createCustomer: (data) => api.post('/customers', data),
-  updateCustomer: (id, data) => api.put(`/customers/${id}`, data),
+  createCustomer: async (data) => {
+    const res = await api.post('/customers', data);
+    clearApiCache();
+    return res;
+  },
+  updateCustomer: async (id, data) => {
+    const res = await api.put(`/customers/${id}`, data);
+    clearApiCache();
+    return res;
+  },
   getReturnAnalytics: (params = {}) => cachedGet('/customers/analytics/return-frequency', params, 30000, 300000),
   sendEmailOtp: (customerId, email) => api.post(`/customers/${customerId}/email-otp/send`, { email }),
   verifyEmailOtp: (customerId, otp) => api.post(`/customers/${customerId}/email-otp/verify`, { otp }),
