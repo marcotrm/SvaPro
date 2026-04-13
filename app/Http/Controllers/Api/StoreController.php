@@ -242,6 +242,69 @@ class StoreController extends Controller
         return response()->json(['message' => 'Negozio eliminato.']);
     }
 
+    // ─── Crea Credenziali Negozio ───────────────────────────────────
+    public function createCredentials(Request $request, int $storeId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $store = DB::table('stores')->where('tenant_id', $tenantId)->where('id', $storeId)->first();
+        
+        if (!$store) {
+            return response()->json(['message' => 'Negozio non trovato.'], 404);
+        }
+
+        $request->validate([
+            'role'     => ['required', 'string', 'in:admin_cliente,dipendente'],
+            'email'    => ['required', 'email'],
+            'password' => ['required', 'string', 'min:6'],
+            'name'     => ['required', 'string', 'max:255'],
+        ]);
+
+        $email = strtolower(trim($request->input('email')));
+        
+        // Controlla se email esiste già
+        if (DB::table('users')->where('email', $email)->exists()) {
+            return response()->json(['errors' => ['email' => ['Email già registrata.']]], 422);
+        }
+
+        $userId = DB::table('users')->insertGetId([
+            'name'       => $request->input('name'),
+            'email'      => $email,
+            'password'   => \Illuminate\Support\Facades\Hash::make($request->input('password')),
+            'tenant_id'  => $tenantId,
+            'status'     => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $roleCode = $request->input('role');
+        $roleId = DB::table('roles')->where('code', $roleCode)->value('id');
+
+        if ($roleId) {
+            DB::table('user_roles')->insert([
+                'user_id'   => $userId,
+                'role_id'   => $roleId,
+                'tenant_id' => $tenantId,
+            ]);
+        }
+
+        // Se è un dipendente (o anche admin locale) creiamo automaticamente il record employee
+        DB::table('employees')->insert([
+            'tenant_id'     => $tenantId,
+            'store_id'      => $storeId,
+            'user_id'       => $userId,
+            'first_name'    => preg_replace('/\s+/', ' ', trim(explode(' ', $request->input('name'))[0])),
+            'last_name'     => preg_replace('/\s+/', ' ', trim(strstr($request->input('name'), ' '))),
+            'barcode'       => strtoupper(substr($roleCode, 0, 3)) . '-' . $store->code . '-' . rand(1000, 9999),
+            'status'        => 'active',
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ]);
+
+        AuditLogger::log($request, 'create_credentials', 'store', $storeId, "Auto-created $roleCode: $email");
+
+        return response()->json(['message' => 'Credenziali generate con successo!']);
+    }
+
     // ─── Helpers ────────────────────────────────────────────────────
     private function formatStore(\stdClass $s): array
     {
