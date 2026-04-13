@@ -20,6 +20,7 @@ const PERIODS = [
   { id: 'week',      label: 'Settimana', chartPeriod: 'daily' },
   { id: 'month',     label: 'Mese',      chartPeriod: 'weekly' },
   { id: 'year',      label: 'Anno',      chartPeriod: 'monthly' },
+  { id: 'custom',    label: 'Giorno...', chartPeriod: 'daily' },
 ];
 
 // Calcola date_from e date_to per ogni periodo
@@ -27,6 +28,10 @@ const getPeriodDates = (periodId) => {
   const today = new Date();
   const fmt = d => d.toISOString().slice(0, 10);
   const todayStr = fmt(today);
+
+  if (periodId === 'custom' && customDateStr) {
+    return { date_from: customDateStr, date_to: customDateStr, days: 1 };
+  }
 
   if (periodId === 'today') {
     return { date_from: todayStr, date_to: todayStr, days: 1 };
@@ -177,6 +182,7 @@ export default function DashboardPage() {
 
   // NEW: period filter for main chart
   const [activePeriod, setActivePeriod] = useState('year');
+  const [customDate, setCustomDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   // NEW: employee activity (ultime attività = dipendenti)
   const [employeeActivity, setEmployeeActivity] = useState([]);
@@ -191,7 +197,7 @@ export default function DashboardPage() {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
       const period = PERIODS.find(p => p.id === activePeriod) || PERIODS[4];
-      const { date_from, date_to, days } = getPeriodDates(activePeriod);
+      const { date_from, date_to, days } = getPeriodDates(activePeriod, customDate);
 
       // Fetch each independently so one failure doesn't break everything
       const [resSummary, resTrend, resOrders, resStock, resCust, resStores, resEmployees] = await Promise.allSettled([
@@ -353,6 +359,11 @@ export default function DashboardPage() {
     };
   }, [fetchData]);
 
+  // Selezionando Custom, invoca fetchData se cambia la customDate
+  useEffect(() => {
+    if (activePeriod === 'custom') fetchData();
+  }, [customDate, activePeriod, fetchData]);
+
   const fmt  = v  => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
   const fmtN = v  => new Intl.NumberFormat('it-IT').format(v || 0);
 
@@ -437,7 +448,7 @@ export default function DashboardPage() {
               </div>
             </div>
             {/* Period Tabs ── CLICCABILI */}
-            <div style={{ display:'flex', gap:4, background:'var(--color-bg)', borderRadius:10, padding:4, border:'1px solid var(--color-border)' }}>
+            <div style={{ display:'flex', gap:4, background:'var(--color-bg)', borderRadius:10, padding:4, border:'1px solid var(--color-border)', alignItems:'center' }}>
               {PERIODS.map(p => (
                 <button
                   key={p.id}
@@ -452,6 +463,24 @@ export default function DashboardPage() {
                   {p.label}
                 </button>
               ))}
+              {activePeriod === 'custom' && (
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={e => setCustomDate(e.target.value)}
+                  style={{
+                    marginLeft: 6,
+                    padding: '4px 8px',
+                    fontSize: 12,
+                    borderRadius: 6,
+                    border: '1px solid var(--color-border-light)',
+                    background: 'var(--color-surface)',
+                    color: 'var(--color-text)',
+                    outline: 'none',
+                    fontWeight: 600,
+                  }}
+                />
+              )}
             </div>
           </div>
 

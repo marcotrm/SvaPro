@@ -819,6 +819,29 @@ class OrderController extends Controller
         $processedLines = [];
 
         foreach ($lines as $line) {
+            $isService = !empty($line['is_service']);
+            $qty = (int) $line['qty'];
+            
+            if ($isService) {
+                $unitPrice = isset($line['unit_price']) ? (float) $line['unit_price'] : 0.0;
+                $lineDiscount = isset($line['discount']) ? (float) $line['discount'] : 0.0;
+                $lineSubtotal = $qty * $unitPrice;
+                $initialLineNet = max(0.0, $lineSubtotal - $lineDiscount);
+                $totalInitialNet += $initialLineNet;
+
+                $processedLines[] = [
+                    'isService' => true,
+                    'variant' => null,
+                    'service_name' => $line['service_name'] ?? 'Service',
+                    'qty' => $qty,
+                    'unitPrice' => $unitPrice,
+                    'lineDiscount' => $lineDiscount,
+                    'lineSubtotal' => $lineSubtotal,
+                    'initialLineNet' => $initialLineNet,
+                ];
+                continue;
+            }
+
             $variant = DB::table('product_variants as pv')
                 ->join('products as p', 'p.id', '=', 'pv.product_id')
                 ->where('pv.id', (int) $line['product_variant_id'])
@@ -844,7 +867,6 @@ class OrderController extends Controller
                 continue;
             }
 
-            $qty = (int) $line['qty'];
             $unitPrice = isset($line['unit_price']) ? (float) $line['unit_price'] : (float) $variant->sale_price;
             $lineDiscount = isset($line['discount']) ? (float) $line['discount'] : 0.0;
             
@@ -853,6 +875,7 @@ class OrderController extends Controller
             $totalInitialNet += $initialLineNet;
 
             $processedLines[] = [
+                'isService' => false,
                 'variant' => $variant,
                 'qty' => $qty,
                 'unitPrice' => $unitPrice,
@@ -867,15 +890,44 @@ class OrderController extends Controller
 
         // Second pass: distribute global discount and calculate taxes
         foreach ($processedLines as $pl) {
-            $variant = $pl['variant'];
             $qty = $pl['qty'];
-            
-            // Distribute global discount proportionally based on initial net
             $proportion = $totalInitialNet > 0 ? ($pl['initialLineNet'] / $totalInitialNet) : 0;
             $allocatedGlobalDiscount = $proportion * $globalDiscount;
             
             $totalLineDiscount = $pl['lineDiscount'] + $allocatedGlobalDiscount;
             $lineNet = max(0.0, $pl['lineSubtotal'] - $totalLineDiscount);
+
+            if ($pl['isService']) {
+                $taxAmount = round($lineNet * 0.22, 2); // default 22% iva for services
+                $exciseAmount = 0.0;
+                $lineTotal = round($lineNet + $taxAmount, 2);
+                $lineMargin = $lineNet; // 100% margin on services usually
+                
+                $subtotal += $pl['lineSubtotal'];
+                $discountTotal += $totalLineDiscount;
+                $taxTotal += $taxAmount;
+                $exciseTotal += $exciseAmount;
+                $marginTotal += $lineMargin;
+
+                $linePayload[] = [
+                    'product_variant_id' => null,
+                    'is_service' => true,
+                    'service_name' => $pl['service_name'],
+                    'qty' => $qty,
+                    'unit_price' => round($pl['unitPrice'], 2),
+                    'discount_amount' => round($totalLineDiscount, 2),
+                    'tax_amount' => $taxAmount,
+                    'excise_amount' => $exciseAmount,
+                    'line_total' => $lineTotal,
+                    'tax_snapshot' => [
+                        'vat_rate' => 22,
+                        'product_type' => 'service',
+                    ],
+                ];
+                continue;
+            }
+
+            $variant = $pl['variant'];
 
             $vatRate = $this->resolveVatRate($tenantId, $variant->tax_class_id);
             $taxAmount = round($lineNet * ($vatRate / 100), 2);
