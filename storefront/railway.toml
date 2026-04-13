@@ -1,7 +1,7 @@
 [build]
 builder = "nixpacks"
-watchPatterns = ["src/**", "public/**", "package.json"]
+buildCommand = "cd storefront && npm install && npm run build"
 
 [deploy]
-startCommand = "npm run start"
+startCommand = "cd storefront && npm run start"
 restartPolicyType = "always"
