@@ -87,7 +87,15 @@ function AdminPresenceView() {
 
   const liveIds = new Set(liveList.map(e => e.employee_id || e.id));
 
-  const fmtMins = (m) => { if (!m) return '—'; const h = Math.floor(m/60); const min = m%60; return `${h}h ${min}m`; };
+  const fmtMins = (m) => {
+    if (!m && m !== 0) return '—';
+    const total = Math.round(m);
+    if (total <= 0) return '—';
+    const h   = Math.floor(total / 60);
+    const min = total % 60;
+    if (h === 0) return `${min}m`;
+    return min > 0 ? `${h}h ${min}m` : `${h}h`;
+  };
 
   /* ── Tab switcher ── */
   const TabBtn = ({ id, label, icon }) => (

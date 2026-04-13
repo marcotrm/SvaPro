@@ -286,14 +286,9 @@ class ReportController extends Controller
             ->where('sales_orders.tenant_id', $tenantId)
             ->where('sales_orders.status', 'paid')
             ->where(function ($q) {
-                $q->where(function ($q2) {
-                    $q2->where('sales_order_lines.is_service', true)
-                       ->where('sales_order_lines.service_name', 'like', '%QScare%');
-                })
-                ->orWhere(function ($q3) {
-                    $q3->whereNull('sales_order_lines.product_variant_id')
-                       ->whereRaw("sales_order_lines.tax_snapshot_json::jsonb->>'product_type' = 'service'");
-                });
+                // Riga servizio QScare: service_name contiene 'QScare'
+                $q->where('sales_order_lines.service_name', 'like', '%QScare%')
+                  ->orWhere('sales_order_lines.service_name', 'like', '%qscare%');
             })
             ->select(
                 'sales_orders.id as order_id',

@@ -16,10 +16,22 @@ class EmployeeController extends Controller
     public function index(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
-        $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
+        $storeId  = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
+        $barcode  = $request->input('barcode');
 
         if ($storeId !== null && ! DB::table('stores')->where('tenant_id', $tenantId)->where('id', $storeId)->exists()) {
             return response()->json(['message' => 'Store non valido per il tenant.'], 422);
+        }
+
+        // Ricerca rapida per barcode (usata da Tesoreria/Cassa per identificare l'operatore)
+        if ($barcode) {
+            $emp = DB::table('employees')
+                ->where('tenant_id', $tenantId)
+                ->where('barcode', $barcode)
+                ->where('status', 'active')
+                ->select(['id', 'first_name', 'last_name', 'barcode', 'store_id'])
+                ->first();
+            return response()->json(['data' => $emp ? [$emp] : []]);
         }
 
         $employees = $this->employeeBaseQuery($tenantId, $storeId)
