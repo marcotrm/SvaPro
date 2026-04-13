@@ -310,7 +310,7 @@ function OrderDetailModal({ orderId, orders, onClose, onNavigate }) {
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 800, color: '#7B6FD0' }}>{fmt(line.line_total)}</div>
                           <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                            ×{line.qty} · <span title="Prezzo netto IVA esclusa">{fmt(line.unit_price)} netto</span>
+                            ×{line.qty} · {fmt(line.unit_price)} cad.
                           </div>
                         </div>
                       </div>
@@ -327,7 +327,7 @@ function OrderDetailModal({ orderId, orders, onClose, onNavigate }) {
                   )}
                   {totalTax > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, opacity: 0.85, marginBottom: 6 }}>
-                      <span>IVA inclusa</span><span>{fmt(totalTax)}</span>
+                      <span>di cui IVA</span><span>{fmt(totalTax)}</span>
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
