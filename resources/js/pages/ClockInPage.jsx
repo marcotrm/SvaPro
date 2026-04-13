@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { attendance } from '../api.jsx';
+import { attendance, stores } from '../api.jsx';
 
 /* ─── Helpers ─────────────────────────────────────────── */
 const fmtTime  = v => v ? new Date(v).toLocaleTimeString('it-IT',  { hour: '2-digit', minute: '2-digit' }) : '—';
@@ -14,12 +14,25 @@ const avatarColor   = id => AVATAR_COLORS[(id || 0) % AVATAR_COLORS.length];
    ADMIN VIEW — Dashboard presenze in tempo reale
 ═══════════════════════════════════════════════════════════ */
 function AdminPresenceView() {
+  const [activeTab,   setActiveTab]   = useState('live');  // 'live' | 'history'
   const [liveList,    setLiveList]    = useState([]);
   const [todayList,   setTodayList]   = useState([]);
   const [loadingLive, setLoadingLive] = useState(true);
   const [clockStr,    setClockStr]    = useState('');
   const [dateStr,     setDateStr]     = useState('');
   const [filterDate,  setFilterDate]  = useState(new Date().toISOString().split('T')[0]);
+
+  // History tab state
+  const [histLoading,     setHistLoading]     = useState(false);
+  const [histData,        setHistData]        = useState([]);
+  const [histSummary,     setHistSummary]     = useState([]);
+  const [histDateFrom,    setHistDateFrom]    = useState(() => { const d = new Date(); d.setDate(d.getDate()-30); return d.toISOString().split('T')[0]; });
+  const [histDateTo,      setHistDateTo]      = useState(new Date().toISOString().split('T')[0]);
+  const [histEmployee,    setHistEmployee]    = useState('');
+  const [histEmployeeQ,   setHistEmployeeQ]   = useState('');
+  const [histStoreId,     setHistStoreId]     = useState('');
+  const [employeesList,   setEmployeesList]   = useState([]);
+  const [storesList2,     setStoresList2]     = useState([]);
 
   useEffect(() => {
     const tick = () => {
@@ -50,10 +63,58 @@ function AdminPresenceView() {
     return () => clearInterval(id);
   }, [fetchPresence]);
 
+  // Carica opzioni filtri history
+  useEffect(() => {
+    stores.getStores().then(r => setStoresList2(r.data?.data || [])).catch(() => {});
+    attendance.getEmployeesKiosk().then(r => setEmployeesList(r.data?.data || [])).catch(() => {});
+  }, []);
+
+  const fetchHistory = useCallback(async () => {
+    setHistLoading(true);
+    try {
+      const params = { date_from: histDateFrom, date_to: histDateTo };
+      if (histEmployee) params.employee_id = histEmployee;
+      if (histStoreId)  params.store_id    = histStoreId;
+      const res = await attendance.getHistory(params);
+      setHistData(res.data?.data || []);
+      setHistSummary(res.data?.summary || []);
+    } catch {}
+    setHistLoading(false);
+  }, [histDateFrom, histDateTo, histEmployee, histStoreId]);
+
+  useEffect(() => { if (activeTab === 'history') fetchHistory(); }, [activeTab, fetchHistory]);
+
   const liveIds = new Set(liveList.map(e => e.employee_id || e.id));
+
+  const fmtMins = (m) => { if (!m) return '—'; const h = Math.floor(m/60); const min = m%60; return `${h}h ${min}m`; };
+
+  /* ── Tab switcher ── */
+  const TabBtn = ({ id, label, icon }) => (
+    <button onClick={() => setActiveTab(id)} style={{
+      padding: '8px 18px', borderRadius: 10, border: 'none', cursor: 'pointer',
+      fontWeight: 700, fontSize: 13, transition: 'all 0.15s',
+      background: activeTab === id ? 'linear-gradient(135deg,#7B6FD0,#4F46E5)' : 'rgba(123,111,208,0.08)',
+      color: activeTab === id ? '#fff' : '#7B6FD0',
+    }}>{icon} {label}</button>
+  );
+
+  /* ── Filtro dipendenti ricerca testo ── */
+  const filteredEmps = employeesList.filter(e =>
+    histEmployeeQ === '' ||
+    `${e.first_name||''} ${e.last_name||''}`.toLowerCase().includes(histEmployeeQ.toLowerCase()) ||
+    (e.barcode && e.barcode.toLowerCase().includes(histEmployeeQ.toLowerCase()))
+  );
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto' }}>
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <TabBtn id="live"    label="Presenze Live"       icon="🟢" />
+        <TabBtn id="history" label="Cronologia & Ore"   icon="📋" />
+      </div>
+
+      {/* ── TAB: LIVE ── */}
+      {activeTab === 'live' && <>
 
       {/* ── Header con orologio ── */}
       <div style={{
@@ -204,8 +265,146 @@ function AdminPresenceView() {
         )}
       </div>
     </div>
+  </>
+  }
+
+  {/* ── TAB: CRONOLOGIA & ORE ── */}
+  {activeTab === 'history' && (
+    <div>
+      {/* Filtri */}
+      <div style={{ background: 'var(--color-surface)', borderRadius: 16, padding: '20px', border: '1px solid var(--color-border)', marginBottom: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14 }}>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Dal</label>
+          <input type="date" value={histDateFrom} onChange={e => setHistDateFrom(e.target.value)}
+            style={{ width: '100%', padding: '8px 12px', border: '1.5px solid var(--color-border)', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Al</label>
+          <input type="date" value={histDateTo} onChange={e => setHistDateTo(e.target.value)}
+            style={{ width: '100%', padding: '8px 12px', border: '1.5px solid var(--color-border)', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Cerca Dipendente</label>
+          <input value={histEmployeeQ} onChange={e => { setHistEmployeeQ(e.target.value); setHistEmployee(''); }}
+            placeholder="Nome, cognome o barcode..."
+            style={{ width: '100%', padding: '8px 12px', border: '1.5px solid var(--color-border)', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+          {histEmployeeQ && filteredEmps.length > 0 && (
+            <div style={{ position: 'absolute', zIndex: 20, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', maxHeight: 180, overflowY: 'auto', minWidth: 220 }}>
+              {filteredEmps.slice(0,8).map(e => (
+                <div key={e.id}
+                  onClick={() => { setHistEmployee(String(e.id)); setHistEmployeeQ(`${e.first_name} ${e.last_name}`); }}
+                  style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+                  onMouseEnter={ev => ev.currentTarget.style.background = '#f9fafb'}
+                  onMouseLeave={ev => ev.currentTarget.style.background = ''}
+                >{e.first_name} {e.last_name} {e.barcode ? <span style={{ fontSize: 10, color: '#9ca3af' }}>· {e.barcode}</span> : ''}</div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Negozio</label>
+          <select value={histStoreId} onChange={e => setHistStoreId(e.target.value)}
+            style={{ width: '100%', padding: '8px 12px', border: '1.5px solid var(--color-border)', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}>
+            <option value="">Tutti i negozi</option>
+            {storesList2.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <button onClick={fetchHistory} disabled={histLoading}
+            style={{ width: '100%', padding: '9px 18px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#7B6FD0,#4F46E5)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+            {histLoading ? 'Caricamento…' : '🔍 Cerca'}
+          </button>
+        </div>
+      </div>
+
+      {/* Riepilogo ore per dipendente */}
+      {histSummary.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12, marginBottom: 20 }}>
+          {histSummary.map(s => (
+            <div key={s.employee_id} style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', border: '1px solid var(--color-border)', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: avatarColor(s.employee_id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff' }}>
+                  {s.employee_name?.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#1f2937' }}>{s.employee_name}</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ background: '#f0fdf4', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: '#16a34a' }}>{fmtMins(s.total_minutes)}</div>
+                  <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 700 }}>ORE TOTALI</div>
+                </div>
+                <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: '#1f2937' }}>{s.days_worked}</div>
+                  <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 700 }}>GIORNI</div>
+                </div>
+              </div>
+              {s.late_count > 0 && <div style={{ marginTop: 8, fontSize: 11, color: '#ef4444', fontWeight: 700 }}>⚠ {s.late_count} ritardi</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tabella cronologia */}
+      <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid var(--color-border)' }}>
+        {histLoading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>Caricamento...</div>
+        ) : histData.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>Nessuna timbratura nel periodo selezionato.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#f9fafb' }}>
+                  {['Dipendente','Negozio','Data','Entrata','Uscita','Ore','★ Ritardo','Stato'].map(h => (
+                    <th key={h} style={{ padding: '12px 14px', fontSize: 11, fontWeight: 700, color: '#6b7280', textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #f3f4f6', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {histData.map((rec, i) => (
+                  <tr key={rec.id || i}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                    onMouseLeave={e => e.currentTarget.style.background = ''}
+                    style={{ borderBottom: '1px solid #f9fafb' }}
+                  >
+                    <td style={{ padding: '11px 14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 30, height: 30, borderRadius: '50%', background: avatarColor(rec.employee_id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+                          {rec.employee_name?.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
+                        </div>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: '#1f2937', whiteSpace: 'nowrap' }}>{rec.employee_name}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '11px 14px', fontSize: 12, color: '#6b7280' }}>{rec.store_name || '—'}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {rec.checked_in_at ? new Date(rec.checked_in_at).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }) : '—'}
+                    </td>
+                    <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: '#22c55e' }}>{fmtTime(rec.checked_in_at)}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: rec.checked_out_at ? '#ef4444' : '#d1d5db' }}>{fmtTime(rec.checked_out_at)}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: '#1f2937' }}>{fmtMins(rec.duration_minutes)}</td>
+                    <td style={{ padding: '11px 14px' }}>
+                      {rec.late_minutes > 0
+                        ? <span style={{ background: '#fef2f2', color: '#dc2626', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>+{rec.late_minutes}m</span>
+                        : <span style={{ color: '#d1d5db', fontSize: 11 }}>—</span>}
+                    </td>
+                    <td style={{ padding: '11px 14px' }}>
+                      <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                        background: rec.status === 'presente' ? '#dcfce7' : '#f3f4f6',
+                        color: rec.status === 'presente' ? '#16a34a' : '#6b7280' }}>
+                        {rec.status === 'presente' ? '🟢 Presente' : '⚪ Uscito'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )}
+    </div>
   );
-}
 
 /* ═══════════════════════════════════════════════════════════
    EMPLOYEE KIOSK VIEW — Schermata timbratura touch

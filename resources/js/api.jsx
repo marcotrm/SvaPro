@@ -710,6 +710,7 @@ export const attendance = {
   getList:           (params = {}) => api.get('/attendance', { params }),
   getLive:           (params = {}) => api.get('/attendance/live', { params }),
   getEmployeesKiosk: (params = {}) => api.get('/attendance/employees-for-kiosk', { params }),
+  getHistory:        (params = {}) => api.get('/attendance/history', { params }),
   checkIn:           (data)        => api.post('/attendance/checkin', data),
   checkOut:          (data)        => api.post('/attendance/checkout', data),
 };

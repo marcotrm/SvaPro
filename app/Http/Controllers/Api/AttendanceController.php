@@ -323,4 +323,71 @@ class AttendanceController extends Controller
             $this->whatsapp->send($phone, $body);
         }
     }
+    /**
+     * GET /attendance/history — cronologia completa con range date (solo admin)
+     * Params: date_from, date_to, employee_id, store_id
+     */
+    public function history(Request $request): JsonResponse
+    {
+        $tenantId   = (int) $request->attributes->get('tenant_id');
+        $storeId    = $request->filled('store_id')    ? (int) $request->integer('store_id') : null;
+        $employeeId = $request->filled('employee_id') ? (int) $request->integer('employee_id') : null;
+        $dateFrom   = $request->input('date_from', now()->subDays(30)->toDateString());
+        $dateTo     = $request->input('date_to',   now()->toDateString());
+
+        $rows = DB::table('employee_attendances as a')
+            ->join('employees as e', 'e.id', '=', 'a.employee_id')
+            ->leftJoin('stores as s', 's.id', '=', 'a.store_id')
+            ->where('a.tenant_id', $tenantId)
+            ->when($storeId,    fn($q) => $q->where('a.store_id', $storeId))
+            ->when($employeeId, fn($q) => $q->where('a.employee_id', $employeeId))
+            ->whereRaw("(a.checked_in_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom])
+            ->whereRaw("(a.checked_in_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo])
+            ->orderByDesc('a.checked_in_at')
+            ->select([
+                'a.id', 'a.employee_id', 'a.store_id',
+                'a.checked_in_at', 'a.checked_out_at',
+                'a.expected_start_time', 'a.late_minutes', 'a.notes',
+                'e.first_name', 'e.last_name', 'e.barcode',
+                's.name as store_name',
+            ])
+            ->get()
+            ->map(function ($r) {
+                $in       = $r->checked_in_at  ? Carbon::parse($r->checked_in_at)  : null;
+                $out      = $r->checked_out_at ? Carbon::parse($r->checked_out_at) : null;
+                $duration = ($in && $out) ? $in->diffInMinutes($out) : null;
+                return [
+                    'id'                => $r->id,
+                    'employee_id'       => $r->employee_id,
+                    'employee_name'     => trim("{$r->first_name} {$r->last_name}"),
+                    'barcode'           => $r->barcode,
+                    'store_id'          => $r->store_id,
+                    'store_name'        => $r->store_name,
+                    'checked_in_at'     => $r->checked_in_at,
+                    'checked_out_at'    => $r->checked_out_at,
+                    'expected_start_time' => $r->expected_start_time,
+                    'late_minutes'      => $r->late_minutes,
+                    'duration_minutes'  => $duration,
+                    'status'            => $r->checked_out_at ? 'fuori' : 'presente',
+                ];
+            });
+
+        // Calcola totale ore per dipendente nel range
+        $summaryByEmployee = $rows->groupBy('employee_id')->map(function ($recs) {
+            $totalMinutes = $recs->sum('duration_minutes');
+            return [
+                'employee_id'    => $recs->first()['employee_id'],
+                'employee_name'  => $recs->first()['employee_name'],
+                'total_minutes'  => $totalMinutes,
+                'total_hours'    => round($totalMinutes / 60, 2),
+                'days_worked'    => $recs->where('status', 'fuori')->count(),
+                'late_count'     => $recs->where('late_minutes', '>', 0)->count(),
+            ];
+        })->values();
+
+        return response()->json([
+            'data'    => $rows,
+            'summary' => $summaryByEmployee,
+        ]);
+    }
 }

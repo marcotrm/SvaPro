@@ -281,30 +281,29 @@ class ReportController extends Controller
 
         $query = DB::table('sales_order_lines')
             ->join('sales_orders', 'sales_order_lines.sales_order_id', '=', 'sales_orders.id')
-            ->leftJoin('users as employees', 'sales_orders.sold_by_employee_id', '=', 'employees.id')
+            ->leftJoin('employees', 'sales_orders.sold_by_employee_id', '=', 'employees.id')
             ->leftJoin('stores', 'sales_orders.store_id', '=', 'stores.id')
             ->where('sales_orders.tenant_id', $tenantId)
             ->where('sales_orders.status', 'paid')
             ->where(function ($q) {
-                // Righe salvate dal CRM/backoffice con campi is_service/service_name
                 $q->where(function ($q2) {
                     $q2->where('sales_order_lines.is_service', true)
                        ->where('sales_order_lines.service_name', 'like', '%QScare%');
                 })
-                // Righe salvate dal POS: product_variant_id null + tax_snapshot_json con product_type = service
                 ->orWhere(function ($q3) {
                     $q3->whereNull('sales_order_lines.product_variant_id')
-                       ->whereRaw("sales_order_lines.tax_snapshot_json::jsonb ->> 'product_type' = 'service'");
+                       ->whereRaw("sales_order_lines.tax_snapshot_json::jsonb->>'product_type' = 'service'");
                 });
             })
             ->select(
                 'sales_orders.id as order_id',
                 'sales_orders.created_at',
                 'sales_order_lines.qty',
-                DB::raw('COALESCE(sales_order_lines.line_total, sales_order_lines.qty * sales_order_lines.unit_price) as line_total'),
                 'sales_order_lines.unit_price',
+                'sales_order_lines.service_name',
+                DB::raw('COALESCE(sales_order_lines.line_total, sales_order_lines.qty * sales_order_lines.unit_price) as line_total'),
                 'stores.name as store_name',
-                DB::raw("concat(employees.first_name, ' ', employees.last_name) as employee_name")
+                DB::raw("COALESCE(employees.first_name || ' ' || employees.last_name, '—') as employee_name")
             );
 
         if ($storeId) {

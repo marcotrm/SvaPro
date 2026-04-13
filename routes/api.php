@@ -203,6 +203,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/employees/{employeeId}/kpi-target', [EmployeeController::class, 'setKpiTarget'])->middleware('permission:employees.manage');
         // Attendance - solo admin
         Route::get('/attendance', [AttendanceController::class, 'index']);
+        Route::get('/attendance/history', [AttendanceController::class, 'history']);
 
         // Stock Transfers / DDT
         Route::get('/stock-transfers', [StockTransferController::class, 'index']);
