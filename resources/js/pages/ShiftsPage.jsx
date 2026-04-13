@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { attendance, shifts as shiftsApi, stores, clearApiCache } from '../api.jsx';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Copy, Loader, Clock, Trash } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Copy, Loader, Clock, Trash, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ShiftTemplateModal from '../components/ShiftTemplateModal.jsx';
 
