@@ -10,7 +10,8 @@ import {
   FileText, RotateCcw, Gift, Shield, Activity, ChevronDown,
   Receipt, Star, ArrowRightLeft, MapPin, ChevronLeft, ChevronRight,
   PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store, AlertCircle,
-  LayoutDashboard, ShoppingCart, Megaphone, HandCoins
+  LayoutDashboard, ShoppingCart, Megaphone, HandCoins,
+  Menu, X, Home, ChevronRight as ChevRight
 } from 'lucide-react';
 
 const allNavigation = [
@@ -111,6 +112,17 @@ export default function Layout({ user, setUser }) {
       return saved ? JSON.parse(saved) : { 'Principale': true };
     } catch { return { 'Principale': true }; }
   });
+
+  // Mobile drawer state
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  // Close drawer on route change
+  useEffect(() => { setMobileDrawerOpen(false); }, [location.pathname]);
+  // Prevent body scroll when drawer is open
+  useEffect(() => {
+    if (mobileDrawerOpen) { document.body.style.overflow = 'hidden'; }
+    else { document.body.style.overflow = ''; }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileDrawerOpen]);
 
   const userRoles = useMemo(() => user?.roles || [], [user]);
 
@@ -378,6 +390,10 @@ export default function Layout({ user, setUser }) {
         style={{ marginLeft: sidebarWidth, transition: 'margin-left 0.25s cubic-bezier(0.4,0,0.2,1)' }}
       >
         <header className="sp-topbar">
+          {/* Mobile hamburger */}
+          <button className="sp-mobile-topbar-menu" onClick={() => setMobileDrawerOpen(true)} aria-label="Menu">
+            <Menu size={20} />
+          </button>
           <div className="sp-topbar-title">{activePageLabel}</div>
           <div className="sp-topbar-actions">
             {storesList.length > 1 && (
@@ -432,6 +448,142 @@ export default function Layout({ user, setUser }) {
           error:   { iconTheme: { primary: '#EF4444', secondary: '#fff' } },
         }}
       />
+
+      {/* ── MOBILE DRAWER ── */}
+      {mobileDrawerOpen && (
+        <>
+          {/* Overlay */}
+          <div
+            className="sp-mobile-drawer-overlay"
+            style={{ display: 'block' }}
+            onClick={() => setMobileDrawerOpen(false)}
+          />
+          {/* Drawer panel */}
+          <div className="sp-mobile-drawer">
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 18px 16px', borderBottom: '1px solid #222', flexShrink: 0 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Sva<span style={{ color: 'var(--color-accent)' }}>Pro</span></div>
+                <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>Point of Sale System</div>
+              </div>
+              <button
+                onClick={() => setMobileDrawerOpen(false)}
+                style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Store selector in drawer */}
+            {storesList.length > 0 && (
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid #1a1a1a' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 6 }}>Negozio Attivo</div>
+                <select
+                  className="sp-select"
+                  value={selectedStoreId}
+                  onChange={(e) => { handleStoreChange(e.target.value); }}
+                  style={{ background: '#1a1a1a', color: '#fff', border: '1px solid #333', borderRadius: 8, fontSize: 13, padding: '8px 10px' }}
+                >
+                  <option value="">Tutti i negozi</option>
+                  {storesList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* Navigation */}
+            <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 10px' }}>
+              {filteredNav.map((section) => (
+                <div key={section.section} style={{ marginBottom: 4 }}>
+                  <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {section.icon && React.createElement(section.icon, { size: 12, style: { color: '#6366f1', flexShrink: 0 } })}
+                    {section.section}
+                  </div>
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href, item.activeKey);
+                    return (
+                      <button
+                        key={item.activeKey ?? item.href}
+                        onClick={() => { navigate(item.href); setMobileDrawerOpen(false); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+                          padding: '11px 14px', borderRadius: 10, border: 'none',
+                          background: active ? 'rgba(99,102,241,0.18)' : 'transparent',
+                          color: active ? '#a5b4fc' : 'rgba(255,255,255,0.75)',
+                          fontSize: 14, fontWeight: active ? 700 : 500, textAlign: 'left',
+                          cursor: 'pointer', marginBottom: 2,
+                          borderLeft: active ? '3px solid #6366f1' : '3px solid transparent',
+                          transition: 'background 0.12s',
+                        }}
+                      >
+                        <Icon size={16} style={{ flexShrink: 0, opacity: active ? 1 : 0.6 }} />
+                        <span style={{ flex: 1 }}>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </nav>
+
+            {/* Drawer footer: user + logout */}
+            <div style={{ padding: '14px 16px', borderTop: '1px solid #222', flexShrink: 0 }}>
+              <button
+                onClick={handleLogout}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 10, border: 'none', background: 'rgba(239,68,68,0.08)', color: '#f87171', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
+              >
+                <LogOut size={16} />
+                <span>Esci — {user?.name || 'Utente'}</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      <nav className="sp-mobile-nav" aria-label="Navigazione principale mobile">
+        <div className="sp-mobile-nav-inner">
+          {/* POS Cassa */}
+          <button
+            className={`sp-mobile-nav-btn ${location.pathname === '/' || location.pathname === '/pos' ? 'active' : ''}`}
+            onClick={() => navigate('/')}
+          >
+            <Monitor size={22} />
+            <span>Cassa</span>
+          </button>
+          {/* Dashboard o sezione principale */}
+          <button
+            className={`sp-mobile-nav-btn ${location.pathname === '/dashboard' ? 'active' : ''}`}
+            onClick={() => navigate('/dashboard')}
+          >
+            <BarChart3 size={22} />
+            <span>Dashboard</span>
+          </button>
+          {/* Clienti */}
+          <button
+            className={`sp-mobile-nav-btn ${location.pathname.startsWith('/customers') ? 'active' : ''}`}
+            onClick={() => navigate('/customers')}
+          >
+            <Users size={22} />
+            <span>Clienti</span>
+          </button>
+          {/* Ordini */}
+          <button
+            className={`sp-mobile-nav-btn ${location.pathname === '/orders' ? 'active' : ''}`}
+            onClick={() => navigate('/orders')}
+          >
+            <ShoppingCart size={22} />
+            <span>Ordini</span>
+          </button>
+          {/* Menu (tutto il resto) */}
+          <button
+            className="sp-mobile-nav-btn"
+            onClick={() => setMobileDrawerOpen(true)}
+          >
+            <Menu size={22} />
+            <span>Menu</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }

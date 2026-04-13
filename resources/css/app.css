@@ -2947,3 +2947,327 @@ a { text-decoration: none; color: inherit; }
   font-weight: 700;
   box-shadow: 0 2px 8px rgba(0,102,255,0.3);
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE FIRST — Responsive System
+   Breakpoints:
+     xs:  < 480px  (telefoni piccoli)
+     sm:  < 768px  (telefoni)
+     md:  768-1024px (tablet)
+     lg:  > 1024px  (desktop — default)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Mobile Bottom Navigation Bar ── */
+.sp-mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1100;
+  background: #0F0F0F;
+  border-top: 1px solid #222;
+  padding: 6px 0 env(safe-area-inset-bottom, 0);
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+}
+.sp-mobile-nav-inner {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  height: 56px;
+}
+.sp-mobile-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 0;
+  transition: color 0.15s;
+  min-width: 0;
+}
+.sp-mobile-nav-btn.active {
+  color: var(--color-accent);
+}
+.sp-mobile-nav-btn svg {
+  flex-shrink: 0;
+}
+
+/* ── Mobile Drawer (hamburger menu) ── */
+.sp-mobile-drawer-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1200;
+  animation: spFadeIn 0.18s ease;
+}
+.sp-mobile-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(300px, 85vw);
+  background: #0F0F0F;
+  z-index: 1201;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  animation: drawerSlideIn 0.22s cubic-bezier(0.4,0,0.2,1);
+  border-right: 1px solid #222;
+}
+@keyframes drawerSlideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+/* ── Mobile Topbar adjustments ── */
+.sp-mobile-topbar-menu {
+  display: none;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════
+   TABLET (768 to 1024px): sidebar icon-only
+   ══════════════════════════════════════════════ */
+@media (max-width: 1024px) and (min-width: 768px) {
+  :root {
+    --sidebar-width: 72px;
+  }
+  .sp-sidebar-brand h1,
+  .sp-brand-sub,
+  .sp-nav-section-title,
+  .sp-nav-item span:not(.sp-nav-badge),
+  .sp-user-info,
+  .sp-sidebar-brand > div:first-child > *,
+  .sp-user-card .sp-user-info { display: none; }
+
+  .sp-sidebar-brand {
+    justify-content: center !important;
+    padding: 16px 0 !important;
+  }
+
+  .sp-sidebar-toggle { margin: 0 auto; }
+
+  .sp-nav-item {
+    justify-content: center;
+    padding: 10px;
+  }
+
+  .sp-user-card {
+    justify-content: center;
+    padding: 8px 0;
+  }
+}
+
+/* ══════════════════════════════════════════════
+   MOBILE (< 768px): full mobile experience
+   ══════════════════════════════════════════════ */
+@media (max-width: 767px) {
+
+  /* Hide desktop sidebar */
+  .sp-sidebar { display: none !important; }
+
+  /* Main content fills full width with bottom padding for nav bar */
+  .sp-main {
+    margin-left: 0 !important;
+    padding-bottom: 72px; /* space for bottom nav */
+  }
+
+  /* Show mobile nav + drawer */
+  .sp-mobile-nav { display: block; }
+  .sp-mobile-topbar-menu { display: flex; }
+
+  /* Topbar: smaller on mobile */
+  .sp-topbar {
+    padding: 0 14px;
+    height: 56px;
+  }
+  .sp-topbar-title {
+    font-size: 15px;
+    font-weight: 800;
+  }
+  /* Store selector: smaller */
+  .sp-topbar .sp-select {
+    width: 140px !important;
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
+  /* Content padding: tighter on mobile */
+  .sp-content {
+    padding: 16px 14px 24px;
+  }
+
+  /* POS layout: stack vertically on mobile */
+  .sp-pos-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    margin: -16px -14px -24px;
+  }
+  /* POS cart on mobile: expandable bottom sheet style */
+  .sp-pos-cart {
+    border-left: none;
+    border-top: 1px solid rgba(255,255,255,0.12);
+    max-height: 60vh;
+  }
+  .sp-pos-products {
+    padding: 12px;
+    /* limit height so cart remains accessible */
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  /* Tables: horizontal scroll container */
+  .sp-table-wrap,
+  .table-v3-container,
+  div[class*="overflow-x-auto"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Tables: don't shrink below table minimum */
+  .sp-table, .table-v3 { min-width: 540px; }
+
+  /* Stats grid: 2 columns on small, 1 on very small */
+  .sp-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .sp-stat-card { padding: 14px; }
+  .sp-stat-value { font-size: 22px; }
+
+  /* KPI v3 grid: 2 columns */
+  .kpi-v3-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  /* Generic grids: collapse to 1-2 columns */
+  .grid-cols-3, [class*="md:grid-cols-3"],
+  .grid-cols-4, [class*="md:grid-cols-4"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Page header: stack vertically */
+  .sp-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .sp-page-title { font-size: 20px; }
+  .sp-page-actions { width: 100%; }
+  .sp-page-actions .sp-btn { flex: 1; justify-content: center; }
+
+  /* Modals: full screen on mobile */
+  .sp-modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .sp-modal, .sp-modal-lg, .sp-modal-xl {
+    max-width: 100% !important;
+    width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    max-height: 92vh;
+    margin: 0;
+  }
+
+  /* Form grids: single column */
+  .sp-form-grid-2, .grid.grid-cols-2, [class*="grid-cols-2"]:not(.kpi-v3-grid):not(.sp-stats-grid) {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  /* Flex rows that should wrap */
+  .flex.items-center.justify-between,
+  .flex.justify-between {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Hide columns marked as desktop: apply .sp-desktop-only to hide on mobile */
+  .sp-desktop-only { display: none !important; }
+  .sp-mobile-only  { display: block !important; }
+
+  /* Buttons: touch-friendly tap targets */
+  .sp-btn { min-height: 42px; }
+  .sp-btn-sm { min-height: 34px; }
+
+  /* Inputs: larger on mobile for thumb tapping */
+  .sp-input, .sp-select { min-height: 44px; font-size: 16px; } /* 16px prevents iOS zoom */
+  
+  /* Tabs: scrollable horizontally */
+  .sp-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .sp-tabs::-webkit-scrollbar { display: none; }
+  .sp-tab { white-space: nowrap; padding: 10px 14px; }
+
+  /* v3 card classes adjust */
+  .card-v3  { border-radius: 12px; }
+  .card-v3[style] { margin-left: 0 !important; margin-right: 0 !important; }
+
+  /* Page h1 headings: reduce */
+  h1.text-4xl, .text-4xl { font-size: 1.6rem !important; }
+  h1.text-3xl, .text-3xl { font-size: 1.3rem !important; }
+
+  /* Space between sections */
+  .space-y-10 > * + * { margin-top: 1.5rem !important; }
+
+  /* Login form stays centered and padded */
+  .sp-login-card { padding: 32px 22px; }
+
+  /* Toaster: bottom of screen above nav */
+  /* (handled by Library — react-hot-toast uses position="bottom-right",
+     we shift it up with CSS) */
+}
+
+/* ══════════════════════════════════════════════
+   VERY SMALL (< 380px): extra squeeze
+   ══════════════════════════════════════════════ */
+@media (max-width: 379px) {
+  .sp-content { padding: 12px 10px 20px; }
+  .sp-stats-grid { grid-template-columns: 1fr; }
+  .kpi-v3-grid { grid-template-columns: 1fr !important; }
+  .sp-topbar-title { font-size: 13px; }
+}
+
+/* ══════════════════════════════════════════════
+   TOUCH TARGET: all clickable elements
+   ══════════════════════════════════════════════ */
+@media (hover: none) and (pointer: coarse) {
+  /* Touch device — increase tap targets */
+  button, a, [role="button"] { min-height: 44px; }
+  .sp-btn-icon { width: 44px; height: 44px; }
+  .sp-nav-item { padding: 12px 14px; }
+  
+  /* Remove hover effects that don't work on touch */
+  .sp-card:hover { box-shadow: var(--shadow-xs); }
+}
+
+/* ══════════════════════════════════════════════
+   DRAWER open state (controlled via JS class)
+   ══════════════════════════════════════════════ */
+.sp-drawer-open .sp-mobile-drawer-overlay { display: block; }
