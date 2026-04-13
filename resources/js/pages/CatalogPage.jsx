@@ -176,7 +176,10 @@ export default function CatalogPage() {
           <tbody>
             {filtered.length > 0 ? filtered.map(product => {
               const variant = product.variants?.[0];
-              const price = parseFloat(variant?.sale_price) || 0;
+              const priceNet = parseFloat(variant?.sale_price) || 0;
+              const vatMap = { '1': 22, '2': 10, '3': 4 };
+              const vatRate = vatMap[String(variant?.tax_class_id)] || 0;
+              const priceGross = vatRate ? priceNet * (1 + vatRate / 100) : priceNet;
               const stock = variant?.stock_quantity ?? 0;
               const category = categories.find(c => c.id === product.category_id);
               const location = variant?.location;
@@ -207,7 +210,14 @@ export default function CatalogPage() {
                       </span>
                     ) : <span className="sp-cell-secondary">—</span>}
                   </td>
-                  <td style={{ fontWeight: 600 }}>{fmt(price)}</td>
+                  <td style={{ fontWeight: 700 }}>
+                    {fmt(priceGross)}
+                    {vatRate > 0 && (
+                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 500 }}>
+                        IVA {vatRate}% incl. · netto {fmt(priceNet)}
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <span className="sp-font-mono" style={{ fontWeight: 600, color: stock <= 0 ? 'var(--color-error)' : stock < 5 ? 'var(--color-warning)' : 'var(--color-text)' }}>
                       {stock}

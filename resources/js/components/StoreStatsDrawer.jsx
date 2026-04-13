@@ -293,7 +293,9 @@ function OrderDetailModal({ orderId, orders, onClose, onNavigate }) {
                         {/* Quantità e prezzi */}
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 800, color: '#7B6FD0' }}>{fmt(line.line_total)}</div>
-                          <div style={{ fontSize: 11, color: '#9ca3af' }}>×{line.qty} · {fmt(line.unit_price)} cad.</div>
+                          <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                            ×{line.qty} · <span title="Prezzo netto IVA esclusa">{fmt(line.unit_price)} netto</span>
+                          </div>
                         </div>
                       </div>
                     );
