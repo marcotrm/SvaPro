@@ -23,12 +23,17 @@ class EmployeeController extends Controller
             return response()->json(['message' => 'Store non valido per il tenant.'], 422);
         }
 
-        // Ricerca rapida per barcode (usata da Tesoreria/Cassa per identificare l'operatore)
+        // Ricerca rapida per barcode, ID o nome (usata da Tesoreria/Cassa per identificare l'operatore)
         if ($barcode) {
             $emp = DB::table('employees')
                 ->where('tenant_id', $tenantId)
-                ->where('barcode', $barcode)
                 ->where('status', 'active')
+                ->where(function($q) use ($barcode) {
+                    $q->where('barcode', $barcode)
+                      ->orWhere('id', (int) $barcode)
+                      ->orWhere('first_name', 'ilike', '%' . $barcode . '%')
+                      ->orWhere('last_name', 'ilike', '%' . $barcode . '%');
+                })
                 ->select(['id', 'first_name', 'last_name', 'barcode', 'store_id'])
                 ->first();
             return response()->json(['data' => $emp ? [$emp] : []]);

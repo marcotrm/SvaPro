@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { returns, orders as ordersApi } from '../api.jsx';
 import { Search, Plus, AlertTriangle, Package, ArrowLeftRight, ChevronRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import OrderDetailModal from '../components/OrderDetailModal.jsx';
 
 const STATUS_LABELS = {
   pending:            'In attesa',
@@ -41,6 +42,8 @@ export default function ReturnsPage() {
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [tab, setTab] = useState('list'); // 'list' | 'new'
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [isOrderDetailOpen, setIsOrderDetailOpen] = useState(false);
 
   // --- New Return Form ---
   const [lookupId, setLookupId] = useState('');
@@ -159,6 +162,11 @@ export default function ReturnsPage() {
 
   return (
     <div className="sp-animate-in">
+      <OrderDetailModal
+        isOpen={isOrderDetailOpen}
+        onClose={() => setIsOrderDetailOpen(false)}
+        orderId={selectedOrderId}
+      />
       {/* Header */}
       <div className="sp-page-header">
         <div>
@@ -400,7 +408,19 @@ export default function ReturnsPage() {
               </thead>
               <tbody>
                 {list.length > 0 ? list.map(r => (
-                  <tr key={r.id}>
+                  <tr 
+                    key={r.id} 
+                    style={{ cursor: 'pointer' }} 
+                    onClick={() => {
+                      const oid = r.order_id || r.sales_order_id;
+                      if (oid) {
+                        setSelectedOrderId(oid);
+                        setIsOrderDetailOpen(true);
+                      } else {
+                        toast.error('Nessun ordine collegato a questo reso');
+                      }
+                    }}
+                  >
                     <td className="sp-cell-secondary" style={{ fontSize: 12 }}>{r.store_name || '—'}</td>
                     <td className="sp-font-mono">
                       <span style={{ color: 'var(--color-accent)', fontWeight: 600 }}>
@@ -418,7 +438,7 @@ export default function ReturnsPage() {
                     </td>
                     <td style={{ fontWeight: 600 }}>{fmtCurrency(r.refund_amount || r.total_value)}</td>
                     <td className="sp-cell-secondary">{fmtDate(r.created_at)}</td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, flexWrap: 'wrap' }}>
                         {/* Da Richiesto/Pending: approva o nega */}
                         {(r.status === 'requested' || r.status === 'pending') && (<>

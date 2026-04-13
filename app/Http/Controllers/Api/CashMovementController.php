@@ -56,7 +56,6 @@ class CashMovementController extends Controller
 
         $stores = DB::table('stores')
             ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
             ->get(['id', 'name']);
 
         $results = [];
@@ -120,7 +119,13 @@ class CashMovementController extends Controller
         if ($barcode) {
             $emp = DB::table('employees')
                 ->where('tenant_id', $tenantId)
-                ->where('barcode', $barcode)
+                ->where('status', 'active')
+                ->where(function($q) use ($barcode) {
+                    $q->where('barcode', $barcode)
+                      ->orWhere('id', (int) $barcode)
+                      ->orWhere('first_name', 'ilike', '%' . $barcode . '%')
+                      ->orWhere('last_name', 'ilike', '%' . $barcode . '%');
+                })
                 ->first(['id']);
             if ($emp) $employeeId = $emp->id;
         }
