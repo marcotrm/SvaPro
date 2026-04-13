@@ -258,7 +258,7 @@ export default function PosPage() {
       // Carica prodotti — SENZA store_id per mostrare tutto il catalogo del tenant
       // (lo stock del negozio viene caricato separatamente)
       const [pRes, cRes] = await Promise.all([
-        catalog.getProducts({ limit: 500 }),
+        catalog.getProducts({ limit: 5000 }),
         catalog.getCategories(),
       ]);
       setProducts(pRes.data?.data || []);
@@ -395,10 +395,7 @@ export default function PosPage() {
         location: variant.location || '',
       }];
     });
-    // Auto-attiva QScare se il prodotto è hardware con prezzo QScare configurato
-    if (isHardwareProduct(product) && parseFloat(product.qscare_price) > 0) {
-      setQscareLines(prev => ({ ...prev, [variant.id]: true }));
-    }
+    // QScare è di default DISATTIVA. L'operatore sceglierà manualmente la quantità.
     toast.success(`${product.name}`, { duration: 900, icon: '🛒' });
   }, [stockMap, isHardwareProduct]);
 
@@ -406,6 +403,16 @@ export default function PosPage() {
     setCartLines(prev => prev.map(l => {
       if (l.product_variant_id !== variantId) return l;
       const n = l.qty + delta;
+      
+      // Controllo QScare: riduci la quantità QScare se eccede la nuova quantità del carrello
+      if (n > 0) {
+         setQscareLines(qsc => {
+            const currentQsc = qsc[variantId] || 0;
+            if (currentQsc > n) return { ...qsc, [variantId]: n };
+            return qsc;
+         });
+      }
+      
       return n <= 0 ? null : { ...l, qty: n };
     }).filter(Boolean));
   };
@@ -429,10 +436,12 @@ export default function PosPage() {
   const cartQscarePrice = useMemo(() => {
     let total = 0;
     cartLines.forEach(line => {
-      if (!qscareLines[line.product_variant_id]) return;
-      const p = products.find(prod => prod.variants?.some(v => v.id === line.product_variant_id));
-      if (p && isHardwareProduct(p)) {
-        total += (parseFloat(p.qscare_price) || 0) * line.qty;
+      const qscQty = qscareLines[line.product_variant_id] || 0;
+      if (qscQty > 0) {
+        const p = products.find(prod => prod.variants?.some(v => v.id === line.product_variant_id));
+        if (p && isHardwareProduct(p)) {
+          total += (parseFloat(p.qscare_price) || 0) * qscQty;
+        }
       }
     });
     return total;
@@ -450,8 +459,13 @@ export default function PosPage() {
     });
   }, [cartLines]);
 
-  const toggleQscareForLine = (variantId) => {
-    setQscareLines(prev => ({ ...prev, [variantId]: !prev[variantId] }));
+  const updateQscareForLine = (variantId, delta, maxQty) => {
+    setQscareLines(prev => {
+      const current = prev[variantId] || 0;
+      const nextRaw = current + delta;
+      const next = Math.max(0, Math.min(nextRaw, maxQty)); // Non può eccedere la qty del carrello
+      return { ...prev, [variantId]: next };
+    });
   };
 
   const effectiveQscarePrice = cartQscarePrice; // somma delle QScare attivate per-riga
@@ -468,14 +482,15 @@ export default function PosPage() {
       const empId = Number(resolvedEmpId) > 0 ? Number(resolvedEmpId) : null;
       // Costruisce righe QScare per-hardware
       const qscareServiceLines = cartLines.flatMap(l => {
-        if (!qscareLines[l.product_variant_id]) return [];
+        const qscQty = qscareLines[l.product_variant_id] || 0;
+        if (qscQty <= 0) return [];
         const p = products.find(prod => prod.variants?.some(v => v.id === l.product_variant_id));
         if (!p || !isHardwareProduct(p)) return [];
         const unitPrice = parseFloat(p.qscare_price) || 0;
         if (unitPrice <= 0) return [];
         return [{
           product_variant_id: null,
-          qty: l.qty,
+          qty: qscQty,
           is_service: true,
           service_name: `QScare — ${l.name}`,
           unit_price: unitPrice,
@@ -1010,35 +1025,48 @@ export default function PosPage() {
                   </div>
                 </div>
               );
-              const enabled = !!qscareLines[line.product_variant_id];
+              const qscQty = qscareLines[line.product_variant_id] || 0;
+              const hasQscare = qscQty > 0;
               return (
-                <button
+                <div
                   key={line.product_variant_id}
-                  onClick={() => toggleQscareForLine(line.product_variant_id)}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6,
-                    background: enabled ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
-                    border: `1.5px solid ${enabled ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                    borderRadius: 12, padding: '9px 12px', cursor: 'pointer', textAlign: 'left',
+                    background: hasQscare ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
+                    border: `1.5px solid ${hasQscare ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: 12, padding: '9px 12px', textAlign: 'left',
                     transition: 'all 0.2s',
                   }}
                 >
                   <span style={{ fontSize: 17 }}>🛡</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: enabled ? '#86efac' : '#fff' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: hasQscare ? '#86efac' : '#fff' }}>
                       QScare — {line.name}
                     </div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>Copertura guasti e danni accidentali</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>Copertura guasti accidentali</div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                    <span style={{ fontSize: 12, fontWeight: 900, color: enabled ? '#86efac' : 'rgba(255,255,255,0.5)' }}>
-                      +{fmt(qscarePrice * line.qty)}
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <span style={{ fontSize: 12, fontWeight: 900, color: hasQscare ? '#86efac' : 'rgba(255,255,255,0.5)' }}>
+                      +{fmt(qscarePrice * qscQty)}
                     </span>
-                    <div style={{ width: 32, height: 18, borderRadius: 9, background: enabled ? '#22c55e' : 'rgba(255,255,255,0.15)', position: 'relative', transition: 'background 0.2s' }}>
-                      <div style={{ position: 'absolute', top: 2, left: enabled ? 14 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button 
+                        onClick={() => updateQscareForLine(line.product_variant_id, -1, line.qty)}
+                        disabled={qscQty <= 0}
+                        style={{ width: 22, height: 22, borderRadius: 6, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: qscQty > 0 ? 'pointer' : 'not-allowed', opacity: qscQty > 0 ? 1 : 0.4 }}
+                      >-</button>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: hasQscare ? '#86efac' : '#fff', minWidth: 20, textAlign: 'center' }}>
+                        {qscQty} <span style={{ fontSize: 9, opacity: 0.6 }}>/ {line.qty}</span>
+                      </span>
+                      <button 
+                        onClick={() => updateQscareForLine(line.product_variant_id, 1, line.qty)}
+                        disabled={qscQty >= line.qty}
+                        style={{ width: 22, height: 22, borderRadius: 6, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: qscQty < line.qty ? 'pointer' : 'not-allowed', opacity: qscQty < line.qty ? 1 : 0.4 }}
+                      >+</button>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
