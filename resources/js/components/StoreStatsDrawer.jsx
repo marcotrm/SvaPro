@@ -3,7 +3,7 @@ import { orders as ordersApi, reports } from '../api.jsx';
 import {
   X, TrendingUp, ShoppingBag, Users, CreditCard, Banknote,
   BarChart3, Package, ArrowUpRight, ArrowDownRight, Calendar,
-  Loader2, Store
+  Loader2, Store, ChevronDown, ChevronRight
 } from 'lucide-react';
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
@@ -77,6 +77,10 @@ function KpiCard({ icon: Icon, label, value, sub, color = '#7B6FD0', trend }) {
 }
 
 function OrderRow({ order }) {
+  const [expanded, setExpanded] = useState(false);
+  const [lines, setLines] = useState(null);
+  const [loadingLines, setLoadingLines] = useState(false);
+
   const statusColors = {
     paid: { bg: 'rgba(16,185,129,0.1)', color: '#10b981', label: 'Pagato' },
     pending: { bg: 'rgba(245,158,11,0.1)', color: '#F59E0B', label: 'Attesa' },
@@ -84,33 +88,107 @@ function OrderRow({ order }) {
     refunded: { bg: 'rgba(99,102,241,0.1)', color: '#6366F1', label: 'Rimborsato' },
   };
   const s = statusColors[order.status] || statusColors.pending;
+
+  const handleToggle = async () => {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && lines === null) {
+      setLoadingLines(true);
+      try {
+        const res = await ordersApi.getOrder(order.id);
+        setLines(res.data?.data?.lines || []);
+      } catch {
+        setLines([]);
+      } finally {
+        setLoadingLines(false);
+      }
+    }
+  };
+
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: 'auto 1fr auto auto',
-      gap: 10, alignItems: 'center',
-      padding: '10px 0',
-      borderBottom: '1px solid #f5f3ff',
-    }}>
-      <div style={{
-        width: 32, height: 32, borderRadius: 8,
-        background: 'rgba(123,111,208,0.08)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <ShoppingBag size={14} color="#7B6FD0" />
-      </div>
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e' }}>
-          #{order.id} {order.customer_name ? `– ${order.customer_name}` : '– Cliente al banco'}
+    <div style={{ borderBottom: '1px solid #f5f3ff' }}>
+      {/* Row header — cliccabile */}
+      <div
+        onClick={handleToggle}
+        style={{
+          display: 'grid', gridTemplateColumns: 'auto 1fr auto auto auto',
+          gap: 10, alignItems: 'center',
+          padding: '10px 0',
+          cursor: 'pointer',
+        }}
+      >
+        <div style={{
+          width: 32, height: 32, borderRadius: 8,
+          background: 'rgba(123,111,208,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <ShoppingBag size={14} color="#7B6FD0" />
         </div>
-        <div style={{ fontSize: 11, color: '#9ca3af' }}>
-          {order.created_at ? new Date(order.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e' }}>
+            #{order.id} {order.customer_name ? `– ${order.customer_name}` : '– Cliente al banco'}
+          </div>
+          <div style={{ fontSize: 11, color: '#9ca3af' }}>
+            {order.created_at ? new Date(order.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+          </div>
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#1a1a2e' }}>{fmt(order.grand_total)}</div>
+        <div style={{
+          fontSize: 10, fontWeight: 700, borderRadius: 6,
+          padding: '3px 7px', background: s.bg, color: s.color,
+        }}>{s.label}</div>
+        <div style={{ color: '#9ca3af', display: 'flex', alignItems: 'center' }}>
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </div>
       </div>
-      <div style={{ fontSize: 12, fontWeight: 800, color: '#1a1a2e' }}>{fmt(order.grand_total)}</div>
-      <div style={{
-        fontSize: 10, fontWeight: 700, borderRadius: 6,
-        padding: '3px 7px', background: s.bg, color: s.color,
-      }}>{s.label}</div>
+
+      {/* Expanded: righe prodotto */}
+      {expanded && (
+        <div style={{
+          margin: '0 0 10px 42px',
+          background: '#f8f7fc',
+          borderRadius: 10,
+          padding: '10px 12px',
+          border: '1px solid #ede9f8',
+        }}>
+          {loadingLines ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#9ca3af', fontSize: 12 }}>
+              <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+              Caricamento dettagli...
+            </div>
+          ) : lines && lines.length > 0 ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', fontWeight: 700, color: '#9ca3af', paddingBottom: 6, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Prodotto</th>
+                  <th style={{ textAlign: 'center', fontWeight: 700, color: '#9ca3af', paddingBottom: 6, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Qtà</th>
+                  <th style={{ textAlign: 'right', fontWeight: 700, color: '#9ca3af', paddingBottom: 6, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Prezzo</th>
+                  <th style={{ textAlign: 'right', fontWeight: 700, color: '#9ca3af', paddingBottom: 6, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Totale</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((line, i) => {
+                  const name = line.product_name || (line.tax_snapshot_json && JSON.parse(line.tax_snapshot_json || '{}')?.product_type === 'service' ? '🛡 QSCare' : '—');
+                  const flavor = line.flavor ? ` · ${line.flavor}` : '';
+                  return (
+                    <tr key={i} style={{ borderTop: i > 0 ? '1px solid #ede9f8' : 'none' }}>
+                      <td style={{ padding: '5px 0', color: '#1a1a2e', fontWeight: 600 }}>
+                        {name}{flavor}
+                        {line.sku && <span style={{ color: '#9ca3af', marginLeft: 4, fontSize: 10 }}>({line.sku})</span>}
+                      </td>
+                      <td style={{ padding: '5px 0', textAlign: 'center', color: '#6b7280' }}>×{line.qty}</td>
+                      <td style={{ padding: '5px 0', textAlign: 'right', color: '#6b7280' }}>{fmt(line.unit_price)}</td>
+                      <td style={{ padding: '5px 0', textAlign: 'right', fontWeight: 700, color: '#7B6FD0' }}>{fmt(line.line_total)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ fontSize: 12, color: '#9ca3af' }}>Nessun dettaglio disponibile</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
