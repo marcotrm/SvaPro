@@ -1,7 +1,7 @@
 [build]
 builder = "nixpacks"
-buildCommand = "cd storefront && npm install && npm run build"
+buildCommand = "(cd storefront || true) && (npm install || npm ci) && npm run build"
 
 [deploy]
-startCommand = "cd storefront && npm run start"
+startCommand = "(cd storefront || true) && npm run start"
 restartPolicyType = "always"
