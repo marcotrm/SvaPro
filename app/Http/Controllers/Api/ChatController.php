@@ -142,4 +142,54 @@ class ChatController extends Controller
 
         return response()->json(['message' => 'Messaggi segnati come letti.']);
     }
+
+    /** GET /chat/conversations — lista negozi con ultimo msg e unread (solo admin) */
+    public function conversations(Request $request)
+    {
+        $user     = $request->user();
+        $tenantId = $user->tenant_id;
+
+        $stores = DB::table('stores')
+            ->where('tenant_id', $tenantId)
+            ->get(['id', 'name']);
+
+        $result = $stores->map(function ($store) use ($tenantId, $user) {
+            $lastNormal = DB::table('chat_messages')
+                ->where('tenant_id', $tenantId)->where('store_id', $store->id)->where('priority', 'normal')
+                ->orderByDesc('created_at')->first(['message', 'sender_name', 'created_at']);
+
+            $lastUrgent = DB::table('chat_messages')
+                ->where('tenant_id', $tenantId)->where('store_id', $store->id)->where('priority', 'urgent')
+                ->orderByDesc('created_at')->first(['message', 'sender_name', 'created_at']);
+
+            $unreadNormal = DB::table('chat_messages')
+                ->where('tenant_id', $tenantId)->where('store_id', $store->id)->where('priority', 'normal')
+                ->whereNull('read_at')->where('sender_user_id', '!=', $user->id)->count();
+
+            $unreadUrgent = DB::table('chat_messages')
+                ->where('tenant_id', $tenantId)->where('store_id', $store->id)->where('priority', 'urgent')
+                ->whereNull('read_at')->where('sender_user_id', '!=', $user->id)->count();
+
+            return [
+                'store_id'      => $store->id,
+                'store_name'    => $store->name,
+                'last_normal'   => $lastNormal,
+                'last_urgent'   => $lastUrgent,
+                'unread_normal' => $unreadNormal,
+                'unread_urgent' => $unreadUrgent,
+                'total_unread'  => $unreadNormal + $unreadUrgent,
+            ];
+        });
+
+        $sorted = $result->sortByDesc(fn($c) =>
+            ($c['unread_urgent'] > 0 ? 1000 : 0) +
+            ($c['unread_normal'] > 0 ? 100  : 0) +
+            max(
+                $c['last_urgent'] ? strtotime($c['last_urgent']->created_at) : 0,
+                $c['last_normal']  ? strtotime($c['last_normal']->created_at)  : 0
+            )
+        )->values();
+
+        return response()->json(['data' => $sorted]);
+    }
 }

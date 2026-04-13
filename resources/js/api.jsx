@@ -757,7 +757,8 @@ export const restockOrders = {
 
 // ── Chat (polling) ───────────────────────────────────────────────
 export const chat = {
-  getMessages: (params = {}) => api.get('/chat/messages', { params }),
-  sendMessage: (data)        => api.post('/chat/messages', data),
-  markRead:    (data)        => api.post('/chat/messages/read', data),
+  getMessages:      (params = {}) => api.get('/chat/messages', { params }),
+  sendMessage:      (data)        => api.post('/chat/messages', data),
+  markRead:         (data)        => api.post('/chat/messages/read', data),
+  getConversations: ()            => api.get('/chat/conversations'),
 };

@@ -236,6 +236,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::delete('/restock-orders/{id}', [RestockOrderController::class, 'destroy']);
 
         // Chat — admin (area manager) vede tutti i messaggi
+        Route::get('/chat/conversations', [ChatController::class, 'conversations']);
         Route::get('/chat/messages', [ChatController::class, 'index']);
         Route::post('/chat/messages', [ChatController::class, 'store']);
         Route::post('/chat/messages/read', [ChatController::class, 'markRead']);
