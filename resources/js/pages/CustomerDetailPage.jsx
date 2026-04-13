@@ -19,8 +19,8 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // Storico ordini: filtri e dettaglio
-  const [orderDateFrom, setOrderDateFrom] = useState('');
-  const [orderDateTo, setOrderDateTo] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [orderPeriod, setOrderPeriod] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null); // ordine aperto nel modal dettaglio
   const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
   // CRM
@@ -126,7 +126,7 @@ export default function CustomerDetailPage() {
             {[
               { label: 'Ordini', value: ordersList.length },
               { label: 'Speso', value: fmt(totalSpent) },
-              { label: 'Punti', value: loyaltyData?.balance ?? '—' },
+              { label: 'Punti', value: Math.floor(totalSpent) },
             ].map(kpi => (
               <div key={kpi.label} style={{ textAlign: 'center' }}>
                 <div style={{ color: '#fff', fontWeight: 900, fontSize: 20 }}>{kpi.value}</div>
@@ -188,12 +188,25 @@ export default function CustomerDetailPage() {
 
       {/* ── ORDINI ── */}
       {activeTab === 'ordini' && (() => {
-        // Filtra per data
+        // Filtri
         const filteredOrders = ordersList.filter(o => {
-          if (orderDateFrom && new Date(o.created_at) < new Date(orderDateFrom)) return false;
-          if (orderDateTo && new Date(o.created_at) > new Date(orderDateTo + 'T23:59:59')) return false;
+          // Filtro numero ordine
+          if (searchTerm && !String(o.id).includes(searchTerm.trim().replace(/^0+/, ''))) return false;
+          // Filtro periodo
+          if (orderPeriod !== 'all') {
+            const date = new Date(o.created_at);
+            const now = new Date();
+            if (orderPeriod === '30d') {
+              if ((now - date) > 30 * 24 * 60 * 60 * 1000) return false;
+            } else if (orderPeriod === '90d') {
+              if ((now - date) > 90 * 24 * 60 * 60 * 1000) return false;
+            } else if (orderPeriod === 'year') {
+              if (date.getFullYear() !== now.getFullYear()) return false;
+            }
+          }
           return true;
         });
+
         const openOrderDetail = async (o) => {
           setSelectedOrder(o);
           if (!o.lines) {
@@ -205,28 +218,54 @@ export default function CustomerDetailPage() {
             } catch {} finally { setLoadingOrderDetail(false); }
           }
         };
+
         return (
           <div className="card-v3 overflow-hidden">
-            {/* Filtri data */}
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Storico Ordini ({filteredOrders.length})</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Dal</label>
-                <input type="date" value={orderDateFrom} onChange={e => setOrderDateFrom(e.target.value)}
-                  style={{ padding: '6px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none' }} />
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Al</label>
-                <input type="date" value={orderDateTo} onChange={e => setOrderDateTo(e.target.value)}
-                  style={{ padding: '6px 10px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none' }} />
-                {(orderDateFrom || orderDateTo) && (
-                  <button onClick={() => { setOrderDateFrom(''); setOrderDateTo(''); }}
-                    style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, background: '#f8fafc', cursor: 'pointer', fontWeight: 600, color: '#64748b' }}>
-                    Reset
+            {/* Pannello Ricerca & Filtri */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', background: '#f8fafc' }}>
+              <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                Storico Ordini ({filteredOrders.length})
+              </h2>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto', flexWrap: 'wrap' }}>
+                {/* Ricerca per numero ordine */}
+                <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '0 12px', height: 38 }}>
+                  <span style={{ fontSize: 16, color: '#94a3b8' }}>🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Cerca numero ordine..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', padding: '0 8px', fontSize: 13, width: 140 }}
+                  />
+                </div>
+
+                {/* Filtro periodo semplificato */}
+                <select
+                  value={orderPeriod}
+                  onChange={e => setOrderPeriod(e.target.value)}
+                  style={{
+                    height: 38, padding: '0 14px', border: '1.5px solid #e2e8f0', borderRadius: 10,
+                    fontSize: 13, fontWeight: 600, color: '#334155', background: '#fff', cursor: 'pointer', outline: 'none'
+                  }}
+                >
+                  <option value="all">Tutti i periodi</option>
+                  <option value="30d">Ultimi 30 giorni</option>
+                  <option value="90d">Ultimi 3 mesi</option>
+                  <option value="year">Quest'anno</option>
+                </select>
+
+                {(searchTerm || orderPeriod !== 'all') && (
+                  <button onClick={() => { setSearchTerm(''); setOrderPeriod('all'); }}
+                    style={{ height: 38, padding: '0 14px', border: 'none', borderRadius: 10, fontSize: 13, background: 'rgba(239,68,68,0.1)', cursor: 'pointer', fontWeight: 700, color: '#ef4444' }}>
+                    Annulla Filtri
                   </button>
                 )}
               </div>
             </div>
+
             {filteredOrders.length === 0 ? (
-              <div style={{ padding: '60px 24px', textAlign: 'center', color: '#cbd5e1' }}>Nessun ordine trovato</div>
+              <div style={{ padding: '60px 24px', textAlign: 'center', color: '#94a3b8' }}>Nessun ordine corrispondente trovato</div>
             ) : (
               <table className="table-v3">
                 <thead><tr>
@@ -234,7 +273,6 @@ export default function CustomerDetailPage() {
                   <th>Data</th>
                   <th>Negozio</th>
                   <th>Totale</th>
-                  <th>Articoli</th>
                 </tr></thead>
                 <tbody>
                   {filteredOrders.map(o => (
@@ -246,9 +284,6 @@ export default function CustomerDetailPage() {
                       <td>{fmtDate(o.created_at)}</td>
                       <td style={{ color: '#64748b', fontSize: 13 }}>{o.store_name || '—'}</td>
                       <td><strong>{fmt(o.grand_total)}</strong></td>
-                      <td style={{ color: '#64748b' }}>
-                        {(o.items_count ?? o.lines_count ?? (o.lines?.length) ?? '—')} art.
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -454,21 +489,24 @@ export default function CustomerDetailPage() {
       {/* ── LOYALTY ── */}
       {activeTab === 'loyalty' && (
         <div style={{ display: 'grid', gap: 16 }}>
-          {loyaltyData ? (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-                {[
-                  { label: 'Punti Disponibili', value: loyaltyData.balance || 0, color: '#4f46e5' },
-                  { label: 'Punti Totali Guadagnati', value: loyaltyData.total_earned || 0, color: '#16a34a' },
-                  { label: 'Punti Utilizzati', value: loyaltyData.total_redeemed || 0, color: '#d97706' },
-                ].map(kpi => (
-                  <div key={kpi.label} className="card-v3" style={{ padding: '20px 24px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 32, fontWeight: 900, color: kpi.color }}>{kpi.value.toLocaleString()}</div>
-                    <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700, marginTop: 4 }}>{kpi.label}</div>
-                  </div>
-                ))}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+            {[
+              { label: 'Punti Disponibili', value: Math.floor(totalSpent) - (loyaltyData?.total_redeemed || 0), color: '#4f46e5' },
+              { label: 'Punti Guadagnati', value: Math.floor(totalSpent), color: '#16a34a' },
+              { label: 'Punti Utilizzati', value: loyaltyData?.total_redeemed || 0, color: '#d97706' },
+            ].map(kpi => (
+              <div key={kpi.label} className="card-v3" style={{ padding: '20px 24px', textAlign: 'center' }}>
+                <div style={{ fontSize: 32, fontWeight: 900, color: kpi.color }}>{kpi.value.toLocaleString()}</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700, marginTop: 4 }}>{kpi.label}</div>
               </div>
-              {loyaltyData.transactions?.length > 0 && (
+            ))}
+          </div>
+
+          <div className="card-v3" style={{ padding: '16px 20px', background: '#f8fafc', color: '#64748b', fontSize: 13 }}>
+            💡 <strong>Info:</strong> I punti vengono calcolati automaticamente sulla base del totale speso dal cliente (1€ speso = 1 punto guadagnato).
+          </div>
+
+          {(loyaltyData?.transactions?.length > 0) && (
                 <div className="card-v3 overflow-hidden">
                   <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid #f1f5f9', fontWeight: 800, fontSize: 14 }}>Transazioni Punti</div>
                   <table className="table-v3">
@@ -486,12 +524,7 @@ export default function CustomerDetailPage() {
                   </table>
                 </div>
               )}
-            </>
-          ) : (
-            <div className="card-v3" style={{ padding: 40, textAlign: 'center', color: '#cbd5e1' }}>
-              Nessun dato loyalty disponibile per questo cliente.
-            </div>
-          )}
+
         </div>
       )}
 
