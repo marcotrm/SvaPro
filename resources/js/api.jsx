@@ -714,15 +714,31 @@ export default api;
 
 export { clearApiCache };
 
-// ── Delivery Notes (Bolle di Carico) ──────────────────────────────
+// ── Delivery Notes (Bolle di Scarico) ──────────────────────────────
 export const deliveryNotes = {
-  getAll: (params = {}) => api.get('/delivery-notes', { params }),
-  getOne: (id) => api.get(`/delivery-notes/${id}`),
-  create: (data) => api.post('/delivery-notes', data),
-  receive: (id, data) => api.post(`/delivery-notes/${id}/receive`, data),
-  syncBrt: (id) => api.post(`/delivery-notes/${id}/brt-sync`),
-  getDiscrepancies: (params = {}) => api.get('/delivery-notes/discrepancies', { params }),
-  resolveDiscrepancy: (id, data) => api.post(`/delivery-notes/discrepancies/${id}/resolve`, data),
+  getAll:               (params = {}) => api.get('/delivery-notes', { params }),
+  getOne:               (id)          => api.get(`/delivery-notes/${id}`),
+  create:               (data)        => api.post('/delivery-notes', data),
+  receive:              (id, data)    => api.post(`/delivery-notes/${id}/receive`, data),
+  syncBrt:              (id)          => api.post(`/delivery-notes/${id}/brt-sync`),
+  getDiscrepancies:     (params = {}) => api.get('/delivery-notes/discrepancies', { params }),
+  resolveDiscrepancy:   (id, data)    => api.post(`/delivery-notes/discrepancies/${id}/resolve`, data),
+  scanItem:             (noteId, itemId, qty = 1) => api.post(`/delivery-notes/${noteId}/items/${itemId}/scan`, { qty }),
+  scanByBarcode:        (noteId, barcode) => api.post(`/delivery-notes/${noteId}/scan-by-barcode`, { barcode }),
+  completeVerification: (noteId)      => api.post(`/delivery-notes/${noteId}/complete-verification`),
+  adjustStock:          (noteId, itemId, data) => api.post(`/delivery-notes/${noteId}/items/${itemId}/adjust-stock`, data),
+};
+
+// ── Ordini di Riassortimento Store ──────────────────────────────────
+export const restockOrders = {
+  getAll:         (params = {}) => api.get('/restock-orders', { params }),
+  getOne:         (id)          => api.get(`/restock-orders/${id}`),
+  create:         (data)        => api.post('/restock-orders', data),
+  update:         (id, data)    => api.put(`/restock-orders/${id}`, data),
+  confirm:        (id)          => api.post(`/restock-orders/${id}/confirm`),
+  startPreparing: (id)          => api.post(`/restock-orders/${id}/start-preparing`),
+  ship:           (id, data)    => api.post(`/restock-orders/${id}/ship`, data),
+  destroy:        (id)          => api.delete(`/restock-orders/${id}`),
 };
 
 // ── Chat (polling) ───────────────────────────────────────────────

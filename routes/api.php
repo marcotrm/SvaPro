@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\LoyaltyCardController;
 use App\Http\Controllers\Api\WooCommerceWebhookController;
 use App\Http\Controllers\Api\StockTransferController;
 use App\Http\Controllers\Api\DeliveryNoteController;
+use App\Http\Controllers\Api\RestockOrderController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\CashMovementController;
 use Illuminate\Support\Facades\Route;
@@ -207,7 +208,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/stock-transfers/{id}/cancel', [StockTransferController::class, 'cancel']);
         Route::delete('/stock-transfers/{id}', [StockTransferController::class, 'destroy']);
 
-        // Delivery Notes (Bolle di Carico) — admin crea, gestisce discrepanze
+        // Delivery Notes (Bolle di Scarico) — admin crea, gestisce discrepanze
         Route::get('/delivery-notes', [DeliveryNoteController::class, 'index']);
         Route::get('/delivery-notes/discrepancies', [DeliveryNoteController::class, 'discrepancies']);
         Route::post('/delivery-notes/discrepancies/{id}/resolve', [DeliveryNoteController::class, 'resolveDiscrepancy']);
@@ -215,6 +216,20 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/delivery-notes', [DeliveryNoteController::class, 'store']);
         Route::post('/delivery-notes/{id}/receive', [DeliveryNoteController::class, 'receive']);
         Route::post('/delivery-notes/{id}/brt-sync', [DeliveryNoteController::class, 'syncBrt']);
+        Route::post('/delivery-notes/{id}/complete-verification', [DeliveryNoteController::class, 'completeVerification']);
+        Route::post('/delivery-notes/{id}/items/{itemId}/scan', [DeliveryNoteController::class, 'scanItem']);
+        Route::post('/delivery-notes/{id}/scan-by-barcode', [DeliveryNoteController::class, 'scanByBarcode']);
+        Route::post('/delivery-notes/{id}/items/{itemId}/adjust-stock', [DeliveryNoteController::class, 'adjustStock']);
+
+        // Ordini di Riassortimento Store (Magazzino → Negozio)
+        Route::get('/restock-orders', [RestockOrderController::class, 'index']);
+        Route::get('/restock-orders/{id}', [RestockOrderController::class, 'show']);
+        Route::post('/restock-orders', [RestockOrderController::class, 'store']);
+        Route::put('/restock-orders/{id}', [RestockOrderController::class, 'update']);
+        Route::post('/restock-orders/{id}/confirm', [RestockOrderController::class, 'confirm']);
+        Route::post('/restock-orders/{id}/start-preparing', [RestockOrderController::class, 'startPreparing']);
+        Route::post('/restock-orders/{id}/ship', [RestockOrderController::class, 'ship']);
+        Route::delete('/restock-orders/{id}', [RestockOrderController::class, 'destroy']);
 
         // Chat — admin (area manager) vede tutti i messaggi
         Route::get('/chat/messages', [ChatController::class, 'index']);
@@ -270,6 +285,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/delivery-notes', [DeliveryNoteController::class, 'index']);
         Route::get('/delivery-notes/{id}', [DeliveryNoteController::class, 'show']);
         Route::post('/delivery-notes/{id}/receive', [DeliveryNoteController::class, 'receive']);
+        Route::post('/delivery-notes/{id}/scan-by-barcode', [DeliveryNoteController::class, 'scanByBarcode']);
+        Route::post('/delivery-notes/{id}/items/{itemId}/scan', [DeliveryNoteController::class, 'scanItem']);
+        Route::post('/delivery-notes/{id}/complete-verification', [DeliveryNoteController::class, 'completeVerification']);
 
         // Chat — dipendente può chattare con area manager
         Route::get('/chat/messages', [ChatController::class, 'index']);

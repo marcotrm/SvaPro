@@ -19,19 +19,22 @@ const allNavigation = [
     { label: 'POS Cassa',              href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente','dipendente'] },
     { label: 'Panoramica Generale',    href: '/dashboard',    icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
     { label: 'Report & Analisi',       href: '/reports',      icon: Activity,    roles: ['superadmin','admin_cliente'] },
-    { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in',    icon: Fingerprint, roles: ['dipendente'] },
-    { label: '📦 Carico Negozio',        href: '/store-loading', icon: Package,  roles: ['dipendente'] },
+    { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in',   icon: Fingerprint, roles: ['dipendente'] },
+    { label: '📦 Carico Negozio',       href: '/store-loading', icon: Package,  roles: ['dipendente'] },
+    { label: '📄 Bolle in Arrivo',       href: '/warehouse/delivery-notes', icon: Truck, roles: ['dipendente'] },
     { label: 'Clienti',                href: '/customers',    icon: Users,       roles: ['dipendente'] },
   ]},
 
   // 4. Magazzino ────────────────────────────────────────────────────
   { section: 'Magazzino', icon: Warehouse, items: [
-    { label: 'Giacenze & Stock',       href: '/inventory',    icon: Warehouse,   roles: ['superadmin','admin_cliente'] },
-    { label: 'Prodotti',               href: '/catalog',      icon: Package,     roles: ['superadmin','admin_cliente'] },
-    { label: 'Carico Merce (DDT)',     href: '/supplier-delivery', icon: Truck,  roles: ['superadmin','admin_cliente'] },
-    { label: 'Resi',                   href: '/returns',      icon: RotateCcw,   roles: ['superadmin','admin_cliente'] },
-    { label: 'Trasferimenti',          href: '/stock-transfers', icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
-    { label: 'Inventario Guidato',     href: '/inventory/count', icon: ClipboardList, roles: ['superadmin','admin_cliente'] },
+    { label: 'Giacenze & Stock',       href: '/inventory',            icon: Warehouse,      roles: ['superadmin','admin_cliente'] },
+    { label: 'Prodotti',               href: '/catalog',              icon: Package,        roles: ['superadmin','admin_cliente'] },
+    { label: 'Carico Merce (DDT)',     href: '/supplier-delivery',    icon: Truck,          roles: ['superadmin','admin_cliente'] },
+    { label: 'Resi',                   href: '/returns',              icon: RotateCcw,      roles: ['superadmin','admin_cliente'] },
+    { label: 'Trasferimenti',          href: '/stock-transfers',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
+    { label: 'Inventario Guidato',     href: '/inventory/count',      icon: ClipboardList,  roles: ['superadmin','admin_cliente'] },
+    { label: '📋 Ordini Riassortimento', href: '/warehouse/restock',         icon: ClipboardList,  roles: ['superadmin','admin_cliente'] },
+    { label: '📄 Bolle di Scarico',      href: '/warehouse/delivery-notes',  icon: Truck,          roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
 
   // 5. Acquisti / Fornitori ─────────────────────────────────────────
