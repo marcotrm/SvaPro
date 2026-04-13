@@ -325,11 +325,7 @@ function OrderDetailModal({ orderId, orders, onClose, onNavigate }) {
                       <span>Sconti applicati</span><span>− {fmt(totalDiscount)}</span>
                     </div>
                   )}
-                  {totalTax > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, opacity: 0.85, marginBottom: 6 }}>
-                      <span>di cui IVA</span><span>{fmt(totalTax)}</span>
-                    </div>
-                  )}
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
                     <span style={{ fontSize: 15, fontWeight: 700 }}>TOTALE</span>
                     <span style={{ fontSize: 26, fontWeight: 900 }}>{fmt(data.grand_total)}</span>

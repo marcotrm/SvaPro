@@ -938,8 +938,9 @@ class OrderController extends Controller
                     'excise_amount' => $exciseAmount,
                     'line_total' => $lineTotal,
                     'tax_snapshot' => [
-                        'vat_rate' => 22,
+                        'vat_rate'     => 22,
                         'product_type' => 'service',
+                        'service_name' => $pl['service_name'] ?? 'QScare',
                     ],
                 ];
                 continue;
