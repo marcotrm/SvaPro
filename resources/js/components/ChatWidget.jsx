@@ -134,7 +134,13 @@ function ChatPanel({ user, selectedStoreId, priority, onClose }) {
                 <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', marginBottom: 6 }}>
                   {!isMe && (
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 700, marginBottom: 2 }}>
-                      {msg.sender_name} · {roleLabel(msg.sender_role)}
+                      {msg.sender_name}
+                      {msg.store_name && (
+                        <span style={{ marginLeft: 5, padding: '1px 6px', borderRadius: 5, background: 'rgba(123,111,208,0.1)', color: '#7B6FD0', fontWeight: 700 }}>
+                          🏪 {msg.store_name}
+                        </span>
+                      )}
+                      <span style={{ marginLeft: 5, opacity: 0.6 }}>· {roleLabel(msg.sender_role)}</span>
                     </div>
                   )}
                   <div style={{
@@ -258,8 +264,8 @@ export default function ChatWidget() {
             onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
           >
             {openPanel === 'urgent' ? '✕' : '🚨'}
-            {openPanel !== 'urgent' && (
-              <span style={{ position: 'absolute', width: 52, height: 52, borderRadius: '50%', border: '2px solid rgba(239,68,68,0.4)', animation: 'ripple 2s ease-out infinite' }} />
+            {openPanel !== 'urgent' && unreadUrgent > 0 && (
+              <span style={{ position: 'absolute', width: 52, height: 52, borderRadius: '50%', border: '2px solid rgba(239,68,68,0.5)', animation: 'ripple 1.5s ease-out infinite' }} />
             )}
           </button>
         </div>

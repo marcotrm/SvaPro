@@ -24,9 +24,11 @@ class ChatController extends Controller
         $priority = $request->query('priority', 'normal');
 
         $query = DB::table('chat_messages as cm')
+            ->leftJoin('stores as st', 'st.id', '=', 'cm.store_id')
             ->where('cm.tenant_id', $tenantId)
             ->where('cm.priority', $priority)
             ->orderBy('cm.created_at', 'asc')
+            ->select('cm.*', 'st.name as store_name')
             ->limit(100);
 
         // Filtra per negozio o messaggi broadcast (store_id null)
