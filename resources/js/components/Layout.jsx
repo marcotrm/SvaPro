@@ -21,7 +21,6 @@ const allNavigation = [
     { label: 'POS Cassa',              href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente','dipendente'] },
     { label: 'Report & Analisi',       href: '/reports',      icon: Activity,    roles: ['superadmin','admin_cliente'] },
     { label: '⏱ Timbra Entrata/Uscita', href: '/clock-in',   icon: Fingerprint, roles: ['dipendente'] },
-    { label: '📦 Carico Negozio',       href: '/store-loading', icon: Package,  roles: ['dipendente'] },
     { label: '📄 Bolle in Arrivo',       href: '/warehouse/delivery-notes', icon: Truck, roles: ['dipendente'] },
     { label: 'Clienti',                href: '/customers',    icon: Users,       roles: ['dipendente'] },
   ]},
