@@ -215,8 +215,13 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
                       type="number"
                       className="sp-input"
                       value={cashAmount}
-                      onChange={e => setCashAmount(e.target.value)}
-                      onFocus={() => handlePaymentFocus('cash')}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setCashAmount(v);
+                        const cash = parseFloat(v) || 0;
+                        const remaining = Math.max(0, finalTotal - cash);
+                        setCardAmount(remaining > 0 ? remaining.toFixed(2) : '');
+                      }}
                       style={{ fontSize: 18, fontWeight: 700, paddingLeft: 30, background: '#fff' }}
                     />
                   </div>
@@ -278,8 +283,13 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
                       type="number"
                       className="sp-input"
                       value={cardAmount}
-                      onChange={e => setCardAmount(e.target.value)}
-                      onFocus={() => handlePaymentFocus('card')}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setCardAmount(v);
+                        const card = parseFloat(v) || 0;
+                        const remaining = Math.max(0, finalTotal - card);
+                        setCashAmount(remaining > 0 ? remaining.toFixed(2) : '');
+                      }}
                       style={{ fontSize: 18, fontWeight: 700, paddingLeft: 30, background: '#fff' }}
                     />
                   </div>
