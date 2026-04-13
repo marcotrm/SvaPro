@@ -906,22 +906,26 @@ class OrderController extends Controller
         // Safety cap for global discount
         $globalDiscount = min($globalDiscount, $totalInitialNet);
 
-        // Second pass: distribute global discount and calculate taxes
+        // Second pass: distribute global discount and extract taxes from gross
         foreach ($processedLines as $pl) {
             $qty = $pl['qty'];
             $proportion = $totalInitialNet > 0 ? ($pl['initialLineNet'] / $totalInitialNet) : 0;
             $allocatedGlobalDiscount = $proportion * $globalDiscount;
             
             $totalLineDiscount = $pl['lineDiscount'] + $allocatedGlobalDiscount;
-            $lineNet = max(0.0, $pl['lineSubtotal'] - $totalLineDiscount);
+            // $lineGross è il totale di riga ESATTAMENTE COME PAGATO DAL CLIENTE (già ivato/accisato)
+            $lineGross = max(0.0, $pl['lineSubtotal'] - $totalLineDiscount);
 
             if ($pl['isService']) {
-                $taxAmount = round($lineNet * 0.22, 2); // default 22% iva for services
+                $vatRate = 22.0;
+                // Scorporo IVA (in Italia: Lordo / 1.22 = Imponibile)
+                $lineNetAndExcise = $lineGross / (1 + ($vatRate / 100));
+                $taxAmount = round($lineGross - $lineNetAndExcise, 2);
                 $exciseAmount = 0.0;
-                $lineTotal = round($lineNet + $taxAmount, 2);
-                $lineMargin = $lineNet; // 100% margin on services usually
+                $lineTotal = round($lineGross, 2);
+                $lineMargin = round($lineNetAndExcise, 2); // Imponibile = margine sui servizi
                 
-                $subtotal += $pl['lineSubtotal'];
+                $subtotal += $pl['lineSubtotal']; // Questo è ivato
                 $discountTotal += $totalLineDiscount;
                 $taxTotal += $taxAmount;
                 $exciseTotal += $exciseAmount;
@@ -949,7 +953,10 @@ class OrderController extends Controller
             $variant = $pl['variant'];
 
             $vatRate = $this->resolveVatRate($tenantId, $variant->tax_class_id);
-            $taxAmount = round($lineNet * ($vatRate / 100), 2);
+            
+            // Scorporo IVA dal Lordo pagato dal cliente
+            $lineNetAndExcise = $lineGross / (1 + ($vatRate / 100));
+            $taxAmount = round($lineGross - $lineNetAndExcise, 2);
 
             $exciseAmount = $this->resolveExcise(
                 $tenantId,
@@ -957,14 +964,17 @@ class OrderController extends Controller
                 (int) ($variant->volume_ml ?? 0),
                 (int) ($variant->nicotine_mg ?? 0),
                 $qty,
-                $lineNet,
+                $lineNetAndExcise, // ignore anyway
                 isset($variant->excise_unit_amount_override) ? (float) $variant->excise_unit_amount_override : null
             );
 
-            $lineTotal = round($lineNet + $taxAmount + $exciseAmount, 2);
-            $lineMargin = round(($pl['unitPrice'] - (float) $variant->cost_price) * $qty, 2);
+            // Il Netto reale è (Lordo Scorporato IVA) - Accisa fissa
+            $lineNet = $lineNetAndExcise - $exciseAmount;
+            
+            $lineTotal = round($lineGross, 2);
+            $lineMargin = round($lineNet - ((float) $variant->cost_price * $qty), 2);
 
-            $subtotal += $pl['lineSubtotal'];
+            $subtotal += $pl['lineSubtotal']; // Sempre ivato
             $discountTotal += $totalLineDiscount;
             $taxTotal += $taxAmount;
             $exciseTotal += $exciseAmount;
