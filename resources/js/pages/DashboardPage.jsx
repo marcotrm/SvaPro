@@ -6,6 +6,11 @@ import {
   AreaChart, Area, LineChart, Line, Cell, PieChart, Pie
 } from 'recharts';
 import { ArrowUpRight, ArrowDownRight, Search, Bell, Download, Users, Trophy } from 'lucide-react';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { it } from 'date-fns/locale/it';
+
+registerLocale('it', it);
 
 /* ─── palette ──────────────────────────────────────────────── */
 const PURPLE   = '#9B8FD4';
@@ -183,6 +188,15 @@ export default function DashboardPage() {
   // NEW: period filter for main chart
   const [activePeriod, setActivePeriod] = useState('year');
   const [customDate, setCustomDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const customDateObj = new Date(customDate);
+
+  const handleCustomDateChange = (date) => {
+    if (date) {
+      const offset = date.getTimezoneOffset();
+      const localDate = new Date(date.getTime() - (offset*60*1000));
+      setCustomDate(localDate.toISOString().split('T')[0]);
+    }
+  };
 
   // NEW: employee activity (ultime attività = dipendenti)
   const [employeeActivity, setEmployeeActivity] = useState([]);
@@ -464,22 +478,69 @@ export default function DashboardPage() {
                 </button>
               ))}
               {activePeriod === 'custom' && (
-                <input
-                  type="date"
-                  value={customDate}
-                  onChange={e => setCustomDate(e.target.value)}
-                  style={{
-                    marginLeft: 6,
-                    padding: '4px 8px',
-                    fontSize: 12,
-                    borderRadius: 6,
-                    border: '1px solid var(--color-border-light)',
-                    background: 'var(--color-surface)',
-                    color: 'var(--color-text)',
-                    outline: 'none',
-                    fontWeight: 600,
-                  }}
-                />
+                <div style={{ position: 'relative', marginLeft: 6 }}>
+                  <DatePicker
+                    selected={customDateObj}
+                    onChange={handleCustomDateChange}
+                    locale="it"
+                    dateFormat="dd/MM/yyyy"
+                    className="sp-custom-datepicker"
+                  />
+                  <style>{`
+                    .sp-custom-datepicker {
+                      padding: 6px 12px;
+                      fontSize: 13px;
+                      border-radius: 8px;
+                      border: 1px solid var(--color-border-light);
+                      background: var(--color-bg);
+                      color: var(--color-text);
+                      outline: none;
+                      font-weight: 700;
+                      width: 110px;
+                      cursor: pointer;
+                      text-align: center;
+                      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                      transition: all 0.2s ease;
+                    }
+                    .sp-custom-datepicker:hover {
+                      border-color: #9B8FD4;
+                    }
+                    .react-datepicker {
+                      font-family: inherit;
+                      border: 1px solid var(--color-border);
+                      border-radius: 12px;
+                      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+                      padding: 4px;
+                    }
+                    .react-datepicker__header {
+                      background-color: transparent;
+                      border-bottom: none;
+                      padding-top: 12px;
+                    }
+                    .react-datepicker__current-month, .react-datepicker-time__header {
+                      color: var(--color-text);
+                      font-weight: 800;
+                      font-size: 15px;
+                    }
+                    .react-datepicker__day-name {
+                      color: var(--color-text-tertiary);
+                      font-weight: 700;
+                    }
+                    .react-datepicker__day {
+                      color: var(--color-text);
+                      border-radius: 8px;
+                    }
+                    .react-datepicker__day:hover {
+                      background-color: var(--color-bg);
+                    }
+                    .react-datepicker__day--selected, .react-datepicker__day--keyboard-selected {
+                      background-color: #6C63AC !important;
+                      color: white !important;
+                      font-weight: 800;
+                      border-radius: 8px;
+                    }
+                  `}</style>
+                </div>
               )}
             </div>
           </div>
