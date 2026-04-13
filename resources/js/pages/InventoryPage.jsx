@@ -70,7 +70,7 @@ export default function InventoryPage() {
 
   const filtered = stock.filter(i => {
     if (filterOutStock && i.on_hand > 0) return false;
-    if (filterLowStock && (i.on_hand <= 0 || i.on_hand >= (i.reorder_point || 5))) return false;
+    if (filterLowStock && i.on_hand >= (i.reorder_point || 5)) return false;
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       return i.product_name?.toLowerCase().includes(s) || i.sku?.toLowerCase().includes(s);

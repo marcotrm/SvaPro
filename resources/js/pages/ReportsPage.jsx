@@ -39,9 +39,9 @@ export default function ReportsPage() {
         revenue_delta: rawKpi.revenue_delta ?? rawKpi.delta_revenue ?? null,
         orders_delta: rawKpi.orders_delta ?? rawKpi.delta_orders ?? null,
       } : null);
-      setTrend((trendRes.data?.data || []).map(d => ({ date: d.label, revenue: parseFloat(d.revenue) || 0 })));
+      setTrend((trendRes.data?.data || []).map(d => ({ date: d.period ?? d.label, revenue: parseFloat(d.revenue) || 0 })));
       setTopProds(topRes.data?.data || []);
-      setAcquisition((acqRes.data?.data || []).map(d => ({ date: d.label, count: parseInt(d.count) || 0 })));
+      setAcquisition((acqRes.data?.data || []).map(d => ({ date: d.period ?? d.label, count: parseInt(d.new_customers ?? d.count) || 0 })));
     } catch {
       // silent
     } finally {
