@@ -81,6 +81,8 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  max-width: 100vw;
+  width: 100vw;
   font-size: 14px;
   line-height: 1.5;
 }
@@ -3091,6 +3093,8 @@ a { text-decoration: none; color: inherit; }
   .sp-main {
     margin-left: 0 !important;
     padding-bottom: 72px; /* space for bottom nav */
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
   }
 
   /* Show mobile nav + drawer */
@@ -3101,6 +3105,8 @@ a { text-decoration: none; color: inherit; }
   .sp-topbar {
     padding: 0 14px;
     height: 56px;
+    max-width: 100vw !important;
+    box-sizing: border-box;
   }
   .sp-topbar-title {
     font-size: 15px;
