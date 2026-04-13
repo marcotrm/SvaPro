@@ -461,7 +461,7 @@ class OrderController extends Controller
                     'updated_at' => $now,
                 ]);
 
-                if ($status === 'paid') {
+                if ($status === 'paid' && !empty($line['product_variant_id'])) {
                     $stockExists = DB::table('stock_items')
                         ->where('tenant_id', $tenantId)
                         ->where('warehouse_id', (int) $request->input('warehouse_id'))
