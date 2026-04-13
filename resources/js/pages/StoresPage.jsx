@@ -300,6 +300,8 @@ function StoreModal({ store, onClose, onSaved }) {
       </div>
     </div>
   );
+}
+
 // ─── Componente form per accessi nel Tab ──────────────────────────
 function StoreAccessTab({ store }) {
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'dipendente' });
