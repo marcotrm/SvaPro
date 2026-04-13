@@ -4,6 +4,7 @@ import { reports, stores, orders } from '../api.jsx';
 import { Shield, Loader2, Store, UserCircle, Euro, LayoutDashboard, Activity } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import DatePicker from '../components/DatePicker.jsx';
+import OrderDetailModal from '../components/OrderDetailModal.jsx';
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 const fmtDate = (d) => new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -13,6 +14,7 @@ export default function QscareDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
   const [summary, setSummary] = useState({ total_revenue: 0, total_qty: 0 });
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   // Filtri
   const [dateFrom, setDateFrom] = useState(() => {
@@ -142,7 +144,13 @@ export default function QscareDashboardPage() {
                 <tr><td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>Nessuna vendita QScare trovata nel periodo.</td></tr>
               ) : (
                 data.map((row, i) => (
-                  <tr key={row.order_id + '-' + i}>
+                  <tr 
+                    key={row.order_id + '-' + i} 
+                    onClick={() => setSelectedOrder(row.order_id)}
+                    style={{ cursor: 'pointer', transition: 'background 0.15s' }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8f7fc'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
                     <td style={{ fontWeight: 600 }}>{fmtDate(row.created_at)}</td>
                     <td><span className="sp-badge sp-badge-primary">#{row.order_id}</span></td>
                     <td>{row.store_name}</td>
@@ -157,6 +165,15 @@ export default function QscareDashboardPage() {
           </table>
         </div>
       </div>
+
+      {selectedOrder && (
+        <OrderDetailModal 
+          orderId={selectedOrder} 
+          orders={data} 
+          onClose={() => setSelectedOrder(null)} 
+          onNavigate={(id) => setSelectedOrder(id)} 
+        />
+      )}
     </div>
   );
 }
