@@ -137,6 +137,7 @@ function StoreModal({ store, onClose, onSaved }) {
     { id: 'info',       label: '📋 Informazioni' },
     { id: 'hours',      label: '🕐 Orari apertura' },
     { id: 'attendance', label: '⏱ Timbrature' },
+    { id: 'access',     label: '🔑 Ruoli e Accessi' },
   ];
 
   return (
@@ -280,25 +281,38 @@ function StoreModal({ store, onClose, onSaved }) {
               </div>
             </div>
           )}
+          {/* TAB ACCESSI */}
+          {tab === 'access' && (
+            <StoreAccessTab store={store} />
+          )}
+
         </div>
 
         {/* Footer */}
         <div style={{ padding: '16px 24px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button className="sp-btn sp-btn-ghost" onClick={onClose} disabled={loading}>Annulla</button>
-          <button className="sp-btn sp-btn-primary" onClick={handleSubmit} disabled={loading}>
-            {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : isEdit ? 'Salva modifiche' : 'Crea negozio'}
-          </button>
+          <button className="sp-btn sp-btn-ghost" onClick={onClose} disabled={loading}>Chiudi</button>
+          {tab !== 'access' && (
+            <button className="sp-btn sp-btn-primary" onClick={handleSubmit} disabled={loading}>
+              {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : isEdit ? 'Salva modifiche' : 'Crea negozio'}
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
-}
-
-// ─── Modale Creazione Credenziali ───────────────────────────────────
-function CreateCredentialsModal({ store, onClose }) {
+// ─── Componente form per accessi nel Tab ──────────────────────────
+function StoreAccessTab({ store }) {
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'dipendente' });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+
+  if (!store?.id) {
+    return (
+      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+        <p>Devi prima salvare il negozio per potergli assegnare degli accessi.</p>
+      </div>
+    );
+  }
 
   const set = (f, v) => setForm(p => ({ ...p, [f]: v }));
 
@@ -307,7 +321,7 @@ function CreateCredentialsModal({ store, onClose }) {
       setLoading(true); setErrors({});
       await storesApi.createCredentials(store.id, form);
       toast.success("Credenziali create! L'utente può ora accedere al negozio.");
-      onClose();
+      setForm({ name: '', email: '', password: '', role: 'dipendente' }); // Reset
     } catch (err) {
       if (err.response?.data?.errors) setErrors(err.response.data.errors);
       else toast.error(err.response?.data?.message || 'Errore generazione credenziali');
@@ -317,63 +331,52 @@ function CreateCredentialsModal({ store, onClose }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ background: 'var(--color-surface)', borderRadius: 20, width: '100%', maxWidth: 460, padding: 24, boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }} className="sp-animate-in">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Users size={18} color="#fff" />
-            </div>
-            <div>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Genera Accesso</h3>
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--color-text-secondary)' }}>per {store.name}</p>
-            </div>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}><X size={20} /></button>
-        </div>
+    <div style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 20, border: '1px solid var(--color-border)' }}>
+      <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800 }}>Genera nuovo accesso per {store.name}</h4>
+      <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 20 }}>
+        Crea rapidamente un account. Verrà associato automaticamente a questo negozio.
+      </p>
 
-        <div style={{ padding: '12px 14px', background: 'rgba(155,143,212,0.08)', borderRadius: 10, border: '1px solid rgba(155,143,212,0.2)', fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
-          <strong>ℹ️ Nota:</strong> Generando questo accesso, l'utente verrà bloccato nel contesto del negozio <strong>{store.name}</strong> e vi verrà assegnato automaticamente il codice <strong>{store.code}</strong>.
+      <div style={{ padding: '12px 14px', background: 'rgba(155,143,212,0.08)', borderRadius: 10, border: '1px solid rgba(155,143,212,0.2)', fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
+        <strong>ℹ️ Info:</strong> Alla creazione, il sistema genererà automaticamente anche il tag/pin per la Cassa POS associato a questo utente e lo bloccherà sulle vendite di questo negozio.
+      </div>
+      
+      <div style={{ display: 'grid', gap: 14, gridTemplateColumns: '1fr 1fr' }}>
+        <div style={{ gridColumn: '1/-1' }}>
+          <label className="sp-label">Ruolo dell'account</label>
+          <select className="sp-select" value={form.role} onChange={e => set('role', e.target.value)}>
+            <option value="dipendente">Operatore Base (Solo POS Cassa e Ordini base)</option>
+            <option value="admin_cliente">Amministratore del Negozio (Vede Dashboard Storica)</option>
+          </select>
         </div>
+        <div>
+          <label className="sp-label">Nominativo (Nome e Cognome)</label>
+          <input className="sp-input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Es: Mario Rossi" />
+          {errors.name && <div style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{errors.name[0]}</div>}
+        </div>
+        <div>
+          <label className="sp-label">Email di Login</label>
+          <input type="email" className="sp-input" value={form.email} onChange={e => set('email', e.target.value.toLowerCase())} placeholder="es: mario@negozio.it" />
+          {errors.email && <div style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{errors.email[0]}</div>}
+        </div>
+        <div style={{ gridColumn: '1/-1' }}>
+          <label className="sp-label">Password Segreta</label>
+          <input type="password" className="sp-input" value={form.password} onChange={e => set('password', e.target.value)} placeholder="Inserisci una password sicura..." />
+          {errors.password && <div style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{errors.password[0]}</div>}
+        </div>
+      </div>
 
-        <div style={{ display: 'grid', gap: 14 }}>
-          <div>
-            <label className="sp-label">Ruolo dell'account</label>
-            <select className="sp-select" value={form.role} onChange={e => set('role', e.target.value)}>
-              <option value="dipendente">Operatore Base (Solo POS Cassa e Ordini base)</option>
-              <option value="admin_cliente">Amministratore del Negozio (Vede Dashboard Storica)</option>
-            </select>
-          </div>
-          <div>
-            <label className="sp-label">Nominativo (Nome e Cognome)</label>
-            <input className="sp-input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Es: Mario Rossi" />
-            {errors.name && <div style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{errors.name[0]}</div>}
-          </div>
-          <div>
-            <label className="sp-label">Email di Login</label>
-            <input type="email" className="sp-input" value={form.email} onChange={e => set('email', e.target.value.toLowerCase())} placeholder="es: mario@negozio.it" />
-            {errors.email && <div style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{errors.email[0]}</div>}
-          </div>
-          <div>
-            <label className="sp-label">Password Segreta</label>
-            <input type="password" className="sp-input" value={form.password} onChange={e => set('password', e.target.value)} placeholder="Inserisci una password sicura (min. 6 caratteri)" />
-            {errors.password && <div style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{errors.password[0]}</div>}
-          </div>
-        </div>
-
-        <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button className="sp-btn sp-btn-ghost" onClick={onClose} disabled={loading}>Annulla</button>
-          <button className="sp-btn sp-btn-primary" onClick={handleSubmit} disabled={loading || !form.name || !form.email || !form.password}>
-             {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : 'Crea Accesso & Pin'}
-          </button>
-        </div>
+      <div style={{ marginTop: 24, textAlign: 'right' }}>
+        <button className="sp-btn sp-btn-primary" onClick={handleSubmit} disabled={loading || !form.name || !form.email || !form.password}>
+          {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : 'Crea Accesso & Pin'}
+        </button>
       </div>
     </div>
   );
 }
 
 // ─── Card negozio ──────────────────────────────────────────────────
-function StoreCard({ store, onEdit, onDelete, onCreateCred }) {
+function StoreCard({ store, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false);
 
   const today = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
@@ -424,9 +427,6 @@ function StoreCard({ store, onEdit, onDelete, onCreateCred }) {
         </div>
 
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-          <button className="sp-btn sp-btn-ghost sp-btn-sm" onClick={() => onCreateCred(store)} title="Crea accesso login">
-            <Users size={14} />
-          </button>
           <button className="sp-btn sp-btn-ghost sp-btn-sm" onClick={() => onEdit(store)} title="Modifica">
             <Edit3 size={14} />
           </button>
@@ -502,7 +502,6 @@ export default function StoresPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editStore, setEditStore] = useState(null);
-  const [credentialStore, setCredentialStore] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -587,7 +586,6 @@ export default function StoresPage() {
               store={store}
               onEdit={(s) => { setEditStore(s); setShowModal(true); }}
               onDelete={(s) => setConfirmDelete(s)}
-              onCreateCred={(s) => setCredentialStore(s)}
             />
           ))}
         </div>
@@ -599,14 +597,6 @@ export default function StoresPage() {
           store={editStore}
           onClose={() => { setShowModal(false); setEditStore(null); }}
           onSaved={() => { setShowModal(false); setEditStore(null); load(); }}
-        />
-      )}
-
-      {/* Modal creazione credenziali dipendente/admin per il negozio */}
-      {credentialStore && (
-        <CreateCredentialsModal
-          store={credentialStore}
-          onClose={() => setCredentialStore(null)}
         />
       )}
 
