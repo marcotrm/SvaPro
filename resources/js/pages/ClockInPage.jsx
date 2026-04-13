@@ -264,12 +264,10 @@ function AdminPresenceView() {
           </div>
         )}
       </div>
-    </div>
-  </>
-  }
+    </>}
 
-  {/* ── TAB: CRONOLOGIA & ORE ── */}
-  {activeTab === 'history' && (
+    {/* ── TAB: CRONOLOGIA & ORE ── */}
+    {activeTab === 'history' && (
     <div>
       {/* Filtri */}
       <div style={{ background: 'var(--color-surface)', borderRadius: 16, padding: '20px', border: '1px solid var(--color-border)', marginBottom: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14 }}>
@@ -405,6 +403,7 @@ function AdminPresenceView() {
   )}
     </div>
   );
+}
 
 /* ═══════════════════════════════════════════════════════════
    EMPLOYEE KIOSK VIEW — Schermata timbratura touch
