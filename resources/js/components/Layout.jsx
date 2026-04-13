@@ -394,7 +394,11 @@ export default function Layout({ user, setUser }) {
           <button className="sp-mobile-topbar-menu" onClick={() => setMobileDrawerOpen(true)} aria-label="Menu">
             <Menu size={20} />
           </button>
-          <div className="sp-topbar-title">{activePageLabel}</div>
+          <div className="sp-topbar-title">
+            {location.pathname === '/' && selectedStore 
+              ? `${activePageLabel} - ${selectedStore.name}` 
+              : activePageLabel}
+          </div>
           <div className="sp-topbar-actions">
             {storesList.length > 1 && (
               <select 
