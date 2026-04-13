@@ -212,15 +212,46 @@ class ReportController extends Controller
             ? round(($current->orders - $previous->orders) / $previous->orders * 100, 1)
             : null;
 
+        // Breakdown per metodo di pagamento
+        $cashTotal = (clone $orderBase)->where('channel', 'cash')->sum('grand_total');
+        $cardTotal = (clone $orderBase)->where('channel', 'card')->sum('grand_total');
+        $otherTotal = (clone $orderBase)
+            ->whereNotIn('channel', ['cash', 'card'])
+            ->sum('grand_total');
+
+        // Items sold (totale quantità linee)
+        $itemsSold = DB::table('sales_order_lines as sol')
+            ->join('sales_orders as so', 'so.id', '=', 'sol.sales_order_id')
+            ->where('so.tenant_id', $tenantId)
+            ->where('so.status', 'paid')
+            ->when($storeId, fn($q) => $q->where('so.store_id', $storeId))
+            ->when($dateFrom && $dateTo,
+                fn($q) => $q->whereRaw("(so.created_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom])
+                            ->whereRaw("(so.created_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]),
+                fn($q) => $q->where('so.created_at', '>=', now()->subDays($days))
+            )
+            ->sum('sol.qty');
+
+        $upt = $current->orders > 0 ? round($itemsSold / $current->orders, 2) : 0;
+
         return response()->json(['data' => [
-            'revenue'         => round($current->revenue, 2),
-            'orders'          => $current->orders,
-            'avg_order'       => round($current->avg_order, 2),
-            'delta_revenue'   => $deltaRevenue,
-            'delta_orders'    => $deltaOrders,
-            'total_customers' => $customerCount,
-            'new_customers'   => $newCustomers,
-            'low_stock'       => $lowStock,
+            'revenue'          => round($current->revenue, 2),
+            'total_revenue'    => round($current->revenue, 2),
+            'orders'           => $current->orders,
+            'total_orders'     => $current->orders,
+            'avg_order'        => round($current->avg_order, 2),
+            'avg_ticket'       => round($current->avg_order, 2),
+            'delta_revenue'    => $deltaRevenue,
+            'delta_orders'     => $deltaOrders,
+            'total_customers'  => $customerCount,
+            'unique_customers' => $customerCount,
+            'new_customers'    => $newCustomers,
+            'low_stock'        => $lowStock,
+            'cash_total'       => round((float) $cashTotal, 2),
+            'card_total'       => round((float) $cardTotal, 2),
+            'other_total'      => round((float) $otherTotal, 2),
+            'items_sold'       => (int) $itemsSold,
+            'upt'              => $upt,
         ]]);
     }
 

@@ -395,12 +395,15 @@ export default function StoreStatsDrawer({ store, onClose }) {
 
       const s = summRes.data?.data || summRes.data || {};
       setKpi({
-        revenue:    parseFloat(s.total_revenue || s.revenue || 0),
-        orders:     parseInt(s.total_orders || s.orders_count || 0),
-        avg_ticket: parseFloat(s.avg_ticket || s.average_ticket || 0),
-        customers:  parseInt(s.unique_customers || s.customers_count || 0),
-        cash:       parseFloat(s.cash_total || 0),
-        card:       parseFloat(s.card_total || 0),
+        revenue:     parseFloat(s.total_revenue || s.revenue || 0),
+        orders:      parseInt(s.total_orders || s.orders || 0),
+        avg_ticket:  parseFloat(s.avg_ticket || s.avg_order || 0),
+        customers:   parseInt(s.unique_customers || s.total_customers || 0),
+        cash:        parseFloat(s.cash_total || 0),
+        card:        parseFloat(s.card_total || 0),
+        other:       parseFloat(s.other_total || 0),
+        items_sold:  parseInt(s.items_sold || 0),
+        upt:         parseFloat(s.upt || 0),
       });
 
       const orderList = ordRes.data?.data || ordRes.data || [];
@@ -464,14 +467,45 @@ export default function StoreStatsDrawer({ store, onClose }) {
           ) : kpi ? (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+                {/* Totale incassato – full width */}
                 <div style={{ gridColumn: '1/-1' }}>
-                  <KpiCard icon={TrendingUp} label="Totale Incassato" value={fmt(kpi.revenue)} color="#7B6FD0" sub={kpi.orders > 0 ? `${fmtN(kpi.orders)} transazioni` : 'Nessuna vendita'} />
+                  <KpiCard icon={TrendingUp} label="Totale Incassato" value={fmt(kpi.revenue)} color="#7B6FD0"
+                    sub={kpi.orders > 0 ? `${fmtN(kpi.orders)} scontrini` : 'Nessuna vendita'} />
                 </div>
-                <KpiCard icon={ShoppingBag} label="N° Scontrini" value={fmtN(kpi.orders)} color="#6C63AC" />
+                {/* Scontrino medio */}
                 <KpiCard icon={BarChart3} label="Scontrino Medio" value={fmt(kpi.avg_ticket)} color="#8B7FCC" />
-                <KpiCard icon={Banknote} label="Contanti" value={fmt(kpi.cash)} color="#10b981" />
-                <KpiCard icon={CreditCard} label="Carta / POS" value={fmt(kpi.card)} color="#3B82F6" />
-                {kpi.customers > 0 && <div style={{ gridColumn: '1/-1' }}><KpiCard icon={Users} label="Clienti Fidelizzati" value={fmtN(kpi.customers)} color="#F59E0B" /></div>}
+                {/* UPT */}
+                <KpiCard icon={ShoppingBag} label="UPT (articoli/scontr.)" value={kpi.upt > 0 ? kpi.upt.toFixed(2) : '—'} color="#6C63AC"
+                  sub={kpi.items_sold > 0 ? `${fmtN(kpi.items_sold)} pz totali` : undefined} />
+                {/* Pagamenti – sezione breakdown */}
+                <div style={{ gridColumn: '1/-1', background: '#f8f7fc', borderRadius: 14, padding: '14px 16px', border: '1px solid #ede9f8' }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#1a1a2e', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    💳 Strumenti di Pagamento
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', border: '1px solid #f0edf8' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981', marginBottom: 4 }}>💵 Contanti</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: '#10b981' }}>{fmt(kpi.cash)}</div>
+                      {kpi.revenue > 0 && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{Math.round(kpi.cash / kpi.revenue * 100)}% del totale</div>}
+                    </div>
+                    <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', border: '1px solid #f0edf8' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#3B82F6', marginBottom: 4 }}>💳 Carta / POS</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: '#3B82F6' }}>{fmt(kpi.card)}</div>
+                      {kpi.revenue > 0 && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{Math.round(kpi.card / kpi.revenue * 100)}% del totale</div>}
+                    </div>
+                    {kpi.other > 0 && (
+                      <div style={{ gridColumn: '1/-1', background: '#fff', borderRadius: 10, padding: '10px 12px', border: '1px solid #f0edf8' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#F59E0B', marginBottom: 4 }}>🔄 Altro</div>
+                        <div style={{ fontSize: 18, fontWeight: 900, color: '#F59E0B' }}>{fmt(kpi.other)}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {kpi.customers > 0 && (
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <KpiCard icon={Users} label="Clienti Fidelizzati" value={fmtN(kpi.customers)} color="#F59E0B" />
+                  </div>
+                )}
               </div>
 
               <div style={{ background: '#fff', borderRadius: 14, padding: '16px', border: '1px solid #f0edf8', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
