@@ -515,6 +515,7 @@ export default function PosPage() {
         ? Object.values(err.response.data.errors).flat().join(' • ')
         : err.response?.data?.message || 'Errore durante il pagamento';
       toast.error(msg);
+        throw err;
     }
     finally { setPlacingOrder(false); }
   };
@@ -1348,3 +1349,4 @@ function PosResoModal({ storeId, onClose, onDone }) {
     </div>
   );
 }
+

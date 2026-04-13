@@ -372,7 +372,14 @@ class OrderController extends Controller
             $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
             $autoWarehouse = DB::table('warehouses')
                 ->where('tenant_id', $tenantId)
-                ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+                ->where(function ($q) use ($storeId) {
+                    if ($storeId) {
+                        $q->where('store_id', $storeId)->orWhereNull('store_id');
+                    } else {
+                        $q->whereNull('store_id');
+                    }
+                })
+                ->orderByRaw('store_id IS NOT NULL DESC')
                 ->orderBy('id')
                 ->value('id');
             if ($autoWarehouse) {
