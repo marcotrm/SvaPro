@@ -1087,7 +1087,14 @@ export default function PosPage() {
 
           {/* Bottone Cassa */}
           <button
-            onClick={() => setShowCheckoutModal(true)}
+            onClick={() => {
+              if (!soldByEmployeeId) {
+                toast.error('⚠️ Inserisci il codice operatore prima di procedere con la vendita!', { duration: 3500 });
+                operatorBarcodeRef.current?.focus();
+                return;
+              }
+              setShowCheckoutModal(true);
+            }}
             disabled={placingOrder || cartLines.length === 0}
             style={{
               width: '100%', height: 56, borderRadius: 14, border: 'none', cursor: cartLines.length ? 'pointer' : 'not-allowed',

@@ -194,7 +194,15 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Metodi di Pagamento</div>
             
             {/* Contanti */}
-            <div style={{ background: 'var(--color-bg)', padding: '16px', borderRadius: 12, border: '1px solid transparent', transition: 'border-color 0.15s', ...(parseFloat(cashAmount) > 0 ? { borderColor: '#86efac' } : {}) }}>
+            <div
+              onClick={() => {
+                // Click sulla card = switch tutto su contanti
+                if (parseFloat(cardAmount) > 0 && parseFloat(cashAmount) === 0) {
+                  setCashAmount(finalTotal.toFixed(2));
+                  setCardAmount('');
+                }
+              }}
+              style={{ background: 'var(--color-bg)', padding: '16px', borderRadius: 12, border: '1.5px solid transparent', transition: 'border-color 0.15s, box-shadow 0.15s', cursor: 'pointer', ...(parseFloat(cashAmount) > 0 ? { borderColor: '#86efac', boxShadow: '0 0 0 3px rgba(16,185,129,0.07)' } : {}) }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 18, background: '#10B98120', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981' }}>
                   <Banknote size={18} />
@@ -249,7 +257,15 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
             </div>
 
             {/* Carta */}
-            <div style={{ background: 'var(--color-bg)', padding: '16px', borderRadius: 12, border: '1px solid transparent', transition: 'border-color 0.15s', ...(parseFloat(cardAmount) > 0 ? { borderColor: '#93c5fd' } : {}) }}>
+            <div
+              onClick={() => {
+                // Click sulla card = switch tutto su carta
+                if (parseFloat(cashAmount) > 0 && parseFloat(cardAmount) === 0) {
+                  setCardAmount(finalTotal.toFixed(2));
+                  setCashAmount('');
+                }
+              }}
+              style={{ background: 'var(--color-bg)', padding: '16px', borderRadius: 12, border: '1.5px solid transparent', transition: 'border-color 0.15s, box-shadow 0.15s', cursor: 'pointer', ...(parseFloat(cardAmount) > 0 ? { borderColor: '#93c5fd', boxShadow: '0 0 0 3px rgba(59,130,246,0.07)' } : {}) }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 18, background: '#3B82F620', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
                   <CreditCard size={18} />
