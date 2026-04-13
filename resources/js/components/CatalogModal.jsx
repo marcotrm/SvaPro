@@ -282,8 +282,8 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
     // Deriva product_type dal nome della categoria (fallback 'other')
     const cat = categories.find(c => String(c.id) === String(catId));
     const derivedType = cat
-      ? (cat.name.toLowerCase().includes('liquid') || cat.name.toLowerCase().includes('liquid') ? 'liquid'
-        : cat.name.toLowerCase().includes('device') || cat.name.toLowerCase().includes('disposit') ? 'device'
+      ? (cat.name.toLowerCase().includes('liquid') ? 'liquid'
+        : cat.name.toLowerCase().includes('device') || cat.name.toLowerCase().includes('disposit') || cat.name.toLowerCase().includes('hardware') || cat.name.toLowerCase().includes('mod') ? 'device'
         : cat.name.toLowerCase().includes('access') ? 'accessory'
         : cat.name.toLowerCase().includes('coil') || cat.name.toLowerCase().includes('cotton') ? 'consumable'
         : 'other')
@@ -415,11 +415,36 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                 <label className="sp-label">Codice PLI (Accise)</label>
                 <input className="sp-input" name="pli_code" value={formData.pli_code} onChange={handleChange} placeholder="Es: 9041" />
               </div>
-              {formData.product_type === 'device' && (
-                <div>
-                  <label className="sp-label">🛡️ QScare Prezzo (€)</label>
-                  <input className="sp-input" type="number" step="0.01" name="qscare_price" value={formData.qscare_price} onChange={handleChange} placeholder="Es: 15.00" />
-                  <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Prezzo dell'estensione di garanzia opzionale QScare per questo hardware.</p>
+              {(formData.product_type === 'device' || (() => {
+                const cat = categories.find(c => String(c.id) === String(formData.subcategory_id || formData.category_id));
+                const n = cat?.name?.toLowerCase() || '';
+                return n.includes('hardware') || n.includes('device') || n.includes('disposit') || n.includes('mod');
+              })()) && (
+                <div style={{ gridColumn: '1/-1', background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.06))', border: '1.5px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '16px 18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 20 }}>🛡️</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text)' }}>QScare — Garanzia Hardware</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Prezzo assicurazione per questo hardware (solo prodotti di tipo dispositivo)</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ position: 'relative', maxWidth: 200 }}>
+                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--color-text-secondary)', fontSize: 14 }}>€</span>
+                      <input
+                        className="sp-input"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="qscare_price"
+                        value={formData.qscare_price}
+                        onChange={handleChange}
+                        placeholder="Es: 9.90"
+                        style={{ paddingLeft: 28, fontWeight: 700 }}
+                      />
+                    </div>
+                    <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: 0 }}>Lascia vuoto per disabilitare QScare su questo prodotto. Il toggle apparirà nel POS quando viene aggiunto al carrello.</p>
+                  </div>
                 </div>
               )}
               <div style={{ gridColumn: '1/-1' }}>

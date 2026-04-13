@@ -33,6 +33,7 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
   const palette   = catPalette(product.category_id);
   const imgUrl    = product.image_url ? getImageUrl(product.image_url) : null;
   const inStock   = onHand > 0;
+  const qscarePrice = parseFloat(product.qscare_price) || 0;
   const [popped, setPopped] = React.useState(false);
 
   const handleAdd = () => {
@@ -50,21 +51,21 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
         borderRadius: 16,
         overflow: 'hidden',
         cursor: 'pointer',
-        border: '1px solid #eee',
+        border: qscarePrice > 0 ? '1px solid rgba(99,102,241,0.25)' : '1px solid #eee',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
         transition: 'all 0.18s cubic-bezier(.4,0,.2,1)',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        boxShadow: qscarePrice > 0 ? '0 1px 6px rgba(99,102,241,0.15)' : '0 1px 4px rgba(0,0,0,0.06)',
         opacity: inStock ? 1 : 0.65,
       }}
       onMouseEnter={e => {
         e.currentTarget.style.transform = 'translateY(-3px)';
-        e.currentTarget.style.boxShadow = '0 12px 28px rgba(0,0,0,0.13)';
+        e.currentTarget.style.boxShadow = qscarePrice > 0 ? '0 12px 28px rgba(99,102,241,0.25)' : '0 12px 28px rgba(0,0,0,0.13)';
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)';
+        e.currentTarget.style.boxShadow = qscarePrice > 0 ? '0 1px 6px rgba(99,102,241,0.15)' : '0 1px 4px rgba(0,0,0,0.06)';
       }}
     >
       {/* Immagine o gradient placeholder */}
@@ -100,6 +101,22 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
         }}>
           {inStock ? onHand : '×'}
         </div>
+
+        {/* QScare badge — visibile solo per hardware con prezzo configurato */}
+        {qscarePrice > 0 && (
+          <div style={{
+            position: 'absolute', bottom: 7, left: 7,
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.92), rgba(139,92,246,0.92))',
+            color: '#fff', borderRadius: 8, padding: '2px 7px', fontSize: 9, fontWeight: 800,
+            backdropFilter: 'blur(6px)',
+            boxShadow: '0 2px 8px rgba(99,102,241,0.4)',
+            display: 'flex', alignItems: 'center', gap: 3,
+            letterSpacing: '0.02em',
+            whiteSpace: 'nowrap',
+          }}>
+            🛡 {fmt(qscarePrice)}
+          </div>
+        )}
 
         {/* Info button */}
         <button
@@ -364,8 +381,12 @@ export default function PosPage() {
         location: variant.location || '',
       }];
     });
+    // Auto-attiva QScare se il prodotto è hardware con prezzo QScare configurato
+    if (isHardwareProduct(product) && parseFloat(product.qscare_price) > 0) {
+      setQscareEnabled(true);
+    }
     toast.success(`${product.name}`, { duration: 900, icon: '🛒' });
-  }, [stockMap]);
+  }, [stockMap, isHardwareProduct]);
 
   const updateQty = (variantId, delta) => {
     setCartLines(prev => prev.map(l => {
@@ -381,40 +402,39 @@ export default function PosPage() {
   const cartTotal = useMemo(() => cartLines.reduce((s, l) => s + l.price * l.qty, 0), [cartLines]);
   const cartCount = useMemo(() => cartLines.reduce((s, l) => s + l.qty, 0), [cartLines]);
 
+  // Helper: determina se un prodotto è hardware/dispositivo
+  const isHardwareProduct = useCallback((product) => {
+    const cat = categories.find(c => c.id === product.category_id);
+    const n = cat?.name?.toLowerCase() || '';
+    return (
+      n.includes('hardware') ||
+      n.includes('dispositiv') ||
+      n.includes('device') ||
+      n.includes('mod') ||
+      product.product_type === 'device'
+    );
+  }, [categories]);
+
   // Controlla se il carrello contiene dispositivi (categoria il cui nome contiene 'dispositiv' oppure product_type 'device')
   const cartHasDevice = useMemo(() => {
     return cartLines.some(line => {
       const product = products.find(p => p.variants?.some(v => v.id === line.product_variant_id));
       if (!product) return false;
-      const cat = categories.find(c => c.id === product.category_id);
-      return (
-        cat?.name?.toLowerCase().includes('dispositiv') ||
-        cat?.name?.toLowerCase().includes('device') ||
-        cat?.name?.toLowerCase().includes('mod') ||
-        product.product_type === 'device'
-      );
+      return isHardwareProduct(product);
     });
-  }, [cartLines, products, categories]);
+  }, [cartLines, products, isHardwareProduct]);
 
   // QScare: calcolato sui dispositivi hardware nel carrello
   const cartQscarePrice = useMemo(() => {
     let total = 0;
     cartLines.forEach(line => {
       const p = products.find(prod => prod.variants?.some(v => v.id === line.product_variant_id));
-      if (p) {
-        // Verifica se è un dispositivo (hardware)
-        const cat = categories.find(c => c.id === p.category_id);
-        const isDevice = cat?.name?.toLowerCase().includes('dispositiv') ||
-                         cat?.name?.toLowerCase().includes('device') ||
-                         cat?.name?.toLowerCase().includes('mod') ||
-                         p.product_type === 'device';
-        if (isDevice) {
-           total += (parseFloat(p.qscare_price) || 0) * line.qty;
-        }
+      if (p && isHardwareProduct(p)) {
+        total += (parseFloat(p.qscare_price) || 0) * line.qty;
       }
     });
     return total;
-  }, [cartLines, products, categories]);
+  }, [cartLines, products, isHardwareProduct]);
 
   const effectiveQscarePrice = cartQscarePrice;
   const cartTotalWithQscare = cartTotal + (qscareEnabled ? effectiveQscarePrice : 0);
