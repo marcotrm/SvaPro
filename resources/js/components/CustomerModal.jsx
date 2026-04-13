@@ -283,8 +283,13 @@ export default function CustomerModal({ customer, onClose, onSave }) {
             <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>
               {isEdit ? 'Modifica Cliente' : 'Nuovo Cliente'}
             </h2>
-            <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '2px 0 0' }}>
-              {isEdit ? `ID: ${customer.id}` : 'Aggiungi un nuovo cliente al gestionale'}
+            <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {isEdit ? (
+                <>
+                  <span style={{ background: 'var(--color-accent)', color: '#fff', borderRadius: 6, padding: '1px 8px', fontWeight: 800, fontFamily: 'monospace', fontSize: 13 }}>#{customer.id}</span>
+                  <span>{customer.first_name || customer.company_name} {customer.last_name || ''}</span>
+                </>
+              ) : 'Aggiungi un nuovo cliente al gestionale'}
             </p>
           </div>
           <button onClick={onClose} style={{ background: 'var(--color-bg)', border: 'none', borderRadius: 10, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
@@ -477,7 +482,7 @@ export default function CustomerModal({ customer, onClose, onSave }) {
               </label>
             </div>
 
-            {/* ─── Codice tessera fidelity ─── */}
+            {/* ─── Codice tessera fidelity + Numero Cliente ─── */}
             <Field label="Codice Tessera Fidelity" error={fe('code')} full>
               <input
                 className={S.input}
@@ -491,6 +496,21 @@ export default function CustomerModal({ customer, onClose, onSave }) {
                 Codice univoco per la tessera fedeltà del cliente
               </p>
             </Field>
+            {isEdit && (
+              <Field label="N° Cliente (progressivo)">
+                <div style={{
+                  background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                  borderRadius: 8, padding: '9px 12px', fontFamily: 'monospace',
+                  fontWeight: 800, fontSize: 16, color: 'var(--color-accent)',
+                  letterSpacing: 1,
+                }}>
+                  #{customer.id}
+                </div>
+                <p style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+                  Numero progressivo assegnato automaticamente alla creazione
+                </p>
+              </Field>
+            )}
           </div>
         </form>
 

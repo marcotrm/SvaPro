@@ -41,16 +41,16 @@ class ReportController extends Controller
     {
         $tenantId  = $request->attributes->get('tenant_id');
         $storeId   = $this->getSecureStoreId($request);
-        $period    = $request->input('period', 'daily'); // daily|weekly|monthly
-        $days      = (int) $request->input('days', 30);
-        $days      = min($days, 365);
-        $dateFrom  = $request->input('date_from'); // es. 2026-04-10
-        $dateTo    = $request->input('date_to');   // es. 2026-04-10
+        $period    = $request->input('period', 'daily');
+        $days      = min((int) ($request->input('days', 30) ?: 30), 365);
+        $dateFrom  = $request->input('date_from');
+        $dateTo    = $request->input('date_to');
 
+        // SQLite-compatible date grouping
         $dateExpr = match ($period) {
-            'weekly'  => DB::raw("to_char(date_trunc('week', sales_orders.created_at AT TIME ZONE 'Europe/Rome'), 'YYYY-MM-DD') as period"),
-            'monthly' => DB::raw("to_char(date_trunc('month', sales_orders.created_at AT TIME ZONE 'Europe/Rome'), 'YYYY-MM') as period"),
-            default   => DB::raw("to_char((sales_orders.created_at AT TIME ZONE 'Europe/Rome')::date, 'YYYY-MM-DD') as period"),
+            'weekly'  => DB::raw("strftime('%Y-%W', created_at) as period"),
+            'monthly' => DB::raw("strftime('%Y-%m', created_at) as period"),
+            default   => DB::raw("strftime('%Y-%m-%d', created_at) as period"),
         };
 
         $query = DB::table('sales_orders')
@@ -66,16 +66,15 @@ class ReportController extends Controller
             ->groupBy(DB::raw('1'))
             ->orderBy(DB::raw('1'));
 
-        // Usa date esatte se fornite, altrimenti fallback su subDays
         if ($dateFrom && $dateTo) {
-            $query->whereRaw("(sales_orders.created_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom])
-                  ->whereRaw("(sales_orders.created_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]);
+            $query->whereRaw("strftime('%Y-%m-%d', created_at) >= ?", [$dateFrom])
+                  ->whereRaw("strftime('%Y-%m-%d', created_at) <= ?", [$dateTo]);
         } else {
-            $query->where('sales_orders.created_at', '>=', now()->subDays($days));
+            $query->where('created_at', '>=', now()->subDays($days));
         }
 
         if ($storeId) {
-            $query->where('sales_orders.store_id', $storeId);
+            $query->where('store_id', $storeId);
         }
 
         return response()->json(['data' => $query->get()]);
@@ -158,10 +157,10 @@ class ReportController extends Controller
             ->where('tenant_id', $tenantId)
             ->where('status', 'paid');
 
-        // Usa date esatte se fornite dalla dashboard
+        // SQLite-compatible date filtering
         if ($dateFrom && $dateTo) {
-            $orderBase->whereRaw("(created_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom])
-                      ->whereRaw("(created_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]);
+            $orderBase->whereRaw("strftime('%Y-%m-%d', created_at) >= ?", [$dateFrom])
+                      ->whereRaw("strftime('%Y-%m-%d', created_at) <= ?", [$dateTo]);
         } else {
             $orderBase->where('created_at', '>=', now()->subDays($days));
         }
@@ -212,7 +211,7 @@ class ReportController extends Controller
             ? round(($current->orders - $previous->orders) / $previous->orders * 100, 1)
             : null;
 
-        // Breakdown per metodo di pagamento (dalla tabella payments)
+        // Breakdown per metodo di pagamento
         $paymentBase = DB::table('payments as pay')
             ->join('sales_orders as so2', 'so2.id', '=', 'pay.sales_order_id')
             ->where('so2.tenant_id', $tenantId)
@@ -222,8 +221,8 @@ class ReportController extends Controller
             $paymentBase->where('so2.store_id', $storeId);
         }
         if ($dateFrom && $dateTo) {
-            $paymentBase->whereRaw("(so2.created_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom])
-                        ->whereRaw("(so2.created_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]);
+            $paymentBase->whereRaw("strftime('%Y-%m-%d', so2.created_at) >= ?", [$dateFrom])
+                        ->whereRaw("strftime('%Y-%m-%d', so2.created_at) <= ?", [$dateTo]);
         } else {
             $paymentBase->where('so2.created_at', '>=', now()->subDays($days));
         }
@@ -232,19 +231,21 @@ class ReportController extends Controller
         $cardTotal  = (clone $paymentBase)->where('pay.method', 'card')->sum('pay.amount');
         $otherTotal = (clone $paymentBase)->whereNotIn('pay.method', ['cash', 'card'])->sum('pay.amount');
 
-        // Items sold (totale quantità linee)
-        $itemsSold = DB::table('sales_order_lines as sol')
+        // Items sold
+        $itemsSoldQuery = DB::table('sales_order_lines as sol')
             ->join('sales_orders as so', 'so.id', '=', 'sol.sales_order_id')
             ->where('so.tenant_id', $tenantId)
             ->where('so.status', 'paid')
-            ->when($storeId, fn($q) => $q->where('so.store_id', $storeId))
-            ->when($dateFrom && $dateTo,
-                fn($q) => $q->whereRaw("(so.created_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom])
-                            ->whereRaw("(so.created_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]),
-                fn($q) => $q->where('so.created_at', '>=', now()->subDays($days))
-            )
-            ->sum('sol.qty');
+            ->when($storeId, fn($q) => $q->where('so.store_id', $storeId));
 
+        if ($dateFrom && $dateTo) {
+            $itemsSoldQuery->whereRaw("strftime('%Y-%m-%d', so.created_at) >= ?", [$dateFrom])
+                           ->whereRaw("strftime('%Y-%m-%d', so.created_at) <= ?", [$dateTo]);
+        } else {
+            $itemsSoldQuery->where('so.created_at', '>=', now()->subDays($days));
+        }
+
+        $itemsSold = $itemsSoldQuery->sum('sol.qty');
         $upt = $current->orders > 0 ? round($itemsSold / $current->orders, 2) : 0;
 
         return response()->json(['data' => [

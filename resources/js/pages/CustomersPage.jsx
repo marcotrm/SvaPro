@@ -268,7 +268,8 @@ export default function CustomersPage() {
         c.email?.toLowerCase().includes(term) ||
         c.phone?.includes(term) ||
         c.code?.toLowerCase().includes(term) ||
-        c.city?.toLowerCase().includes(term)
+        c.city?.toLowerCase().includes(term) ||
+        String(c.id) === term.replace('#', '')
       );
       const matchCity = !cityFilter || c.city === cityFilter;
       const matchStatus = !statusFilter || c.status === statusFilter;
@@ -536,7 +537,7 @@ export default function CustomersPage() {
                     {allSelected ? <CheckSquare size={18} color="#6366f1" /> : <Square size={18} />}
                   </button>
                 </th>
-                <th>Codice</th>
+                <th>N° Cliente</th>
                 <th>Anagrafica Cliente</th>
                 <th>Residenza</th>
                 <th>Ciclo Vendita</th>
@@ -577,8 +578,8 @@ export default function CustomersPage() {
                       {isSelected ? <CheckSquare size={18} color="#6366f1" /> : <Square size={18} color="#cbd5e1" />}
                     </td>
                     <td>
-                      <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md tracking-tighter">
-                        {customer.code || customer.card_code || '—'}
+                      <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md tracking-tighter font-mono">
+                        #{customer.id}
                       </span>
                     </td>
                     <td>
@@ -627,9 +628,9 @@ export default function CustomersPage() {
                       </div>
                     </td>
                     <td>
-                      <div className={`badge-v3 ${customer.card_code ? 'badge-v3-emerald' : 'badge-v3-amber'}`}>
+                      <div className={`badge-v3 ${customer.code || customer.card_code ? 'badge-v3-emerald' : 'badge-v3-amber'}`}>
                         <CreditCard size={12} />
-                        {customer.card_code ? customer.card_code : 'Da Attivare'}
+                        {customer.code || customer.card_code || 'Da Attivare'}
                       </div>
                     </td>
                     <td>
