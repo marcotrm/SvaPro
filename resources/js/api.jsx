@@ -672,8 +672,9 @@ export const pos = {
 };
 
 export const cashMovements = {
-  get: (params = {}) => api.get('/cash-movements', { params }),
-  create: (data) => api.post('/cash-movements', data),
+  get:      (params = {}) => api.get('/cash-movements', { params }),
+  balances: (params = {}) => api.get('/cash-movements/balances', { params }),
+  create:   (data) => api.post('/cash-movements', data),
 };
 
 // Promotion APIs

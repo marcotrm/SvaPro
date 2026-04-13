@@ -50,6 +50,56 @@ class CashMovementController extends Controller
         return response()->json(['data' => $movements]);
     }
 
+    public function balances(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $stores = DB::table('stores')
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->get(['id', 'name']);
+
+        $results = [];
+        foreach ($stores as $store) {
+            $deposits    = (float) DB::table('cash_movements')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', $store->id)
+                ->where('type', 'deposit')
+                ->sum('amount');
+            $withdrawals = (float) DB::table('cash_movements')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', $store->id)
+                ->where('type', 'withdrawal')
+                ->sum('amount');
+
+            // Aggiungi vendite POS al saldo cassa (metodo contanti)
+            $salesCash   = (float) DB::table('sales_orders')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', $store->id)
+                ->where('status', 'paid')
+                ->where('channel', 'cash')
+                ->sum('grand_total');
+
+            // Ultima movimentazione
+            $lastMov = DB::table('cash_movements')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', $store->id)
+                ->orderByDesc('created_at')
+                ->first(['created_at', 'type', 'amount']);
+
+            $results[] = [
+                'store_id'       => $store->id,
+                'store_name'     => $store->name,
+                'balance'        => round($salesCash + $deposits - $withdrawals, 2),
+                'total_deposits' => round($salesCash + $deposits, 2),
+                'total_withdrawals' => round($withdrawals, 2),
+                'last_movement'  => $lastMov,
+            ];
+        }
+
+        return response()->json(['data' => $results]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
@@ -63,11 +113,22 @@ class CashMovementController extends Controller
         ]);
 
         $storeId = (int) $request->input('store_id');
-        
+
+        // Risolvi dipendente da barcode se passato
+        $employeeId = $user->id;
+        $barcode = $request->input('operator_barcode');
+        if ($barcode) {
+            $emp = DB::table('employees')
+                ->where('tenant_id', $tenantId)
+                ->where('barcode', $barcode)
+                ->first(['id']);
+            if ($emp) $employeeId = $emp->id;
+        }
+
         $id = DB::table('cash_movements')->insertGetId([
             'tenant_id'   => $tenantId,
             'store_id'    => $storeId,
-            'employee_id' => $user->id,
+            'employee_id' => $employeeId,
             'type'        => $request->input('type'),
             'amount'      => $request->input('amount'),
             'note'        => $request->input('note'),

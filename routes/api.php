@@ -270,6 +270,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
 
         // Tesoreria - Cash Movements
         Route::get('/cash-movements', [CashMovementController::class, 'index']);
+        Route::get('/cash-movements/balances', [CashMovementController::class, 'balances']);
         Route::post('/cash-movements', [CashMovementController::class, 'store']);
 
         // Attendance - accessibile anche ai dipendenti (per timbrare se stessi)

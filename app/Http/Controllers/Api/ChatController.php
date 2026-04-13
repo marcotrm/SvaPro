@@ -21,9 +21,11 @@ class ChatController extends Controller
         }
 
         $since = $request->query('since');
+        $priority = $request->query('priority', 'normal');
 
         $query = DB::table('chat_messages as cm')
             ->where('cm.tenant_id', $tenantId)
+            ->where('cm.priority', $priority)
             ->orderBy('cm.created_at', 'asc')
             ->limit(100);
 
@@ -43,6 +45,7 @@ class ChatController extends Controller
         // Conta non letti
         $unreadCount = DB::table('chat_messages')
             ->where('tenant_id', $tenantId)
+            ->where('priority', $priority)
             ->whereNull('read_at')
             ->where('sender_user_id', '!=', $request->user()->id)
             ->when($storeId, fn($q) => $q->where(fn($q2) => $q2->where('store_id', $storeId)->orWhereNull('store_id')))
@@ -60,7 +63,9 @@ class ChatController extends Controller
         $data = $request->validate([
             'message'  => 'required|string|max:1000',
             'store_id' => 'nullable|integer',
+            'priority' => 'nullable|in:normal,urgent',
         ]);
+        $priority = $data['priority'] ?? 'normal';
 
         $user = $request->user();
 
@@ -83,6 +88,7 @@ class ChatController extends Controller
             'sender_name'    => $user->name,
             'sender_role'    => $role,
             'message'        => $data['message'],
+            'priority'       => $priority,
             'created_at'     => now(),
             'updated_at'     => now(),
         ]);
