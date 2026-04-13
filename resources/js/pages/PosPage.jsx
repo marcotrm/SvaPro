@@ -247,7 +247,7 @@ export default function PosPage() {
   const [showCustomerDrop, setShowCustomerDrop] = useState(false);
   const [showProductInfo, setShowProductInfo]   = useState(null);
 
-  const [qscareEnabled, setQscareEnabled] = useState(false);
+  const [qscareLines, setQscareLines] = useState({}); // { [product_variant_id]: bool }
 
   /* Load data */
   const fetchData = useCallback(async () => {
@@ -255,9 +255,10 @@ export default function PosPage() {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
 
-      // Carica prodotti + categorie — sempre disponibili per dipendente
+      // Carica prodotti — SENZA store_id per mostrare tutto il catalogo del tenant
+      // (lo stock del negozio viene caricato separatamente)
       const [pRes, cRes] = await Promise.all([
-        catalog.getProducts({ ...sp, limit: 500 }),
+        catalog.getProducts({ limit: 500 }),
         catalog.getCategories(),
       ]);
       setProducts(pRes.data?.data || []);
@@ -396,7 +397,7 @@ export default function PosPage() {
     });
     // Auto-attiva QScare se il prodotto è hardware con prezzo QScare configurato
     if (isHardwareProduct(product) && parseFloat(product.qscare_price) > 0) {
-      setQscareEnabled(true);
+      setQscareLines(prev => ({ ...prev, [variant.id]: true }));
     }
     toast.success(`${product.name}`, { duration: 900, icon: '🛒' });
   }, [stockMap, isHardwareProduct]);
@@ -424,29 +425,39 @@ export default function PosPage() {
     });
   }, [cartLines, products, isHardwareProduct]);
 
-  // QScare: calcolato sui dispositivi hardware nel carrello
+  // QScare: calcolato sulle righe hardware dove l'operatore ha attivato la copertura
   const cartQscarePrice = useMemo(() => {
     let total = 0;
     cartLines.forEach(line => {
+      if (!qscareLines[line.product_variant_id]) return;
       const p = products.find(prod => prod.variants?.some(v => v.id === line.product_variant_id));
       if (p && isHardwareProduct(p)) {
         total += (parseFloat(p.qscare_price) || 0) * line.qty;
       }
     });
     return total;
-  }, [cartLines, products, isHardwareProduct]);
+  }, [cartLines, products, isHardwareProduct, qscareLines]);
 
-  const effectiveQscarePrice = cartQscarePrice;
-  const cartTotalWithQscare = cartTotal + (qscareEnabled ? effectiveQscarePrice : 0);
-  
-  // Disabilita QScare se il prezzo totale applicabile scende a 0 (es. rimuovendo i dispositivi dal carrello)
+  // Pulisce qscareLines quando una riga viene rimossa
   useEffect(() => {
-    if (cartQscarePrice <= 0 && qscareEnabled) {
-      setQscareEnabled(false);
-    }
-  }, [cartQscarePrice, qscareEnabled]);
+    const validIds = new Set(cartLines.map(l => l.product_variant_id));
+    setQscareLines(prev => {
+      const next = {};
+      for (const k of Object.keys(prev)) {
+        if (validIds.has(Number(k)) || validIds.has(String(k))) next[k] = prev[k];
+      }
+      return next;
+    });
+  }, [cartLines]);
 
-  /* Checkout */
+  const toggleQscareForLine = (variantId) => {
+    setQscareLines(prev => ({ ...prev, [variantId]: !prev[variantId] }));
+  };
+
+  const effectiveQscarePrice = cartQscarePrice; // somma delle QScare attivate per-riga
+  const cartTotalWithQscare  = cartTotal + effectiveQscarePrice;
+
+
   const handleCheckout = async (payload) => {
     if (!cartLines.length) return toast.error('Carrello vuoto');
     // Risolvi operatore dal barcode
@@ -455,6 +466,22 @@ export default function PosPage() {
     try {
       setPlacingOrder(true);
       const empId = Number(resolvedEmpId) > 0 ? Number(resolvedEmpId) : null;
+      // Costruisce righe QScare per-hardware
+      const qscareServiceLines = cartLines.flatMap(l => {
+        if (!qscareLines[l.product_variant_id]) return [];
+        const p = products.find(prod => prod.variants?.some(v => v.id === l.product_variant_id));
+        if (!p || !isHardwareProduct(p)) return [];
+        const unitPrice = parseFloat(p.qscare_price) || 0;
+        if (unitPrice <= 0) return [];
+        return [{
+          product_variant_id: null,
+          qty: l.qty,
+          is_service: true,
+          service_name: `QScare — ${l.name}`,
+          unit_price: unitPrice,
+        }];
+      });
+
       await ordersApi.place({
         channel: 'pos',
         store_id: selectedStoreId || null,
@@ -464,7 +491,7 @@ export default function PosPage() {
         customer_id: selectedCustomer?.id ?? null,
         lines: [
           ...cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
-          ...(qscareEnabled ? [{ product_variant_id: null, qty: 1, is_service: true, service_name: 'QScare Assicurazione Dispositivo', unit_price: effectiveQscarePrice }] : []),
+          ...qscareServiceLines,
         ],
         notes: note + (payload.receipt_type ? ` [${payload.receipt_type}]` : ''),
         status: 'paid',
@@ -472,7 +499,7 @@ export default function PosPage() {
         order_discount_amount: payload.order_discount_amount,
       });
       toast.success('✅ Vendita completata!');
-      setCartLines([]); setSelectedCustomer(null); setNote(''); setShowCheckoutModal(false); setQscareEnabled(false);
+      setCartLines([]); setSelectedCustomer(null); setNote(''); setShowCheckoutModal(false); setQscareLines({});
       // Reset operatore dopo ogni vendita (deve riscannerizzare)
       setSoldByEmployeeId(''); setOperatorBarcode(''); setOperatorName(''); setOperatorError('');
       setTimeout(() => operatorBarcodeRef.current?.focus(), 100);
@@ -964,57 +991,60 @@ export default function PosPage() {
           )}
         </div>
 
-        {/* ─── QScare toggle (visibile solo se ci sono dispositivi con prezzo qscare nel carrello) ─── */}
+        {/* ─── QScare per-prodotto (una riga per ogni hardware con prezzo configurato) ─── */}
         {cartLines.length > 0 && cartHasDevice && (
           <div style={{ padding: '0 22px 12px' }}>
-            {effectiveQscarePrice <= 0 ? (
-              // Dispositivi senza prezzo QScare configurato o non valido: banner informativo
-              <div style={{
-                background: 'rgba(234,179,8,0.08)', border: '1.5px solid rgba(234,179,8,0.2)',
-                borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10,
-              }}>
-                <span style={{ fontSize: 18 }}>🛡</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(234,179,8,0.9)' }}>QScare — Assicurazione Dispositivo</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
-                    Nessun prezzo QScare impostato in anagrafica per questi hardware.
+            {cartLines.map(line => {
+              const p = products.find(prod => prod.variants?.some(v => v.id === line.product_variant_id));
+              if (!p || !isHardwareProduct(p)) return null;
+              const qscarePrice = parseFloat(p.qscare_price) || 0;
+              if (qscarePrice <= 0) return (
+                <div key={line.product_variant_id} style={{
+                  background: 'rgba(234,179,8,0.08)', border: '1.5px solid rgba(234,179,8,0.2)',
+                  borderRadius: 12, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6,
+                }}>
+                  <span style={{ fontSize: 16 }}>🛡</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(234,179,8,0.9)' }}>QScare — {line.name}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Prezzo non configurato in anagrafica</div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              // Prezzo configurato: toggle funzionante
-              <button
-                onClick={() => setQscareEnabled(e => !e)}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                  background: qscareEnabled ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
-                  border: `1.5px solid ${qscareEnabled ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                  borderRadius: 12, padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <span style={{ fontSize: 20 }}>🛡</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: qscareEnabled ? '#86efac' : '#fff' }}>QScare — Assicurazione Dispositivo</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>Copertura guasti e danni accidentali</div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                  <span style={{ fontSize: 13, fontWeight: 900, color: qscareEnabled ? '#86efac' : 'rgba(255,255,255,0.6)' }}>+{fmt(effectiveQscarePrice)}</span>
-                  <div style={{
-                    width: 36, height: 20, borderRadius: 10, background: qscareEnabled ? '#22c55e' : 'rgba(255,255,255,0.15)',
-                    position: 'relative', transition: 'background 0.2s',
-                  }}>
-                    <div style={{
-                      position: 'absolute', top: 2, left: qscareEnabled ? 18 : 2,
-                      width: 16, height: 16, borderRadius: '50%', background: '#fff',
-                      transition: 'left 0.2s',
-                    }} />
+              );
+              const enabled = !!qscareLines[line.product_variant_id];
+              return (
+                <button
+                  key={line.product_variant_id}
+                  onClick={() => toggleQscareForLine(line.product_variant_id)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6,
+                    background: enabled ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
+                    border: `1.5px solid ${enabled ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: 12, padding: '9px 12px', cursor: 'pointer', textAlign: 'left',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <span style={{ fontSize: 17 }}>🛡</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: enabled ? '#86efac' : '#fff' }}>
+                      QScare — {line.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>Copertura guasti e danni accidentali</div>
                   </div>
-                </div>
-              </button>
-            )}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                    <span style={{ fontSize: 12, fontWeight: 900, color: enabled ? '#86efac' : 'rgba(255,255,255,0.5)' }}>
+                      +{fmt(qscarePrice * line.qty)}
+                    </span>
+                    <div style={{ width: 32, height: 18, borderRadius: 9, background: enabled ? '#22c55e' : 'rgba(255,255,255,0.15)', position: 'relative', transition: 'background 0.2s' }}>
+                      <div style={{ position: 'absolute', top: 2, left: enabled ? 14 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
+
+
 
 
         {/* Cart Footer — Total + CTA */}
@@ -1032,22 +1062,23 @@ export default function PosPage() {
           )}
 
           {/* Totale */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: qscareEnabled ? 4 : 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: effectiveQscarePrice > 0 ? 4 : 16 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Subtotale</span>
             <span style={{ fontSize: 20, fontWeight: 900, color: 'rgba(255,255,255,0.7)' }}>{fmt(cartTotal)}</span>
           </div>
-          {qscareEnabled && (
+          {effectiveQscarePrice > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#86efac' }}>🛡 QScare</span>
               <span style={{ fontSize: 14, fontWeight: 800, color: '#86efac' }}>+{fmt(effectiveQscarePrice)}</span>
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: qscareEnabled ? 8 : 0, borderTop: qscareEnabled ? '1px solid rgba(255,255,255,0.1)' : 'none' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: effectiveQscarePrice > 0 ? 8 : 0, borderTop: effectiveQscarePrice > 0 ? '1px solid rgba(255,255,255,0.1)' : 'none' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Totale</span>
             <span style={{ fontSize: 28, fontWeight: 900, color: '#fff', letterSpacing: -1 }}>
               {fmt(cartTotalWithQscare)}
             </span>
           </div>
+
 
           {/* Bottone Cassa */}
           <button
