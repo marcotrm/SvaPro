@@ -242,7 +242,7 @@ class DeliveryNoteController extends Controller
         return response()->json(['data' => $updatedItem]);
     }
 
-    /** POST /delivery-notes/:id/items/:itemId/scan-by-barcode — scansione per barcode */
+    /** POST /delivery-notes/:id/scan-by-barcode */
     public function scanByBarcode(Request $request, $id)
     {
         $tenantId = $request->user()->tenant_id;
@@ -252,10 +252,10 @@ class DeliveryNoteController extends Controller
         $barcode = $request->input('barcode');
         if (!$barcode) return response()->json(['message' => 'Barcode richiesto.'], 422);
 
-        // Cerca articolo nella bolla per barcode o product_variant_id
+        // 1) Cerca articolo nella bolla per barcode, SKU, o variant
         $item = DB::table('delivery_note_items')
             ->where('delivery_note_id', $id)
-            ->where(function ($q) use ($barcode, $tenantId) {
+            ->where(function ($q) use ($barcode) {
                 $q->where('barcode', $barcode)
                   ->orWhere('sku', $barcode)
                   ->orWhereIn('product_variant_id', function ($sub) use ($barcode) {
@@ -266,22 +266,57 @@ class DeliveryNoteController extends Controller
             })
             ->first();
 
+        // 2) Fallback: cerca nel catalogo e aggiunge come articolo extra non atteso
         if (!$item) {
-            return response()->json(['message' => 'Articolo non trovato in questa bolla per il barcode: ' . $barcode, 'found' => false], 404);
+            $variant = DB::table('product_variants as pv')
+                ->join('products as p', 'p.id', '=', 'pv.product_id')
+                ->where('p.tenant_id', $tenantId)
+                ->where(function ($q) use ($barcode) {
+                    $q->where('pv.barcode', $barcode)->orWhere('pv.sku', $barcode);
+                })
+                ->select('pv.id', 'pv.barcode', 'pv.sku', 'p.name as product_name')
+                ->first();
+
+            if ($variant) {
+                $newItemId = DB::table('delivery_note_items')->insertGetId([
+                    'delivery_note_id'   => $id,
+                    'product_variant_id' => $variant->id,
+                    'product_name'       => $variant->product_name . ' (NON ATTESO)',
+                    'barcode'            => $variant->barcode,
+                    'sku'                => $variant->sku,
+                    'expected_qty'       => 0,
+                    'scanned_qty'        => 1,
+                    'received_qty'       => null,
+                    'unit_cost'          => 0,
+                    'created_at'         => now(),
+                    'updated_at'         => now(),
+                ]);
+                $updatedItem = DB::table('delivery_note_items')->where('id', $newItemId)->first();
+                $updatedItem->scan_status = $this->getScanStatus($updatedItem);
+
+                if ($note->status === 'pending') {
+                    DB::table('delivery_notes')->where('id', $id)->update([
+                        'status' => 'in_progress', 'verification_started_at' => now(), 'updated_at' => now(),
+                    ]);
+                }
+                return response()->json(['data' => $updatedItem, 'found' => true, 'extra' => true]);
+            }
+
+            return response()->json([
+                'message' => 'Articolo non trovato in bolla ne\'nel catalogo per: ' . $barcode,
+                'found'   => false,
+            ], 404);
         }
 
-        // Scansiona 1 unità
-        $newScanned = $item->scanned_qty + 1;
+        // 3) Articolo trovato nella bolla → incrementa scansione
         DB::table('delivery_note_items')->where('id', $item->id)->update([
-            'scanned_qty' => $newScanned,
+            'scanned_qty' => $item->scanned_qty + 1,
             'updated_at'  => now(),
         ]);
 
         if ($note->status === 'pending') {
             DB::table('delivery_notes')->where('id', $id)->update([
-                'status'                  => 'in_progress',
-                'verification_started_at' => now(),
-                'updated_at'              => now(),
+                'status' => 'in_progress', 'verification_started_at' => now(), 'updated_at' => now(),
             ]);
         }
 

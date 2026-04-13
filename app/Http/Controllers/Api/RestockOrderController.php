@@ -55,7 +55,12 @@ class RestockOrderController extends Controller
             ->where('ri.restock_order_id', $id)
             ->leftJoin('product_variants as pv', 'pv.id', '=', 'ri.product_variant_id')
             ->leftJoin('products as p', 'p.id', '=', 'pv.product_id')
-            ->select('ri.*', 'pv.sale_price', 'pv.on_hand')
+            ->select(
+                'ri.*',
+                'pv.sale_price',
+                'pv.on_hand',
+                DB::raw("COALESCE(ri.product_name, p.name, 'Prodotto senza nome') as product_name")
+            )
             ->get();
 
         // Aggiungi giacenza centrale per ogni articolo

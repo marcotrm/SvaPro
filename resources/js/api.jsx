@@ -115,7 +115,7 @@ const cacheKey = (path, params = {}) => {
   return `${tenantCode}|${selectedStoreId}|${path}|${stableStringify(params)}`;
 };
 
-const clearApiCache = () => {
+export const clearApiCache = () => {
   responseCache.clear();
 };
 
@@ -735,8 +735,6 @@ export const stockTransfers = {
 };
 
 export default api;
-
-export { clearApiCache };
 
 // ── Delivery Notes (Bolle di Scarico) ──────────────────────────────
 export const deliveryNotes = {

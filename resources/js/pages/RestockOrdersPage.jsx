@@ -209,12 +209,25 @@ export default function RestockOrdersPage() {
 /* ─── Dettaglio ordine (pannello laterale) ────────────────── */
 function OrderDetail({ orderId, onClose, onRefresh, storesList }) {
   const [order, setOrder] = useState(null);
+  const [loadErr, setLoadErr] = useState('');
 
   useEffect(() => {
+    setOrder(null); setLoadErr('');
     restockOrders.getOne(orderId)
-      .then(r => setOrder(r.data?.data))
-      .catch(() => toast.error('Errore caricamento dettaglio'));
+      .then(r => setOrder(r.data?.data || null))
+      .catch(e => {
+        const msg = e.response?.data?.message || 'Errore caricamento dettaglio';
+        setLoadErr(msg);
+        toast.error(msg);
+      });
   }, [orderId]);
+
+  if (loadErr) return (
+    <div className="table-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200, gap: 12 }}>
+      <div style={{ color: '#dc2626', fontSize: 14, fontWeight: 600 }}>⚠️ {loadErr}</div>
+      <button className="btn btn-ghost" onClick={onClose}>Chiudi</button>
+    </div>
+  );
 
   if (!order) return (
     <div className="table-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>

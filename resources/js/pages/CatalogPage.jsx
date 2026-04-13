@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { catalog, suppliers, inventory, orders as ordersApi } from '../api.jsx';
+import { catalog, suppliers, inventory, orders as ordersApi, clearApiCache } from '../api.jsx';
 import { getImageUrl } from '../api.jsx';
 import api from '../api.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
@@ -21,16 +21,19 @@ export default function CatalogPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockPopover, setStockPopover] = useState(null);
   const [warehousesList, setWarehousesList] = useState([]);
-  const [showPsImport, setShowPsImport] = useState(false);;
+  const [showPsImport, setShowPsImport] = useState(false);
+  const [showCsvImport, setShowCsvImport] = useState(false);
 
   useEffect(() => { fetchData(); }, [selectedStoreId]);
 
   const fetchData = async () => {
     try {
       setLoading(true); setError('');
+      // Invalida la cache ogni volta per avere sempre dati aggiornati
+      clearApiCache();
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
       const [pRes, sRes, cRes] = await Promise.all([
-        catalog.getProducts({ ...sp, limit: 200 }),
+        catalog.getProducts({ ...sp, limit: 500 }),
         suppliers.getAll().catch(() => ({ data: { data: [] } })),
         catalog.getCategories()
       ]);
@@ -118,7 +121,15 @@ export default function CatalogPage() {
             title="Importa prodotti da PrestaShop"
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <Upload size={16} /> Importa PrestaShop
+            <ShoppingBag size={16} /> Importa PrestaShop
+          </button>
+          <button
+            className="sp-btn sp-btn-secondary"
+            onClick={() => setShowCsvImport(true)}
+            title="Importa prodotti da file CSV"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Upload size={16} /> Importa CSV
           </button>
           <button className="sp-btn sp-btn-primary" onClick={() => { setSelectedProduct(null); setShowModal(true); }}>
             <Plus size={16} /> Nuovo Prodotto
@@ -310,10 +321,174 @@ export default function CatalogPage() {
           onImported={() => { setShowPsImport(false); fetchData(); }}
         />
       )}
+
+      {showCsvImport && (
+        <CsvImportModal
+          onClose={() => setShowCsvImport(false)}
+          onImported={() => { setShowCsvImport(false); fetchData(); }}
+        />
+      )}
     </div>
   );
 }
 
+/* ─── Modale Importa da CSV ─────────────────────────────────────────────── */
+function CsvImportModal({ onClose, onImported }) {
+  const [file, setFile]       = useState(null);
+  const [status, setStatus]   = useState('idle'); // idle | uploading | done | error
+  const [result, setResult]   = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef();
+
+  const CSV_FORMAT = 'sku,name,type_code,category,price,barcode,stock';
+  const CSV_EXAMPLE = 'SKU-001,Kiwi Spark 20mg,liquid,Liquidi,18.00,1234567890,50\nSKU-002,Pod Kit V2,hardware,Hardware,29.90,0987654321,10';
+
+  const handleFile = async (f) => {
+    if (!f) return;
+    if (!f.name.match(/\.(csv|txt)$/i)) { toast.error('Carica un file CSV o TXT'); return; }
+    setFile(f);
+    setStatus('idle');
+    setResult(null);
+  };
+
+  const startImport = async () => {
+    if (!file) { toast.error('Seleziona un file CSV prima'); return; }
+    setStatus('uploading');
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await catalog.importProducts(fd);
+      const data = res.data;
+      setResult(data);
+      setStatus('done');
+      toast.success(`${data.imported ?? 0} prodotti importati dal CSV!`);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Errore durante l\'importazione CSV';
+      setStatus('error');
+      setResult({ error: msg });
+      toast.error(msg);
+    }
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault(); setDragOver(false);
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: 'var(--color-surface)', borderRadius: 20, width: '100%', maxWidth: 560, boxShadow: '0 24px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Upload size={18} color="#22C55E" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--color-text)' }}>Importa da CSV</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Carica un file CSV per importare prodotti in batch</div>
+            </div>
+          </div>
+          <button onClick={onClose} disabled={status === 'uploading'} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Format instructions */}
+          <div style={{ background: 'var(--color-bg)', borderRadius: 10, padding: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Formato CSV richiesto
+            </div>
+            <code style={{ fontSize: 11, fontFamily: 'monospace', color: '#22C55E', display: 'block', marginBottom: 6 }}>{CSV_FORMAT}</code>
+            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>Esempio:</div>
+            <pre style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--color-text-secondary)', margin: 0, whiteSpace: 'pre-wrap' }}>{CSV_EXAMPLE}</pre>
+            <div style={{ marginTop: 8, fontSize: 10, color: 'var(--color-text-tertiary)' }}>
+              • <strong>type_code</strong>: liquid / hardware / accessori / pod<br/>
+              • <strong>price</strong>: usa il punto come separatore decimale (es. 18.00)<br/>
+              • <strong>stock</strong>: quantità iniziale (opzionale, default 0)
+            </div>
+          </div>
+
+          {/* Drop zone */}
+          <div
+            style={{
+              border: `2px dashed ${dragOver ? 'var(--color-accent)' : file ? '#22C55E' : 'var(--color-border)'}`,
+              borderRadius: 12, padding: '24px 16px', textAlign: 'center', cursor: 'pointer',
+              background: dragOver ? 'rgba(var(--accent-rgb),0.04)' : 'transparent',
+              transition: 'all 0.15s',
+            }}
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+          >
+            <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }}
+              onChange={e => handleFile(e.target.files[0])} />
+            {file ? (
+              <div style={{ color: '#22C55E', fontWeight: 700 }}>
+                <CheckCircle size={24} style={{ marginBottom: 6 }} />
+                <div style={{ fontSize: 14 }}>{file.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+                  {(file.size / 1024).toFixed(1)} KB · Clicca per cambiare
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: 'var(--color-text-tertiary)' }}>
+                <Upload size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
+                <div style={{ fontSize: 14, fontWeight: 600 }}>Trascina il CSV qui o clicca per selezionare</div>
+                <div style={{ fontSize: 11, marginTop: 4 }}>Supporta .csv e .txt</div>
+              </div>
+            )}
+          </div>
+
+          {/* Result */}
+          {result && status === 'done' && (
+            <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <CheckCircle size={18} color="#22C55E" />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#22C55E' }}>Importazione completata!</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                  {result.imported ?? 0} prodotti importati · {result.skipped ?? 0} saltati (duplicati) · {result.errors ?? 0} errori
+                </div>
+              </div>
+            </div>
+          )}
+          {result && status === 'error' && (
+            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#EF4444' }}>
+              ❌ {result.error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--color-border)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          {status === 'done' ? (
+            <button className="sp-btn sp-btn-primary" onClick={onImported}>
+              <CheckCircle size={15} /> Chiudi e aggiorna catalogo
+            </button>
+          ) : (
+            <>
+              <button className="sp-btn sp-btn-secondary" onClick={onClose} disabled={status === 'uploading'}>Annulla</button>
+              <button
+                className="sp-btn sp-btn-primary"
+                onClick={startImport}
+                disabled={!file || status === 'uploading'}
+                style={{ background: '#22C55E', border: 'none', minWidth: 140 }}
+              >
+                {status === 'uploading'
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Importazione...</>
+                  : <><Upload size={14} /> Importa CSV</>}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 /* ─── Modale Importa da PrestaShop ───────────────────────────────────────── */
 function PrestashopImportModal({ onClose, onImported }) {
   const [psUrl, setPsUrl]       = useState('');
