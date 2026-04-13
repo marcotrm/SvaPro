@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { orders as ordersApi, reports } from '../api.jsx';
+import { orders as ordersApi, reports, getImageUrl } from '../api.jsx';
 import {
   X, TrendingUp, ShoppingBag, Users, CreditCard, Banknote,
-  BarChart3, Package, ArrowUpRight, ArrowDownRight, Calendar,
-  Loader2, Store, Receipt, MapPin, User, Clock, ArrowLeft
+  BarChart3, Package, Calendar, Loader2, Store, Receipt,
+  User, Clock, ArrowLeft, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
@@ -21,29 +21,20 @@ function getPeriodDates(period) {
   const pad = (n) => String(n).padStart(2, '0');
   const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   switch (period) {
-    case 'today':
-      return { date_from: today, date_to: today };
+    case 'today': return { date_from: today, date_to: today };
     case 'week': {
-      const d = new Date(now);
-      d.setDate(d.getDate() - 6);
+      const d = new Date(now); d.setDate(d.getDate() - 6);
       return { date_from: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, date_to: today };
     }
-    case 'month':
-      return { date_from: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`, date_to: today };
-    case 'year':
-      return { date_from: `${now.getFullYear()}-01-01`, date_to: today };
-    default:
-      return { date_from: today, date_to: today };
+    case 'month': return { date_from: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`, date_to: today };
+    case 'year':  return { date_from: `${now.getFullYear()}-01-01`, date_to: today };
+    default:      return { date_from: today, date_to: today };
   }
 }
 
 function KpiCard({ icon: Icon, label, value, sub, color = '#7B6FD0' }) {
   return (
-    <div style={{
-      background: '#fff', borderRadius: 14, padding: '14px 16px',
-      border: '1px solid #f0edf8', boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
-      display: 'flex', flexDirection: 'column', gap: 6,
-    }}>
+    <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1px solid #f0edf8', boxShadow: '0 1px 6px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ width: 36, height: 36, borderRadius: 10, background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Icon size={18} color={color} />
       </div>
@@ -54,8 +45,7 @@ function KpiCard({ icon: Icon, label, value, sub, color = '#7B6FD0' }) {
   );
 }
 
-/* ─── Riga transazione cliccabile ─── */
-function OrderRow({ order, onClick }) {
+function OrderRow({ order, onClick, active }) {
   const statusColors = {
     paid:      { bg: 'rgba(16,185,129,0.1)',  color: '#10b981', label: 'Pagato' },
     pending:   { bg: 'rgba(245,158,11,0.1)',  color: '#F59E0B', label: 'Attesa' },
@@ -69,25 +59,25 @@ function OrderRow({ order, onClick }) {
       style={{
         display: 'grid', gridTemplateColumns: 'auto 1fr auto auto',
         gap: 10, alignItems: 'center',
-        padding: '11px 0',
+        padding: '11px 8px',
         borderBottom: '1px solid #f5f3ff',
         cursor: 'pointer',
         borderRadius: 8,
+        background: active ? 'rgba(123,111,208,0.07)' : 'transparent',
         transition: 'background 0.12s',
       }}
-      onMouseEnter={e => e.currentTarget.style.background = '#f5f3ff'}
-      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f5f3ff'; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
     >
       <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(123,111,208,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <ShoppingBag size={14} color="#7B6FD0" />
       </div>
       <div>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e' }}>
-          #{order.id} {order.customer_name ? `– ${order.customer_name}` : '– Cliente al banco'}
+          #{order.id} {order.customer_name ? `– ${order.customer_name}` : '– Al banco'}
         </div>
         <div style={{ fontSize: 11, color: '#9ca3af' }}>
           {order.created_at ? new Date(order.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
-          {order.employee_name && <span style={{ marginLeft: 6 }}>· {order.employee_name}</span>}
         </div>
       </div>
       <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a2e' }}>{fmt(order.grand_total)}</div>
@@ -96,17 +86,34 @@ function OrderRow({ order, onClick }) {
   );
 }
 
-/* ─── Modal scontrino completo ─── */
-function OrderDetailModal({ orderId, onClose }) {
+/* ─── Modal scontrino completo con navigazione ─── */
+function OrderDetailModal({ orderId, orders, onClose, onNavigate }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const currentIdx = orders.findIndex(o => o.id === orderId);
+  const hasPrev = currentIdx > 0;
+  const hasNext = currentIdx < orders.length - 1;
+
   useEffect(() => {
+    setLoading(true);
+    setData(null);
     ordersApi.getOrder(orderId)
       .then(res => setData(res.data?.data || null))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, [orderId]);
+
+  // Navigazione con frecce tastiera
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'ArrowLeft' && hasPrev)  onNavigate(orders[currentIdx - 1].id);
+      if (e.key === 'ArrowRight' && hasNext) onNavigate(orders[currentIdx + 1].id);
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [orderId, hasPrev, hasNext, currentIdx]);
 
   const statusColors = {
     paid:      { bg: 'rgba(16,185,129,0.12)', color: '#10b981', label: '✓ Pagato' },
@@ -114,59 +121,81 @@ function OrderDetailModal({ orderId, onClose }) {
     cancelled: { bg: 'rgba(239,68,68,0.12)',  color: '#EF4444', label: '✗ Annullato' },
     refunded:  { bg: 'rgba(99,102,241,0.12)', color: '#6366F1', label: '↩ Rimborsato' },
   };
-
-  const paymentLabel = (ch) => {
-    const map = { cash: 'Contanti', card: 'Carta / POS', transfer: 'Bonifico', mixed: 'Misto' };
-    return map[ch] || ch || '—';
-  };
+  const paymentLabel = (ch) => ({ cash: 'Contanti 💵', card: 'Carta / POS 💳', transfer: 'Bonifico', mixed: 'Misto' }[ch] || ch || '—');
 
   return (
     <>
-      {/* Backdrop sopra il drawer */}
-      <div
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, zIndex: 9995, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
-      />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9995, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)' }} />
 
-      {/* Modal centrato */}
       <div style={{
         position: 'fixed', top: '50%', left: '50%', zIndex: 9996,
         transform: 'translate(-50%, -50%)',
-        width: 'min(560px, 96vw)',
-        maxHeight: '90vh',
+        width: 'min(600px, 96vw)',
+        maxHeight: '92vh',
         background: '#fff',
         borderRadius: 20,
-        boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
         display: 'flex', flexDirection: 'column',
-        animation: 'modalIn 0.22s cubic-bezier(0.4,0,0.2,1)',
+        animation: 'modalIn 0.2s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden',
       }}>
-        {/* Header */}
-        <div style={{
-          padding: '18px 20px',
-          background: 'linear-gradient(135deg,#7B6FD0,#5B50B0)',
-          color: '#fff',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexShrink: 0,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
-              <ArrowLeft size={15} />
-            </button>
-            <div>
-              <div style={{ fontSize: 10, opacity: 0.75, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Dettaglio Vendita</div>
-              <div style={{ fontSize: 17, fontWeight: 800 }}>Scontrino #{orderId}</div>
+        {/* Header con naviga */}
+        <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg,#7B6FD0,#5B50B0)', color: '#fff', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
+                <X size={15} />
+              </button>
+              <div>
+                <div style={{ fontSize: 10, opacity: 0.7, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Dettaglio Vendita</div>
+                <div style={{ fontSize: 17, fontWeight: 800 }}>Scontrino #{orderId}</div>
+              </div>
+            </div>
+            {/* Navigazione prev/next */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontSize: 11, opacity: 0.7, fontWeight: 600, marginRight: 4 }}>
+                {currentIdx + 1} / {orders.length}
+              </div>
+              <button
+                onClick={() => hasPrev && onNavigate(orders[currentIdx - 1].id)}
+                disabled={!hasPrev}
+                title="Vendita precedente (←)"
+                style={{
+                  background: hasPrev ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)',
+                  border: 'none', borderRadius: 8, width: 32, height: 32,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: hasPrev ? 'pointer' : 'not-allowed', color: '#fff',
+                  opacity: hasPrev ? 1 : 0.4, transition: 'all 0.15s',
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() => hasNext && onNavigate(orders[currentIdx + 1].id)}
+                disabled={!hasNext}
+                title="Vendita successiva (→)"
+                style={{
+                  background: hasNext ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)',
+                  border: 'none', borderRadius: 8, width: 32, height: 32,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: hasNext ? 'pointer' : 'not-allowed', color: '#fff',
+                  opacity: hasNext ? 1 : 0.4, transition: 'all 0.15s',
+                }}
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
-            <X size={15} />
-          </button>
+          {/* Hint tastiera */}
+          <div style={{ fontSize: 10, opacity: 0.6, textAlign: 'center', letterSpacing: '0.04em' }}>
+            Usa ← → per navigare tra le vendite · ESC per chiudere
+          </div>
         </div>
 
         {/* Body */}
         <div style={{ overflowY: 'auto', flex: 1, padding: 20 }}>
           {loading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 220, flexDirection: 'column', gap: 12 }}>
               <Loader2 size={32} color="#7B6FD0" style={{ animation: 'spin 1s linear infinite' }} />
               <div style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>Caricamento scontrino...</div>
             </div>
@@ -177,7 +206,6 @@ function OrderDetailModal({ orderId, onClose }) {
             const custName = [data.customer_first_name, data.customer_last_name].filter(Boolean).join(' ');
             const empName = [data.employee_first_name, data.employee_last_name].filter(Boolean).join(' ');
             const lines = data.lines || [];
-            const subtotal = lines.reduce((s, l) => s + parseFloat(l.unit_price || 0) * parseInt(l.qty || 1), 0);
             const totalTax = lines.reduce((s, l) => s + parseFloat(l.tax_amount || 0), 0);
             const totalDiscount = lines.reduce((s, l) => s + parseFloat(l.discount_amount || 0), 0);
 
@@ -193,76 +221,86 @@ function OrderDetailModal({ orderId, onClose }) {
                   </div>
                 </div>
 
-                {/* Negozio / Operatore / Cliente */}
+                {/* Meta card */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
                   {data.store_name && (
                     <div style={{ background: '#f8f7fc', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Store size={14} color="#7B6FD0" />
-                      <div>
-                        <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' }}>Negozio</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{data.store_name}</div>
-                      </div>
+                      <div><div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' }}>Negozio</div><div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{data.store_name}</div></div>
                     </div>
                   )}
                   {empName && (
                     <div style={{ background: '#f8f7fc', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
                       <User size={14} color="#7B6FD0" />
-                      <div>
-                        <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' }}>Operatore</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{empName}</div>
-                      </div>
+                      <div><div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' }}>Operatore</div><div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{empName}</div></div>
                     </div>
                   )}
                   {custName && (
-                    <div style={{ background: '#f8f7fc', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, gridColumn: !empName ? '1/-1' : undefined }}>
+                    <div style={{ background: '#f8f7fc', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, gridColumn: '1/-1' }}>
                       <Users size={14} color="#7B6FD0" />
-                      <div>
-                        <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' }}>Cliente</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{custName}</div>
-                      </div>
+                      <div><div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' }}>Cliente</div><div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{custName}</div></div>
                     </div>
                   )}
                 </div>
 
-                {/* Prodotti */}
-                <div style={{ background: '#f8f7fc', borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
+                {/* Prodotti con immagini */}
+                <div style={{ background: '#f8f7fc', borderRadius: 14, padding: '14px', marginBottom: 18 }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: '#1a1a2e', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Receipt size={13} color="#7B6FD0" />
-                    Articoli venduti
+                    Articoli venduti ({lines.length})
                   </div>
                   {lines.length === 0 ? (
-                    <div style={{ fontSize: 12, color: '#9ca3af' }}>Nessun articolo trovato</div>
-                  ) : (
-                    <div>
-                      {/* Intestazione colonne */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px 80px 80px', gap: 6, borderBottom: '1px solid #ede9f8', paddingBottom: 6, marginBottom: 6 }}>
-                        {['Prodotto', 'Qtà', 'Prezzo', 'Totale'].map(h => (
-                          <div key={h} style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: h !== 'Prodotto' ? 'right' : 'left' }}>{h}</div>
-                        ))}
-                      </div>
-                      {lines.map((line, i) => {
-                        let name = line.product_name;
-                        if (!name) {
-                          try { name = JSON.parse(line.tax_snapshot_json || '{}')?.product_type === 'service' ? '🛡 QSCare' : '—'; } catch { name = '—'; }
-                        }
-                        const flavor = line.flavor ? ` · ${line.flavor}` : '';
-                        return (
-                          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 40px 80px 80px', gap: 6, padding: '8px 0', borderBottom: i < lines.length - 1 ? '1px solid #ede9f8' : 'none', alignItems: 'center' }}>
-                            <div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>{name}{flavor}</div>
-                              {line.sku && <div style={{ fontSize: 10, color: '#9ca3af' }}>SKU: {line.sku}</div>}
-                            </div>
-                            <div style={{ textAlign: 'right', fontSize: 13, fontWeight: 600, color: '#6b7280' }}>×{line.qty}</div>
-                            <div style={{ textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{fmt(line.unit_price)}</div>
-                            <div style={{ textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#7B6FD0' }}>{fmt(line.line_total)}</div>
+                    <div style={{ fontSize: 12, color: '#9ca3af' }}>Nessun articolo</div>
+                  ) : lines.map((line, i) => {
+                    let name = line.product_name;
+                    if (!name) {
+                      try { name = JSON.parse(line.tax_snapshot_json || '{}')?.product_type === 'service' ? '🛡 QSCare' : '—'; } catch { name = '—'; }
+                    }
+                    const flavor = line.flavor ? ` · ${line.flavor}` : '';
+                    const imgUrl = line.image_url ? getImageUrl(line.image_url) : null;
+
+                    return (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '10px 0',
+                        borderBottom: i < lines.length - 1 ? '1px solid #ede9f8' : 'none',
+                      }}>
+                        {/* Immagine prodotto */}
+                        <div style={{
+                          width: 52, height: 52, borderRadius: 10, flexShrink: 0, overflow: 'hidden',
+                          background: 'linear-gradient(135deg, #7B6FD018, #5B50B018)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          border: '1px solid #ede9f8',
+                        }}>
+                          {imgUrl ? (
+                            <img src={imgUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                            />
+                          ) : null}
+                          <div style={{ display: imgUrl ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                            <Package size={20} color="#7B6FD0" style={{ opacity: 0.4 }} />
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                        </div>
+
+                        {/* Info prodotto */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {name}{flavor}
+                          </div>
+                          {line.sku && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>SKU: {line.sku}</div>}
+                        </div>
+
+                        {/* Quantità e prezzi */}
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: '#7B6FD0' }}>{fmt(line.line_total)}</div>
+                          <div style={{ fontSize: 11, color: '#9ca3af' }}>×{line.qty} · {fmt(line.unit_price)} cad.</div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* Totali */}
+                {/* Riepilogo totali */}
                 <div style={{ background: 'linear-gradient(135deg,#7B6FD0,#5B50B0)', borderRadius: 14, padding: '16px 18px', color: '#fff' }}>
                   {totalDiscount > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, opacity: 0.85, marginBottom: 6 }}>
@@ -276,12 +314,12 @@ function OrderDetailModal({ orderId, onClose }) {
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
                     <span style={{ fontSize: 15, fontWeight: 700 }}>TOTALE</span>
-                    <span style={{ fontSize: 24, fontWeight: 900 }}>{fmt(data.grand_total)}</span>
+                    <span style={{ fontSize: 26, fontWeight: 900 }}>{fmt(data.grand_total)}</span>
                   </div>
                   <div style={{ textAlign: 'right', fontSize: 11, opacity: 0.7, marginTop: 4 }}>
-                    Pagato con: {paymentLabel(data.channel)}
+                    {paymentLabel(data.channel)}
                   </div>
-                  {(data.loyalty_points_awarded > 0) && (
+                  {data.loyalty_points_awarded > 0 && (
                     <div style={{ marginTop: 10, padding: '7px 12px', background: 'rgba(255,255,255,0.15)', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
                       🏆 {data.loyalty_points_awarded} punti fedeltà guadagnati
                     </div>
@@ -292,11 +330,43 @@ function OrderDetailModal({ orderId, onClose }) {
           })()}
         </div>
 
+        {/* Footer navigazione */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f0edf8', display: 'flex', justifyContent: 'space-between', flexShrink: 0, background: '#fafafa' }}>
+          <button
+            onClick={() => hasPrev && onNavigate(orders[currentIdx - 1].id)}
+            disabled={!hasPrev}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', borderRadius: 10, border: '1px solid #ede9f8',
+              background: hasPrev ? '#fff' : '#f5f5f5',
+              color: hasPrev ? '#7B6FD0' : '#ccc',
+              cursor: hasPrev ? 'pointer' : 'not-allowed',
+              fontSize: 12, fontWeight: 700, transition: 'all 0.15s',
+            }}
+          >
+            <ChevronLeft size={14} /> Vendita precedente
+          </button>
+          <div style={{ fontSize: 11, color: '#9ca3af', alignSelf: 'center', fontWeight: 600 }}>
+            {currentIdx + 1} di {orders.length}
+          </div>
+          <button
+            onClick={() => hasNext && onNavigate(orders[currentIdx + 1].id)}
+            disabled={!hasNext}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', borderRadius: 10, border: '1px solid #ede9f8',
+              background: hasNext ? '#fff' : '#f5f5f5',
+              color: hasNext ? '#7B6FD0' : '#ccc',
+              cursor: hasNext ? 'pointer' : 'not-allowed',
+              fontSize: 12, fontWeight: 700, transition: 'all 0.15s',
+            }}
+          >
+            Vendita successiva <ChevronRight size={14} />
+          </button>
+        </div>
+
         <style>{`
-          @keyframes modalIn {
-            from { transform: translate(-50%, -48%); opacity: 0; }
-            to { transform: translate(-50%, -50%); opacity: 1; }
-          }
+          @keyframes modalIn { from { transform: translate(-50%, -48%); opacity: 0; } to { transform: translate(-50%, -50%); opacity: 1; } }
         `}</style>
       </div>
     </>
@@ -315,7 +385,7 @@ export default function StoreStatsDrawer({ store, onClose }) {
     setLoading(true);
     const { date_from, date_to } = getPeriodDates(period);
     const baseParams = store?.id ? { store_id: store.id } : {};
-    const params = { ...baseParams, date_from, date_to, limit: 30 };
+    const params = { ...baseParams, date_from, date_to, limit: 50 };
 
     try {
       const [summRes, ordRes] = await Promise.all([
@@ -325,12 +395,12 @@ export default function StoreStatsDrawer({ store, onClose }) {
 
       const s = summRes.data?.data || summRes.data || {};
       setKpi({
-        revenue:   parseFloat(s.total_revenue || s.revenue || 0),
-        orders:    parseInt(s.total_orders || s.orders_count || 0),
-        avg_ticket:parseFloat(s.avg_ticket || s.average_ticket || 0),
-        customers: parseInt(s.unique_customers || s.customers_count || 0),
-        cash:      parseFloat(s.cash_total || 0),
-        card:      parseFloat(s.card_total || 0),
+        revenue:    parseFloat(s.total_revenue || s.revenue || 0),
+        orders:     parseInt(s.total_orders || s.orders_count || 0),
+        avg_ticket: parseFloat(s.avg_ticket || s.average_ticket || 0),
+        customers:  parseInt(s.unique_customers || s.customers_count || 0),
+        cash:       parseFloat(s.cash_total || 0),
+        card:       parseFloat(s.card_total || 0),
       });
 
       const orderList = ordRes.data?.data || ordRes.data || [];
@@ -346,10 +416,8 @@ export default function StoreStatsDrawer({ store, onClose }) {
 
   return (
     <>
-      {/* BACKDROP */}
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9990, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)', animation: 'fadeIn 0.2s ease' }} />
 
-      {/* DRAWER */}
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 9991,
         width: 'min(580px, 100vw)',
@@ -409,17 +477,22 @@ export default function StoreStatsDrawer({ store, onClose }) {
               <div style={{ background: '#fff', borderRadius: 14, padding: '16px', border: '1px solid #f0edf8', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a2e', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Calendar size={14} color="#7B6FD0" />
-                  Transazioni recenti
+                  Transazioni ({recentOrders.length})
                 </div>
-                <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12 }}>Clicca su una vendita per vedere il dettaglio completo</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12 }}>Clicca su una vendita per il dettaglio completo · usa ← → da tastiera nel modal</div>
                 {recentOrders.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '24px 0', color: '#9ca3af' }}>
                     <Package size={36} style={{ opacity: 0.2, margin: '0 auto 8px', display: 'block' }} />
                     <div style={{ fontSize: 13, fontWeight: 600 }}>Nessuna transazione nel periodo</div>
                   </div>
-                ) : (
-                  recentOrders.map(o => <OrderRow key={o.id} order={o} onClick={o => setSelectedOrderId(o.id)} />)
-                )}
+                ) : recentOrders.map(o => (
+                  <OrderRow
+                    key={o.id}
+                    order={o}
+                    active={o.id === selectedOrderId}
+                    onClick={o => setSelectedOrderId(o.id)}
+                  />
+                ))}
               </div>
             </>
           ) : (
@@ -436,9 +509,13 @@ export default function StoreStatsDrawer({ store, onClose }) {
         `}</style>
       </div>
 
-      {/* MODAL DETTAGLIO ORDINE */}
       {selectedOrderId && (
-        <OrderDetailModal orderId={selectedOrderId} onClose={() => setSelectedOrderId(null)} />
+        <OrderDetailModal
+          orderId={selectedOrderId}
+          orders={recentOrders}
+          onClose={() => setSelectedOrderId(null)}
+          onNavigate={(id) => setSelectedOrderId(id)}
+        />
       )}
     </>
   );

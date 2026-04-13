@@ -242,8 +242,10 @@ class OrderController extends Controller
                 'sol.tax_amount',
                 'sol.excise_amount',
                 'sol.line_total',
+                'sol.tax_snapshot_json',
                 'p.sku',
                 'p.name as product_name',
+                'p.image_url',
                 'pv.flavor',
                 'pv.resistance_ohm',
             ])

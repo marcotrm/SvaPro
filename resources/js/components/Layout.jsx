@@ -415,6 +415,25 @@ export default function Layout({ user, setUser }) {
                 ))}
               </select>
             )}
+            {/* Bottone Panoramica Generale */}
+            <button
+              onClick={() => navigate('/dashboard')}
+              title="Panoramica Generale"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 14px', borderRadius: 10,
+                background: location.pathname === '/dashboard' ? 'linear-gradient(135deg, #5B50B0, #3d3490)' : 'rgba(123,111,208,0.12)',
+                color: location.pathname === '/dashboard' ? '#fff' : '#7B6FD0',
+                border: '1px solid rgba(123,111,208,0.25)',
+                cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                transition: 'all 0.15s', whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.background = 'linear-gradient(135deg, #7B6FD0, #5B50B0)'; e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.background = location.pathname === '/dashboard' ? 'linear-gradient(135deg, #5B50B0, #3d3490)' : 'rgba(123,111,208,0.12)'; e.currentTarget.style.color = location.pathname === '/dashboard' ? '#fff' : '#7B6FD0'; }}
+            >
+              <LayoutDashboard size={14} />
+              Panoramica
+            </button>
             {/* Bottone riepilogo vendite */}
             <button
               onClick={() => setShowStoreStats(true)}
