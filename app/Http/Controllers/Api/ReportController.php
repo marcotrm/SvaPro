@@ -9,12 +9,38 @@ use Illuminate\Support\Facades\DB;
 class ReportController extends Controller
 {
     /**
+     * Enforce store_id for employees to prevent them from seeing all stores.
+     */
+    private function getSecureStoreId(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) return $request->input('store_id');
+
+        $isDipendente = DB::table('user_roles')
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->where('user_roles.user_id', $user->id)
+            ->where('roles.code', 'dipendente')
+            ->exists();
+
+        if ($isDipendente) {
+            $employeeStoreId = DB::table('employees')
+                ->where('user_id', $user->id)
+                ->value('store_id');
+            if ($employeeStoreId) {
+                return $employeeStoreId;
+            }
+        }
+
+        return $request->input('store_id');
+    }
+
+    /**
      * Revenue trend grouped by day/week/month.
      */
     public function revenueTrend(Request $request)
     {
         $tenantId  = $request->attributes->get('tenant_id');
-        $storeId   = $request->input('store_id');
+        $storeId   = $this->getSecureStoreId($request);
         $period    = $request->input('period', 'daily'); // daily|weekly|monthly
         $days      = (int) $request->input('days', 30);
         $days      = min($days, 365);
@@ -61,7 +87,7 @@ class ReportController extends Controller
     public function topProducts(Request $request)
     {
         $tenantId = $request->attributes->get('tenant_id');
-        $storeId  = $request->input('store_id');
+        $storeId  = $this->getSecureStoreId($request);
         $sortBy   = $request->input('sort', 'revenue'); // revenue|qty
         $limit    = min((int) ($request->input('limit', 20) ?: 20), 100);
         $days     = min((int) ($request->input('days', 30) ?: 30), 365);
@@ -123,7 +149,7 @@ class ReportController extends Controller
     public function summary(Request $request)
     {
         $tenantId = $request->attributes->get('tenant_id');
-        $storeId  = $request->input('store_id');
+        $storeId  = $this->getSecureStoreId($request);
         $days     = min((int) ($request->input('days', 30) ?: 30), 365);
         $dateFrom = $request->input('date_from');
         $dateTo   = $request->input('date_to');
@@ -204,7 +230,7 @@ class ReportController extends Controller
     public function qscareDashboard(Request $request)
     {
         $tenantId = $request->attributes->get('tenant_id');
-        $storeId  = $request->input('store_id');
+        $storeId  = $this->getSecureStoreId($request);
         $employeeId = $request->input('employee_id');
         $dateFrom = $request->input('date_from');
         $dateTo   = $request->input('date_to');
