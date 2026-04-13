@@ -281,21 +281,23 @@ class ReportController extends Controller
 
         $query = DB::table('sales_order_lines')
             ->join('sales_orders', 'sales_order_lines.sales_order_id', '=', 'sales_orders.id')
+            ->leftJoin('product_variants', 'sales_order_lines.product_variant_id', '=', 'product_variants.id')
+            ->leftJoin('products', 'product_variants.product_id', '=', 'products.id')
             ->leftJoin('employees', 'sales_orders.sold_by_employee_id', '=', 'employees.id')
             ->leftJoin('stores', 'sales_orders.store_id', '=', 'stores.id')
             ->where('sales_orders.tenant_id', $tenantId)
             ->where('sales_orders.status', 'paid')
             ->where(function ($q) {
-                // Riga servizio QScare: service_name contiene 'QScare'
-                $q->where('sales_order_lines.service_name', 'like', '%QScare%')
-                  ->orWhere('sales_order_lines.service_name', 'like', '%qscare%');
+                // Prodotto con nome contenente "QScare" oppure product_type = 'service'
+                $q->whereRaw("LOWER(products.name) LIKE '%qscare%'")
+                  ->orWhere('products.product_type', 'service');
             })
             ->select(
                 'sales_orders.id as order_id',
                 'sales_orders.created_at',
                 'sales_order_lines.qty',
                 'sales_order_lines.unit_price',
-                'sales_order_lines.service_name',
+                DB::raw("COALESCE(products.name, '—') as service_name"),
                 DB::raw('COALESCE(sales_order_lines.line_total, sales_order_lines.qty * sales_order_lines.unit_price) as line_total'),
                 'stores.name as store_name',
                 DB::raw("COALESCE(employees.first_name || ' ' || employees.last_name, '—') as employee_name")
