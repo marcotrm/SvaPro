@@ -304,7 +304,7 @@ function StoreModal({ store, onClose, onSaved }) {
 
 // ─── Componente form per accessi nel Tab ──────────────────────────
 function StoreAccessTab({ store }) {
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'dipendente' });
+  const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -322,8 +322,8 @@ function StoreAccessTab({ store }) {
     try {
       setLoading(true); setErrors({});
       await storesApi.createCredentials(store.id, form);
-      toast.success("Credenziali create! L'utente può ora accedere al negozio.");
-      setForm({ name: '', email: '', password: '', role: 'dipendente' }); // Reset
+      toast.success("Credenziali salvate! La password è aggiornata.");
+      setForm({ email: '', password: '' }); // Reset
     } catch (err) {
       if (err.response?.data?.errors) setErrors(err.response.data.errors);
       else toast.error(err.response?.data?.message || 'Errore generazione credenziali');
@@ -334,43 +334,30 @@ function StoreAccessTab({ store }) {
 
   return (
     <div style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 20, border: '1px solid var(--color-border)' }}>
-      <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800 }}>Genera nuovo accesso per {store.name}</h4>
+      <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800 }}>Imposta Password: {store.name}</h4>
       <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 20 }}>
-        Crea rapidamente un account. Verrà associato automaticamente a questo negozio.
+        Crea un nuovo accesso dipendente o aggiorna liberamente la password di un'email esistente.
       </p>
 
       <div style={{ padding: '12px 14px', background: 'rgba(155,143,212,0.08)', borderRadius: 10, border: '1px solid rgba(155,143,212,0.2)', fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
         <strong>ℹ️ Info:</strong> Alla creazione, il sistema genererà automaticamente anche il tag/pin per la Cassa POS associato a questo utente e lo bloccherà sulle vendite di questo negozio.
       </div>
-      
       <div style={{ display: 'grid', gap: 14, gridTemplateColumns: '1fr 1fr' }}>
-        <div style={{ gridColumn: '1/-1' }}>
-          <label className="sp-label">Ruolo dell'account</label>
-          <select className="sp-select" value={form.role} onChange={e => set('role', e.target.value)}>
-            <option value="dipendente">Operatore Base (Solo POS Cassa e Ordini base)</option>
-            <option value="admin_cliente">Amministratore del Negozio (Vede Dashboard Storica)</option>
-          </select>
-        </div>
-        <div>
-          <label className="sp-label">Nominativo (Nome e Cognome)</label>
-          <input className="sp-input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Es: Mario Rossi" />
-          {errors.name && <div style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{errors.name[0]}</div>}
-        </div>
         <div>
           <label className="sp-label">Email di Login</label>
           <input type="email" className="sp-input" value={form.email} onChange={e => set('email', e.target.value.toLowerCase())} placeholder="es: mario@negozio.it" />
           {errors.email && <div style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{errors.email[0]}</div>}
         </div>
-        <div style={{ gridColumn: '1/-1' }}>
+        <div>
           <label className="sp-label">Password Segreta</label>
-          <input type="password" className="sp-input" value={form.password} onChange={e => set('password', e.target.value)} placeholder="Inserisci una password sicura..." />
+          <input type="password" className="sp-input" value={form.password} onChange={e => set('password', e.target.value)} placeholder="Inserisci o aggiorna la password..." />
           {errors.password && <div style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{errors.password[0]}</div>}
         </div>
       </div>
 
       <div style={{ marginTop: 24, textAlign: 'right' }}>
-        <button className="sp-btn sp-btn-primary" onClick={handleSubmit} disabled={loading || !form.name || !form.email || !form.password}>
-          {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : 'Crea Accesso & Pin'}
+        <button className="sp-btn sp-btn-primary" onClick={handleSubmit} disabled={loading || !form.email || !form.password}>
+          {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : 'Salva Credenziali'}
         </button>
       </div>
     </div>

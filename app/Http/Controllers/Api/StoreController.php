@@ -253,21 +253,46 @@ class StoreController extends Controller
         }
 
         $request->validate([
-            'role'     => ['required', 'string', 'in:admin_cliente,dipendente'],
             'email'    => ['required', 'email'],
             'password' => ['required', 'string', 'min:6'],
-            'name'     => ['required', 'string', 'max:255'],
         ]);
 
         $email = strtolower(trim($request->input('email')));
         
-        // Controlla se email esiste già
-        if (DB::table('users')->where('email', $email)->exists()) {
-            return response()->json(['errors' => ['email' => ['Email già registrata.']]], 422);
+        $existingUser = DB::table('users')->where('email', $email)->first();
+
+        if ($existingUser) {
+            DB::table('users')->where('id', $existingUser->id)->update([
+                'password' => \Illuminate\Support\Facades\Hash::make($request->input('password')),
+                'updated_at' => now(),
+            ]);
+            
+            // Assicuriamoci che esista come dipendente nel negozio corrente
+            $employeeExists = DB::table('employees')
+                ->where('user_id', $existingUser->id)
+                ->where('store_id', $storeId)
+                ->exists();
+                
+            if (!$employeeExists) {
+                DB::table('employees')->insert([
+                    'tenant_id'     => $tenantId,
+                    'store_id'      => $storeId,
+                    'user_id'       => $existingUser->id,
+                    'first_name'    => preg_replace('/\s+/', ' ', trim(explode('@', $email)[0])),
+                    'last_name'     => '',
+                    'barcode'       => 'DIP-' . $store->code . '-' . rand(1000, 9999),
+                    'status'        => 'active',
+                    'created_at'    => now(),
+                    'updated_at'    => now(),
+                ]);
+            }
+            
+            AuditLogger::log($request, 'update_credentials', 'store', $storeId, "Password aggiornata per: $email");
+            return response()->json(['message' => 'Password aggiornata con successo per l\'utente esistente!']);
         }
 
         $userId = DB::table('users')->insertGetId([
-            'name'       => $request->input('name'),
+            'name'       => explode('@', $email)[0],
             'email'      => $email,
             'password'   => \Illuminate\Support\Facades\Hash::make($request->input('password')),
             'tenant_id'  => $tenantId,
@@ -276,8 +301,7 @@ class StoreController extends Controller
             'updated_at' => now(),
         ]);
 
-        $roleCode = $request->input('role');
-        $roleId = DB::table('roles')->where('code', $roleCode)->value('id');
+        $roleId = DB::table('roles')->where('code', 'dipendente')->value('id');
 
         if ($roleId) {
             DB::table('user_roles')->insert([
@@ -287,20 +311,19 @@ class StoreController extends Controller
             ]);
         }
 
-        // Se è un dipendente (o anche admin locale) creiamo automaticamente il record employee
         DB::table('employees')->insert([
             'tenant_id'     => $tenantId,
             'store_id'      => $storeId,
             'user_id'       => $userId,
-            'first_name'    => preg_replace('/\s+/', ' ', trim(explode(' ', $request->input('name'))[0])),
-            'last_name'     => preg_replace('/\s+/', ' ', trim(strstr($request->input('name'), ' '))),
-            'barcode'       => strtoupper(substr($roleCode, 0, 3)) . '-' . $store->code . '-' . rand(1000, 9999),
+            'first_name'    => explode('@', $email)[0],
+            'last_name'     => '',
+            'barcode'       => 'DIP-' . $store->code . '-' . rand(1000, 9999),
             'status'        => 'active',
             'created_at'    => now(),
             'updated_at'    => now(),
         ]);
 
-        AuditLogger::log($request, 'create_credentials', 'store', $storeId, "Auto-created $roleCode: $email");
+        AuditLogger::log($request, 'create_credentials', 'store', $storeId, "Auto-created dipendente: $email");
 
         return response()->json(['message' => 'Credenziali generate con successo!']);
     }
