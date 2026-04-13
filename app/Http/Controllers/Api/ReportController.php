@@ -216,26 +216,24 @@ class ReportController extends Controller
                 : null;
 
             // Breakdown per metodo di pagamento
+            // Usa gli stessi ordini del revenue (whereIn evita problemi di alias JOIN in SQLite)
             $cashTotal = 0; $cardTotal = 0; $otherTotal = 0;
             try {
-                $paymentBase = DB::table('payments as pay')
-                    ->join('sales_orders as so2', 'so2.id', '=', 'pay.sales_order_id')
-                    ->where('so2.tenant_id', $tenantId)
-                    ->where('so2.status', 'paid');
-
-                if ($storeId) {
-                    $paymentBase->where('so2.store_id', $storeId);
+                $matchingIds = (clone $orderBase)->pluck('id');
+                if ($matchingIds->isNotEmpty()) {
+                    $cashTotal  = DB::table('payments')
+                        ->whereIn('sales_order_id', $matchingIds)
+                        ->where('method', 'cash')
+                        ->sum('amount');
+                    $cardTotal  = DB::table('payments')
+                        ->whereIn('sales_order_id', $matchingIds)
+                        ->where('method', 'card')
+                        ->sum('amount');
+                    $otherTotal = DB::table('payments')
+                        ->whereIn('sales_order_id', $matchingIds)
+                        ->whereNotIn('method', ['cash', 'card'])
+                        ->sum('amount');
                 }
-                if ($dateFrom && $dateTo) {
-                    $paymentBase->whereRaw("strftime('%Y-%m-%d', so2.created_at) >= ?", [$dateFrom])
-                                ->whereRaw("strftime('%Y-%m-%d', so2.created_at) <= ?", [$dateTo]);
-                } else {
-                    $paymentBase->where('so2.created_at', '>=', now()->subDays($days));
-                }
-
-                $cashTotal  = (clone $paymentBase)->where('pay.method', 'cash')->sum('pay.amount');
-                $cardTotal  = (clone $paymentBase)->where('pay.method', 'card')->sum('pay.amount');
-                $otherTotal = (clone $paymentBase)->whereNotIn('pay.method', ['cash', 'card'])->sum('pay.amount');
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('ReportController::summary payments query failed: ' . $e->getMessage());
             }
