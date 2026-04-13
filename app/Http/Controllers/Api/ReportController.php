@@ -272,8 +272,18 @@ class ReportController extends Controller
             ->leftJoin('stores', 'sales_orders.store_id', '=', 'stores.id')
             ->where('sales_orders.tenant_id', $tenantId)
             ->where('sales_orders.status', 'paid')
-            ->where('sales_order_lines.is_service', true)
-            ->where('sales_order_lines.service_name', 'like', '%QScare%')
+            ->where(function ($q) {
+                // Righe salvate dal CRM/backoffice con campi is_service/service_name
+                $q->where(function ($q2) {
+                    $q2->where('sales_order_lines.is_service', true)
+                       ->where('sales_order_lines.service_name', 'like', '%QScare%');
+                })
+                // Righe salvate dal POS: product_variant_id null + tax_snapshot_json con product_type = service
+                ->orWhere(function ($q3) {
+                    $q3->whereNull('sales_order_lines.product_variant_id')
+                       ->whereRaw("sales_order_lines.tax_snapshot_json::jsonb ->> 'product_type' = 'service'");
+                });
+            })
             ->select(
                 'sales_orders.id as order_id',
                 'sales_orders.created_at',
