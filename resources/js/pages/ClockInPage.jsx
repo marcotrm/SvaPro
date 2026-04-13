@@ -408,9 +408,11 @@ function AdminPresenceView() {
    EMPLOYEE KIOSK VIEW — Schermata timbratura touch
 ═══════════════════════════════════════════════════════════ */
 function KioskView() {
+  const { selectedStoreId, user } = useOutletContext() || {};
+  const isDipendente = (user?.roles || []).includes('dipendente') || user?.role === 'dipendente';
+
   const [employees, setEmployees]        = useState([]);
   const [employee,  setEmployee]         = useState(null);
-  const [lastStatus, setLastStatus]      = useState(null);
   const [todayRecords, setTodayRecords]  = useState([]);
   const [loading, setLoading]            = useState(false);
   const [message, setMessage]            = useState(null);
@@ -439,8 +441,33 @@ function KioskView() {
   }, []);
 
   useEffect(() => {
-    if (!employee) setTimeout(() => barcodeRef.current?.focus(), 100);
-  }, [employee]);
+    if (!employee && phase === 'idle' && !isDipendente) setTimeout(() => barcodeRef.current?.focus(), 100);
+  }, [employee, phase, isDipendente]);
+
+  // Se l'utente è un dipendente, trova automaticamente il suo ID
+  useEffect(() => {
+    if (isDipendente && user && employees.length > 0 && phase === 'idle') {
+      const found = employees.find(e => 
+        e.email === user.email || 
+        (user.employee_id && e.id === user.employee_id) || 
+        (String(e.id) === String(user.id))
+      );
+      if (found) {
+        setEmployee(found);
+        // Controlla subito il suo status live
+        setLoading(true);
+        attendance.getLive({ employee_id: found.id })
+          .then(r => {
+             const l = r.data?.data || [];
+             const isIn = l.some(e => e.employee_id === found.id || e.id === found.id);
+             if (isIn) setPhase('ask_checkout_type');
+             else setPhase('personal_dashboard_out'); // Nuovo stato per chi è fuori
+          })
+          .catch(() => setPhase('personal_dashboard_out'))
+          .finally(() => setLoading(false));
+      }
+    }
+  }, [isDipendente, user, employees, phase]);
 
   const getStoreId = () => {
     const v = localStorage.getItem('selectedStoreId');
@@ -495,9 +522,13 @@ function KioskView() {
       await loadTodayRecords(emp);
       
       setTimeout(() => {
-        setEmployee(null); setLastStatus(null); setTodayRecords([]);
-        setMessage(null); setBarcodeInput(''); setPhase('idle');
-        barcodeRef.current?.focus();
+        if (isDipendente) {
+            setLastStatus(null); setPhase('idle'); // Ritona al check iniziale
+        } else {
+            setEmployee(null); setLastStatus(null); setTodayRecords([]);
+            setMessage(null); setBarcodeInput(''); setPhase('idle');
+            barcodeRef.current?.focus();
+        }
       }, 4500);
     } catch (err) {
       setMessage({ text: err.response?.data?.message || 'Errore di connessione', type: 'error' });
@@ -552,6 +583,33 @@ function KioskView() {
     await performClock(found, 'in');
   }, [barcodeInput, employees, phase]);
 
+  /* ── Schermata Personale - Fuori Turno ── */
+  if (phase === 'personal_dashboard_out' && employee) {
+    return (
+      <div style={{
+        minHeight: '82vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        background: '#1a1a2e', borderRadius: 24, padding: 30
+      }}>
+        <div style={{ fontSize: 28, color: '#fff', marginBottom: 40, fontWeight: 800, textAlign: 'center' }}>
+          Ciao {employee.first_name}, <br/><span style={{ color: '#9CA3AF', fontSize: 20, fontWeight: 600 }}>Cosa vuoi fare?</span>
+        </div>
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button 
+                onClick={() => performClock(employee, 'in')}
+                disabled={loading}
+                style={{ background: '#F0FDF4', color: '#16A34A', padding: '24px 40px', borderRadius: 20, fontSize: 18, fontWeight: 800, border: '4px solid #BBF7D0', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', minWidth: 220, opacity: loading ? 0.7 : 1 }}
+            >
+                <span style={{ fontSize: 48 }}>✅</span>
+                Inizia Turno (Entrata)
+            </button>
+        </div>
+        <button onClick={() => setPhase('ask_history')} style={{ marginTop: 50, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+          🕒 Vedi Storico Ore
+        </button>
+      </div>
+    );
+  }
+
   /* ── Schermata Scelta Checkout ── */
   if (phase === 'ask_checkout_type' && employee) {
     return (
@@ -565,7 +623,8 @@ function KioskView() {
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
             <button 
                 onClick={() => performClock(employee, 'out', true)}
-                style={{ background: '#FFFBEB', color: '#B45309', padding: '24px 40px', borderRadius: 20, fontSize: 18, fontWeight: 800, border: '4px solid #FCD34D', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', minWidth: 220, transition: 'transform 0.1s' }}
+                disabled={loading}
+                style={{ background: '#FFFBEB', color: '#B45309', padding: '24px 40px', borderRadius: 20, fontSize: 18, fontWeight: 800, border: '4px solid #FCD34D', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', minWidth: 220, transition: 'transform 0.1s', opacity: loading ? 0.7 : 1 }}
                 onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
@@ -574,7 +633,8 @@ function KioskView() {
             </button>
             <button 
                 onClick={() => performClock(employee, 'out', false)}
-                style={{ background: '#FEF2F2', color: '#B91C1C', padding: '24px 40px', borderRadius: 20, fontSize: 18, fontWeight: 800, border: '4px solid #FECACA', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', minWidth: 220, transition: 'transform 0.1s' }}
+                disabled={loading}
+                style={{ background: '#FEF2F2', color: '#B91C1C', padding: '24px 40px', borderRadius: 20, fontSize: 18, fontWeight: 800, border: '4px solid #FECACA', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', minWidth: 220, transition: 'transform 0.1s', opacity: loading ? 0.7 : 1 }}
                 onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
@@ -582,9 +642,15 @@ function KioskView() {
                 Fine Turno (Uscita)
             </button>
         </div>
-        <button onClick={() => { setPhase('idle'); setEmployee(null); barcodeRef.current?.focus(); }} style={{ marginTop: 50, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-          Annulla Operazione
+        <button onClick={() => setPhase('ask_history')} style={{ marginTop: 50, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+          🕒 Vedi Storico Ore
         </button>
+        
+        {!isDipendente && (
+          <button onClick={() => { setPhase('idle'); setEmployee(null); barcodeRef.current?.focus(); }} style={{ marginTop: 20, background: 'transparent', color: 'rgba(255,255,255,0.5)', border: 'none', padding: '8px 24px', fontSize: 13, cursor: 'pointer' }}>
+            Annulla Operazione (Esci)
+          </button>
+        )}
       </div>
     );
   }
@@ -786,10 +852,17 @@ function KioskView() {
             </div>
             
             <button 
-               onClick={() => { setPhase(phase === 'ask_history' ? 'idle' : 'ask_history'); barcodeRef.current?.focus(); }}
+               onClick={() => {
+                 if (isDipendente) {
+                     setPhase('idle'); // ritornerà ai bottoni personali
+                 } else {
+                     setPhase(phase === 'ask_history' ? 'idle' : 'ask_history'); 
+                     barcodeRef.current?.focus();
+                 }
+               }}
                style={{ background: phase === 'ask_history' ? 'rgba(255,255,255,0.15)' : 'transparent', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: 20, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 12, transition: 'all 0.2s' }}
             >
-               {phase === 'ask_history' ? '🔙 Torna a Timbratura' : '🕒 Vedi Storico'}
+               {phase === 'ask_history' ? '🔙 Torna Indietro' : '🕒 Vedi Storico'}
             </button>
         </div>
       </div>
