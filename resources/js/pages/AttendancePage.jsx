@@ -5,8 +5,9 @@ import { CheckCircle, LogIn, LogOut, Clock, AlertTriangle, Loader, RefreshCw, Wi
 
 const STATUS_COLOR = {
   presente: { bg: '#ECFDF5', text: '#065F46', border: '#6EE7B7', label: 'Presente', avatarBg: 'linear-gradient(135deg, #10B981, #059669)' },
-  fuori: { bg: '#F9FAFB', text: '#6B7280', border: '#E5E7EB', label: 'Uscito', avatarBg: '#9CA3AF' },
-  assente: { bg: 'var(--color-surface)', text: 'var(--color-text)', border: 'var(--color-border)', label: 'Non timbrato', avatarBg: '#D1D5DB' },
+  pausa:    { bg: '#FFFBEB', text: '#B45309', border: '#FCD34D', label: 'In Pausa', avatarBg: '#F59E0B' },
+  fuori:    { bg: '#F9FAFB', text: '#6B7280', border: '#E5E7EB', label: 'Uscito', avatarBg: '#9CA3AF' },
+  assente:  { bg: 'var(--color-surface)', text: 'var(--color-text)', border: 'var(--color-border)', label: 'Non timbrato', avatarBg: '#D1D5DB' },
 };
 
 function Clock_({ serverTime }) {
@@ -55,6 +56,7 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(null); // employee_id in lavorazione
   const [feedback, setFeedback] = useState(null); // { message, type }
+  const [askAction, setAskAction] = useState(null); // emp for checkout modal
   const [serverTime, setServerTime] = useState(null);
   const [online, setOnline] = useState(navigator.onLine);
   const feedbackTimer = useRef(null);
@@ -92,32 +94,38 @@ export default function AttendancePage() {
 
   const handleTap = async (emp) => {
     if (processing) return;
+    if (emp.status === 'presente') {
+      setAskAction(emp); // mostra modal
+      return;
+    }
+    await executeAction(emp, 'in');
+  };
+
+  const executeAction = async (emp, actionType, isBreak = false) => {
+    setAskAction(null);
     setProcessing(emp.id);
     try {
       const params = { employee_id: emp.id };
       if (selectedStoreId) params.store_id = selectedStoreId;
       else params.store_id = 1; // fallback
 
-      if (emp.status === 'presente') {
-        // Check-out
+      if (actionType === 'out') {
+        params.is_break = isBreak;
         const res = await attendanceApi.checkOut(params);
-        showFeedback(
-          `👋 ${res.data.employee_name} — Uscita registrata alle ${new Date(res.data.checked_out_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.\n⏱ Turno: ${res.data.duration_label}`,
-          'info', 4000
-        );
+        if (isBreak) {
+           showFeedback(`☕ ${res.data.employee_name} — In Pausa. A tra poco!`, 'info', 4000);
+        } else {
+           showFeedback(`👋 ${res.data.employee_name} — Uscita registrata alle ${new Date(res.data.checked_out_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.\n⏱ Turno: ${res.data.duration_label}`, 'info', 4000);
+        }
       } else {
-        // Check-in
         const res = await attendanceApi.checkIn(params);
-        const lateMsg = res.data.late_minutes > 0
-          ? ` ⚠️ ${res.data.late_minutes} min in ritardo`
-          : '';
+        const lateMsg = res.data.late_minutes > 0 ? ` ⚠️ ${res.data.late_minutes} min ritardo` : '';
+        const breakReturnMsg = emp.status === 'pausa' ? ' — Rientrato dalla pausa' : '';
         showFeedback(
-          `✅ ${res.data.employee_name} — Entrata alle ${new Date(res.data.checked_in_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.${lateMsg}`,
-          res.data.late_minutes > 0 ? 'warning' : 'success',
-          4000
+          `✅ ${res.data.employee_name} ${breakReturnMsg} alle ${new Date(res.data.checked_in_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.${lateMsg}`,
+          res.data.late_minutes > 0 ? 'warning' : 'success', 4000
         );
       }
-      // Ricarica stato
       await load();
     } catch (err) {
       showFeedback(err.response?.data?.message || 'Errore di connessione.', 'error');
@@ -297,6 +305,44 @@ export default function AttendancePage() {
           </div>
         )}
       </div>
+
+      {/* Modal Scelta Azione */}
+      {askAction && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9995, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={() => setAskAction(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(3px)' }} />
+          <div style={{ position: 'relative', background: '#fff', borderRadius: 24, padding: 32, width: 'min(90vw, 400px)', boxShadow: '0 24px 60px rgba(0,0,0,0.2)', textAlign: 'center', animation: 'modalIn 0.2s cubic-bezier(0.4,0,0.2,1)' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 6 }}>
+              Ciao {askAction.first_name}!
+            </div>
+            <div style={{ fontSize: 14, color: '#6B7280', marginBottom: 24 }}>Cosa desideri fare?</div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button 
+                onClick={() => executeAction(askAction, 'out', true)}
+                style={{ background: '#FFFBEB', color: '#B45309', border: '2px solid #FCD34D', padding: '16px', borderRadius: 16, fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'transform 0.1s' }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <span style={{ fontSize: 24 }}>☕</span> Inizia Pausa / Bagno
+              </button>
+              
+              <button 
+                onClick={() => executeAction(askAction, 'out', false)}
+                style={{ background: '#FEF2F2', color: '#B91C1C', border: '2px solid #FECACA', padding: '16px', borderRadius: 16, fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'transform 0.1s' }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <span style={{ fontSize: 24 }}>🚪</span> Uscita Fine Turno
+              </button>
+            </div>
+            
+            <button onClick={() => setAskAction(null)} style={{ marginTop: 24, background: 'transparent', color: '#9CA3AF', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              Annulla
+            </button>
+          </div>
+          <style>{`@keyframes modalIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }`}</style>
+        </div>
+      )}
 
       {/* Banner feedback */}
       <FeedbackBanner message={feedback?.message} type={feedback?.type} />

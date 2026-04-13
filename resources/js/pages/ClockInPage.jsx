@@ -457,18 +457,15 @@ function KioskView() {
     ) || null;
   };
 
-  const loadTodayStatus = async emp => {
+  const loadTodayRecords = async emp => {
     try {
-      const res = await attendance.getLive({ employee_id: emp.id });
-      const liveList = res.data?.data || [];
-      setLastStatus(liveList.some(e => e.employee_id === emp.id || e.id === emp.id) ? 'in' : 'out');
       const tr = await attendance.getList({ employee_id: emp.id });
       const all = (tr.data?.data || []).filter(r => r.employee_id === emp.id);
-      setTodayRecords(all.map(r => ({ clock_in: r.checked_in_at, clock_out: r.checked_out_at })));
-    } catch { setLastStatus(null); setTodayRecords([]); }
+      setTodayRecords(all.map(r => ({ clock_in: r.checked_in_at, clock_out: r.checked_out_at, is_break: r.notes === 'Pausa' })));
+    } catch { setTodayRecords([]); }
   };
 
-  const performClock = async (emp, forceAction = null) => {
+  const performClock = async (emp, forceAction = null, isBreak = false) => {
     setLoading(true);
     const storeId = getStoreId();
     if (!storeId) {
@@ -484,16 +481,19 @@ function KioskView() {
         curr = l.some(e => e.employee_id === emp.id || e.id === emp.id) ? 'in' : 'out';
       } catch {}
       const action = forceAction || (curr === 'in' ? 'out' : 'in');
+      
       if (action === 'in') {
         await attendance.checkIn({ employee_id: emp.id, store_id: storeId });
         setLastStatus('in');
       } else {
-        await attendance.checkOut({ employee_id: emp.id, store_id: storeId });
-        setLastStatus('out');
+        await attendance.checkOut({ employee_id: emp.id, store_id: storeId, is_break: isBreak });
+        setLastStatus(isBreak ? 'pausa' : 'out');
       }
+      
       setEmployee(emp);
       setPhase('confirmed');
-      await loadTodayStatus(emp);
+      await loadTodayRecords(emp);
+      
       setTimeout(() => {
         setEmployee(null); setLastStatus(null); setTodayRecords([]);
         setMessage(null); setBarcodeInput(''); setPhase('idle');
@@ -521,7 +521,7 @@ function KioskView() {
         try {
             const tr = await attendance.getList({ employee_id: found.id, date: 'all' });
             const all = (tr.data?.data || []);
-            setTodayRecords(all.map(r => ({ clock_in: r.checked_in_at, clock_out: r.checked_out_at })));
+            setTodayRecords(all.map(r => ({ clock_in: r.checked_in_at, clock_out: r.checked_out_at, is_break: r.notes === 'Pausa' })));
             setEmployee(found);
             setPhase('history_view');
         } catch {
@@ -533,8 +533,61 @@ function KioskView() {
         return;
     }
 
-    await performClock(found);
+    // Identifica lo stato attuale per vedere se mostrare modal o fare azione diretta
+    setLoading(true);
+    let curr = 'out';
+    try {
+        const r = await attendance.getLive({ employee_id: found.id });
+        const l = r.data?.data || [];
+        curr = l.some(e => e.employee_id === found.id || e.id === found.id) ? 'in' : 'out';
+    } catch {}
+    setLoading(false);
+
+    if (curr === 'in') {
+        setEmployee(found);
+        setPhase('ask_checkout_type');
+        return;
+    }
+
+    await performClock(found, 'in');
   }, [barcodeInput, employees, phase]);
+
+  /* ── Schermata Scelta Checkout ── */
+  if (phase === 'ask_checkout_type' && employee) {
+    return (
+      <div style={{
+        minHeight: '82vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        background: '#1a1a2e', borderRadius: 24, padding: 30
+      }}>
+        <div style={{ fontSize: 28, color: '#fff', marginBottom: 40, fontWeight: 800, textAlign: 'center' }}>
+          Ciao {employee.first_name}, <br/><span style={{ color: '#9CA3AF', fontSize: 20, fontWeight: 600 }}>Cosa vuoi fare?</span>
+        </div>
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button 
+                onClick={() => performClock(employee, 'out', true)}
+                style={{ background: '#FFFBEB', color: '#B45309', padding: '24px 40px', borderRadius: 20, fontSize: 18, fontWeight: 800, border: '4px solid #FCD34D', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', minWidth: 220, transition: 'transform 0.1s' }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            >
+                <span style={{ fontSize: 48 }}>☕</span>
+                Inizia Pausa / Bagno
+            </button>
+            <button 
+                onClick={() => performClock(employee, 'out', false)}
+                style={{ background: '#FEF2F2', color: '#B91C1C', padding: '24px 40px', borderRadius: 20, fontSize: 18, fontWeight: 800, border: '4px solid #FECACA', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', minWidth: 220, transition: 'transform 0.1s' }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            >
+                <span style={{ fontSize: 48 }}>🚪</span>
+                Fine Turno (Uscita)
+            </button>
+        </div>
+        <button onClick={() => { setPhase('idle'); setEmployee(null); barcodeRef.current?.focus(); }} style={{ marginTop: 50, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+          Annulla Operazione
+        </button>
+      </div>
+    );
+  }
 
   /* ── Schermata CONFERMA (dopo timbratura) ── */
   if (phase === 'confirmed' && employee) {
@@ -560,7 +613,7 @@ function KioskView() {
         </div>
 
         <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>
-          {isIn ? 'Entrata timbrata' : 'Uscita timbrata'}
+          {lastStatus === 'in' ? 'Entrata timbrata' : (lastStatus === 'pausa' ? 'In Pausa' : 'Uscita timbrata')}
         </div>
         <div style={{ fontSize: 36, fontWeight: 900, color: '#fff', marginBottom: 8 }}>
           {employee.first_name} {employee.last_name}
@@ -578,7 +631,7 @@ function KioskView() {
                 border: '1px solid rgba(255,255,255,0.12)', display: 'flex', gap: 12, alignItems: 'center',
               }}>
                 <span style={{ color: '#4ade80', fontWeight: 700, fontSize: 14 }}>🟢 {fmtTime(rec.clock_in)}</span>
-                {rec.clock_out && <span style={{ color: '#f87171', fontWeight: 700, fontSize: 14 }}>🔴 {fmtTime(rec.clock_out)}</span>}
+                {rec.clock_out && <span style={{ color: rec.is_break ? '#FCD34D' : '#f87171', fontWeight: 700, fontSize: 14 }}>{rec.is_break ? '☕' : '🔴'} {fmtTime(rec.clock_out)}</span>}
               </div>
             ))}
           </div>

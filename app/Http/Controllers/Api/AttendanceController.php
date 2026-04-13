@@ -220,20 +220,31 @@ class AttendanceController extends Controller
         $checkIn  = Carbon::parse($attendance->checked_in_at);
         $duration = $checkIn->diffInMinutes($now);
 
+        $isBreak = $request->boolean('is_break', false);
+
         DB::table('employee_attendances')
             ->where('id', $attendance->id)
-            ->update(['checked_out_at' => $now, 'updated_at' => $now]);
+            ->update([
+                'checked_out_at' => $now, 
+                'notes' => $isBreak ? 'Pausa' : DB::raw('notes'),
+                'updated_at' => $now
+            ]);
 
         $employeeName = trim("{$employee->first_name} {$employee->last_name}");
         $hours   = intdiv($duration, 60);
         $minutes = $duration % 60;
 
+        $msg = $isBreak 
+            ? "Pausa registrata per {$employeeName}. A tra poco!" 
+            : "Arrivederci, {$employeeName}! Uscita registrata.";
+
         return response()->json([
-            'message'         => "Arrivederci, {$employeeName}! Uscita registrata.",
+            'message'         => $msg,
             'employee_name'   => $employeeName,
             'checked_out_at'  => $now->toIso8601String(),
             'duration_minutes'=> $duration,
             'duration_label'  => "{$hours}h {$minutes}m",
+            'status'          => $isBreak ? 'pausa' : 'fuori'
         ]);
     }
 
@@ -253,11 +264,12 @@ class AttendanceController extends Controller
             ->orderBy('first_name')
             ->get();
 
-        // Timbrature di oggi
+        // Timbrature di oggi (ordina per checked_in_at così keyBy terrà l'ultimo record della giornata)
         $today = DB::table('employee_attendances')
             ->where('tenant_id', $tenantId)
             ->when($storeId, fn($q) => $q->where('store_id', $storeId))
             ->whereDate('checked_in_at', now()->toDateString())
+            ->orderBy('checked_in_at')
             ->get()
             ->keyBy('employee_id');
 
@@ -271,7 +283,7 @@ class AttendanceController extends Controller
                 'barcode'              => $emp->barcode,
                 'expected_start_time'  => $emp->expected_start_time,
                 'status'               => $att
-                    ? ($att->checked_out_at ? 'fuori' : 'presente')
+                    ? ($att->checked_out_at ? ($att->notes === 'Pausa' ? 'pausa' : 'fuori') : 'presente')
                     : 'assente',
                 'checked_in_at'        => $att?->checked_in_at,
                 'checked_out_at'       => $att?->checked_out_at,
