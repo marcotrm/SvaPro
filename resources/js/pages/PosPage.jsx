@@ -308,6 +308,44 @@ export default function PosPage() {
     }
   }, [user]);
 
+  // Auto-invio per codice operatore dopo aver finito di digitare (debounce 1 secondo)
+  useEffect(() => {
+    if (!operatorBarcode.trim() || soldByEmployeeId) return;
+    const delayId = setTimeout(async () => {
+      const val = operatorBarcode.trim();
+      const valLow = val.toLowerCase();
+      let found = employees.find(em =>
+        (em.barcode && em.barcode.toLowerCase() === valLow) ||
+        (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
+        String(em.id) === valLow
+      );
+
+      if (!found) {
+        try {
+          const { employees: empApi } = await import('../api.jsx');
+          const res = await empApi.getEmployees({ search: val, limit: 10 });
+          const list = res.data?.data || [];
+          found = list.find(em => 
+            (em.barcode && em.barcode.toLowerCase() === valLow) ||
+            (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
+            String(em.id) === valLow
+          ) || (/^\d+$/.test(val) && list.find(em => String(em.id) === val));
+        } catch {}
+      }
+
+      if (found) {
+        setSoldByEmployeeId(String(found.id));
+        setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || `Operatore #${found.id}`);
+        setOperatorError('');
+        setOperatorBarcode('');
+      } else {
+        setOperatorError(`Codice "${val}" non trovato`);
+        setOperatorBarcode('');
+      }
+    }, 1000); // ASPETTA 1 SECONDO DOPO AVER FINITO DI DIGITARE!
+    return () => clearTimeout(delayId);
+  }, [operatorBarcode, employees, soldByEmployeeId]);
+
 
   /* Cart logic */
 
@@ -512,23 +550,26 @@ export default function PosPage() {
     }).slice(0, 8);
   }, [allCustomers, customerSearch, isDipendente]);
 
-  // Auto-selezione cliente: se la ricerca corrisponde esattamente a fidelity/telefono/email/codice
+  // Auto-selezione cliente: invio automatico dopo essersi fermati per 1 secondo
   useEffect(() => {
     if (!customerSearch.trim() || selectedCustomer) return;
-    const s = customerSearch.trim().toLowerCase();
-    const exactMatch = allCustomers.find(c =>
-      (c.fidelity_card && c.fidelity_card.toLowerCase() === s) ||
-      (c.phone         && c.phone.toLowerCase()         === s) ||
-      (c.email         && c.email.toLowerCase()         === s) ||
-      (c.code          && c.code.toLowerCase()          === s) ||
-      String(c.id) === s
-    );
-    if (exactMatch) {
-      setSelectedCustomer(exactMatch);
-      setCustomerSearch('');
-      setShowCustomerDrop(false);
-      toast.success(`Cliente: ${exactMatch.name || `${exactMatch.first_name} ${exactMatch.last_name}`}`, { icon: '👤' });
-    }
+    const delayId = setTimeout(() => {
+      const s = customerSearch.trim().toLowerCase();
+      const exactMatch = allCustomers.find(c =>
+        (c.fidelity_card && c.fidelity_card.toLowerCase() === s) ||
+        (c.phone         && c.phone.toLowerCase()         === s) ||
+        (c.email         && c.email.toLowerCase()         === s) ||
+        (c.code          && c.code.toLowerCase()          === s) ||
+        String(c.id) === s
+      );
+      if (exactMatch) {
+        setSelectedCustomer(exactMatch);
+        setCustomerSearch('');
+        setShowCustomerDrop(false);
+        toast.success(`Cliente: ${exactMatch.name || `${exactMatch.first_name || ''} ${exactMatch.last_name || ''}`}`, { icon: '👤' });
+      }
+    }, 1000); // 1 SECONDO WAIT
+    return () => clearTimeout(delayId);
   }, [customerSearch, allCustomers, selectedCustomer]);
 
   /* Cross-sell */
