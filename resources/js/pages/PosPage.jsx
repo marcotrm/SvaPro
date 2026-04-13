@@ -29,7 +29,7 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
   const variant   = product.variants?.[0];
   const price     = parseFloat(variant?.sale_price) || 0;
   const stockInfo = variant ? stockMap[variant.id] : null;
-  const onHand    = stockInfo?.on_hand ?? 0;
+  const onHand    = variant?.stock_quantity ?? variant?.on_hand ?? stockInfo?.on_hand ?? 0;
   const palette   = catPalette(product.category_id);
   const imgUrl    = product.image_url ? getImageUrl(product.image_url) : null;
   const inStock   = onHand > 0;
@@ -367,7 +367,7 @@ export default function PosPage() {
     if (!variant) return;
     // Blocca aggiunta se stock 0
     const stockInfo = stockMap[variant.id];
-    const onHand = stockInfo?.on_hand ?? product.variants?.[0]?.stock_quantity ?? 0;
+    const onHand = product.variants?.[0]?.stock_quantity ?? product.variants?.[0]?.on_hand ?? stockInfo?.on_hand ?? 0;
     if (onHand <= 0) {
       toast.error(`❌ ${product.name} non disponibile in magazzino`, { duration: 2000 });
       return;
@@ -762,7 +762,7 @@ export default function PosPage() {
                 const imgUrl = p.image_url ? getImageUrl(p.image_url) : null;
                 const sv = p.variants?.[0];
                 const sInfo = sv ? stockMap[sv.id] : null;
-                const avail = sInfo?.on_hand ?? 0;
+                const avail = sv?.stock_quantity ?? sv?.on_hand ?? sInfo?.on_hand ?? 0;
                 return (
                   <button
                     key={p.id}
