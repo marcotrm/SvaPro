@@ -122,15 +122,15 @@ export default function StoreStatsDrawer({ store, onClose }) {
   const [recentOrders, setRecentOrders] = useState([]);
 
   const load = useCallback(async () => {
-    if (!store?.id) return;
     setLoading(true);
     const { date_from, date_to } = getPeriodDates(period);
-    const params = { store_id: store.id, date_from, date_to, limit: 20 };
+    const baseParams = store?.id ? { store_id: store.id } : {};
+    const params = { ...baseParams, date_from, date_to, limit: 20 };
 
     try {
       const [summRes, ordRes] = await Promise.all([
-        reports.summary({ store_id: store.id, date_from, date_to }),
-        ordersApi.getOrders({ ...params }),
+        reports.summary({ ...baseParams, date_from, date_to }),
+        ordersApi.getOrders(params),
       ]);
 
       const s = summRes.data?.data || summRes.data || {};
