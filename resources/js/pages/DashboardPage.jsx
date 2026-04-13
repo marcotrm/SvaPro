@@ -29,13 +29,13 @@ const PERIODS = [
 ];
 
 // Calcola date_from e date_to per ogni periodo
-const getPeriodDates = (periodId) => {
+const getPeriodDates = (periodId, customDate = null) => {
   const today = new Date();
   const fmt = d => d.toISOString().slice(0, 10);
   const todayStr = fmt(today);
 
-  if (periodId === 'custom' && customDateStr) {
-    return { date_from: customDateStr, date_to: customDateStr, days: 1 };
+  if (periodId === 'custom' && customDate) {
+    return { date_from: customDate, date_to: customDate, days: 1 };
   }
 
   if (periodId === 'today') {
@@ -351,7 +351,7 @@ export default function DashboardPage() {
     } catch (err) {
       console.error('Dashboard fetch error:', err);
     } finally { setLoading(false); }
-  }, [selectedStoreId, activePeriod]);
+  }, [selectedStoreId, activePeriod, customDate]);
 
   // Si aggiorna quando main fetchData cambia
   React.useEffect(() => { fetchData(); }, [fetchData]);
