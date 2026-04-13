@@ -153,120 +153,137 @@ class ReportController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo   = $request->input('date_to');
 
-        $orderBase = DB::table('sales_orders')
-            ->where('tenant_id', $tenantId)
-            ->where('status', 'paid');
+        try {
+            $orderBase = DB::table('sales_orders')
+                ->where('tenant_id', $tenantId)
+                ->where('status', 'paid');
 
-        // SQLite-compatible date filtering
-        if ($dateFrom && $dateTo) {
-            $orderBase->whereRaw("strftime('%Y-%m-%d', created_at) >= ?", [$dateFrom])
-                      ->whereRaw("strftime('%Y-%m-%d', created_at) <= ?", [$dateTo]);
-        } else {
-            $orderBase->where('created_at', '>=', now()->subDays($days));
+            // SQLite-compatible date filtering
+            if ($dateFrom && $dateTo) {
+                $orderBase->whereRaw("strftime('%Y-%m-%d', created_at) >= ?", [$dateFrom])
+                          ->whereRaw("strftime('%Y-%m-%d', created_at) <= ?", [$dateTo]);
+            } else {
+                $orderBase->where('created_at', '>=', now()->subDays($days));
+            }
+
+            if ($storeId) {
+                $orderBase->where('store_id', $storeId);
+            }
+
+            $current = (clone $orderBase)->select(
+                DB::raw('count(*) as orders'),
+                DB::raw('coalesce(sum(grand_total), 0) as revenue'),
+                DB::raw('coalesce(avg(grand_total), 0) as avg_order')
+            )->first();
+
+            // Previous period for comparison
+            $prevBase = DB::table('sales_orders')
+                ->where('tenant_id', $tenantId)
+                ->where('status', 'paid')
+                ->where('created_at', '>=', now()->subDays($days * 2))
+                ->where('created_at', '<', now()->subDays($days));
+
+            if ($storeId) {
+                $prevBase->where('store_id', $storeId);
+            }
+
+            $previous = $prevBase->select(
+                DB::raw('count(*) as orders'),
+                DB::raw('coalesce(sum(grand_total), 0) as revenue')
+            )->first();
+
+            $customerCount = DB::table('customers')
+                ->where('tenant_id', $tenantId)
+                ->count();
+            $newCustomers = DB::table('customers')
+                ->where('tenant_id', $tenantId)
+                ->where('created_at', '>=', now()->subDays($days))
+                ->count();
+
+            $lowStock = 0;
+            try {
+                $lowStock = DB::table('stock_items')
+                    ->where('tenant_id', $tenantId)
+                    ->whereColumn('on_hand', '<', 'reorder_point')
+                    ->count();
+            } catch (\Throwable $e) {}
+
+            $deltaRevenue = $previous->revenue > 0
+                ? round(($current->revenue - $previous->revenue) / $previous->revenue * 100, 1)
+                : null;
+            $deltaOrders = $previous->orders > 0
+                ? round(($current->orders - $previous->orders) / $previous->orders * 100, 1)
+                : null;
+
+            // Breakdown per metodo di pagamento
+            $cashTotal = 0; $cardTotal = 0; $otherTotal = 0;
+            try {
+                $paymentBase = DB::table('payments as pay')
+                    ->join('sales_orders as so2', 'so2.id', '=', 'pay.sales_order_id')
+                    ->where('so2.tenant_id', $tenantId)
+                    ->where('so2.status', 'paid');
+
+                if ($storeId) {
+                    $paymentBase->where('so2.store_id', $storeId);
+                }
+                if ($dateFrom && $dateTo) {
+                    $paymentBase->whereRaw("strftime('%Y-%m-%d', so2.created_at) >= ?", [$dateFrom])
+                                ->whereRaw("strftime('%Y-%m-%d', so2.created_at) <= ?", [$dateTo]);
+                } else {
+                    $paymentBase->where('so2.created_at', '>=', now()->subDays($days));
+                }
+
+                $cashTotal  = (clone $paymentBase)->where('pay.method', 'cash')->sum('pay.amount');
+                $cardTotal  = (clone $paymentBase)->where('pay.method', 'card')->sum('pay.amount');
+                $otherTotal = (clone $paymentBase)->whereNotIn('pay.method', ['cash', 'card'])->sum('pay.amount');
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('ReportController::summary payments query failed: ' . $e->getMessage());
+            }
+
+            // Items sold
+            $itemsSold = 0;
+            try {
+                $itemsSoldQuery = DB::table('sales_order_lines as sol')
+                    ->join('sales_orders as so', 'so.id', '=', 'sol.sales_order_id')
+                    ->where('so.tenant_id', $tenantId)
+                    ->where('so.status', 'paid')
+                    ->when($storeId, fn($q) => $q->where('so.store_id', $storeId));
+
+                if ($dateFrom && $dateTo) {
+                    $itemsSoldQuery->whereRaw("strftime('%Y-%m-%d', so.created_at) >= ?", [$dateFrom])
+                                   ->whereRaw("strftime('%Y-%m-%d', so.created_at) <= ?", [$dateTo]);
+                } else {
+                    $itemsSoldQuery->where('so.created_at', '>=', now()->subDays($days));
+                }
+
+                $itemsSold = $itemsSoldQuery->sum('sol.qty');
+            } catch (\Throwable $e) {}
+
+            $upt = $current->orders > 0 ? round($itemsSold / $current->orders, 2) : 0;
+
+            return response()->json(['data' => [
+                'revenue'          => round($current->revenue, 2),
+                'total_revenue'    => round($current->revenue, 2),
+                'orders'           => $current->orders,
+                'total_orders'     => $current->orders,
+                'avg_order'        => round($current->avg_order, 2),
+                'avg_ticket'       => round($current->avg_order, 2),
+                'delta_revenue'    => $deltaRevenue,
+                'delta_orders'     => $deltaOrders,
+                'total_customers'  => $customerCount,
+                'unique_customers' => $customerCount,
+                'new_customers'    => $newCustomers,
+                'low_stock'        => $lowStock,
+                'cash_total'       => round((float) $cashTotal, 2),
+                'card_total'       => round((float) $cardTotal, 2),
+                'other_total'      => round((float) $otherTotal, 2),
+                'items_sold'       => (int) $itemsSold,
+                'upt'              => $upt,
+            ]]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('ReportController::summary error: ' . $e->getMessage());
+            return response()->json(['message' => 'Errore nel calcolo del riepilogo.', 'error' => $e->getMessage()], 500);
         }
-
-        if ($storeId) {
-            $orderBase->where('store_id', $storeId);
-        }
-
-        $current = (clone $orderBase)->select(
-            DB::raw('count(*) as orders'),
-            DB::raw('coalesce(sum(grand_total), 0) as revenue'),
-            DB::raw('coalesce(avg(grand_total), 0) as avg_order')
-        )->first();
-
-        // Previous period for comparison
-        $prevBase = DB::table('sales_orders')
-            ->where('tenant_id', $tenantId)
-            ->where('status', 'paid')
-            ->where('created_at', '>=', now()->subDays($days * 2))
-            ->where('created_at', '<', now()->subDays($days));
-
-        if ($storeId) {
-            $prevBase->where('store_id', $storeId);
-        }
-
-        $previous = $prevBase->select(
-            DB::raw('count(*) as orders'),
-            DB::raw('coalesce(sum(grand_total), 0) as revenue')
-        )->first();
-
-        $customerCount = DB::table('customers')
-            ->where('tenant_id', $tenantId)
-            ->count();
-        $newCustomers = DB::table('customers')
-            ->where('tenant_id', $tenantId)
-            ->where('created_at', '>=', now()->subDays($days))
-            ->count();
-
-        $lowStock = DB::table('stock_items')
-            ->where('tenant_id', $tenantId)
-            ->whereColumn('on_hand', '<', 'reorder_point')
-            ->count();
-
-        $deltaRevenue = $previous->revenue > 0
-            ? round(($current->revenue - $previous->revenue) / $previous->revenue * 100, 1)
-            : null;
-        $deltaOrders = $previous->orders > 0
-            ? round(($current->orders - $previous->orders) / $previous->orders * 100, 1)
-            : null;
-
-        // Breakdown per metodo di pagamento
-        $paymentBase = DB::table('payments as pay')
-            ->join('sales_orders as so2', 'so2.id', '=', 'pay.sales_order_id')
-            ->where('so2.tenant_id', $tenantId)
-            ->where('so2.status', 'paid');
-
-        if ($storeId) {
-            $paymentBase->where('so2.store_id', $storeId);
-        }
-        if ($dateFrom && $dateTo) {
-            $paymentBase->whereRaw("strftime('%Y-%m-%d', so2.created_at) >= ?", [$dateFrom])
-                        ->whereRaw("strftime('%Y-%m-%d', so2.created_at) <= ?", [$dateTo]);
-        } else {
-            $paymentBase->where('so2.created_at', '>=', now()->subDays($days));
-        }
-
-        $cashTotal  = (clone $paymentBase)->where('pay.method', 'cash')->sum('pay.amount');
-        $cardTotal  = (clone $paymentBase)->where('pay.method', 'card')->sum('pay.amount');
-        $otherTotal = (clone $paymentBase)->whereNotIn('pay.method', ['cash', 'card'])->sum('pay.amount');
-
-        // Items sold
-        $itemsSoldQuery = DB::table('sales_order_lines as sol')
-            ->join('sales_orders as so', 'so.id', '=', 'sol.sales_order_id')
-            ->where('so.tenant_id', $tenantId)
-            ->where('so.status', 'paid')
-            ->when($storeId, fn($q) => $q->where('so.store_id', $storeId));
-
-        if ($dateFrom && $dateTo) {
-            $itemsSoldQuery->whereRaw("strftime('%Y-%m-%d', so.created_at) >= ?", [$dateFrom])
-                           ->whereRaw("strftime('%Y-%m-%d', so.created_at) <= ?", [$dateTo]);
-        } else {
-            $itemsSoldQuery->where('so.created_at', '>=', now()->subDays($days));
-        }
-
-        $itemsSold = $itemsSoldQuery->sum('sol.qty');
-        $upt = $current->orders > 0 ? round($itemsSold / $current->orders, 2) : 0;
-
-        return response()->json(['data' => [
-            'revenue'          => round($current->revenue, 2),
-            'total_revenue'    => round($current->revenue, 2),
-            'orders'           => $current->orders,
-            'total_orders'     => $current->orders,
-            'avg_order'        => round($current->avg_order, 2),
-            'avg_ticket'       => round($current->avg_order, 2),
-            'delta_revenue'    => $deltaRevenue,
-            'delta_orders'     => $deltaOrders,
-            'total_customers'  => $customerCount,
-            'unique_customers' => $customerCount,
-            'new_customers'    => $newCustomers,
-            'low_stock'        => $lowStock,
-            'cash_total'       => round((float) $cashTotal, 2),
-            'card_total'       => round((float) $cardTotal, 2),
-            'other_total'      => round((float) $otherTotal, 2),
-            'items_sold'       => (int) $itemsSold,
-            'upt'              => $upt,
-        ]]);
     }
 
     /**

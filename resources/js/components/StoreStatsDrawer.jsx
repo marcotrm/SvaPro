@@ -123,7 +123,28 @@ export default function StoreStatsDrawer({ store, onClose }) {
         });
       } else {
         console.error('[StoreStatsDrawer] summary failed:', summRes.reason?.response?.data || summRes.reason?.message);
-        setKpi(null);
+        // Fallback: calcola KPI base dagli ordini se summary non è disponibile
+        if (ordRes.status === 'fulfilled') {
+          const orderList = ordRes.value.data?.data || ordRes.value.data || [];
+          if (Array.isArray(orderList) && orderList.length > 0) {
+            const revenue = orderList.reduce((sum, o) => sum + parseFloat(o.grand_total || 0), 0);
+            setKpi({
+              revenue,
+              orders:     orderList.length,
+              avg_ticket: revenue / orderList.length,
+              customers:  0,
+              cash:       0,
+              card:       0,
+              other:      0,
+              items_sold: 0,
+              upt:        0,
+            });
+          } else {
+            setKpi(null);
+          }
+        } else {
+          setKpi(null);
+        }
       }
 
       if (ordRes.status === 'fulfilled') {

@@ -322,6 +322,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
 
         // Employee's own shifts
         Route::get('/employee/my-shifts', [\App\Http\Controllers\Api\ShiftController::class, 'myShifts']);
+
+        // Reports summary — accessibile anche ai dipendenti per il Riepilogo Vendite drawer
+        // getSecureStoreId limita automaticamente al negozio del dipendente
+        Route::get('/reports/summary', [ReportController::class, 'summary']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente,cliente_finale')->group(function () {
