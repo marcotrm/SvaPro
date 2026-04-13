@@ -1,0 +1,7 @@
+[build]
+builder = "nixpacks"
+watchPatterns = ["src/**", "public/**", "package.json"]
+
+[deploy]
+startCommand = "npm run start"
+restartPolicyType = "always"
