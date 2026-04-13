@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
 import { Toaster } from 'react-hot-toast';
-import ChatWidget from './ChatWidget.jsx';
+import ChatWidget, { ChatTopbarButtons } from './ChatWidget.jsx';
 import StoreStatsDrawer from './StoreStatsDrawer.jsx';
 import { 
   BarChart3, Package, Warehouse, ClipboardList, ShoppingBag,
@@ -394,10 +394,16 @@ export default function Layout({ user, setUser }) {
           <button className="sp-mobile-topbar-menu" onClick={() => setMobileDrawerOpen(true)} aria-label="Menu">
             <Menu size={20} />
           </button>
-          <div className="sp-topbar-title">
-            {location.pathname === '/' && selectedStore 
-              ? `${activePageLabel} - ${selectedStore.name}` 
-              : activePageLabel}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="sp-topbar-title">
+              {location.pathname === '/' && selectedStore 
+                ? `${activePageLabel} - ${selectedStore.name}` 
+                : activePageLabel}
+            </div>
+            {/* Chat buttons vicino al titolo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ChatTopbarButtons user={user} selectedStoreId={selectedStoreId} />
+            </div>
           </div>
           <div className="sp-topbar-actions">
             {storesList.length > 1 && (
@@ -489,7 +495,7 @@ export default function Layout({ user, setUser }) {
         />
       )}
 
-      <ChatWidget />
+
       <Toaster
         position="bottom-right"
         toastOptions={{

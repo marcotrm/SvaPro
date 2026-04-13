@@ -63,9 +63,11 @@ class ChatController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'message'  => 'required|string|max:1000',
-            'store_id' => 'nullable|integer',
-            'priority' => 'nullable|in:normal,urgent',
+            'message'       => 'required|string|max:1000',
+            'store_id'      => 'nullable|integer',
+            'priority'      => 'nullable|in:normal,urgent',
+            'operator_name' => 'nullable|string|max:100',
+            'operator_code' => 'nullable|string|max:100',
         ]);
         $priority = $data['priority'] ?? 'normal';
 
@@ -95,6 +97,10 @@ class ChatController extends Controller
         }
         if (!$senderName) {
             $senderName = $user->email ?? 'Operatore';
+        }
+        // Il frontend può passare il nome risolto dal barcode
+        if (!empty($data['operator_name'])) {
+            $senderName = $data['operator_name'];
         }
 
         // Nome negozio del mittente
