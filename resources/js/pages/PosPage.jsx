@@ -357,8 +357,21 @@ export default function PosPage() {
   }, [operatorBarcode, employees, soldByEmployeeId]);
 
 
-
   /* Cart logic */
+
+  // Helper: determina se un prodotto è hardware/dispositivo (dichiarato prima di addToCart per evitare TDZ)
+  const isHardwareProduct = useCallback((product) => {
+    const cat = categories.find(c => c.id === product.category_id);
+    const n = cat?.name?.toLowerCase() || '';
+    return (
+      n.includes('hardware') ||
+      n.includes('dispositiv') ||
+      n.includes('device') ||
+      n.includes('mod') ||
+      product.product_type === 'device'
+    );
+  }, [categories]);
+
   const addToCart = useCallback((product) => {
     const variant = product.variants?.[0];
     if (!variant) return;
@@ -401,19 +414,6 @@ export default function PosPage() {
 
   const cartTotal = useMemo(() => cartLines.reduce((s, l) => s + l.price * l.qty, 0), [cartLines]);
   const cartCount = useMemo(() => cartLines.reduce((s, l) => s + l.qty, 0), [cartLines]);
-
-  // Helper: determina se un prodotto è hardware/dispositivo
-  const isHardwareProduct = useCallback((product) => {
-    const cat = categories.find(c => c.id === product.category_id);
-    const n = cat?.name?.toLowerCase() || '';
-    return (
-      n.includes('hardware') ||
-      n.includes('dispositiv') ||
-      n.includes('device') ||
-      n.includes('mod') ||
-      product.product_type === 'device'
-    );
-  }, [categories]);
 
   // Controlla se il carrello contiene dispositivi (categoria il cui nome contiene 'dispositiv' oppure product_type 'device')
   const cartHasDevice = useMemo(() => {
