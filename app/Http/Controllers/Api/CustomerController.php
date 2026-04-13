@@ -340,36 +340,47 @@ class CustomerController extends Controller
 
         $isAzienda = $customerType === 'azienda';
 
-        $id = DB::table('customers')->insertGetId([
-            'tenant_id' => $tenantId,
-            'customer_type' => $customerType,
-            'code' => $request->input('code') ?: null,
-            'first_name' => $isAzienda ? ($request->input('contact_person') ?: '') : $request->input('first_name'),
-            'last_name' => $isAzienda ? '' : $request->input('last_name'),
-            'company_name' => $isAzienda ? $request->input('company_name') : null,
-            'vat_number' => $isAzienda ? $request->input('vat_number') : null,
-            'sdi_code' => $isAzienda ? $request->input('sdi_code') : null,
-            'pec_email' => $isAzienda ? $request->input('pec_email') : null,
-            'contact_person' => $isAzienda ? $request->input('contact_person') : null,
-            'codice_fiscale' => ! $isAzienda ? $request->input('codice_fiscale') : null,
-            'email' => $request->input('email'),
-            'phone' => $request->input('phone'),
-            'birth_date' => ! $isAzienda ? $request->input('birth_date') : null,
-            'address' => $request->input('address'),
-            'city' => $request->input('city'),
-            'province' => $request->input('province'),
-            'zip_code' => $request->input('zip_code'),
-            'country' => $request->input('country', 'IT'),
-            'marketing_consent' => (bool) $request->boolean('marketing_consent'),
-            'status' => 'active', // Auto-attivazione: ogni nuovo cliente è attivo di default
-            'created_by_employee_id' => $request->user()->employee_id ?? null, // Operatore registrante
-            'total_orders' => 0,
-            'total_spent' => 0,
-            'avg_days_between_purchases' => null,
-            'uuid' => (string) Str::uuid(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            $employeeId = DB::table('employees')->where('user_id', $request->user()?->id)->value('id');
+
+            $id = DB::table('customers')->insertGetId([
+                'tenant_id' => $tenantId,
+                'customer_type' => $customerType,
+                'code' => $request->input('code') ?: null,
+                'first_name' => $isAzienda ? ($request->input('contact_person') ?: '') : $request->input('first_name'),
+                'last_name' => $isAzienda ? '' : $request->input('last_name'),
+                'company_name' => $isAzienda ? $request->input('company_name') : null,
+                'vat_number' => $isAzienda ? $request->input('vat_number') : null,
+                'sdi_code' => $isAzienda ? $request->input('sdi_code') : null,
+                'pec_email' => $isAzienda ? $request->input('pec_email') : null,
+                'contact_person' => $isAzienda ? $request->input('contact_person') : null,
+                'codice_fiscale' => ! $isAzienda ? $request->input('codice_fiscale') : null,
+                'email' => $request->input('email'),
+                'phone' => $request->input('phone'),
+                'birth_date' => ! $isAzienda ? $request->input('birth_date') : null,
+                'address' => $request->input('address'),
+                'city' => $request->input('city'),
+                'province' => $request->input('province'),
+                'zip_code' => $request->input('zip_code'),
+                'country' => $request->input('country', 'IT'),
+                'marketing_consent' => (bool) $request->boolean('marketing_consent'),
+                'status' => 'active', // Auto-attivazione: ogni nuovo cliente è attivo di default
+                'created_by_employee_id' => $employeeId, // Operatore registrante
+                'uuid' => (string) Str::uuid(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Auto-crea tessera loyalty se c'è il codice in fase di creazione!
+            if ($request->has('code') && $request->input('code')) {
+                DB::table('loyalty_cards')->insert([
+                    'tenant_id' => $tenantId,
+                    'customer_id' => $id,
+                    'card_code' => trim((string) $request->input('code')),
+                    'status' => 'active',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
         $displayName = $isAzienda
             ? $request->input('company_name')

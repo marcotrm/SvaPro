@@ -212,6 +212,9 @@ export default function CustomersPage() {
   // Selezione checkbox
   const [selectedIds, setSelectedIds] = useState(new Set());
   
+  // Ordinamento Tabella
+  const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
+
   // Marketing modal
   const [showMarketing, setShowMarketing] = useState(false);
 
@@ -272,22 +275,55 @@ export default function CustomersPage() {
   const allSelected = selectedIds.size > 0 && selectedIds.size === filtered.length;
   const someSelected = selectedIds.size > 0;
 
-  const filtered = useMemo(() => customersList.filter(c => {
-    const term = searchTerm.toLowerCase();
-    const matchSearch = !searchTerm || (
-      c.first_name?.toLowerCase().includes(term) ||
-      c.last_name?.toLowerCase().includes(term) ||
-      c.company_name?.toLowerCase().includes(term) ||
-      c.email?.toLowerCase().includes(term) ||
-      c.phone?.includes(term) ||
-      c.code?.toLowerCase().includes(term) ||
-      c.city?.toLowerCase().includes(term)
-    );
-    const matchCity = !cityFilter || c.city === cityFilter;
-    const matchStatus = !statusFilter || c.status === statusFilter;
-    const matchConsent = !consentFilter || String(!!c.marketing_consent) === consentFilter;
-    return matchSearch && matchCity && matchStatus && matchConsent;
-  }), [customersList, searchTerm, cityFilter, statusFilter, consentFilter]);
+  const filtered = useMemo(() => {
+    let result = customersList.filter(c => {
+      const term = searchTerm.toLowerCase();
+      const matchSearch = !searchTerm || (
+        c.first_name?.toLowerCase().includes(term) ||
+        c.last_name?.toLowerCase().includes(term) ||
+        c.company_name?.toLowerCase().includes(term) ||
+        c.email?.toLowerCase().includes(term) ||
+        c.phone?.includes(term) ||
+        c.code?.toLowerCase().includes(term) ||
+        c.city?.toLowerCase().includes(term)
+      );
+      const matchCity = !cityFilter || c.city === cityFilter;
+      const matchStatus = !statusFilter || c.status === statusFilter;
+      const matchConsent = !consentFilter || String(!!c.marketing_consent) === consentFilter;
+      return matchSearch && matchCity && matchStatus && matchConsent;
+    });
+
+    result.sort((a, b) => {
+      let aVal = a[sortConfig.key];
+      let bVal = b[sortConfig.key];
+
+      if (sortConfig.key === 'fidelity') {
+        aVal = a.card_code ? 1 : 0;
+        bVal = b.card_code ? 1 : 0;
+      } else if (sortConfig.key === 'app') {
+        aVal = (a.loyalty_devices_count || 0) > 0 ? 1 : 0;
+        bVal = (b.loyalty_devices_count || 0) > 0 ? 1 : 0;
+      } else if (sortConfig.key === 'status') {
+        aVal = a.status === 'active' ? 1 : 0;
+        bVal = b.status === 'active' ? 1 : 0;
+      }
+
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [customersList, searchTerm, cityFilter, statusFilter, consentFilter, sortConfig]);
+
+  const handleSort = (key) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'desc' };
+    });
+  };
 
   const initials = c => `${c.first_name?.[0] || ''}${c.last_name?.[0] || ''}`.toUpperCase() || c.company_name?.[0]?.toUpperCase() || '?';
   const cityOptions = analytics?.city_breakdown || [];
@@ -456,6 +492,14 @@ export default function CustomersPage() {
           <div style={{ fontSize: 12, fontWeight: 800, color: '#94a3b8', padding: '8px 12px', background: '#f1f5f9', borderRadius: 8, whiteSpace: 'nowrap' }}>
             {filtered.length} risultati
           </div>
+          {/* Tasto Seleziona Tutti Toolbar */}
+          <button
+            onClick={toggleSelectAll}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '2px solid #e0e7ff', background: allSelected ? '#eef2ff' : '#fff', color: '#4f46e5', fontSize: 12, fontWeight: 800, cursor: 'pointer', marginLeft: 'auto' }}
+          >
+            {allSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+            {allSelected ? 'Deseleziona Tutti' : 'Seleziona Tutti'}
+          </button>
         </div>
 
         {/* Selezione rapida bar (appare se ci sono selezionati) */}
@@ -495,9 +539,24 @@ export default function CustomersPage() {
                 <th>Residenza</th>
                 <th>Ciclo Vendita</th>
                 <th>Registrato da</th>
-                <th>Status</th>
-                <th>Fidelity</th>
-                <th>App</th>
+                <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    Status
+                    {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </div>
+                </th>
+                <th onClick={() => handleSort('fidelity')} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    Fidelity
+                    {sortConfig.key === 'fidelity' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </div>
+                </th>
+                <th onClick={() => handleSort('app')} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    App
+                    {sortConfig.key === 'app' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </div>
+                </th>
                 <th style={{ textAlign: 'right' }}>Azioni</th>
               </tr>
             </thead>
