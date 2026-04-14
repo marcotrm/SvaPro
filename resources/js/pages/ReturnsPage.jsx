@@ -162,11 +162,12 @@ export default function ReturnsPage() {
 
   return (
     <div className="sp-animate-in">
-      <OrderDetailModal
-        isOpen={isOrderDetailOpen}
-        onClose={() => setIsOrderDetailOpen(false)}
-        orderId={selectedOrderId}
-      />
+      {isOrderDetailOpen && selectedOrderId && (
+        <OrderDetailModal
+          onClose={() => setIsOrderDetailOpen(false)}
+          orderId={selectedOrderId}
+        />
+      )}
       {/* Header */}
       <div className="sp-page-header">
         <div>
