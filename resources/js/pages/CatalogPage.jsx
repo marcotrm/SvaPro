@@ -4,7 +4,7 @@ import { catalog, suppliers, inventory, orders as ordersApi, clearApiCache } fro
 import { getImageUrl } from '../api.jsx';
 import api from '../api.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
-import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, PackagePlus, Upload, X, CheckCircle, Loader2, ShoppingBag } from 'lucide-react';
+import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, PackagePlus, Upload, X, CheckCircle, Loader2, ShoppingBag, Star } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function CatalogPage() {
@@ -65,6 +65,20 @@ export default function CatalogPage() {
   const outOfStockCount = products.filter(p => (p.variants?.[0]?.stock_quantity ?? 0) <= 0).length;
 
   const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+
+  const handleToggleFeatured = async (product) => {
+    const newVal = !product.is_featured;
+    // Aggiornamento ottimistico immediato
+    setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_featured: newVal } : p));
+    try {
+      await catalog.toggleFeatured(product.id, newVal);
+      toast.success(newVal ? `⭐ "${product.name}" messo in evidenza nel POS` : `"${product.name}" rimosso dall'evidenza`, { duration: 2000 });
+    } catch (err) {
+      // Rollback in caso di errore
+      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_featured: !newVal } : p));
+      toast.error('Errore nell\'aggiornamento');
+    }
+  };
 
   const handleQuickStock = async (variantId, qty) => {
     if (!qty || isNaN(parseInt(qty)) || parseInt(qty) === 0) {
@@ -191,6 +205,7 @@ export default function CatalogPage() {
               <th>Prezzo</th>
               <th>Stock</th>
               <th>Stato</th>
+              <th style={{ textAlign: 'center' }}>POS</th>
               <th></th>
             </tr>
           </thead>
@@ -252,6 +267,27 @@ export default function CatalogPage() {
                     ) : (
                       <span className="sp-badge sp-badge-success"><span className="sp-badge-dot" /> Disponibile</span>
                     )}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <button
+                      title={product.is_featured ? 'Rimuovi da In Evidenza nel POS' : 'Metti In Evidenza nel POS'}
+                      onClick={() => handleToggleFeatured(product)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        padding: '4px 6px', borderRadius: 8, display: 'inline-flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        transition: 'transform 0.15s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.25)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                    >
+                      <Star
+                        size={18}
+                        fill={product.is_featured ? '#FBBF24' : 'none'}
+                        color={product.is_featured ? '#FBBF24' : 'var(--color-text-tertiary)'}
+                        strokeWidth={2}
+                      />
+                    </button>
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', position: 'relative' }}>

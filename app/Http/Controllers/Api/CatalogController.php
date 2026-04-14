@@ -571,6 +571,37 @@ class CatalogController extends Controller
         return $productId;
     }
 
+    public function toggleFeatured(Request $request, int $productId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $product = DB::table('products')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $productId)
+            ->first();
+
+        if (! $product) {
+            return response()->json(['message' => 'Prodotto non trovato per il tenant.'], 404);
+        }
+
+        $isFeatured = (bool) $request->boolean('is_featured', ! $product->is_featured);
+
+        DB::table('products')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $productId)
+            ->update([
+                'is_featured' => $isFeatured,
+                'updated_at'  => now(),
+            ]);
+
+        AuditLogger::log($request, 'update', 'product', $productId, ($isFeatured ? 'Messo in evidenza' : 'Rimosso da evidenza') . ": {$product->name}");
+
+        return response()->json([
+            'message'     => $isFeatured ? 'Prodotto messo in evidenza.' : 'Prodotto rimosso dall\'evidenza.',
+            'is_featured' => $isFeatured,
+        ]);
+    }
+
     public function storeCategory(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');

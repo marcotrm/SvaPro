@@ -4,7 +4,7 @@ import { orders as ordersApi, catalog, customers as customersApi, inventory, sto
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, X, User,
   MapPin, Zap, Package, ChevronRight, ReceiptText, Loader2,
-  ScanBarcode, Cherry, RotateCcw, UserCircle, Tag
+  ScanBarcode, Cherry, RotateCcw, UserCircle, Tag, Star
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import PosCheckoutModal from '../components/PosCheckoutModal.jsx';
@@ -131,6 +131,19 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
         >
           <Search size={12} color="#555" strokeWidth={2.5} />
         </button>
+
+        {/* Featured badge */}
+        {product.is_featured && (
+          <div style={{
+            position: 'absolute', bottom: 7, right: 7,
+            background: 'rgba(251,191,36,0.92)',
+            borderRadius: '50%', width: 22, height: 22,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(251,191,36,0.5)',
+          }}>
+            <Star size={11} fill="#fff" color="#fff" strokeWidth={0} />
+          </div>
+        )}
       </div>
 
       {/* Info */}
@@ -217,6 +230,7 @@ export default function PosPage() {
   // Controllo ruolo dipendente
   const isDipendente = (user?.roles || []).includes('dipendente') || user?.role === 'dipendente';
   const [loading, setLoading]           = useState(true);
+  const [showAllProducts, setShowAllProducts] = useState(false);
 
   const [products, setProducts]         = useState([]);
   const [categories, setCategories]     = useState([]);
@@ -522,7 +536,10 @@ export default function PosPage() {
 
 
   /* Filters */
+  const hasFeatured = products.some(p => p.is_featured);
   const filteredProducts = useMemo(() => products.filter(p => {
+    // Se non sto mostrando tutti e ci sono prodotti in evidenza, filtra solo i featured
+    if (!showAllProducts && hasFeatured && !p.is_featured) return false;
     const s = searchTerm.toLowerCase().trim();
     const f = flavorTerm.toLowerCase().trim();
     const matchS = !s || p.name?.toLowerCase().includes(s) || p.sku?.toLowerCase().includes(s)
@@ -536,7 +553,7 @@ export default function PosPage() {
     ) || normalize(p.name)?.includes(fNorm) || normalize(p.description)?.includes(fNorm);
     const matchC = !activeCategory || p.category_id === activeCategory;
     return matchS && matchF && matchC;
-  }), [products, searchTerm, flavorTerm, activeCategory]);
+  }), [products, searchTerm, flavorTerm, activeCategory, showAllProducts, hasFeatured]);
 
   const filteredCustomers = useMemo(() => {
     const s = customerSearch.toLowerCase().trim();
@@ -680,6 +697,30 @@ export default function PosPage() {
 
         {/* Category pills */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', marginBottom: 14, paddingBottom: 4 }}>
+
+          {/* Toggle In Evidenza / Tutti — visibile solo se esistono prodotti featured */}
+          {hasFeatured && (
+            <button
+              onClick={() => setShowAllProducts(v => !v)}
+              style={{
+                padding: '7px 16px', borderRadius: 100, border: 'none', cursor: 'pointer',
+                fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+                display: 'flex', alignItems: 'center', gap: 5,
+                background: !showAllProducts
+                  ? 'linear-gradient(135deg,#FBBF24,#D97706)'
+                  : 'rgba(251,191,36,0.12)',
+                color: !showAllProducts ? '#fff' : '#D97706',
+                boxShadow: !showAllProducts ? '0 4px 12px rgba(251,191,36,0.45)' : 'none',
+                transition: 'all 0.15s',
+                flexShrink: 0,
+              }}
+              title={showAllProducts ? 'Mostra solo i prodotti in evidenza' : 'Mostra tutti i prodotti'}
+            >
+              <Star size={12} fill={!showAllProducts ? '#fff' : 'none'} color={!showAllProducts ? '#fff' : '#D97706'} strokeWidth={2} />
+              {showAllProducts ? 'Tutti i prodotti' : `In Evidenza (${products.filter(p => p.is_featured).length})`}
+            </button>
+          )}
+
           <button
             onClick={() => setActiveCategory(null)}
             style={{
