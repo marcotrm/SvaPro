@@ -67,7 +67,10 @@ class AttendanceController extends Controller
                     'expected_start_time'  => $r->expected_start_time ?? $r->employee_expected_start,
                     'late_minutes'         => $r->late_minutes,
                     'duration_minutes'     => $duration,
-                    'status'               => $r->checked_out_at ? 'fuori' : 'presente',
+                    'status'               => $r->checked_out_at 
+                        ? ($r->notes === 'Pausa' ? 'pausa' : 'fuori') 
+                        : 'presente',
+                    'notes'                => $r->notes,
                 ];
             });
 
@@ -380,7 +383,10 @@ class AttendanceController extends Controller
                     'expected_start_time' => $r->expected_start_time,
                     'late_minutes'      => $r->late_minutes,
                     'duration_minutes'  => $duration,
-                    'status'            => $r->checked_out_at ? 'fuori' : 'presente',
+                    'status'            => $r->checked_out_at 
+                        ? ($r->notes === 'Pausa' ? 'pausa' : 'fuori') 
+                        : 'presente',
+                    'notes'             => $r->notes,
                 ];
             });
 

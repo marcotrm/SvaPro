@@ -48,11 +48,14 @@ function AdminPresenceView() {
 
   const fetchPresence = useCallback(async () => {
     try {
-      const [liveRes, histRes] = await Promise.allSettled([
-        attendance.getLive(),
+      const [kioskRes, histRes] = await Promise.allSettled([
+        attendance.getEmployeesKiosk(),
         attendance.getList({ date: filterDate }),
       ]);
-      if (liveRes.status === 'fulfilled') setLiveList(liveRes.value?.data?.data || []);
+      if (kioskRes.status === 'fulfilled') {
+        const list = kioskRes.value?.data?.data || [];
+        setLiveList(list.filter(e => e.status === 'presente' || e.status === 'pausa'));
+      }
       if (histRes.status === 'fulfilled') setTodayList(histRes.value?.data?.data || []);
     } catch {}
     setLoadingLive(false);
@@ -176,20 +179,21 @@ function AdminPresenceView() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px,1fr))', gap: 12 }}>
             {liveList.map(emp => {
-              const entry = fmtTime(emp.checked_in_at || emp.clock_in);
+              const entry = fmtTime(emp.status === 'pausa' ? emp.checked_out_at : (emp.checked_in_at || emp.clock_in));
               const color = avatarColor(emp.employee_id || emp.id);
-              const name  = emp.employee_name || `${emp.first_name||''} ${emp.last_name||''}`.trim() || `Dipendente #${emp.employee_id||emp.id}`;
+              const name  = emp.employee_name || emp.name || `${emp.first_name||''} ${emp.last_name||''}`.trim() || `Dipendente #${emp.employee_id||emp.id}`;
+              const isPausa = emp.status === 'pausa';
               return (
                 <div key={emp.id} style={{
-                  background: '#fff', borderRadius: 16, padding: '16px 20px',
-                  border: '2px solid #dcfce7', display: 'flex', alignItems: 'center', gap: 14,
-                  boxShadow: '0 2px 8px rgba(34,197,94,0.08)',
+                  background: isPausa ? '#fffbeb' : '#fff', borderRadius: 16, padding: '16px 20px',
+                  border: `2px solid ${isPausa ? '#fcd34d' : '#dcfce7'}`, display: 'flex', alignItems: 'center', gap: 14,
+                  boxShadow: `0 2px 8px ${isPausa ? 'rgba(245, 158, 11, 0.08)' : 'rgba(34,197,94,0.08)'}`,
                 }}>
                   <div style={{
-                    width: 44, height: 44, borderRadius: '50%', background: color, flexShrink: 0,
+                    width: 44, height: 44, borderRadius: '50%', background: isPausa ? '#f59e0b' : color, flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: '#fff', fontSize: 16, fontWeight: 800, overflow: 'hidden',
-                    border: '2px solid #22c55e',
+                    border: `2px solid ${isPausa ? '#f59e0b' : '#22c55e'}`,
                   }}>
                     {emp.photo_url
                       ? <img src={emp.photo_url} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -197,8 +201,10 @@ function AdminPresenceView() {
                     }
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-                    <div style={{ fontSize: 12, color: '#22c55e', fontWeight: 600, marginTop: 2 }}>🟢 Entrata: {entry}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: isPausa ? '#b45309' : '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                    <div style={{ fontSize: 12, color: isPausa ? '#d97706' : '#22c55e', fontWeight: 600, marginTop: 2 }}>
+                      {isPausa ? '☕ In pausa da: ' : '🟢 Entrata: '}{entry}
+                    </div>
                     {emp.store_name && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>📍 {emp.store_name}</div>}
                   </div>
                 </div>
@@ -253,10 +259,10 @@ function AdminPresenceView() {
                       <td style={{ padding: '12px 16px' }}>
                         <span style={{
                           display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-                          background: isIn ? '#dcfce7' : '#f3f4f6',
-                          color: isIn ? '#16a34a' : '#6b7280',
+                          background: rec.status === 'pausa' ? '#FFFBEB' : (rec.status === 'presente' || isIn ? '#dcfce7' : '#f3f4f6'),
+                          color: rec.status === 'pausa' ? '#B45309' : (rec.status === 'presente' || isIn ? '#16a34a' : '#6b7280'),
                         }}>
-                          {isIn ? '🟢 Presente' : rec.checked_out_at ? '⚪ Uscito' : '—'}
+                          {rec.status === 'pausa' ? '☕ Pausa' : (rec.status === 'presente' || isIn ? '🟢 Presente' : '⚪ Uscito')}
                         </span>
                       </td>
                     </tr>
