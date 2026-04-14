@@ -291,11 +291,26 @@ class ReportController extends Controller
      */
     public function qscareDashboard(Request $request)
     {
-        $tenantId = $request->attributes->get('tenant_id');
-        $storeId  = $this->getSecureStoreId($request);
+        $tenantId   = $request->attributes->get('tenant_id');
+        $storeId    = $this->getSecureStoreId($request);
         $employeeId = $request->input('employee_id');
-        $dateFrom = $request->input('date_from');
-        $dateTo   = $request->input('date_to');
+        $dateFrom   = $request->input('date_from');
+        $dateTo     = $request->input('date_to');
+
+        $driver = DB::connection()->getDriverName(); // pgsql | mysql | sqlite
+
+        // JSON path expressions differ by driver
+        if ($driver === 'pgsql') {
+            $serviceNameExpr = "COALESCE(sales_order_lines.tax_snapshot_json::json->>'service_name', 'QScare')";
+            $productTypeFilter = "sales_order_lines.tax_snapshot_json::json->>'product_type' = 'service'";
+        } elseif ($driver === 'sqlite') {
+            $serviceNameExpr = "COALESCE(json_extract(sales_order_lines.tax_snapshot_json, '$.service_name'), 'QScare')";
+            $productTypeFilter = "json_extract(sales_order_lines.tax_snapshot_json, '$.product_type') = 'service'";
+        } else {
+            // MySQL / MariaDB
+            $serviceNameExpr = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.service_name')), 'QScare')";
+            $productTypeFilter = "JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.product_type')) = 'service'";
+        }
 
         $query = DB::table('sales_order_lines')
             ->join('sales_orders', 'sales_order_lines.sales_order_id', '=', 'sales_orders.id')
@@ -303,16 +318,16 @@ class ReportController extends Controller
             ->leftJoin('stores', 'sales_orders.store_id', '=', 'stores.id')
             ->where('sales_orders.tenant_id', $tenantId)
             ->where('sales_orders.status', 'paid')
-            // Le righe QScare: product_variant_id = NULL e tax_snapshot_json contiene product_type=service
+            // QScare lines: no product_variant_id, tax_snapshot_json present and product_type = service
             ->whereNull('sales_order_lines.product_variant_id')
             ->whereNotNull('sales_order_lines.tax_snapshot_json')
-            ->where('sales_order_lines.tax_snapshot_json->product_type', 'service')
+            ->whereRaw($productTypeFilter)
             ->select(
                 'sales_orders.id as order_id',
                 'sales_orders.created_at',
                 'sales_order_lines.qty',
                 'sales_order_lines.unit_price',
-                DB::raw("COALESCE(json_extract(sales_order_lines.tax_snapshot_json, '$.service_name'), 'QScare') as service_name"),
+                DB::raw($serviceNameExpr . ' as service_name'),
                 DB::raw('COALESCE(sales_order_lines.line_total, sales_order_lines.qty * sales_order_lines.unit_price) as line_total'),
                 'stores.name as store_name',
                 DB::raw("COALESCE(employees.first_name || ' ' || employees.last_name, '—') as employee_name")
@@ -330,18 +345,18 @@ class ReportController extends Controller
         if ($dateTo) {
             $query->whereDate('sales_orders.created_at', '<=', $dateTo);
         }
-        
+
         $lines = $query->orderByDesc('sales_orders.created_at')->get();
 
         $totalRevenue = $lines->sum('line_total');
-        $totalQty = $lines->sum('qty');
+        $totalQty     = $lines->sum('qty');
 
         return response()->json([
-            'data' => $lines,
+            'data'    => $lines,
             'summary' => [
                 'total_revenue' => $totalRevenue,
-                'total_qty' => $totalQty
-            ]
+                'total_qty'     => $totalQty,
+            ],
         ]);
     }
 }
