@@ -305,9 +305,8 @@ class ReportController extends Controller
             ->where('sales_orders.status', 'paid')
             // Le righe QScare: product_variant_id = NULL e tax_snapshot_json contiene product_type=service
             ->whereNull('sales_order_lines.product_variant_id')
-            ->whereRaw(
-                "sales_order_lines.tax_snapshot_json IS NOT NULL AND json_extract(sales_order_lines.tax_snapshot_json, '$.product_type') = 'service'"
-            )
+            ->whereNotNull('sales_order_lines.tax_snapshot_json')
+            ->where('sales_order_lines.tax_snapshot_json->product_type', 'service')
             ->select(
                 'sales_orders.id as order_id',
                 'sales_orders.created_at',

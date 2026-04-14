@@ -539,26 +539,25 @@ class CatalogController extends Controller
                 if ($variantStoreRows !== []) {
                     DB::table('store_product_variants')->insert($variantStoreRows);
                 }
-
                 // Auto-crea stock_items con on_hand=0 per nuove varianti
-                // così il prodotto appare subito in magazzino
-                if (!$existingVariantId) {
-                    $defaultWarehouse = DB::table('warehouses')
+                // cosǪ il prodotto appare subito in tutti i magazzini dei negozi attivi
+                if (!$existingVariantId && !empty($storeIds)) {
+                    $warehouses = DB::table('warehouses')
                         ->where('tenant_id', $tenantId)
-                        ->orderBy('id')
-                        ->value('id');
+                        ->whereIn('store_id', $storeIds)
+                        ->pluck('id');
 
-                    if ($defaultWarehouse) {
+                    foreach ($warehouses as $warehouseId) {
                         $alreadyExists = DB::table('stock_items')
                             ->where('tenant_id', $tenantId)
                             ->where('product_variant_id', $variantId)
-                            ->where('warehouse_id', $defaultWarehouse)
+                            ->where('warehouse_id', $warehouseId)
                             ->exists();
 
                         if (!$alreadyExists) {
                             DB::table('stock_items')->insert([
                                 'tenant_id'          => $tenantId,
-                                'warehouse_id'       => $defaultWarehouse,
+                                'warehouse_id'       => $warehouseId,
                                 'product_variant_id' => $variantId,
                                 'on_hand'            => 0,
                                 'reserved'           => 0,

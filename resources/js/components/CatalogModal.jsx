@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+﻿import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { X, Loader, Plus, Trash2, Barcode, MapPin, Package, Tag, DollarSign, Settings2, AlertTriangle, Upload, ImageIcon } from 'lucide-react';
 import { catalog, getImageUrl } from '../api.jsx';
 
-/* ─── Componente Upload Foto Prodotto ─────────────────────── */
+/* â”€â”€â”€ Componente Upload Foto Prodotto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function ProductImageUpload({ currentImageUrl, onFileChange }) {
   const [preview, setPreview] = useState(currentImageUrl ? getImageUrl(currentImageUrl) : null);
   const [dragging, setDragging] = useState(false);
@@ -42,11 +42,11 @@ function ProductImageUpload({ currentImageUrl, onFileChange }) {
               style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 12, border: '2px solid var(--color-border)', display: 'block' }} />
             <button type="button" onClick={handleRemove}
               style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%', background: '#EF4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-              ×
+              Ã—
             </button>
           </div>
           <div style={{ paddingTop: 8 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>Foto caricata ✓</p>
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>Foto caricata âœ“</p>
             <button type="button" onClick={() => inputRef.current?.click()}
               style={{ fontSize: 12, color: 'var(--color-accent)', background: 'none', border: '1px solid var(--color-accent)', borderRadius: 8, padding: '4px 12px', cursor: 'pointer' }}>
               Cambia foto
@@ -66,8 +66,9 @@ function ProductImageUpload({ currentImageUrl, onFileChange }) {
           }}>
           <ImageIcon size={28} style={{ color: 'var(--color-text-tertiary)' }} />
           <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: 0 }}>Trascina una foto o <span style={{ color: 'var(--color-accent)', fontWeight: 600 }}>clicca per caricare</span></p>
-          <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: 0 }}>PNG, JPG, WebP — max 2MB</p>
-        </div>
+          <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
+                    </div>
+                    )}
       )}
     </div>
   );
@@ -77,9 +78,9 @@ function ProductImageUpload({ currentImageUrl, onFileChange }) {
 
 const TAX_CLASSES = [
   { value: '', label: 'Seleziona IVA...', rate: 0 },
-  { value: '1', label: '22% — Standard',  rate: 22 },
-  { value: '2', label: '10% — Ridotta',   rate: 10 },
-  { value: '3', label: '4% — Agevolata',  rate: 4  },
+  { value: '1', label: '22% â€” Standard',  rate: 22 },
+  { value: '2', label: '10% â€” Ridotta',   rate: 10 },
+  { value: '3', label: '4% â€” Agevolata',  rate: 4  },
 ];
 
 // Dato prezzo netto e aliquota IVA, restituisce il prezzo ivato
@@ -212,7 +213,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
       };
 
       Object.entries(formData).forEach(([k, v]) => {
-        // subcategory_id non è un campo backend: lo usiamo per sovrascrivere category_id se valorizzato
+        // subcategory_id non Ã¨ un campo backend: lo usiamo per sovrascrivere category_id se valorizzato
         if (k === 'subcategory_id') return;
         if (k === 'category_id') {
           // Se l'utente ha scelto una sottocategoria, quella vince
@@ -337,7 +338,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               {product ? 'Modifica Prodotto' : 'Nuovo Prodotto'}
             </h2>
             <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
-              {product ? `ID: ${product.id} — SKU: ${product.sku}` : 'Aggiungi un nuovo prodotto al catalogo'}
+              {product ? `ID: ${product.id} â€” SKU: ${product.sku}` : 'Aggiungi un nuovo prodotto al catalogo'}
             </p>
           </div>
           <button onClick={onClose} style={{
@@ -400,7 +401,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               <div>
                 <label className="sp-label">Categoria</label>
                 <select className="sp-select" name="category_id" value={formData.category_id} onChange={handleCategoryChange}>
-                  <option value="">— Seleziona Categoria —</option>
+                  <option value="">â€” Seleziona Categoria â€”</option>
                   {parentCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
@@ -413,14 +414,14 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                   onChange={handleSubCategoryChange}
                   disabled={subCategories.length === 0}
                 >
-                  <option value="">{subCategories.length === 0 ? '— Nessuna sottocategoria —' : '— Seleziona Sottocategoria —'}</option>
+                  <option value="">{subCategories.length === 0 ? 'â€” Nessuna sottocategoria â€”' : 'â€” Seleziona Sottocategoria â€”'}</option>
                   {subCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="sp-label">Fornitore Predefinito</label>
                 <select className="sp-select" name="default_supplier_id" value={formData.default_supplier_id} onChange={handleChange}>
-                  <option value="">— Seleziona Fornitore —</option>
+                  <option value="">â€” Seleziona Fornitore â€”</option>
                   {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
@@ -435,15 +436,26 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               })()) && (
                 <div style={{ gridColumn: '1/-1', background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.06))', border: '1.5px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '16px 18px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 20 }}>🛡️</span>
+                    <span style={{ fontSize: 20 }}>ðŸ›¡ï¸</span>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text)' }}>QScare — Garanzia Hardware</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text)' }}>QScare â€” Garanzia Hardware</div>
                       <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Prezzo assicurazione per questo hardware (solo prodotti di tipo dispositivo)</div>
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--color-accent)', marginLeft: 'auto' }}>
+                        <input type="checkbox"
+                            checked={formData.qscare_price !== '' && formData.qscare_price !== null}
+                            onChange={(e) => {
+                                setFormData(p => ({ ...p, qscare_price: e.target.checked ? '9.90' : '' }));
+                            }}
+                        />
+                        Abilita QScare
+                      </label>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {formData.qscare_price !== '' && formData.qscare_price !== null && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(99,102,241,0.1)' }}>
                     <div style={{ position: 'relative', maxWidth: 200 }}>
-                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--color-text-secondary)', fontSize: 14 }}>€</span>
+                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--color-text-secondary)', fontSize: 14 }}>â‚¬</span>
                       <input
                         className="sp-input"
                         type="number"
@@ -456,8 +468,9 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                         style={{ paddingLeft: 28, fontWeight: 700 }}
                       />
                     </div>
-                    <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: 0 }}>Lascia vuoto per disabilitare QScare su questo prodotto. Il toggle apparirà nel POS quando viene aggiunto al carrello.</p>
-                  </div>
+                    <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
+                    </div>
+                    )}
                 </div>
               )}
               <div style={{ gridColumn: '1/-1' }}>
@@ -549,7 +562,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                       <input className="sp-input" type="number" min="1" value={v.pack_size} onChange={e => handleVariantChange(idx, 'pack_size', e.target.value)} />
                     </div>
                     <div>
-                      <label className="sp-label">💰 Listino 1 — Prezzo Vendita IVA incl. (€) *</label>
+                      <label className="sp-label">ðŸ’° Listino 1 â€” Prezzo Vendita IVA incl. (â‚¬) *</label>
                       <div style={{ position: 'relative' }}>
                         <input className="sp-input" type="number" step="0.01"
                           value={(() => {
@@ -573,28 +586,28 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                         const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id));
                         return tc?.rate ? (
                           <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>
-                            Imponibile (netto): €{parseFloat(v.sale_price).toFixed(2)} · IVA {tc.rate}%: €{(parseFloat(v.sale_price) * tc.rate / 100).toFixed(2)}
+                            Imponibile (netto): â‚¬{parseFloat(v.sale_price).toFixed(2)} Â· IVA {tc.rate}%: â‚¬{(parseFloat(v.sale_price) * tc.rate / 100).toFixed(2)}
                           </p>
                         ) : (
-                          <p style={{ fontSize: 11, color: '#F59E0B', marginTop: 3 }}>⚠ Seleziona la Classe IVA per calcolare il prezzo ivato</p>
+                          <p style={{ fontSize: 11, color: '#F59E0B', marginTop: 3 }}>âš  Seleziona la Classe IVA per calcolare il prezzo ivato</p>
                         );
                       })()}
                       {fv(idx, 'sale_price') && <p style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{fv(idx, 'sale_price')}</p>}
                     </div>
                     <div>
-                      <label className="sp-label">💰 Listino 2 (es. Ingrosso) (€)</label>
+                      <label className="sp-label">ðŸ’° Listino 2 (es. Ingrosso) (â‚¬)</label>
                       <input className="sp-input" type="number" step="0.01" value={v.price_list_2}
                         onChange={e => handleVariantChange(idx, 'price_list_2', e.target.value)}
                         placeholder="0.00" />
                     </div>
                     <div>
-                      <label className="sp-label">💰 Listino 3 (es. Promo/Staff) (€)</label>
+                      <label className="sp-label">ðŸ’° Listino 3 (es. Promo/Staff) (â‚¬)</label>
                       <input className="sp-input" type="number" step="0.01" value={v.price_list_3}
                         onChange={e => handleVariantChange(idx, 'price_list_3', e.target.value)}
                         placeholder="0.00" />
                     </div>
                     <div>
-                      <label className="sp-label">Costo (€)</label>
+                      <label className="sp-label">Costo (â‚¬)</label>
                       <input className="sp-input" type="number" step="0.01" value={v.cost_price} onChange={e => handleVariantChange(idx, 'cost_price', e.target.value)} placeholder="0.00" />
                     </div>
                     <div>
@@ -634,7 +647,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               {formData.variants.map((v, idx) => (
                 <React.Fragment key={idx}>
                   <div style={{ gridColumn: '1/-1', background: 'var(--color-bg)', borderRadius: 10, padding: 16 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 12 }}>Variante #{idx + 1} {v.flavor ? `— ${v.flavor}` : ''}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 12 }}>Variante #{idx + 1} {v.flavor ? `â€” ${v.flavor}` : ''}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                       <div>
                         <label className="sp-label">Classe IVA</label>
@@ -647,11 +660,11 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                         <input className="sp-input" value={v.excise_profile_code} onChange={e => handleVariantChange(idx, 'excise_profile_code', e.target.value)} placeholder="Es: E1" />
                       </div>
                       <div>
-                        <label className="sp-label">Accisa Unitaria Override (€)</label>
+                        <label className="sp-label">Accisa Unitaria Override (â‚¬)</label>
                         <input className="sp-input" type="number" step="0.001" value={v.excise_unit_amount_override} onChange={e => handleVariantChange(idx, 'excise_unit_amount_override', e.target.value)} placeholder="Auto da regole" />
                       </div>
                       <div>
-                        <label className="sp-label">🔑 Codice CLI (Accise Doganali)</label>
+                        <label className="sp-label">ðŸ”‘ Codice CLI (Accise Doganali)</label>
                         <input
                           className="sp-input"
                           value={v.cli_code}
@@ -659,14 +672,15 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                           placeholder="Es: CLI-IT-00123"
                           style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}
                         />
-                        <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Codice identificativo doganale per le accise sui liquidi da inalazione</p>
-                      </div>
+                        <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
+                    </div>
+                    )}
                       <div style={{ gridColumn: '1/-1' }}>
                         <label className="sp-label">Prevalenza Tabaccosa</label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                           {[
-                            { val: 'PREVALENZA_SI', label: 'Sì — Prevalenza tabaccosa' },
-                            { val: '',              label: 'No — Non applicabile' },
+                            { val: 'PREVALENZA_SI', label: 'SÃ¬ â€” Prevalenza tabaccosa' },
+                            { val: '',              label: 'No â€” Non applicabile' },
                           ].map(opt => (
                             <button
                               key={opt.val}
@@ -698,13 +712,15 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               <div>
                 <label className="sp-label">Stock Minimo (Soglia Alert)</label>
                 <input className="sp-input" type="number" min="0" name="min_stock_qty" value={formData.min_stock_qty} onChange={handleChange} />
-                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Sotto questa quantità scatta l'alert di riordino</p>
-              </div>
+                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
+                    </div>
+                    )}
               <div>
                 <label className="sp-label">Giorni Riordino</label>
                 <input className="sp-input" type="number" min="1" name="reorder_days" value={formData.reorder_days} onChange={handleChange} />
-                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Tempo medio di approvvigionamento dal fornitore</p>
-              </div>
+                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
+                    </div>
+                    )}
               <div>
                 <label className="sp-label" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                   <input
@@ -716,8 +732,9 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                   />
                   Riordino Automatico Abilitato
                 </label>
-                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>Il sistema proporrà automaticamente l'ordine fornitore quando lo stock scende sotto la soglia</p>
-              </div>
+                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
+                    </div>
+                    )}
             </div>
           )}
         </form>
