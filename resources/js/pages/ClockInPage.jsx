@@ -536,14 +536,36 @@ function KioskView() {
     const val = barcodeInput.trim();
     if (!val) return;
     setBarcodeInput('');
-    const found = resolveEmployee(val);
+    setLoading(true);
+
+    // 1. Prima prova nella lista locale (offline-fast)
+    let found = resolveEmployee(val);
+
+    // 2. Se non trovato localmente, chiedi al server (fallback)
+    if (!found) {
+      try {
+        const res = await attendance.getEmployeesKiosk();
+        const freshList = res.data?.data || [];
+        // Aggiorna la lista locale
+        if (freshList.length > 0) setEmployees(freshList);
+        // Cerca di nuovo nella lista aggiornata
+        found = freshList.find(em =>
+          (em.barcode    && em.barcode.toLowerCase()    === val.trim().toLowerCase()) ||
+          (em.badge_code && em.badge_code.toLowerCase() === val.trim().toLowerCase()) ||
+          String(em.id) === val.trim()
+        ) || null;
+      } catch {}
+    }
+
+    setLoading(false);
+
     if (!found) {
       setMessage({ text: `Badge "${val}" non riconosciuto`, type: 'error' });
       setTimeout(() => setMessage(null), 3000);
       barcodeRef.current?.focus();
       return;
     }
-    
+
     if (phase === 'ask_history') {
         setLoading(true);
         try {
