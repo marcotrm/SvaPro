@@ -344,7 +344,7 @@ export default function CustomerModal({ customer, onClose, onSave }) {
                 <input className={S.input} name="phone" value={formData.phone} onChange={handleChange} placeholder="+39 333 1234567" />
               </Field>
               <Field label="Data di Nascita" error={fe('birth_date')}>
-                <DatePicker className={S.input} name="birth_date" value={formData.birth_date} onChange={handleChange} placeholder="Seleziona data di nascita" />
+                <DatePicker className={S.input} name="birth_date" value={formData.birth_date} onChange={(date) => setFormData(prev => ({...prev, birth_date: date}))} placeholder="Seleziona data di nascita" />
               </Field>
 
               <Field label="Sesso" error={fe('gender')}>
