@@ -29,7 +29,7 @@ export default function SupplierDeliveryPage() {
   const [ddtNumber, setDdtNumber] = useState(`DDT-${Date.now().toString().slice(-6)}`);
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
-  const [lines, setLines] = useState([{ product_variant_id: '', product_name: '', qty: 1, unit_cost: 0 }]);
+  const [lines, setLines] = useState([{ product_variant_id: '', product_name: '', qty: 1, unit_cost: '' }]);
 
   const DDT_TYPES = [
     { id: 'carico',          label: '📦 Carico Merce',      sub: 'Fornitore → Magazzino (+stock)',           qtySign: +1, color: '#065f46', bg: '#d1fae5' },
@@ -66,7 +66,7 @@ export default function SupplierDeliveryPage() {
       .catch(() => {});
   }, []);
 
-  const addLine = () => setLines([...lines, { product_variant_id: '', product_name: '', qty: 1, unit_cost: 0 }]);
+  const addLine = () => setLines([...lines, { product_variant_id: '', product_name: '', qty: 1, unit_cost: '' }]);
 
   const removeLine = (i) => setLines(lines.filter((_, idx) => idx !== i));
 
@@ -387,6 +387,7 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
               <div>
                 {i === 0 && <label className="field-label">Costo Unitario €</label>}
                 <input className="field-input" type="number" step="0.01" value={line.unit_cost}
+                  placeholder="0.00"
                   onChange={e => updateLine(i, 'unit_cost', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
               </div>
               <div style={{ paddingTop: i === 0 ? 22 : 0 }}>
@@ -471,7 +472,7 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
             <button className="btn btn-ghost" onClick={() => {
               setStep(1); setSuccess(null); setError('');
               setDdtNumber(`DDT-${Date.now().toString().slice(-6)}`);
-              setLines([{ product_variant_id: '', product_name: '', qty: 1, unit_cost: 0 }]);
+              setLines([{ product_variant_id: '', product_name: '', qty: 1, unit_cost: '' }]);
               setSupplierId(''); setNotes('');
             }}>
               + Nuovo DDT
