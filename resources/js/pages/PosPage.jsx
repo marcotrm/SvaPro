@@ -553,7 +553,7 @@ export default function PosPage() {
     ) || normalize(p.name)?.includes(fNorm) || normalize(p.description)?.includes(fNorm);
     const matchC = !activeCategory || p.category_id === activeCategory;
     return matchS && matchF && matchC;
-  }), [products, searchTerm, flavorTerm, activeCategory, showAllProducts, hasFeatured]);
+  }).slice(0, 20), [products, searchTerm, flavorTerm, activeCategory, showAllProducts, hasFeatured]);
 
   const filteredCustomers = useMemo(() => {
     const s = customerSearch.toLowerCase().trim();
