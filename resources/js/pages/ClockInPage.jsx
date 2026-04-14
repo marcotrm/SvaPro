@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { attendance, stores } from '../api.jsx';
 import DatePicker from '../components/DatePicker.jsx';
@@ -425,7 +425,8 @@ function KioskView() {
   const [barcodeInput, setBarcodeInput]  = useState('');
   const [clockStr, setClockStr]          = useState('');
   const [dateStr,  setDateStr]           = useState('');
-  const [phase, setPhase]                = useState('idle'); // idle | confirmed
+  const [phase, setPhase]                = useState('idle'); // idle | ask_action | confirmed | ask_history | history_view
+  const [lastStatus, setLastStatus]      = useState(null); // 'in' | 'out' | 'pausa'
   const barcodeRef = useRef(null);
 
   useEffect(() => {
