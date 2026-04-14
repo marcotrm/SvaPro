@@ -31,9 +31,10 @@ export default function CatalogPage() {
       setLoading(true); setError('');
       // Invalida la cache ogni volta per avere sempre dati aggiornati
       clearApiCache();
-      const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
+      // Catalogo admin: mostra SEMPRE tutti i prodotti del tenant (no filtro store_id)
+      // L'assegnazione per negozio è già inclusa in variant.assigned_stores nella risposta
       const [pRes, sRes, cRes] = await Promise.all([
-        catalog.getProducts({ ...sp, limit: 500 }),
+        catalog.getProducts({ limit: 500 }),
         suppliers.getAll().catch(() => ({ data: { data: [] } })),
         catalog.getCategories()
       ]);
