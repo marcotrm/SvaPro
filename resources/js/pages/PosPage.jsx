@@ -230,11 +230,10 @@ export default function PosPage() {
   // Controllo ruolo dipendente
   const isDipendente = (user?.roles || []).includes('dipendente') || user?.role === 'dipendente';
   const [loading, setLoading]           = useState(true);
-  const [showAllProducts, setShowAllProducts] = useState(false);
-
   const [products, setProducts]         = useState([]);
   const [categories, setCategories]     = useState([]);
-  const [activeCategory, setActiveCategory] = useState(null);
+  const [activeCategory, setActiveCategory] = useState('featured');
+  const [fetchedCats, setFetchedCats]   = useState(new Set(['featured']));
   const [searchTerm, setSearchTerm]     = useState('');
   const [flavorTerm, setFlavorTerm]     = useState('');
   const searchRef                       = useRef(null);
@@ -269,10 +268,10 @@ export default function PosPage() {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
 
-      // Carica prodotti — SENZA store_id per mostrare tutto il catalogo del tenant
+      // Carica prodotti — solo preferiti per limitare i dati massivi
       // (lo stock del negozio viene caricato separatamente)
       const [pRes, cRes] = await Promise.all([
-        catalog.getProducts({ limit: 5000 }),
+        catalog.getProducts({ limit: 150, is_featured: 1 }),
         catalog.getCategories(),
       ]);
       setProducts(pRes.data?.data || []);
@@ -310,6 +309,21 @@ export default function PosPage() {
   }, [selectedStoreId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Caricamento dinamico categorie
+  useEffect(() => {
+    if (activeCategory && activeCategory !== 'featured' && !fetchedCats.has(activeCategory)) {
+      setFetchedCats(prev => new Set(prev).add(activeCategory));
+      catalog.getProducts({ category_id: activeCategory, limit: 1000 }).then(res => {
+         const newProds = res.data?.data || [];
+         setProducts(prev => {
+            const map = new Map(prev.map(p => [p.id, p]));
+            newProds.forEach(p => map.set(p.id, p));
+            return Array.from(map.values());
+         });
+      });
+    }
+  }, [activeCategory, fetchedCats]);
 
   // Auto-precompila operatore se l'utente loggato è un dipendente
   useEffect(() => {
@@ -538,8 +552,11 @@ export default function PosPage() {
   /* Filters */
   const hasFeatured = products.some(p => p.is_featured);
   const filteredProducts = useMemo(() => products.filter(p => {
-    // Se non sto mostrando tutti e ci sono prodotti in evidenza, filtra solo i featured
-    if (!showAllProducts && hasFeatured && !p.is_featured) return false;
+    // Se la categoria attiva è featured, filtra solo in evidenza
+    if (activeCategory === 'featured' && !p.is_featured) return false;
+    // Se la categoria attiva è una categoria, filtra per id
+    if (typeof activeCategory === 'number' && p.category_id !== activeCategory) return false;
+
     const s = searchTerm.toLowerCase().trim();
     const f = flavorTerm.toLowerCase().trim();
     const matchS = !s || p.name?.toLowerCase().includes(s) || p.sku?.toLowerCase().includes(s)
@@ -551,9 +568,9 @@ export default function PosPage() {
       normalize(v.flavor)?.includes(fNorm) ||
       normalize(v.description)?.includes(fNorm)
     ) || normalize(p.name)?.includes(fNorm) || normalize(p.description)?.includes(fNorm);
-    const matchC = !activeCategory || p.category_id === activeCategory;
+    const matchC = true; // category match gestito sopra
     return matchS && matchF && matchC;
-  }).slice(0, 20), [products, searchTerm, flavorTerm, activeCategory, showAllProducts, hasFeatured]);
+  }).slice(0, 30), [products, searchTerm, flavorTerm, activeCategory]);
 
   const filteredCustomers = useMemo(() => {
     const s = customerSearch.toLowerCase().trim();
@@ -603,10 +620,10 @@ export default function PosPage() {
   }, [cartLines, products]);
 
   /* Barcode scan su Enter — prodotto o fidelity card cliente */
-  const handleSearchKey = (e) => {
+  const handleSearchKey = async (e) => {
     if (e.key === 'Enter' && searchTerm.trim()) {
       const bc = searchTerm.trim().toLowerCase();
-      const match = products.find(p =>
+      let match = products.find(p =>
         p.barcode?.toLowerCase() === bc ||
         p.sku?.toLowerCase() === bc ||
         p.variants?.some(v =>
@@ -614,10 +631,28 @@ export default function PosPage() {
           v.sku?.toLowerCase() === bc
         )
       );
+
+      if (!match) {
+        // Fallback server per barcode non caricati in memoria
+        try {
+          const res = await catalog.getProducts({ barcode: searchTerm.trim(), limit: 1 });
+          if (res.data?.data?.length > 0) {
+            match = res.data.data[0];
+            setProducts(prev => {
+              const map = new Map(prev.map(p => [p.id, p]));
+              map.set(match.id, match);
+              return Array.from(map.values());
+            });
+          }
+        } catch {}
+      }
+
       if (match) {
         addToCart(match);
         setSearchTerm('');
         searchRef.current?.focus();
+      } else {
+        toast.error('Prodotto non indicato in anagrafica');
       }
     }
   };
@@ -698,40 +733,18 @@ export default function PosPage() {
         {/* Category pills */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', marginBottom: 14, paddingBottom: 4 }}>
 
-          {/* Toggle In Evidenza / Tutti — visibile solo se esistono prodotti featured */}
-          {hasFeatured && (
-            <button
-              onClick={() => setShowAllProducts(v => !v)}
-              style={{
-                padding: '7px 16px', borderRadius: 100, border: 'none', cursor: 'pointer',
-                fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
-                display: 'flex', alignItems: 'center', gap: 5,
-                background: !showAllProducts
-                  ? 'linear-gradient(135deg,#FBBF24,#D97706)'
-                  : 'rgba(251,191,36,0.12)',
-                color: !showAllProducts ? '#fff' : '#D97706',
-                boxShadow: !showAllProducts ? '0 4px 12px rgba(251,191,36,0.45)' : 'none',
-                transition: 'all 0.15s',
-                flexShrink: 0,
-              }}
-              title={showAllProducts ? 'Mostra solo i prodotti in evidenza' : 'Mostra tutti i prodotti'}
-            >
-              <Star size={12} fill={!showAllProducts ? '#fff' : 'none'} color={!showAllProducts ? '#fff' : '#D97706'} strokeWidth={2} />
-              {showAllProducts ? 'Tutti i prodotti' : `In Evidenza (${products.filter(p => p.is_featured).length})`}
-            </button>
-          )}
-
+          {/* Toggle In Evidenza (Preferiti) */}
           <button
-            onClick={() => setActiveCategory(null)}
+            onClick={() => setActiveCategory('featured')}
             style={{
               padding: '7px 18px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
-              background: !activeCategory ? '#7B6FD0' : '#fff',
-              color: !activeCategory ? '#fff' : '#6b7280',
-              boxShadow: !activeCategory ? '0 4px 12px rgba(123,111,208,0.35)' : '0 1px 3px rgba(0,0,0,0.07)',
-              transition: 'all 0.15s',
+              background: activeCategory === 'featured' ? 'linear-gradient(135deg,#FBBF24,#D97706)' : '#fff',
+              color: activeCategory === 'featured' ? '#fff' : '#6b7280',
+              boxShadow: activeCategory === 'featured' ? '0 4px 12px rgba(251,191,36,0.35)' : '0 1px 3px rgba(0,0,0,0.07)',
+              transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5,
             }}
           >
-            Tutti ({products.length})
+            <Star size={14} fill={activeCategory === 'featured' ? '#fff' : 'none'} color={activeCategory === 'featured' ? '#fff' : '#FBBF24'} /> Preferiti
           </button>
           {categories.map(cat => {
             const pal = catPalette(cat.id);

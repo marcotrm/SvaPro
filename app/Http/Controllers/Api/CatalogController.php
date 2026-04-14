@@ -63,10 +63,39 @@ class CatalogController extends Controller
             }
         }
 
-        $products = DB::table('products')
-            ->where('tenant_id', $tenantId)
-            ->orderByDesc('id')
-            ->limit((int) $request->input('limit', 100))
+        $query = DB::table('products')->where('tenant_id', $tenantId);
+
+        if ($request->filled('is_featured')) {
+            $query->where('is_featured', $request->boolean('is_featured'));
+        }
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->integer('category_id'));
+        }
+        if ($request->filled('search') || $request->filled('barcode')) {
+            $term = $request->input('search') ?: $request->input('barcode');
+            $term = strtolower(trim($term));
+            
+            // Per il search esteso, join con product_variants e store_product_variants non conviene qui, 
+            // ma faremo una sottoquery o exists su varianti.
+            // La ricerca in products la facciamo su nome e sku
+            $query->where(function ($q) use ($term, $tenantId) {
+                $q->where(DB::raw('LOWER(name)'), 'like', "%{$term}%")
+                  ->orWhere(DB::raw('LOWER(sku)'), 'like', "%{$term}%")
+                  ->orWhereExists(function ($subq) use ($term, $tenantId) {
+                      $subq->select(DB::raw(1))
+                           ->from('product_variants')
+                           ->whereColumn('product_variants.product_id', 'products.id')
+                           ->where('product_variants.tenant_id', $tenantId)
+                           ->where(function ($vq) use ($term) {
+                               $vq->where(DB::raw('LOWER(barcode)'), 'like', "%{$term}%")
+                                  ->orWhere(DB::raw('LOWER(flavor)'), 'like', "%{$term}%");
+                           });
+                  });
+            });
+        }
+
+        $products = $query->orderByDesc('id')
+            ->limit((int) $request->input('limit', 500))
             ->get();
 
         $productIds = $products->pluck('id')->all();
