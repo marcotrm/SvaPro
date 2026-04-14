@@ -61,7 +61,7 @@ export default function OrdersPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true); setError('');
-      const params = {};
+      const params = { limit: 500 };
       if (selectedStoreId) params.store_id = selectedStoreId;
       if (supplierFilter) params.supplier_id = supplierFilter;
       if (typeFilter) params.product_type = typeFilter;

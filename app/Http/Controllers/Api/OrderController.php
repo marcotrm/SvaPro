@@ -46,7 +46,7 @@ class OrderController extends Controller
             'store_id' => ['nullable', 'integer'],
             'supplier_id' => ['nullable', 'integer'],
             'product_type' => ['nullable', 'string', 'max:50'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'q' => ['nullable', 'string', 'max:100'],
         ]);
 
@@ -55,7 +55,7 @@ class OrderController extends Controller
         }
 
         $status = (string) ($request->input('status') ?: 'all');
-        $limit = (int) ($request->input('limit') ?: 80);
+        $limit = (int) ($request->input('limit') ?: 200);
         $term = trim((string) $request->input('q', ''));
 
         $rows = DB::table('sales_orders as so')
