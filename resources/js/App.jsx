@@ -49,6 +49,8 @@ const TesoreriaPage        = lazy(() => import('./pages/TesoreriaPage.jsx'));
 const AdminDeliveryNotesPage = lazy(() => import('./pages/AdminDeliveryNotesPage.jsx'));
 const RestockOrdersPage    = lazy(() => import('./pages/RestockOrdersPage.jsx'));
 const DeliveryNotesPage    = lazy(() => import('./pages/DeliveryNotesPage.jsx'));
+const AdmPage              = lazy(() => import('./pages/AdmPage.jsx'));
+
 
 // Components
 import Layout from './components/Layout.jsx';
@@ -176,6 +178,8 @@ export default function App() {
               <Route path="/admin-panel" element={<AdminPanelPage />} />
               <Route path="/warehouse/restock" element={<RestockOrdersPage />} />
               <Route path="/warehouse/delivery-notes" element={<DeliveryNotesPage />} />
+              <Route path="/adm" element={<AdmPage />} />
+
             </Route>
           </Route>
 

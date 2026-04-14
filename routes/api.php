@@ -34,7 +34,10 @@ use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\CashMovementController;
 use App\Http\Controllers\Api\GamificationController;
 use App\Http\Controllers\Api\PrestashopController;
+use App\Http\Controllers\Api\AdmController;
 use Illuminate\Support\Facades\Route;
+
+
 
 Route::get('/loyalty-card/{uuid}', [LoyaltyCardController::class, 'show']);
 Route::post('/webhooks/woocommerce/order', [WooCommerceWebhookController::class, 'handleOrder']);
@@ -250,6 +253,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/restock-orders/{id}/start-preparing', [RestockOrderController::class, 'startPreparing']);
         Route::post('/restock-orders/{id}/ship', [RestockOrderController::class, 'ship']);
         Route::delete('/restock-orders/{id}', [RestockOrderController::class, 'destroy']);
+
+        // ADM — Reportistica Fiscale PLI
+        Route::post('/adm/generate-report', [AdmController::class, 'generateReport']);
+        Route::get('/adm/history', [AdmController::class, 'getHistory']);
 
         // Chat — admin (area manager) vede tutti i messaggi
         Route::get('/chat/conversations', [ChatController::class, 'conversations']);

@@ -12,8 +12,9 @@ import {
   Receipt, Star, ArrowRightLeft, MapPin, ChevronLeft, ChevronRight,
   PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store, AlertCircle,
   LayoutDashboard, ShoppingCart, Megaphone, HandCoins,
-  Menu, X, Home, ChevronRight as ChevRight, Calendar
+  Menu, X, Home, ChevronRight as ChevRight, Calendar, FileSpreadsheet
 } from 'lucide-react';
+
 
 const allNavigation = [
   // ── Principale ───────────────────────────────────────────────────
@@ -62,13 +63,15 @@ const allNavigation = [
 
   // Amministrazione ──────────────────────────────────────────────
   { section: 'Amministrazione', icon: Shield, items: [
-    { label: 'Tesoreria & Cassa',      href: '/tesoreria',    icon: HandCoins,   roles: ['superadmin','admin_cliente','dipendente'] },
-    { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
-    { label: 'Dashboard QScare',       href: '/qscare-dashboard', icon: Shield,  roles: ['superadmin','admin_cliente'] },
-    { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,       roles: ['superadmin','admin_cliente'] },
-    { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,       roles: ['superadmin','admin_cliente'] },
-    { label: 'Fatturazione',           href: '/invoices',     icon: FileText,    roles: ['superadmin','admin_cliente'] },
+    { label: 'Tesoreria & Cassa',      href: '/tesoreria',    icon: HandCoins,        roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,        roles: ['superadmin','admin_cliente'] },
+    { label: 'Dashboard QScare',       href: '/qscare-dashboard', icon: Shield,       roles: ['superadmin','admin_cliente'] },
+    { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,            roles: ['superadmin','admin_cliente'] },
+    { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,            roles: ['superadmin','admin_cliente'] },
+    { label: 'Fatturazione',           href: '/invoices',     icon: FileText,         roles: ['superadmin','admin_cliente'] },
+    { label: '📊 ADM Fiscale',          href: '/adm',          icon: FileSpreadsheet,  roles: ['superadmin','admin_cliente'] },
   ]},
+
 
   // 10. Impostazioni ────────────────────────────────────────────────
   { section: 'Impostazioni', icon: Settings, items: [
