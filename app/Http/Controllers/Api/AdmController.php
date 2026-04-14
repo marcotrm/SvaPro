@@ -13,9 +13,12 @@ class AdmController extends Controller
 {
     /**
      * Genera il report Excel ADM/PLI on-demand.
-     * Chiama direttamente l'excel-api su Railway con i dati del DB.
      *
-     * POST /api/adm/generate-report
+     * Flusso:
+     *   1. Se N8N_WEBHOOK_URL è configurato → chiama il workflow n8n e restituisce il file che n8n restituisce.
+     *   2. Altrimenti → fallback: query DB + chiamata diretta all'excel-api.
+     *
+     * POST /api/{tenant}/adm/generate-report
      * Body: { type: 'mensile'|'quindicinale', year: '2025', month: '07', half: 1|2 }
      */
     public function generateReport(Request $request): Response|JsonResponse
@@ -24,53 +27,97 @@ class AdmController extends Controller
             'type'  => ['required', 'in:mensile,quindicinale'],
             'year'  => ['required', 'digits:4', 'integer', 'min:2020', 'max:2030'],
             'month' => ['required', 'digits_between:1,2', 'integer', 'min:1', 'max:12'],
-            'half'  => ['nullable', 'integer', 'in:1,2'], // solo per quindicinale
+            'half'  => ['nullable', 'integer', 'in:1,2'],
         ]);
 
         $tenantId = (int) $request->attributes->get('tenant_id');
-        $year  = (int) $validated['year'];
-        $month = (int) $validated['month'];
-        $type  = $validated['type'];
-        $half  = (int) ($validated['half'] ?? 1);
+        $year     = (int) $validated['year'];
+        $month    = (int) $validated['month'];
+        $type     = $validated['type'];
+        $half     = (int) ($validated['half'] ?? 1);
 
-        // Calcola range date
+        // Calcola range date e nome file
         if ($type === 'mensile') {
-            $startDate = sprintf('%04d-%02d-01 00:00:00', $year, $month);
-            $lastDay   = cal_days_in_month(CAL_GREGORIAN, $month, $year);
-            $endDate   = sprintf('%04d-%02d-%02d 23:59:59', $year, $month, $lastDay);
-            $periodoLabel = sprintf('%02d/%d', $month, $year);
-            $tipoFile = 'mensile';
+            $startDate    = sprintf('%04d-%02d-01 00:00:00', $year, $month);
+            $lastDay      = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+            $endDate      = sprintf('%04d-%02d-%02d 23:59:59', $year, $month, $lastDay);
+            $periodoLabel = sprintf('%02d%d', $month, $year);
+            $nomeFile     = "SVAPOGROUPSRL{$periodoLabel}.xlsx";
         } else {
             if ($half === 1) {
                 $startDate = sprintf('%04d-%02d-01 00:00:00', $year, $month);
                 $endDate   = sprintf('%04d-%02d-15 23:59:59', $year, $month);
-                $halfNum   = '1Q';
+                $halfKey   = '1Q';
             } else {
-                $lastDay  = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+                $lastDay   = cal_days_in_month(CAL_GREGORIAN, $month, $year);
                 $startDate = sprintf('%04d-%02d-16 00:00:00', $year, $month);
                 $endDate   = sprintf('%04d-%02d-%02d 23:59:59', $year, $month, $lastDay);
-                $halfNum   = '2Q';
+                $halfKey   = '2Q';
             }
-            $periodoLabel = sprintf('%s%02d%d', $halfNum, $month, $year);
-            $tipoFile = 'quindicinale';
+            $periodoLabel = sprintf('%s%02d%d', $halfKey, $month, $year);
+            $nomeFile     = "SVAPOGROUPSRL{$periodoLabel}.xlsx";
         }
 
-        // ─── Tenant info ─────────────────────────────────────────────
-        $tenant = DB::table('tenants')
-            ->where('id', $tenantId)
-            ->first(['name', 'vat_number', 'settings_json']);
+        $finePeriodo = \Carbon\Carbon::parse($endDate)->format('d/m/Y');
 
+        // ──────────────────────────────────────────────────────────────────────
+        // OPZIONE A — Chiama il workflow n8n se N8N_WEBHOOK_URL è configurato
+        // ──────────────────────────────────────────────────────────────────────
+        $n8nWebhookUrl = env('N8N_WEBHOOK_URL');
+
+        if ($n8nWebhookUrl) {
+            try {
+                $response = Http::timeout(120) // n8n può impiegare qualche secondo
+                    ->withHeaders(['Content-Type' => 'application/json'])
+                    ->post($n8nWebhookUrl, [
+                        'type'         => $type,
+                        'year'         => $year,
+                        'month'        => $month,
+                        'half'         => $half,
+                        'start_date'   => $startDate,
+                        'end_date'     => $endDate,
+                        'period_label' => $periodoLabel,
+                        'fine_periodo' => $finePeriodo,
+                        'nome_file'    => $nomeFile,
+                        'tenant_id'    => $tenantId,
+                    ]);
+
+                if ($response->failed()) {
+                    return response()->json([
+                        'message' => 'Il workflow n8n ha restituito un errore. Controlla il log n8n su Railway.',
+                        'detail'  => $response->body(),
+                    ], 502);
+                }
+
+                // n8n deve restituire il file Excel direttamente
+                $contentType = $response->header('Content-Type')
+                    ?? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+                return response($response->body(), 200, [
+                    'Content-Type'        => $contentType,
+                    'Content-Disposition' => "attachment; filename=\"{$nomeFile}\"",
+                    'Cache-Control'       => 'no-cache, no-store, must-revalidate',
+                ]);
+
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Impossibile raggiungere il workflow n8n. Controlla la variabile N8N_WEBHOOK_URL.',
+                    'detail'  => $e->getMessage(),
+                ], 503);
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────────────
+        // OPZIONE B — Fallback: query DB + excel-api diretta
+        // ──────────────────────────────────────────────────────────────────────
+        $tenant   = DB::table('tenants')->where('id', $tenantId)->first(['name', 'vat_number', 'settings_json']);
         $settings = json_decode($tenant?->settings_json ?? '{}', true);
+
         $tenantInfo = [
-            'ragione_sociale' => $tenant?->name ?? 'N/D',
+            'ragione_sociale' => $tenant?->name       ?? 'N/D',
             'partita_iva'     => $tenant?->vat_number ?? 'N/D',
             'codice_imposta'  => $settings['depositary_pli_code'] ?? 'N/D',
         ];
-
-        // ─── Prospetto: vendite aggregati per prodotto ───────────────
-        $finePeriodo = $type === 'mensile'
-            ? \Carbon\Carbon::parse($endDate)->format('d/m/Y')
-            : \Carbon\Carbon::parse($endDate)->format('d/m/Y');
 
         $prospettoRows = DB::select("
             SELECT
@@ -105,7 +152,6 @@ class AdmController extends Controller
             ORDER BY denominazione_prodotto
         ");
 
-        // ─── Giacenza: stock finale per variante ─────────────────────
         $giacenzaRows = DB::select("
             SELECT
                 COALESCE(NULLIF(pv.flavor, ''), p.name) AS denominazione_prodotto,
@@ -128,7 +174,6 @@ class AdmController extends Controller
             ORDER BY denominazione_prodotto
         ");
 
-        // ─── Resi: resi nel periodo ───────────────────────────────────
         $resiRows = DB::select("
             SELECT
                 COALESCE(NULLIF(pv.flavor, ''), p.name) AS denominazione_prodotto,
@@ -152,16 +197,12 @@ class AdmController extends Controller
             ORDER BY data_reso
         ");
 
-        // Determina nome file
-        $nomeFile = 'SVAPOGROUPSRL' . $periodoLabel . '.xlsx';
-
-        // ─── Chiama excel-api su Railway ─────────────────────────────
-        $excelApiUrl = rtrim(config('services.excel_api.url', env('EXCEL_API_URL', 'http://localhost:3001')), '/');
+        // Chiama excel-api direttamente
+        $excelApiUrl = rtrim(env('EXCEL_API_URL', 'http://localhost:3001'), '/');
         $endpoint    = $type === 'quindicinale' ? '/genera-excel-quindicinale' : '/genera-excel';
 
         try {
             $response = Http::timeout(60)
-                ->withHeaders(['Content-Type' => 'application/json'])
                 ->post($excelApiUrl . $endpoint, [
                     'prospetto' => array_map(fn($r) => (array) $r, $prospettoRows),
                     'giacenza'  => array_map(fn($r) => (array) $r, $giacenzaRows),
@@ -173,35 +214,27 @@ class AdmController extends Controller
 
             if ($response->failed()) {
                 return response()->json([
-                    'message' => 'Errore durante la generazione del file Excel. Verifica che il servizio excel-api sia online.',
+                    'message' => 'Errore durante la generazione Excel. Configura N8N_WEBHOOK_URL o EXCEL_API_URL su Railway.',
                     'detail'  => $response->body(),
                 ], 502);
             }
 
-            // Stream the Excel file back to browser
             return response($response->body(), 200, [
                 'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition' => 'attachment; filename="' . $nomeFile . '"',
+                'Content-Disposition' => "attachment; filename=\"{$nomeFile}\"",
                 'Cache-Control'       => 'no-cache, no-store, must-revalidate',
-                'Pragma'              => 'no-cache',
-                'Expires'             => '0',
             ]);
 
         } catch (\Throwable $e) {
             return response()->json([
-                'message' => 'Impossibile contattare il servizio di generazione Excel.',
+                'message' => 'Impossibile contattare il servizio di generazione Excel. Configura N8N_WEBHOOK_URL su Railway.',
                 'detail'  => $e->getMessage(),
             ], 503);
         }
     }
 
-    /**
-     * Restituisce l'elenco degli ultimi report generati (da un log o tabella).
-     * Per ora restituisce un placeholder.
-     */
     public function getHistory(Request $request): JsonResponse
     {
-        // TODO: implementare una tabella adm_report_history per storico
         return response()->json(['data' => []]);
     }
 }

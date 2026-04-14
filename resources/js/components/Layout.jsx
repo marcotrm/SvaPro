@@ -69,7 +69,11 @@ const allNavigation = [
     { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,            roles: ['superadmin','admin_cliente'] },
     { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,            roles: ['superadmin','admin_cliente'] },
     { label: 'Fatturazione',           href: '/invoices',     icon: FileText,         roles: ['superadmin','admin_cliente'] },
-    { label: '📊 ADM Fiscale',          href: '/adm',          icon: FileSpreadsheet,  roles: ['superadmin','admin_cliente'] },
+  ]},
+
+  // ADM — Sezione separata Reportistica Fiscale PLI ───────────────────
+  { section: 'ADM', icon: FileSpreadsheet, items: [
+    { label: 'Report Fiscali PLI',     href: '/adm',          icon: FileSpreadsheet,  roles: ['superadmin','admin_cliente'] },
   ]},
 
 
