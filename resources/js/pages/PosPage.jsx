@@ -571,15 +571,20 @@ export default function PosPage() {
   /* Filters */
   const hasFeatured = products.some(p => p.is_featured);
   const filteredProducts = useMemo(() => products.filter(p => {
-    // Se la categoria attiva è featured, filtra solo in evidenza
-    if (activeCategory === 'featured' && !p.is_featured) return false;
-    // Se la categoria attiva è una categoria, filtra per id
-    if (typeof activeCategory === 'number' && p.category_id !== activeCategory) return false;
-
     const s = searchTerm.toLowerCase().trim();
     const f = flavorTerm.toLowerCase().trim();
-    const matchS = !s || p.name?.toLowerCase().includes(s) || p.sku?.toLowerCase().includes(s)
-      || p.variants?.some(v => v.barcode?.toLowerCase().includes(s));
+    const hasSearch = s.length > 0 || f.length > 0;
+
+    // Applica filtro categoria SOLO se non c'è una ricerca di testo in corso (così il barcode o la ricerca globale ignorano la tab "Preferiti")
+    if (!hasSearch) {
+      if (activeCategory === 'featured' && !p.is_featured) return false;
+      if (typeof activeCategory === 'number' && p.category_id !== activeCategory) return false;
+    }
+
+    const matchS = !s || p.name?.toLowerCase().includes(s) 
+      || p.sku?.toLowerCase().includes(s) 
+      || p.barcode?.toLowerCase().includes(s)
+      || p.variants?.some(v => v.barcode?.toLowerCase().includes(s) || v.sku?.toLowerCase().includes(s));
     // Fix ricerca aroma: controlla anche description e tags, normalizza accenti
     const normalize = str => (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const fNorm = normalize(f);
