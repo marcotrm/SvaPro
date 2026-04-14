@@ -460,17 +460,7 @@ function KioskView() {
       );
       if (found) {
         setEmployee(found);
-        // Controlla subito il suo status live
-        setLoading(true);
-        attendance.getLive({ employee_id: found.id })
-          .then(r => {
-             const l = r.data?.data || [];
-             const isIn = l.some(e => e.employee_id === found.id || e.id === found.id);
-             if (isIn) setPhase('ask_checkout_type');
-             else setPhase('personal_dashboard_out'); // Nuovo stato per chi è fuori
-          })
-          .catch(() => setPhase('personal_dashboard_out'))
-          .finally(() => setLoading(false));
+        setPhase('ask_action');
       }
     }
   }, [isDipendente, user, employees, phase]);
@@ -570,85 +560,71 @@ function KioskView() {
         return;
     }
 
-    // Identifica lo stato attuale per vedere se mostrare modal o fare azione diretta
-    setLoading(true);
-    let curr = 'out';
-    try {
-        const r = await attendance.getLive({ employee_id: found.id });
-        const l = r.data?.data || [];
-        curr = l.some(e => e.employee_id === found.id || e.id === found.id) ? 'in' : 'out';
-    } catch {}
-    setLoading(false);
-
-    if (curr === 'in') {
-        setEmployee(found);
-        setPhase('ask_checkout_type');
-        return;
-    }
-
-    await performClock(found, 'in');
+    setEmployee(found);
+    setPhase('ask_action');
   }, [barcodeInput, employees, phase]);
 
-  /* ── Schermata Personale - Fuori Turno ── */
-  if (phase === 'personal_dashboard_out' && employee) {
+  /* ── Schermata Unificata Scelta Azione (Kiosk) ── */
+  if (phase === 'ask_action' && employee) {
     return (
       <div style={{
         minHeight: '82vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         background: '#1a1a2e', borderRadius: 24, padding: 30
       }}>
         <div style={{ fontSize: 28, color: '#fff', marginBottom: 40, fontWeight: 800, textAlign: 'center' }}>
-          Ciao {employee.first_name}, <br/><span style={{ color: '#9CA3AF', fontSize: 20, fontWeight: 600 }}>Cosa vuoi fare?</span>
+          Ciao {employee.first_name}, <br/><span style={{ color: '#9CA3AF', fontSize: 20, fontWeight: 600 }}>Cosa vuoi registrare?</span>
         </div>
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, maxWidth: 600 }}>
+            {/* Entrata */}
             <button 
                 onClick={() => performClock(employee, 'in')}
                 disabled={loading}
-                style={{ background: '#F0FDF4', color: '#16A34A', padding: '24px 40px', borderRadius: 20, fontSize: 18, fontWeight: 800, border: '4px solid #BBF7D0', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', minWidth: 220, opacity: loading ? 0.7 : 1 }}
+                style={{ background: '#F0FDF4', color: '#16A34A', padding: '24px 20px', borderRadius: 20, fontSize: 16, fontWeight: 800, border: '4px solid #BBF7D0', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', transition: 'transform 0.1s', opacity: loading ? 0.7 : 1 }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-                <span style={{ fontSize: 48 }}>✅</span>
+                <span style={{ fontSize: 40 }}>✅</span>
                 Inizia Turno (Entrata)
             </button>
-        </div>
-        <button onClick={() => setPhase('ask_history')} style={{ marginTop: 50, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-          🕒 Vedi Storico Ore
-        </button>
-      </div>
-    );
-  }
 
-  /* ── Schermata Scelta Checkout ── */
-  if (phase === 'ask_checkout_type' && employee) {
-    return (
-      <div style={{
-        minHeight: '82vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        background: '#1a1a2e', borderRadius: 24, padding: 30
-      }}>
-        <div style={{ fontSize: 28, color: '#fff', marginBottom: 40, fontWeight: 800, textAlign: 'center' }}>
-          Ciao {employee.first_name}, <br/><span style={{ color: '#9CA3AF', fontSize: 20, fontWeight: 600 }}>Cosa vuoi fare?</span>
-        </div>
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
+            {/* Inizia Pausa */}
             <button 
                 onClick={() => performClock(employee, 'out', true)}
                 disabled={loading}
-                style={{ background: '#FFFBEB', color: '#B45309', padding: '24px 40px', borderRadius: 20, fontSize: 18, fontWeight: 800, border: '4px solid #FCD34D', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', minWidth: 220, transition: 'transform 0.1s', opacity: loading ? 0.7 : 1 }}
+                style={{ background: '#FFFBEB', color: '#B45309', padding: '24px 20px', borderRadius: 20, fontSize: 16, fontWeight: 800, border: '4px solid #FCD34D', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', transition: 'transform 0.1s', opacity: loading ? 0.7 : 1 }}
                 onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-                <span style={{ fontSize: 48 }}>☕</span>
+                <span style={{ fontSize: 40 }}>☕</span>
                 Inizia Pausa / Bagno
             </button>
+
+            {/* Fine Pausa -> (Rientro / Entrata) */}
+            <button 
+                onClick={() => performClock(employee, 'in')}
+                disabled={loading}
+                style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '24px 20px', borderRadius: 20, fontSize: 16, fontWeight: 800, border: '4px solid #BFDBFE', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', transition: 'transform 0.1s', opacity: loading ? 0.7 : 1 }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            >
+                <span style={{ fontSize: 40 }}>🔙</span>
+                Fine Pausa (Rientro)
+            </button>
+
+            {/* Uscita */}
             <button 
                 onClick={() => performClock(employee, 'out', false)}
                 disabled={loading}
-                style={{ background: '#FEF2F2', color: '#B91C1C', padding: '24px 40px', borderRadius: 20, fontSize: 18, fontWeight: 800, border: '4px solid #FECACA', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', minWidth: 220, transition: 'transform 0.1s', opacity: loading ? 0.7 : 1 }}
+                style={{ background: '#FEF2F2', color: '#B91C1C', padding: '24px 20px', borderRadius: 20, fontSize: 16, fontWeight: 800, border: '4px solid #FECACA', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', transition: 'transform 0.1s', opacity: loading ? 0.7 : 1 }}
                 onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-                <span style={{ fontSize: 48 }}>🚪</span>
+                <span style={{ fontSize: 40 }}>🚪</span>
                 Fine Turno (Uscita)
             </button>
         </div>
-        <button onClick={() => setPhase('ask_history')} style={{ marginTop: 50, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+        
+        <button onClick={() => setPhase('ask_history')} style={{ marginTop: 40, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           🕒 Vedi Storico Ore
         </button>
         
