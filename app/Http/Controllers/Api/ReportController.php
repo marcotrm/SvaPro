@@ -223,15 +223,15 @@ class ReportController extends Controller
                 if ($matchingIds->isNotEmpty()) {
                     $cashTotal  = DB::table('payments')
                         ->whereIn('sales_order_id', $matchingIds)
-                        ->where('method', 'cash')
+                        ->whereIn('method', ['cash', 'contanti'])
                         ->sum('amount');
                     $cardTotal  = DB::table('payments')
                         ->whereIn('sales_order_id', $matchingIds)
-                        ->where('method', 'card')
+                        ->whereIn('method', ['card', 'carta', 'pos'])
                         ->sum('amount');
                     $otherTotal = DB::table('payments')
                         ->whereIn('sales_order_id', $matchingIds)
-                        ->whereNotIn('method', ['cash', 'card'])
+                        ->whereNotIn('method', ['cash', 'contanti', 'card', 'carta', 'pos'])
                         ->sum('amount');
                 }
             } catch (\Throwable $e) {

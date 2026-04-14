@@ -329,9 +329,9 @@ function EmployeeChatPanel({ user, selectedStoreId, priority, onClose }) {
     setOpVerifying(true); setOpError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('/api/employees/by-barcode', { params: { barcode: opCode.trim() }, headers: { Authorization: `Bearer ${token}` } });
-      const emp = res.data?.data;
-      if (emp) { setOpName(`${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || opCode); setOpVerified(true); }
+      const res = await axios.get('/api/employees', { params: { barcode: opCode.trim(), limit: 1 }, headers: { Authorization: `Bearer ${token}` } });
+      const empList = res.data?.data || [];
+      if (empList.length > 0) { const emp = empList[0]; setOpName(`${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || opCode); setOpVerified(true); }
       else setOpError('Codice non trovato.');
     } catch { setOpError('Codice non valido.'); }
     finally { setOpVerifying(false); }

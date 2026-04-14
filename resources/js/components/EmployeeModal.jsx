@@ -250,7 +250,7 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
             <DatePicker
               name="hire_date"
               value={formData.hire_date}
-              onChange={handleChange}
+              onChange={(date) => setFormData(prev => ({...prev, hire_date: date}))}
               placeholder="Seleziona data assunzione"
             />
             {fe('hire_date') && <p className="mt-1 text-xs text-red-500">{fe('hire_date')}</p>}

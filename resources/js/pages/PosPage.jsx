@@ -236,6 +236,25 @@ export default function PosPage() {
   const [fetchedCats, setFetchedCats]   = useState(new Set(['featured']));
   const [searchTerm, setSearchTerm]     = useState('');
   const [flavorTerm, setFlavorTerm]     = useState('');
+  
+  // Effetto Debounce per Ricerca Globale su tutto il magazzino
+  useEffect(() => {
+    if (!searchTerm || searchTerm.trim().length < 2) return;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await catalog.getProducts({ search: searchTerm.trim(), limit: 40 });
+        const newProds = res.data?.data || [];
+        if (newProds.length > 0) {
+          setProducts(prev => {
+            const map = new Map(prev.map(p => [String(p.id), p]));
+            newProds.forEach(np => map.set(String(np.id), np));
+            return Array.from(map.values());
+          });
+        }
+      } catch (err) {}
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
   const searchRef                       = useRef(null);
 
   const [cartLines, setCartLines]       = useState([]);

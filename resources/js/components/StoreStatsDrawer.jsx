@@ -12,6 +12,7 @@ const fmtN = (v) => new Intl.NumberFormat('it-IT').format(v || 0);
 
 const PERIODS = [
   { id: 'today',  label: 'Oggi' },
+  { id: 'yesterday', label: 'Ieri' },
   { id: 'week',   label: 'Settimana' },
   { id: 'month',  label: 'Mese' },
   { id: 'year',   label: 'Anno' },
@@ -21,8 +22,14 @@ function getPeriodDates(period) {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  
   switch (period) {
     case 'today': return { date_from: today, date_to: today };
+    case 'yesterday': {
+      const d = new Date(now); d.setDate(d.getDate() - 1);
+      const yStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      return { date_from: yStr, date_to: yStr };
+    }
     case 'week': {
       const d = new Date(now); d.setDate(d.getDate() - 6);
       return { date_from: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, date_to: today };

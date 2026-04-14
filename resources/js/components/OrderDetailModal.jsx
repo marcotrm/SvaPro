@@ -18,13 +18,21 @@ export default function OrderDetailModal({ orderId, orders, onClose, onNavigate 
 
   useEffect(() => {
     if (!orderId) return;
+    
+    const cached = ordersList.find(o => o.id === orderId || o.order_id === orderId);
+    if (cached && cached.lines && cached.lines.length > 0) {
+      setData(cached);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setData(null);
     ordersApi.getOrder(orderId)
       .then(res => setData(res.data?.data || null))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [orderId]);
+  }, [orderId, ordersList]);
 
   // Navigazione con frecce tastiera
   useEffect(() => {
