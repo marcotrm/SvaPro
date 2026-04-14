@@ -81,6 +81,7 @@ class CatalogController extends Controller
             $query->where(function ($q) use ($term, $tenantId) {
                 $q->where(DB::raw('LOWER(name)'), 'like', "%{$term}%")
                   ->orWhere(DB::raw('LOWER(sku)'), 'like', "%{$term}%")
+                  ->orWhere(DB::raw('LOWER(barcode)'), 'like', "%{$term}%")
                   ->orWhereExists(function ($subq) use ($term, $tenantId) {
                       $subq->select(DB::raw(1))
                            ->from('product_variants')
@@ -88,7 +89,8 @@ class CatalogController extends Controller
                            ->where('product_variants.tenant_id', $tenantId)
                            ->where(function ($vq) use ($term) {
                                $vq->where(DB::raw('LOWER(barcode)'), 'like', "%{$term}%")
-                                  ->orWhere(DB::raw('LOWER(flavor)'), 'like', "%{$term}%");
+                                  ->orWhere(DB::raw('LOWER(flavor)'), 'like', "%{$term}%")
+                                  ->orWhere(DB::raw('LOWER(sku)'), 'like', "%{$term}%");
                            });
                   });
             });
