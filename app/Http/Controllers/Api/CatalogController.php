@@ -106,11 +106,16 @@ class CatalogController extends Controller
             ->where('product_variants.tenant_id', $tenantId)
             ->whereIn('product_id', $productIds ?: [0])
             ->when($storeId !== null, function ($query) use ($tenantId, $storeId) {
-                $query->join('store_product_variants as spv', function ($join) use ($tenantId, $storeId) {
+                // LEFT JOIN: prodotti senza record spv rimangono visibili (compatibilità backward)
+                $query->leftJoin('store_product_variants as spv', function ($join) use ($tenantId, $storeId) {
                     $join->on('spv.product_variant_id', '=', 'product_variants.id')
                         ->where('spv.tenant_id', '=', $tenantId)
-                        ->where('spv.store_id', '=', $storeId)
-                        ->where('spv.is_enabled', '=', true);
+                        ->where('spv.store_id', '=', $storeId);
+                })
+                // Mostra varianti senza record spv (NULL) OPPURE con is_enabled=true
+                ->where(function ($q) {
+                    $q->whereNull('spv.id')
+                      ->orWhere('spv.is_enabled', true);
                 });
             })
             ->select('product_variants.*')
@@ -156,6 +161,7 @@ class CatalogController extends Controller
                 ->unique()
                 ->count();
             return $product;
+        // Includi sempre i prodotti con varianti in DB (indipendentemente da spv)
         })->filter(fn ($product) => $product->variants->count() > 0)->values();
 
         return response()->json(['data' => $data]);
