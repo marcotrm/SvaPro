@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { X, Loader, Plus, Trash2, Barcode, MapPin, Package, Tag, DollarSign, Settings2, AlertTriangle, Upload, ImageIcon } from 'lucide-react';
 import { catalog, getImageUrl } from '../api.jsx';
 
@@ -66,9 +66,8 @@ function ProductImageUpload({ currentImageUrl, onFileChange }) {
           }}>
           <ImageIcon size={28} style={{ color: 'var(--color-text-tertiary)' }} />
           <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: 0 }}>Trascina una foto o <span style={{ color: 'var(--color-accent)', fontWeight: 600 }}>clicca per caricare</span></p>
-          <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
-                    </div>
-                    )}
+          <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: 0 }}>JPG, PNG, WebP. Max 2MB.</p>
+        </div>
       )}
     </div>
   );
@@ -421,7 +420,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               <div>
                 <label className="sp-label">Fornitore Predefinito</label>
                 <select className="sp-select" name="default_supplier_id" value={formData.default_supplier_id} onChange={handleChange}>
-                  <option value="">â€” Seleziona Fornitore â€”</option>
+                  <option value="">— Seleziona Fornitore —</option>
                   {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
@@ -436,41 +435,40 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               })()) && (
                 <div style={{ gridColumn: '1/-1', background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.06))', border: '1.5px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '16px 18px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 20 }}>ðŸ›¡ï¸</span>
+                    <span style={{ fontSize: 20 }}>🛡️</span>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text)' }}>QScare â€” Garanzia Hardware</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text)' }}>QScare — Garanzia Hardware</div>
                       <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Prezzo assicurazione per questo hardware (solo prodotti di tipo dispositivo)</div>
-                      </div>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--color-accent)', marginLeft: 'auto' }}>
-                        <input type="checkbox"
-                            checked={formData.qscare_price !== '' && formData.qscare_price !== null}
-                            onChange={(e) => {
-                                setFormData(p => ({ ...p, qscare_price: e.target.checked ? '9.90' : '' }));
-                            }}
-                        />
-                        Abilita QScare
-                      </label>
                     </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--color-accent)', marginLeft: 'auto' }}>
+                      <input type="checkbox"
+                        checked={formData.qscare_price !== '' && formData.qscare_price !== null}
+                        onChange={(e) => {
+                          setFormData(p => ({ ...p, qscare_price: e.target.checked ? '9.90' : '' }));
+                        }}
+                      />
+                      Abilita QScare
+                    </label>
                   </div>
                   {formData.qscare_price !== '' && formData.qscare_price !== null && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(99,102,241,0.1)' }}>
-                    <div style={{ position: 'relative', maxWidth: 200 }}>
-                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--color-text-secondary)', fontSize: 14 }}>â‚¬</span>
-                      <input
-                        className="sp-input"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        name="qscare_price"
-                        value={formData.qscare_price}
-                        onChange={handleChange}
-                        placeholder="Es: 9.90"
-                        style={{ paddingLeft: 28, fontWeight: 700 }}
-                      />
+                      <div style={{ position: 'relative', maxWidth: 200 }}>
+                        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--color-text-secondary)', fontSize: 14 }}>€</span>
+                        <input
+                          className="sp-input"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          name="qscare_price"
+                          value={formData.qscare_price}
+                          onChange={handleChange}
+                          placeholder="Es: 9.90"
+                          style={{ paddingLeft: 28, fontWeight: 700 }}
+                        />
+                      </div>
+                      <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: 0 }}>Imposta il prezzo della garanzia. Il toggle apparirà nel POS durante la vendita.</p>
                     </div>
-                    <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
-                    </div>
-                    )}
+                  )}
                 </div>
               )}
               <div style={{ gridColumn: '1/-1' }}>
@@ -672,9 +670,8 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                           placeholder="Es: CLI-IT-00123"
                           style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}
                         />
-                        <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
-                    </div>
-                    )}
+                        <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: 0 }}>Codice identificativo per la liquidazione accise doganali.</p>
+                        </div>
                       <div style={{ gridColumn: '1/-1' }}>
                         <label className="sp-label">Prevalenza Tabaccosa</label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
@@ -712,15 +709,13 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               <div>
                 <label className="sp-label">Stock Minimo (Soglia Alert)</label>
                 <input className="sp-input" type="number" min="0" name="min_stock_qty" value={formData.min_stock_qty} onChange={handleChange} />
-                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
-                    </div>
-                    )}
+                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '4px 0 0' }}>Quantità minima sotto cui scatta l'allerta riassortimento.</p>
+              </div>
               <div>
                 <label className="sp-label">Giorni Riordino</label>
                 <input className="sp-input" type="number" min="1" name="reorder_days" value={formData.reorder_days} onChange={handleChange} />
-                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
-                    </div>
-                    )}
+                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '4px 0 0' }}>Giorni stimati per ricevere un nuovo riordino dal fornitore.</p>
+              </div>
               <div>
                 <label className="sp-label" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                   <input
@@ -732,9 +727,8 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                   />
                   Riordino Automatico Abilitato
                 </label>
-                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)'</p>
-                    </div>
-                    )}
+                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '4px 0 0' }}>Se abilitato, genera automaticamente un ordine di riassortimento al raggiungimento dello stock minimo.</p>
+              </div>
             </div>
           )}
         </form>
