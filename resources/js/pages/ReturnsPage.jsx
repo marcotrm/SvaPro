@@ -1,9 +1,152 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { returns, orders as ordersApi } from '../api.jsx';
-import { Search, Plus, AlertTriangle, Package, ArrowLeftRight, ChevronRight } from 'lucide-react';
+import { Search, Plus, AlertTriangle, Package, ArrowLeftRight, ChevronRight, X, RefreshCcw, User, ArrowRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import OrderDetailModal from '../components/OrderDetailModal.jsx';
+
+/* ─── Return Detail Modal ─────────────────────────────────────── */
+function ReturnDetailModal({ returnObj, onClose }) {
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDetail = async () => {
+      try {
+        setLoading(true);
+        // Fetch specific return details
+        const res = await returns.getAll({ return_id: returnObj.id, limit: 1 });
+        const found = res.data?.data?.find(r => r.id === returnObj.id);
+        setDetail(found || returnObj);
+      } catch {
+        setDetail(returnObj);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDetail();
+  }, [returnObj.id]);
+
+  const r = detail || returnObj;
+  const fmtDate = v => v ? new Date(v).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–';
+  const fmtCurrency = v => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+
+  const STATUS_LABELS_LOCAL = {
+    pending: 'In attesa', requested: 'Richiesto', approved: 'Approvato',
+    received: 'Ricevuto', refunded: 'Rimborsato', denied: 'Rifiutato',
+    rejected: 'Rifiutato', exchanged: 'Scambiato', on_hold: '⏸ In Attesa',
+    repaired: '🔧 Riparato', scrapped: '🗑 Smaltimento', sent_to_supplier: '📦 Al Produttore',
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 4000,
+      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: '#fff', borderRadius: 20, width: '100%', maxWidth: 640,
+        maxHeight: '88vh', overflow: 'auto',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.22)',
+        border: '1px solid #e2e8f0',
+      }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '18px 24px', borderBottom: '1px solid #f1f5f9',
+          background: 'linear-gradient(135deg, #0f172a, #1e293b)', borderRadius: '20px 20px 0 0',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ArrowLeftRight size={20} color="#f87171" />
+            </div>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#fff' }}>Dettaglio Reso #{r.id}</div>
+              <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>
+                Ordine #{r.order_id || r.sales_order_id || '–'} • {fmtDate(r.created_at)}
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 10, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ padding: 24 }}>
+          {/* Info Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+            {[
+              { label: 'Cliente', value: r.customer_name || 'Non registrato' },
+              { label: 'Dipendente', value: r.employee_name || '—' },
+              { label: 'Negozio', value: r.store_name || '—' },
+              { label: 'Stato', value: STATUS_LABELS_LOCAL[r.status] || r.status },
+              { label: 'Motivo', value: r.reason || '—' },
+              { label: 'Valore Rimborso', value: fmtCurrency(r.refund_amount || r.total_value) },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ background: '#f8fafc', borderRadius: 12, padding: '12px 16px' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Note */}
+          {r.notes && (
+            <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 12, padding: '12px 16px', marginBottom: 20 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', marginBottom: 4 }}>Note</div>
+              <div style={{ fontSize: 13, color: '#78350f' }}>{r.notes}</div>
+            </div>
+          )}
+
+          {/* Lines / Articoli */}
+          {r.lines && r.lines.length > 0 ? (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
+                Articoli Resi ({r.lines.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {r.lines.map((line, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 16px', background: '#f8fafc', borderRadius: 12,
+                    border: '1px solid #e2e8f0',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Package size={16} color="#6366f1" />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{line.product_name || line.name || `Prodotto #${line.product_variant_id}`}</div>
+                        {line.flavor && <div style={{ fontSize: 11, color: '#94a3b8' }}>{line.flavor}</div>}
+                        {line.condition && <span style={{ fontSize: 10, background: line.condition === 'good' ? '#dcfce7' : '#fee2e2', color: line.condition === 'good' ? '#16a34a' : '#dc2626', borderRadius: 6, padding: '1px 6px', fontWeight: 700 }}>{line.condition === 'good' ? 'Buono' : line.condition === 'damaged' ? 'Danneggiato' : 'Difettoso'}</span>}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>×{line.qty || line.quantity}</div>
+                      {line.unit_price && <div style={{ fontSize: 11, color: '#94a3b8' }}>{fmtCurrency(line.unit_price)}/pz</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '24px 16px', background: '#f8fafc', borderRadius: 12, color: '#94a3b8' }}>
+              <Package size={28} style={{ marginBottom: 8, opacity: 0.4 }} />
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Dettaglio articoli non disponibile</div>
+              <div style={{ fontSize: 11, marginTop: 4 }}>Vedi l'ordine #{ r.order_id || r.sales_order_id} per i prodotti</div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button onClick={onClose} style={{ padding: '10px 24px', borderRadius: 12, border: '2px solid #e2e8f0', background: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>Chiudi</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 const STATUS_LABELS = {
   pending:            'In attesa',
@@ -44,6 +187,8 @@ export default function ReturnsPage() {
   const [tab, setTab] = useState('list'); // 'list' | 'new'
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [isOrderDetailOpen, setIsOrderDetailOpen] = useState(false);
+  const [selectedReturn, setSelectedReturn] = useState(null); // for ReturnDetailModal
+
 
   // --- New Return Form ---
   const [lookupId, setLookupId] = useState('');
@@ -162,12 +307,19 @@ export default function ReturnsPage() {
 
   return (
     <div className="sp-animate-in">
+      {selectedReturn && (
+        <ReturnDetailModal
+          returnObj={selectedReturn}
+          onClose={() => setSelectedReturn(null)}
+        />
+      )}
       {isOrderDetailOpen && selectedOrderId && (
         <OrderDetailModal
           onClose={() => setIsOrderDetailOpen(false)}
           orderId={selectedOrderId}
         />
       )}
+
       {/* Header */}
       <div className="sp-page-header">
         <div>
@@ -412,16 +564,9 @@ export default function ReturnsPage() {
                   <tr 
                     key={r.id} 
                     style={{ cursor: 'pointer' }} 
-                    onClick={() => {
-                      const oid = r.order_id || r.sales_order_id;
-                      if (oid) {
-                        setSelectedOrderId(oid);
-                        setIsOrderDetailOpen(true);
-                      } else {
-                        toast.error('Nessun ordine collegato a questo reso');
-                      }
-                    }}
+                    onClick={() => setSelectedReturn(r)}
                   >
+
                     <td className="sp-cell-secondary" style={{ fontSize: 12 }}>{r.store_name || '—'}</td>
                     <td className="sp-font-mono">
                       <span style={{ color: 'var(--color-accent)', fontWeight: 600 }}>

@@ -232,8 +232,9 @@ export default function PosPage() {
   const [loading, setLoading]           = useState(true);
   const [products, setProducts]         = useState([]);
   const [categories, setCategories]     = useState([]);
-  const [activeCategory, setActiveCategory] = useState('featured');
-  const [fetchedCats, setFetchedCats]   = useState(new Set(['featured']));
+  const [activeCategory, setActiveCategory] = useState('top_selling');
+  const [fetchedCats, setFetchedCats]   = useState(new Set(['top_selling', 'featured']));
+
   const [searchTerm, setSearchTerm]     = useState('');
   const [flavorTerm, setFlavorTerm]     = useState('');
   
@@ -287,13 +288,20 @@ export default function PosPage() {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
 
-      // Carica prodotti — solo preferiti per limitare i dati massivi
-      // (lo stock del negozio viene caricato separatamente)
-      const [pRes, cRes] = await Promise.all([
-        catalog.getProducts({ limit: 150, is_featured: 1 }),
+      // Carica prodotti — top 20 più venduti + prodotti in evidenza
+      // Questi sono i prodotti presenti nella home del POS
+      const [topRes, featRes, cRes] = await Promise.all([
+        catalog.getProducts({ sort: 'top_selling', limit: 20, ...(selectedStoreId ? { store_id: selectedStoreId } : {}) }),
+        catalog.getProducts({ limit: 30, is_featured: 1, ...(selectedStoreId ? { store_id: selectedStoreId } : {}) }),
         catalog.getCategories(),
       ]);
-      setProducts(pRes.data?.data || []);
+      // Merge top-selling + featured, senza duplicati
+      const topProds = topRes.data?.data || [];
+      const featProds = featRes.data?.data || [];
+      const merged = new Map();
+      [...topProds, ...featProds].forEach(p => merged.set(p.id, p));
+      setProducts(Array.from(merged.values()));
+
       const allCats = cRes.data?.data || [];
       setCategories(allCats.filter(c => !c.parent_id));
 
@@ -331,9 +339,13 @@ export default function PosPage() {
 
   // Caricamento dinamico categorie
   useEffect(() => {
-    if (activeCategory && activeCategory !== 'featured' && !fetchedCats.has(activeCategory)) {
+    if (activeCategory && activeCategory !== 'top_selling' && activeCategory !== 'featured' && !fetchedCats.has(activeCategory)) {
       setFetchedCats(prev => new Set(prev).add(activeCategory));
-      catalog.getProducts({ category_id: activeCategory, limit: 1000 }).then(res => {
+      catalog.getProducts({
+        category_id: activeCategory,
+        limit: 80,  // Limitato a 80 per performance (era 1000)
+        ...(selectedStoreId ? { store_id: selectedStoreId } : {}),
+      }).then(res => {
          const newProds = res.data?.data || [];
          setProducts(prev => {
             const map = new Map(prev.map(p => [p.id, p]));
@@ -342,7 +354,8 @@ export default function PosPage() {
          });
       });
     }
-  }, [activeCategory, fetchedCats]);
+  }, [activeCategory, fetchedCats, selectedStoreId]);
+
 
   // Auto-precompila operatore se l'utente loggato è un dipendente
   useEffect(() => {
@@ -575,11 +588,16 @@ export default function PosPage() {
     const f = flavorTerm.toLowerCase().trim();
     const hasSearch = s.length > 0 || f.length > 0;
 
-    // Applica filtro categoria SOLO se non c'è una ricerca di testo in corso (così il barcode o la ricerca globale ignorano la tab "Preferiti")
+    // Applica filtro categoria SOLO se non c'è una ricerca di testo in corso
     if (!hasSearch) {
+      if (activeCategory === 'top_selling') {
+        // Mostra i 20 più venduti (già in products grazie al fetch iniziale)
+        // Nessun filtro ulteriore — la lista è già ordinata per vendite
+      }
       if (activeCategory === 'featured' && !p.is_featured) return false;
       if (typeof activeCategory === 'number' && p.category_id !== activeCategory) return false;
     }
+
 
     const matchS = !s || p.name?.toLowerCase().includes(s) 
       || p.sku?.toLowerCase().includes(s) 
@@ -757,7 +775,22 @@ export default function PosPage() {
         {/* Category pills */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', marginBottom: 14, paddingBottom: 4 }}>
 
+          {/* Toggle Top Selling */}
+          <button
+            onClick={() => setActiveCategory('top_selling')}
+            style={{
+              padding: '7px 18px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+              background: activeCategory === 'top_selling' ? 'linear-gradient(135deg,#7B6FD0,#4F46E5)' : '#fff',
+              color: activeCategory === 'top_selling' ? '#fff' : '#6b7280',
+              boxShadow: activeCategory === 'top_selling' ? '0 4px 12px rgba(123,111,208,0.4)' : '0 1px 3px rgba(0,0,0,0.07)',
+              transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5,
+            }}
+          >
+            🏆 Top 20
+          </button>
+
           {/* Toggle In Evidenza (Preferiti) */}
+
           <button
             onClick={() => setActiveCategory('featured')}
             style={{

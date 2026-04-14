@@ -23,8 +23,10 @@ const POP_W = 296; // larghezza popup
 
 function parseYMD(str) {
   if (!str) return null;
-  const [y, m, d] = str.split('-').map(Number);
-  if (!y || !m || !d) return null;
+  // Handle ISO datetime strings like "1990-03-15T00:00:00.000000Z"
+  const datePart = typeof str === 'string' && str.includes('T') ? str.split('T')[0] : String(str);
+  const [y, m, d] = datePart.split('-').map(Number);
+  if (!y || !m || !d || isNaN(y) || isNaN(m) || isNaN(d)) return null;
   return new Date(y, m - 1, d);
 }
 function toYMD(date) {

@@ -96,8 +96,35 @@ class CatalogController extends Controller
             });
         }
 
-        $products = $query->orderByDesc('id')
+        // Ordinamento top-selling: ordina per numero di vendite negli ultimi 90 giorni
+        $sort = $request->input('sort', 'newest');
+        if ($sort === 'top_selling') {
+            $cutoff = now()->subDays(90)->toDateTimeString();
+            $query->leftJoin(
+                DB::raw("(
+                    SELECT pv.product_id, COALESCE(SUM(sol.qty), 0) AS sales_count
+                    FROM product_variants pv
+                    LEFT JOIN sales_order_lines sol ON sol.product_variant_id = pv.id
+                    LEFT JOIN sales_orders so ON so.id = sol.sales_order_id
+                        AND so.tenant_id = {$tenantId}
+                        AND so.status = 'paid'
+                        AND so.created_at >= '{$cutoff}'
+                    WHERE pv.tenant_id = {$tenantId}
+                    GROUP BY pv.product_id
+                ) AS top_stats"),
+                'top_stats.product_id',
+                '=',
+                'products.id'
+            )
+            ->orderByDesc('top_stats.sales_count')
+            ->orderByDesc('products.id');
+        } else {
+            $query->orderByDesc('id');
+        }
+
+        $products = $query
             ->limit((int) $request->input('limit', 500))
+
             ->get();
 
         $productIds = $products->pluck('id')->all();
@@ -313,11 +340,13 @@ class CatalogController extends Controller
         ]);
     }
 
+
     private function rules(?int $productId = null): array
     {
         return [
             'sku' => ['required', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
+
             'product_type' => ['nullable', 'string', 'max:50'],
             'pli_code' => ['nullable', 'string', 'max:50'],
             'barcode' => ['nullable', 'string', 'max:100'],
