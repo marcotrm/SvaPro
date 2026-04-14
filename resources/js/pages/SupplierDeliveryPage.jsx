@@ -381,13 +381,13 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
               <div>
                 {i === 0 && <label className="field-label">Qtà Ricevuta *</label>}
                 <input className="field-input" type="number" min="1" value={line.qty}
-                  onChange={e => updateLine(i, 'qty', parseInt(e.target.value) || 0)}
+                  onChange={e => updateLine(i, 'qty', e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                   style={{ fontWeight: 800, color: '#065f46' }} />
               </div>
               <div>
                 {i === 0 && <label className="field-label">Costo Unitario €</label>}
                 <input className="field-input" type="number" step="0.01" value={line.unit_cost}
-                  onChange={e => updateLine(i, 'unit_cost', parseFloat(e.target.value) || 0)} />
+                  onChange={e => updateLine(i, 'unit_cost', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
               </div>
               <div style={{ paddingTop: i === 0 ? 22 : 0 }}>
                 {lines.length > 1 && (

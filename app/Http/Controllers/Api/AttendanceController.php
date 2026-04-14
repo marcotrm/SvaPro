@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers\Api;
 
@@ -79,7 +79,7 @@ class AttendanceController extends Controller
 
     /**
      * GET /attendance/live
-     * Chi è attualmente presente (check-in senza check-out oggi).
+     * Chi Ã¨ attualmente presente (check-in senza check-out oggi).
      */
     public function live(Request $request): JsonResponse
     {
@@ -129,7 +129,7 @@ class AttendanceController extends Controller
 
         $storeId = (int) $request->integer('store_id');
 
-        // Controlla se già registrato oggi senza check-out
+        // Controlla se giÃ  registrato oggi senza check-out
         $existing = DB::table('employee_attendances')
             ->where('tenant_id', $tenantId)
             ->where('employee_id', $employee->id)
@@ -139,7 +139,7 @@ class AttendanceController extends Controller
 
         if ($existing) {
             return response()->json([
-                'message'       => 'Già registrato in entrata.',
+                'message'       => 'GiÃ  registrato in entrata.',
                 'attendance_id' => $existing->id,
                 'employee_name' => trim("{$employee->first_name} {$employee->last_name}"),
                 'checked_in_at' => $existing->checked_in_at,
@@ -171,7 +171,7 @@ class AttendanceController extends Controller
         $employeeName = trim("{$employee->first_name} {$employee->last_name}");
         $storeName    = DB::table('stores')->where('id', $storeId)->value('name') ?? "Negozio #{$storeId}";
 
-        // Notifica WhatsApp immediata se in ritardo di più di 10 minuti
+        // Notifica WhatsApp immediata se in ritardo di piÃ¹ di 10 minuti
         if ($lateMinutes && $lateMinutes > 10) {
             $this->notifyLate($tenantId, $employeeName, $storeName, (int) $lateMinutes);
             DB::table('employee_attendances')->where('id', $id)->update(['late_notified' => true]);
@@ -267,7 +267,7 @@ class AttendanceController extends Controller
             ->orderBy('first_name')
             ->get();
 
-        // Timbrature di oggi (ordina per checked_in_at così keyBy terrà l'ultimo record della giornata)
+        // Timbrature di oggi (ordina per checked_in_at cosÃ¬ keyBy terrÃ  l'ultimo record della giornata)
         $today = DB::table('employee_attendances')
             ->where('tenant_id', $tenantId)
             ->when($storeId, fn($q) => $q->where('store_id', $storeId))
@@ -298,7 +298,7 @@ class AttendanceController extends Controller
         return response()->json(['data' => $result, 'server_time' => now()->toIso8601String()]);
     }
 
-    // ─── Helper ──────────────────────────────────────────────────
+    // â”€â”€â”€ Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private function resolveEmployee(int $tenantId, Request $request): ?\stdClass
     {
@@ -329,17 +329,21 @@ class AttendanceController extends Controller
             ->whereNotNull('phone')
             ->pluck('phone');
 
-        $body = "⏰ *Ritardo dipendente*\n"
-              . "📍 Negozio: *{$storeName}*\n"
-              . "👤 {$employeeName} è arrivato con *{$lateMinutes} minuti* di ritardo.\n"
-              . "🕐 Ora: " . now()->format('H:i');
+        $body = "â° *Ritardo dipendente*\n"
+              . "ðŸ“ Negozio: *{$storeName}*\n"
+              . "ðŸ‘¤ {$employeeName} Ã¨ arrivato con *{$lateMinutes} minuti* di ritardo.\n"
+              . "ðŸ• Ora: " . now()->format('H:i');
 
         foreach ($admins as $phone) {
-            $this->whatsapp->send($phone, $body);
+            try {
+                $this->whatsapp->send($phone, $body);
+            } catch (\Exception $e) {
+                // Ignore notification errors to avoid failing the clock-in
+            }
         }
     }
     /**
-     * GET /attendance/history — cronologia completa con range date (solo admin)
+     * GET /attendance/history â€” cronologia completa con range date (solo admin)
      * Params: date_from, date_to, employee_id, store_id
      */
     public function history(Request $request): JsonResponse
