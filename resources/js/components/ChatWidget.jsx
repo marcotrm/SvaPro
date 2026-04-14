@@ -328,13 +328,20 @@ function EmployeeChatPanel({ user, selectedStoreId, priority, onClose }) {
     if (!opCode.trim()) { setOpError('Inserisci il codice operatore'); return; }
     setOpVerifying(true); setOpError('');
     try {
-      const token = localStorage.getItem('authToken');
-      const tenantCode = localStorage.getItem('tenantCode') || 'DEMO';
-      const res = await axios.get('/api/employees', { params: { barcode: opCode.trim(), limit: 1 }, headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Code': tenantCode } });
+      // Usa l'istanza api già configurata (authToken + X-Tenant-Code corretti)
+      const { default: api } = await import('../api.jsx');
+      const res = await api.get('/employees', { params: { barcode: opCode.trim(), limit: 1 } });
       const empList = res.data?.data || [];
-      if (empList.length > 0) { const emp = empList[0]; setOpName(`${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || opCode); setOpVerified(true); }
-      else setOpError('Codice non trovato.');
-    } catch { setOpError('Codice non valido.'); }
+      if (empList.length > 0) {
+        const emp = empList[0];
+        setOpName(`${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || opCode);
+        setOpVerified(true);
+      } else {
+        setOpError('Codice non trovato. Verifica il badge del dipendente.');
+      }
+    } catch (err) {
+      setOpError('Errore di connessione. Riprova.');
+    }
     finally { setOpVerifying(false); }
   };
 
