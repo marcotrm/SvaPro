@@ -607,7 +607,7 @@ function AdjustStockModal({ discrepancy: d, onClose, onSaved }) {
 
         <div style={{ marginBottom: 16 }}>
           <label className="field-label">Quantità Corretta *</label>
-          <input className="field-input" type="number" min={0} value={qty} onChange={e => setQty(e.target.value)} />
+          <input className="field-input" type="number" min={0} value={qty === 0 ? '' : qty} onChange={e => setQty(e.target.value === '' ? 0 : e.target.value)} />
         </div>
         <div style={{ marginBottom: 20 }}>
           <label className="field-label">Note (opzionale)</label>
@@ -721,7 +721,7 @@ function CreateNoteModal({ storesList, onClose, onCreated }) {
               <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#f9fafb', borderRadius: 8, marginBottom: 6 }}>
                 <div style={{ flex: 1, fontSize: 13 }}>{item.product_name}</div>
                 <input type="number" min={1} value={item.expected_qty}
-                  onChange={e => { const n = [...form.items]; n[idx].expected_qty = parseInt(e.target.value) || 1; setForm({ ...form, items: n }); }}
+                  onChange={e => { const n = [...form.items]; n[idx].expected_qty = e.target.value === '' ? '' : parseInt(e.target.value); setForm({ ...form, items: n }); }}
                   style={{ width: 60, padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 6, textAlign: 'center' }} />
                 <button onClick={() => setForm({ ...form, items: form.items.filter((_, i) => i !== idx) })}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}><X size={14} /></button>

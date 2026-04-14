@@ -328,8 +328,9 @@ function EmployeeChatPanel({ user, selectedStoreId, priority, onClose }) {
     if (!opCode.trim()) { setOpError('Inserisci il codice operatore'); return; }
     setOpVerifying(true); setOpError('');
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get('/api/employees', { params: { barcode: opCode.trim(), limit: 1 }, headers: { Authorization: `Bearer ${token}` } });
+      const token = localStorage.getItem('authToken');
+      const tenantCode = localStorage.getItem('tenantCode') || 'DEMO';
+      const res = await axios.get('/api/employees', { params: { barcode: opCode.trim(), limit: 1 }, headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Code': tenantCode } });
       const empList = res.data?.data || [];
       if (empList.length > 0) { const emp = empList[0]; setOpName(`${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || opCode); setOpVerified(true); }
       else setOpError('Codice non trovato.');

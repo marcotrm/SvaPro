@@ -46,11 +46,12 @@ class ReportController extends Controller
         $dateFrom  = $request->input('date_from');
         $dateTo    = $request->input('date_to');
 
-        // SQLite-compatible date grouping
+        // Compatibile con SQLite e MariaDB/MySQL
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
         $dateExpr = match ($period) {
-            'weekly'  => DB::raw("strftime('%Y-%W', created_at) as period"),
-            'monthly' => DB::raw("strftime('%Y-%m', created_at) as period"),
-            default   => DB::raw("strftime('%Y-%m-%d', created_at) as period"),
+            'weekly'  => DB::raw($isSqlite ? "strftime('%Y-%W', created_at) as period" : "DATE_FORMAT(created_at, '%Y-%v') as period"),
+            'monthly' => DB::raw($isSqlite ? "strftime('%Y-%m', created_at) as period" : "DATE_FORMAT(created_at, '%Y-%m') as period"),
+            default   => DB::raw($isSqlite ? "strftime('%Y-%m-%d', created_at) as period" : "DATE(created_at) as period"),
         };
 
         $query = DB::table('sales_orders')
@@ -67,8 +68,8 @@ class ReportController extends Controller
             ->orderBy(DB::raw('1'));
 
         if ($dateFrom && $dateTo) {
-            $query->whereRaw("strftime('%Y-%m-%d', created_at) >= ?", [$dateFrom])
-                  ->whereRaw("strftime('%Y-%m-%d', created_at) <= ?", [$dateTo]);
+            $query->whereDate('created_at', '>=', $dateFrom)
+                  ->whereDate('created_at', '<=', $dateTo);
         } else {
             $query->where('created_at', '>=', now()->subDays($days));
         }
@@ -125,10 +126,11 @@ class ReportController extends Controller
         $period   = $request->input('period', 'monthly');
         $days     = min((int) ($request->input('days', 180) ?: 180), 365);
 
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
         $dateExpr = match ($period) {
-            'weekly'  => DB::raw("strftime('%Y-%W', created_at) as period"),
-            'monthly' => DB::raw("strftime('%Y-%m', created_at) as period"),
-            default   => DB::raw("strftime('%Y-%m-%d', created_at) as period"),
+            'weekly'  => DB::raw($isSqlite ? "strftime('%Y-%W', created_at) as period" : "DATE_FORMAT(created_at, '%Y-%v') as period"),
+            'monthly' => DB::raw($isSqlite ? "strftime('%Y-%m', created_at) as period" : "DATE_FORMAT(created_at, '%Y-%m') as period"),
+            default   => DB::raw($isSqlite ? "strftime('%Y-%m-%d', created_at) as period" : "DATE(created_at) as period"),
         };
 
         $rows = DB::table('customers')
@@ -160,8 +162,8 @@ class ReportController extends Controller
 
             // SQLite-compatible date filtering
             if ($dateFrom && $dateTo) {
-                $orderBase->whereRaw("strftime('%Y-%m-%d', created_at) >= ?", [$dateFrom])
-                          ->whereRaw("strftime('%Y-%m-%d', created_at) <= ?", [$dateTo]);
+                $orderBase->whereDate('created_at', '>=', $dateFrom)
+                          ->whereDate('created_at', '<=', $dateTo);
             } else {
                 $orderBase->where('created_at', '>=', now()->subDays($days));
             }
@@ -248,8 +250,8 @@ class ReportController extends Controller
                     ->when($storeId, fn($q) => $q->where('so.store_id', $storeId));
 
                 if ($dateFrom && $dateTo) {
-                    $itemsSoldQuery->whereRaw("strftime('%Y-%m-%d', so.created_at) >= ?", [$dateFrom])
-                                   ->whereRaw("strftime('%Y-%m-%d', so.created_at) <= ?", [$dateTo]);
+                    $itemsSoldQuery->whereDate('so.created_at', '>=', $dateFrom)
+                                   ->whereDate('so.created_at', '<=', $dateTo);
                 } else {
                     $itemsSoldQuery->where('so.created_at', '>=', now()->subDays($days));
                 }
@@ -324,10 +326,10 @@ class ReportController extends Controller
             $query->where('sales_orders.sold_by_employee_id', $employeeId);
         }
         if ($dateFrom) {
-            $query->whereRaw("strftime('%Y-%m-%d', sales_orders.created_at) >= ?", [$dateFrom]);
+            $query->whereDate('sales_orders.created_at', '>=', $dateFrom);
         }
         if ($dateTo) {
-            $query->whereRaw("strftime('%Y-%m-%d', sales_orders.created_at) <= ?", [$dateTo]);
+            $query->whereDate('sales_orders.created_at', '<=', $dateTo);
         }
         
         $lines = $query->orderByDesc('sales_orders.created_at')->get();
@@ -344,3 +346,4 @@ class ReportController extends Controller
         ]);
     }
 }
+

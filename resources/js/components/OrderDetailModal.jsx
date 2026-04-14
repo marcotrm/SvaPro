@@ -20,17 +20,21 @@ export default function OrderDetailModal({ orderId, orders, onClose, onNavigate 
     if (!orderId) return;
     
     const cached = ordersList.find(o => o.id === orderId || o.order_id === orderId);
+    
+    // Mostra subito quello che abbiamo in cache (Totale, Sconti, Metodi)
+    if (cached) setData(cached);
+    else setData(null);
+
+    // Se ci sono le lines, abbiamo tutto e ci fermiamo.
     if (cached && cached.lines && cached.lines.length > 0) {
-      setData(cached);
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    setData(null);
     ordersApi.getOrder(orderId)
-      .then(res => setData(res.data?.data || null))
-      .catch(() => setData(null))
+      .then(res => setData(prev => ({ ...(prev || {}), ...(res.data?.data || {}) })))
+      .catch(() => setData(prev => prev || null))
       .finally(() => setLoading(false));
   }, [orderId, ordersList]);
 
@@ -142,7 +146,7 @@ export default function OrderDetailModal({ orderId, orders, onClose, onNavigate 
 
         {/* Body */}
         <div style={{ overflowY: 'auto', flex: 1, padding: 20 }}>
-          {loading ? (
+          {(loading && !data) ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 220, flexDirection: 'column', gap: 12 }}>
               <Loader2 size={32} color="#7B6FD0" style={{ animation: 'spin 1s linear infinite' }} />
               <div style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>Caricamento scontrino...</div>
@@ -195,6 +199,7 @@ export default function OrderDetailModal({ orderId, orders, onClose, onNavigate 
                   <div style={{ fontSize: 12, fontWeight: 800, color: '#1a1a2e', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Receipt size={13} color="#7B6FD0" />
                     Articoli venduti ({lines.length})
+                    {loading && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', marginLeft: 8 }} />}
                   </div>
                   {lines.length === 0 ? (
                     <div style={{ fontSize: 12, color: '#9ca3af' }}>Nessun articolo</div>
