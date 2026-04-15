@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { attendance, stores } from '../api.jsx';
+import { attendance, stores, shifts as shiftsApi } from '../api.jsx';
 import DatePicker from '../components/DatePicker.jsx';
 
 /* â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -14,10 +14,45 @@ const avatarColor   = id => AVATAR_COLORS[(id || 0) % AVATAR_COLORS.length];
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    ADMIN VIEW — Dashboard presenze in tempo reale
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+// ── Shift mismatch helpers ───────────────────────────────────────────────────
+function parseShiftDt(dateStr, timeStr) {
+  if (!timeStr || !dateStr) return null;
+  const [h, m] = timeStr.split(':').map(Number);
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+function getMismatch(rec, shift) {
+  const warnings = [];
+  if (!shift) return warnings;
+  const date = (rec.checked_in_at || '').split('T')[0] || new Date().toISOString().split('T')[0];
+  if (rec.checked_in_at && shift.start_time) {
+    const actualIn   = new Date(rec.checked_in_at);
+    const expected   = parseShiftDt(date, shift.start_time);
+    if (expected) {
+      const diff = Math.round((actualIn - expected) / 60000);
+      if (diff >  15) warnings.push({ icon: '⚠️', text: `Ritardo ${diff}m`,            color: '#B45309', bg: '#FFFBEB' });
+      if (diff < -15) warnings.push({ icon: 'ℹ️', text: `Anticipato ${Math.abs(diff)}m`, color: '#1D4ED8', bg: '#EFF6FF' });
+    }
+  }
+  if (rec.checked_out_at && shift.end_time) {
+    const outDate  = (rec.checked_out_at || '').split('T')[0] || date;
+    const actualOut  = new Date(rec.checked_out_at);
+    const expected   = parseShiftDt(outDate, shift.end_time);
+    if (expected) {
+      const diff = Math.round((expected - actualOut) / 60000);
+      if (diff > 15) warnings.push({ icon: '🚶', text: `Uscita anticipata ${diff}m`, color: '#B91C1C', bg: '#FEF2F2' });
+    }
+  }
+  return warnings;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function AdminPresenceView() {
   const [activeTab,   setActiveTab]   = useState('live');  // 'live' | 'history'
   const [liveList,    setLiveList]    = useState([]);
   const [todayList,   setTodayList]   = useState([]);
+  const [todayShifts, setTodayShifts] = useState({});   // empId -> shift record
   const [loadingLive, setLoadingLive] = useState(true);
   const [clockStr,    setClockStr]    = useState('');
   const [dateStr,     setDateStr]     = useState('');
@@ -48,15 +83,23 @@ function AdminPresenceView() {
 
   const fetchPresence = useCallback(async () => {
     try {
-      const [kioskRes, histRes] = await Promise.allSettled([
+      const todayStr = filterDate;
+      const [kioskRes, histRes, shiftRes] = await Promise.allSettled([
         attendance.getEmployeesKiosk(),
         attendance.getList({ date: filterDate }),
+        shiftsApi.getAll({ start_date: todayStr, end_date: todayStr }),
       ]);
       if (kioskRes.status === 'fulfilled') {
         const list = kioskRes.value?.data?.data || [];
         setLiveList(list.filter(e => e.status === 'presente' || e.status === 'pausa'));
       }
       if (histRes.status === 'fulfilled') setTodayList(histRes.value?.data?.data || []);
+      if (shiftRes.status === 'fulfilled') {
+        const shiftList = shiftRes.value?.data?.data || [];
+        const map = {};
+        shiftList.forEach(s => { map[String(s.employee_id)] = s; });
+        setTodayShifts(map);
+      }
     } catch {}
     setLoadingLive(false);
   }, [filterDate]);
@@ -195,17 +238,23 @@ function AdminPresenceView() {
               const color = avatarColor(emp.employee_id || emp.id);
               const name  = emp.employee_name || emp.name || `${emp.first_name||''} ${emp.last_name||''}`.trim() || `Dipendente #${emp.employee_id||emp.id}`;
               const isPausa = emp.status === 'pausa';
+              // Mismatch check
+              const empIdStr = String(emp.employee_id || emp.id);
+              const liveShift  = todayShifts[empIdStr];
+              const fakeRec = { checked_in_at: emp.checked_in_at || emp.clock_in };
+              const warnings  = getMismatch(fakeRec, liveShift);
+              const isLate = warnings.some(w => w.text.startsWith('Ritardo'));
               return (
                 <div key={emp.id} style={{
-                  background: isPausa ? '#fffbeb' : '#fff', borderRadius: 16, padding: '16px 20px',
-                  border: `2px solid ${isPausa ? '#fcd34d' : '#dcfce7'}`, display: 'flex', alignItems: 'center', gap: 14,
-                  boxShadow: `0 2px 8px ${isPausa ? 'rgba(245, 158, 11, 0.08)' : 'rgba(34,197,94,0.08)'}`,
+                  background: isLate ? '#FFFBEB' : (isPausa ? '#fffbeb' : '#fff'), borderRadius: 16, padding: '16px 20px',
+                  border: `2px solid ${isLate ? '#F59E0B' : (isPausa ? '#fcd34d' : '#dcfce7')}`, display: 'flex', alignItems: 'center', gap: 14,
+                  boxShadow: `0 2px 8px ${isPausa ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)'}`,
                 }}>
                   <div style={{
                     width: 44, height: 44, borderRadius: '50%', background: isPausa ? '#f59e0b' : color, flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: '#fff', fontSize: 16, fontWeight: 800, overflow: 'hidden',
-                    border: `2px solid ${isPausa ? '#f59e0b' : '#22c55e'}`,
+                    border: `2px solid ${isLate ? '#F59E0B' : (isPausa ? '#f59e0b' : '#22c55e')}`,
                   }}>
                     {emp.photo_url
                       ? <img src={emp.photo_url} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -213,11 +262,17 @@ function AdminPresenceView() {
                     }
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: isPausa ? '#b45309' : '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
                     <div style={{ fontSize: 12, color: isPausa ? '#d97706' : '#22c55e', fontWeight: 600, marginTop: 2 }}>
                       {isPausa ? '☕ In pausa da: ' : '🟢 Entrata: '}{entry}
+                      {liveShift && <span style={{ color: '#6b7280', marginLeft: 6 }}>· Turno {liveShift.start_time}–{liveShift.end_time}</span>}
                     </div>
                     {emp.store_name && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>📍 {emp.store_name}</div>}
+                    {warnings.map((w, wi) => (
+                      <div key={wi} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, marginRight: 4, background: w.bg, color: w.color, borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                        {w.icon} {w.text}
+                      </div>
+                    ))}
                   </div>
                 </div>
               );
@@ -240,7 +295,7 @@ function AdminPresenceView() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f9fafb' }}>
-                  {['Dipendente', 'Negozio', 'Entrata', 'Uscita', 'Stato'].map(h => (
+                  {['Dipendente', 'Negozio', 'Entrata', 'Uscita', 'Turno Previsto', 'Anomalie'].map(h => (
                     <th key={h} style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #f3f4f6' }}>{h}</th>
                   ))}
                 </tr>
@@ -249,10 +304,12 @@ function AdminPresenceView() {
                 {todayList.map((rec, i) => {
                   const name = rec.employee_name || `${rec.first_name||''} ${rec.last_name||''}`.trim() || `#${rec.employee_id}`;
                   const isIn = liveIds.has(rec.employee_id);
+                  const shift = todayShifts[String(rec.employee_id)];
+                  const warnings = getMismatch(rec, shift);
                   return (
-                    <tr key={rec.id || i} style={{ borderBottom: '1px solid #f9fafb' }}
+                    <tr key={rec.id || i} style={{ borderBottom: '1px solid #f9fafb', background: warnings.length > 0 ? '#FFFDF5' : undefined }}
                       onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                      onMouseLeave={e => e.currentTarget.style.background = warnings.length > 0 ? '#FFFDF5' : '#fff'}
                     >
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -268,14 +325,27 @@ function AdminPresenceView() {
                       <td style={{ padding: '12px 16px', fontSize: 13, color: '#6b7280' }}>{rec.store_name || '—'}</td>
                       <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 700, color: '#22c55e' }}>{fmtTime(rec.checked_in_at)}</td>
                       <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 700, color: rec.checked_out_at ? '#ef4444' : '#d1d5db' }}>{fmtTime(rec.checked_out_at)}</td>
+                      {/* Turno previsto */}
+                      <td style={{ padding: '12px 16px', fontSize: 12, color: '#6b7280' }}>
+                        {shift ? (
+                          <span style={{ background: `${shift.color || '#10B981'}18`, border: `1px solid ${shift.color || '#10B981'}50`, borderRadius: 6, padding: '3px 8px', fontWeight: 700, color: shift.color || '#065F46' }}>
+                            ⏰ {shift.start_time}–{shift.end_time}
+                          </span>
+                        ) : <span style={{ color: '#d1d5db' }}>—</span>}
+                      </td>
+                      {/* Anomalie */}
                       <td style={{ padding: '12px 16px' }}>
-                        <span style={{
-                          display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-                          background: rec.status === 'pausa' ? '#FFFBEB' : (rec.status === 'presente' || isIn ? '#dcfce7' : '#f3f4f6'),
-                          color: rec.status === 'pausa' ? '#B45309' : (rec.status === 'presente' || isIn ? '#16a34a' : '#6b7280'),
-                        }}>
-                          {rec.status === 'pausa' ? 'â˜• Pausa' : (rec.status === 'presente' || isIn ? '🟢 Presente' : '⚪ Uscito')}
-                        </span>
+                        {warnings.length === 0 ? (
+                          <span style={{ color: '#22c55e', fontSize: 12, fontWeight: 700 }}>✅ Ok</span>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            {warnings.map((w, wi) => (
+                              <span key={wi} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: w.bg, color: w.color, borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                {w.icon} {w.text}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

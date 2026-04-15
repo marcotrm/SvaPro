@@ -45,9 +45,11 @@ function saveAbsencesToStorage(obj) {
 // ── Popup assenza ─────────────────────────────────────────────────────────────
 function AbsenceModal({ emp, existing, onSave, onRemove, onClose }) {
   const today = formatDate(new Date());
-  const [type, setType]       = useState(existing?.type || 'ferie');
-  const [from, setFrom]       = useState(existing?.from || today);
-  const [to,   setTo]         = useState(existing?.to   || today);
+  const [type, setType]           = useState(existing?.type     || 'ferie');
+  const [from, setFrom]           = useState(existing?.from     || today);
+  const [to,   setTo]             = useState(existing?.to       || today);
+  const [timeFrom, setTimeFrom]   = useState(existing?.time_from || '09:00');
+  const [timeTo,   setTimeTo]     = useState(existing?.time_to   || '13:00');
 
   const typeOpts = [
     { value: 'ferie',    label: '🌴 Ferie', color: '#3B82F6' },
@@ -104,7 +106,7 @@ function AbsenceModal({ emp, existing, onSave, onRemove, onClose }) {
         </div>
 
         {/* Date */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: type === 'permesso' ? 12 : 24 }}>
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>
               Dal
@@ -130,10 +132,30 @@ function AbsenceModal({ emp, existing, onSave, onRemove, onClose }) {
           </div>
         </div>
 
+        {/* Orario permesso (solo per tipo = permesso) */}
+        {type === 'permesso' && (
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>⏰ Orario permesso</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>Dalle ore</label>
+                <input type="time" value={timeFrom} onChange={e => setTimeFrom(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #F59E0B80', background: '#FFFBEB', color: '#92400E', fontSize: 16, fontWeight: 700, boxSizing: 'border-box', outline: 'none' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>Alle ore</label>
+                <input type="time" value={timeTo} onChange={e => setTimeTo(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #F59E0B80', background: '#FFFBEB', color: '#92400E', fontSize: 16, fontWeight: 700, boxSizing: 'border-box', outline: 'none' }} />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Riepilogo */}
         {from && to && (
           <div style={{ background: `${chosen.color}12`, border: `1px solid ${chosen.color}40`, borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: chosen.color, fontWeight: 600 }}>
             {chosen.label} dal {from.split('-').reverse().join('/')} al {to.split('-').reverse().join('/')}
+            {type === 'permesso' && timeFrom && timeTo && (
+              <span> · ⏰ {timeFrom}–{timeTo}</span>
+            )}
           </div>
         )}
 
@@ -157,7 +179,9 @@ function AbsenceModal({ emp, existing, onSave, onRemove, onClose }) {
             onClick={() => {
               if (!from || !to) { toast.error('Imposta le date di inizio e fine'); return; }
               if (from > to)    { toast.error('La data inizio deve precedere la data fine'); return; }
-              onSave({ type, from, to });
+              const data = { type, from, to };
+              if (type === 'permesso') { data.time_from = timeFrom; data.time_to = timeTo; }
+              onSave(data);
             }}
             style={{ flex: 2, padding: '12px', borderRadius: 12, border: 'none', background: chosen.color, color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
           >
@@ -429,7 +453,11 @@ export default function ShiftsPage() {
                         <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--color-text)' }}>{emp.name}</div>
                         {empAbsence ? (
                           <div style={{ fontSize: 11, color: absenceColor(empAbsence.type), fontWeight: 700 }}>
-                            {absenceLabel(empAbsence.type)} · {empAbsence.from?.slice(5).split('-').join('/')}→{empAbsence.to?.slice(5).split('-').join('/')}
+                            {absenceLabel(empAbsence.type)}
+                            {' · '}{empAbsence.from?.slice(5).split('-').join('/')}→{empAbsence.to?.slice(5).split('-').join('/')}
+                            {empAbsence.type === 'permesso' && empAbsence.time_from && (
+                              <span> · ⏰ {empAbsence.time_from}–{empAbsence.time_to}</span>
+                            )}
                           </div>
                         ) : (
                           <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', textTransform: 'capitalize' }}>{emp.role || 'Operatore'}</div>
@@ -460,8 +488,10 @@ export default function ShiftsPage() {
                             <div style={{ fontSize: 18, lineHeight: 1 }}>
                               {absence.type === 'ferie' ? '🌴' : absence.type === 'malattia' ? '🤒' : absence.type === 'permesso' ? '📋' : '⛔'}
                             </div>
-                            <div style={{ fontSize: 10, fontWeight: 800, color: c, textAlign: 'center', lineHeight: 1.2 }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: c, textAlign: 'center', lineHeight: 1.3 }}>
                               Indisponibile<br />{absence.type}
+                              {absence.type === 'permesso' && absence.time_from && (
+                                <><br />⏰ {absence.time_from}–{absence.time_to}</>)}
                             </div>
                           </div>
                         </td>
