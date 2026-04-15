@@ -432,13 +432,14 @@ class OrderController extends Controller
 
         $orderId = DB::transaction(function () use ($request, $tenantId, $quote, $status, $now, $stockAlerts, $pointsToRedeem, $pointsDiscount): int {
             $orderId = DB::table('sales_orders')->insertGetId([
-                'tenant_id' => $tenantId,
-                'store_id' => $request->input('store_id'),
-                'channel' => $request->input('channel'),
-                'customer_id' => $request->input('customer_id'),
-                'employee_id' => $request->input('employee_id'),
-                'sold_by_employee_id' => $request->input('sold_by_employee_id'),
-                'status' => $status,
+                'tenant_id'            => $tenantId,
+                'store_id'             => $request->input('store_id'),
+                'channel'              => $request->input('channel'),
+                'customer_id'          => $request->input('customer_id'),
+                'employee_id'          => $request->input('employee_id'),
+                'sold_by_employee_id'  => $request->input('sold_by_employee_id'),
+                'promotion_id'         => $request->input('promotion_id') ? (int) $request->input('promotion_id') : null,
+                'status'               => $status,
                 'currency' => 'EUR',
                 'subtotal' => $quote['totals']['subtotal'],
                 'discount_total' => $quote['totals']['discount_total'],

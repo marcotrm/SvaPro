@@ -266,7 +266,7 @@ class PromotionController extends Controller
         }
 
         if ($promo->max_uses) {
-            $used = DB::table('orders')
+            $used = DB::table('sales_orders')
                 ->where('tenant_id', $tenantId)
                 ->where('promotion_id', $promo->id)
                 ->count();
