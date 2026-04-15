@@ -23,13 +23,14 @@ class EmployeeController extends Controller
             return response()->json(['message' => 'Store non valido per il tenant.'], 422);
         }
 
-        // Ricerca rapida per barcode, ID o nome (usata da Chat/Cassa/Tesoreria)
+        // Ricerca rapida per barcode, ID o nome (usata da Chat/Cassa/Tesoreria/Kiosk)
         if ($barcode) {
             $emp = DB::table('employees')
                 ->where('tenant_id', $tenantId)
                 ->where('status', 'active')
                 ->where(function($q) use ($barcode) {
-                    $q->where('barcode', $barcode)
+                    $q->where('barcode', $barcode)                     // match esatto
+                      ->orWhere('barcode', 'like', '%-' . $barcode)   // suffix: '5555' trova 'DIP-XXX-5555'
                       ->orWhere('id', (int) $barcode)
                       ->orWhere('first_name', 'like', '%' . $barcode . '%')
                       ->orWhere('last_name', 'like', '%' . $barcode . '%');

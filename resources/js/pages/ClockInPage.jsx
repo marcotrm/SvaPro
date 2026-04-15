@@ -203,7 +203,7 @@ function AdminPresenceView() {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, color: isPausa ? '#b45309' : '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
                     <div style={{ fontSize: 12, color: isPausa ? '#d97706' : '#22c55e', fontWeight: 600, marginTop: 2 }}>
-                      {isPausa ? 'â˜• In pausa da: ' : '🟢 Entrata: '}{entry}
+                      {isPausa ? '☕ In pausa da: ' : '🟢 Entrata: '}{entry}
                     </div>
                     {emp.store_name && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>📍 {emp.store_name}</div>}
                   </div>
@@ -498,8 +498,12 @@ function KioskView() {
     const t = val.trim().toLowerCase();
     if (!t) return null;
     return employees.find(em =>
+      // Match esatto su barcode o badge_code
       (em.barcode    && em.barcode.toLowerCase()    === t) ||
       (em.badge_code && em.badge_code.toLowerCase() === t) ||
+      // Match suffisso: '5555' trova 'DIP-CAIVANO-5555'
+      (em.barcode    && em.barcode.toLowerCase().endsWith('-' + t)) ||
+      // Match per ID numerico
       String(em.id) === t
     ) || null;
   };
@@ -564,27 +568,48 @@ function KioskView() {
     // 1. Prima prova nella lista locale (offline-fast)
     let found = resolveEmployee(val);
 
-    // 2. Se non trovato localmente, chiedi al server (fallback)
+    // 2. Se non trovato localmente, chiedi al server (fallback kiosk list)
     if (!found) {
       try {
         const res = await attendance.getEmployeesKiosk();
         const freshList = res.data?.data || [];
-        // Aggiorna la lista locale
         if (freshList.length > 0) setEmployees(freshList);
-        // Cerca di nuovo nella lista aggiornata
+        const t = val.trim().toLowerCase();
         found = freshList.find(em =>
-          (em.barcode    && em.barcode.toLowerCase()    === val.trim().toLowerCase()) ||
-          (em.badge_code && em.badge_code.toLowerCase() === val.trim().toLowerCase()) ||
-          String(em.id) === val.trim()
+          (em.barcode    && em.barcode.toLowerCase()    === t) ||
+          (em.badge_code && em.badge_code.toLowerCase() === t) ||
+          (em.barcode    && em.barcode.toLowerCase().endsWith('-' + t)) ||
+          String(em.id) === t
         ) || null;
+      } catch {}
+    }
+
+    // 3. Ultimo fallback: cerca via /employees?barcode= (supporta suffix e LIKE)
+    if (!found) {
+      try {
+        const { default: api } = await import('../api.jsx');
+        const res = await api.get('/employees', { params: { barcode: val.trim() } });
+        const empList = res.data?.data || [];
+        if (empList.length > 0) {
+          // Costruiamo un record compatibile con il kiosk
+          const e = empList[0];
+          found = {
+            id: e.id,
+            first_name: e.first_name,
+            last_name: e.last_name,
+            barcode: e.barcode,
+            name: `${e.first_name || ''} ${e.last_name || ''}`.trim(),
+            store_id: e.store_id,
+          };
+        }
       } catch {}
     }
 
     setLoading(false);
 
     if (!found) {
-      setMessage({ text: `Badge "${val}" non riconosciuto`, type: 'error' });
-      setTimeout(() => setMessage(null), 3000);
+      setMessage({ text: `Codice "${val}" non riconosciuto. Prova il codice completo (es: DIP-STORECODE-${val}) oppure il tuo ID.`, type: 'error' });
+      setTimeout(() => setMessage(null), 5000);
       barcodeRef.current?.focus();
       return;
     }
@@ -641,7 +666,7 @@ function KioskView() {
                 onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-                <span style={{ fontSize: 40 }}>â˜•</span>
+                <span style={{ fontSize: 40 }}>☕</span>
                 Inizia Pausa / Bagno
             </button>
 
@@ -671,7 +696,7 @@ function KioskView() {
         </div>
         
         <button onClick={() => setPhase('ask_history')} style={{ marginTop: 40, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-          ðŸ•’ Vedi Storico Ore
+          🕒 Vedi Storico Ore
         </button>
         
         {!isDipendente && (
@@ -683,7 +708,7 @@ function KioskView() {
     );
   }
 
-  /* â”€â”€ Schermata CONFERMA (dopo timbratura) â”€â”€ */
+  /* — Schermata CONFERMA (dopo timbratura) — */
   if (phase === 'confirmed' && employee) {
     const isIn = lastStatus === 'in';
     return (
@@ -725,7 +750,7 @@ function KioskView() {
                 border: '1px solid rgba(255,255,255,0.12)', display: 'flex', gap: 12, alignItems: 'center',
               }}>
                 <span style={{ color: '#4ade80', fontWeight: 700, fontSize: 14 }}>🟢 {fmtTime(rec.clock_in)}</span>
-                {rec.clock_out && <span style={{ color: rec.is_break ? '#FCD34D' : '#f87171', fontWeight: 700, fontSize: 14 }}>{rec.is_break ? 'â˜•' : '🔴'} {fmtTime(rec.clock_out)}</span>}
+                {rec.clock_out && <span style={{ color: rec.is_break ? '#FCD34D' : '#f87171', fontWeight: 700, fontSize: 14 }}>{rec.is_break ? '☕' : '🔴'} {fmtTime(rec.clock_out)}</span>}
               </div>
             ))}
           </div>
@@ -738,7 +763,7 @@ function KioskView() {
     );
   }
 
-  /* â”€â”€ Schermata STORICO PERSONALE â”€â”€ */
+  /* — Schermata STORICO PERSONALE — */
   if (phase === 'history_view' && employee) {
     const recordsByMonth = todayRecords.reduce((acc, rec) => {
       const month = new Date(rec.clock_in).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
@@ -800,7 +825,7 @@ function KioskView() {
     );
   }
 
-  /* â”€â”€ Schermata kiosk normale â”€â”€ */
+  /* — Schermata kiosk normale — */
   return (
     <div style={{
       minHeight: '82vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
@@ -845,7 +870,7 @@ function KioskView() {
           }}
         >
           <div style={{ fontSize: 36, marginBottom: 10 }}>
-            {phase === 'ask_history' ? '📅' : (barcodeInput.length > 0 ? 'ðŸ”¦' : '📲')}
+            {phase === 'ask_history' ? '📅' : (barcodeInput.length > 0 ? '📦' : '📲')}
           </div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
             {barcodeInput.length > 0
@@ -890,7 +915,7 @@ function KioskView() {
                }}
                style={{ background: phase === 'ask_history' ? 'rgba(255,255,255,0.15)' : 'transparent', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: 20, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 12, transition: 'all 0.2s' }}
             >
-               {phase === 'ask_history' ? '🔙 Torna Indietro' : 'ðŸ•’ Vedi Storico'}
+               {phase === 'ask_history' ? '🔙 Torna Indietro' : '🕒 Vedi Storico'}
             </button>
         </div>
       </div>
