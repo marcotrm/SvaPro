@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\Shift;
 use App\Models\ShiftTemplate;
 use Carbon\Carbon;
@@ -18,6 +19,9 @@ class ShiftController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if (!Schema::hasTable('employee_shifts')) {
+            return response()->json(['data' => [], '_note' => 'Tabella turni non ancora migrata. Esegui php artisan migrate.']);
+        }
         $tenantId = (int)$request->attributes->get('tenant_id');
         $storeId = $request->integer('store_id');
         $startDate = $request->input('start_date');
@@ -83,6 +87,9 @@ class ShiftController extends Controller
      */
     public function getTemplates(Request $request): JsonResponse
     {
+        if (!Schema::hasTable('shift_templates')) {
+            return response()->json(['data' => []]);
+        }
         $tenantId = (int)$request->attributes->get('tenant_id');
         $templates = ShiftTemplate::where('tenant_id', $tenantId)->get();
         return response()->json(['data' => $templates]);
