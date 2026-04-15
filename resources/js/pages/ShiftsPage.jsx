@@ -322,12 +322,22 @@ function ExportModal({ employees, onClose }) {
       ];
       const rows = [header];
 
-      const totSched = {};
-      const totAct   = {};
+      const totSched    = {};
+      const totAct      = {};
+      const totFerie    = {};
+      const totMalatt   = {};
+      const totPerm     = {};
+      const totAssente  = {};
+      const totPresente = {};
 
       employees.filter(e => selected.has(e.id)).forEach(emp => {
-        totSched[emp.id] = 0;
-        totAct[emp.id]   = 0;
+        totSched[emp.id]    = 0;
+        totAct[emp.id]      = 0;
+        totFerie[emp.id]    = 0;
+        totMalatt[emp.id]   = 0;
+        totPerm[emp.id]     = 0;
+        totAssente[emp.id]  = 0;
+        totPresente[emp.id] = 0;
 
         dates.forEach(date => {
           const shift   = shiftByKey[`${emp.id}_${date}`];
@@ -347,12 +357,15 @@ function ExportModal({ employees, onClose }) {
 
           let stato = 'Assente';
           if (absence) {
-            stato = absence.type === 'ferie' ? 'Ferie'
-                  : absence.type === 'malattia' ? 'Malattia'
-                  : absence.type === 'permesso' ? 'Permesso'
-                  : 'Indisponibile';
+            if (absence.type === 'ferie')         { stato = 'Ferie';         totFerie[emp.id]++;   }
+            else if (absence.type === 'malattia') { stato = 'Malattia';      totMalatt[emp.id]++;  }
+            else if (absence.type === 'permesso') { stato = 'Permesso';      totPerm[emp.id]++;    }
+            else                                  { stato = 'Indisponibile'; }
           } else if (rec?.checked_in_at) {
             stato = 'Presente';
+            totPresente[emp.id]++;
+          } else {
+            totAssente[emp.id]++;
           }
 
           const note = absence?.type === 'permesso' && absence.time_from
@@ -373,15 +386,45 @@ function ExportModal({ employees, onClose }) {
           ]);
         });
 
-        // Riga totale per questo dipendente
+        // ── Riga TOTALE per dipendente (con ore extra + assenze) ────────────────
         const extra = Math.max(0, totAct[emp.id] - totSched[emp.id]);
         rows.push([
-          `TOTALE ${emp.first_name} ${emp.last_name}`, '', '', '',
-          formatHours(totSched[emp.id]), '', formatHours(totAct[emp.id]),
-          extra > 0 ? `+ ${formatHours(extra)}` : '0h 0m',
-          '', emp.store_name || '',
+          `── TOTALE ${emp.first_name} ${emp.last_name} ──`,
+          '',
+          '',
+          `Prog: ${formatHours(totSched[emp.id])}`,
+          `Effettive: ${formatHours(totAct[emp.id])}`,
+          extra > 0 ? `ORE EXTRA: +${formatHours(extra)}` : 'Ore extra: 0',
+          totFerie[emp.id]   > 0 ? `Ferie: ${totFerie[emp.id]}gg`     : '',
+          totMalatt[emp.id]  > 0 ? `Malattia: ${totMalatt[emp.id]}gg` : '',
+          totPerm[emp.id]    > 0 ? `Permessi: ${totPerm[emp.id]}gg`   : '',
+          totAssente[emp.id] > 0 ? `Assente: ${totAssente[emp.id]}gg` : '',
         ]);
         rows.push(Array(10).fill(''));
+      });
+
+      // ── RIEPILOGO FINALE (sezione separata con proprio header) ───────────────
+      rows.push(Array(10).fill(''));
+      rows.push(['═══ RIEPILOGO TOTALI ═══', ...Array(9).fill('')]);
+      rows.push([
+        'Nome','Cognome',
+        'Ore Programmate','Ore Effettive','ORE IN PIÙ',
+        'Gg Ferie','Gg Malattia','Gg Permesso','Gg Assenti','Negozio',
+      ]);
+      employees.filter(e => selected.has(e.id)).forEach(emp => {
+        const extra = Math.max(0, totAct[emp.id] - totSched[emp.id]);
+        rows.push([
+          emp.first_name || '',
+          emp.last_name  || '',
+          formatHours(totSched[emp.id]),
+          formatHours(totAct[emp.id]),
+          extra > 0 ? `+${formatHours(extra)}` : '0h 0m',
+          totFerie[emp.id]   || 0,
+          totMalatt[emp.id]  || 0,
+          totPerm[emp.id]    || 0,
+          totAssente[emp.id] || 0,
+          emp.store_name || '',
+        ]);
       });
 
       downloadCSV(rows, `turni_${dateFrom}_${dateTo}.csv`);
