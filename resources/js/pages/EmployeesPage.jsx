@@ -6,15 +6,33 @@ import ErrorAlert from '../components/ErrorAlert.jsx';
 import EmployeeModal from '../components/EmployeeModal.jsx';
 import toast from 'react-hot-toast';
 
+// ── Sospensione ──────────────────────────────────────────────────────
+const SUSP_KEY = 'svapro_suspended_employees_v1';
+const loadSuspended = () => { try { return new Set(JSON.parse(localStorage.getItem(SUSP_KEY) || '[]')); } catch { return new Set(); } };
+const saveSuspended = (s) => { try { localStorage.setItem(SUSP_KEY, JSON.stringify([...s])); } catch {} };
+// ─────────────────────────────────────────────────────────────────
+
 export default function EmployeesPage() {
   const { selectedStoreId, selectedStore, storesList } = useOutletContext();
   const [employeesList, setEmployeesList] = useState([]);
-  const [analytics, setAnalytics] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [showModal, setShowModal] = useState(false);
+  const [analytics,     setAnalytics]     = useState(null);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState('');
+  const [showModal,     setShowModal]     = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm,    setSearchTerm]    = useState('');
+  // Sospensione — locale/localStorage
+  const [suspendedIds,  setSuspendedIds]  = useState(() => loadSuspended());
+  const [showSuspended, setShowSuspended] = useState(false);
+
+  const handleSuspend = (emp) => {
+    const next = new Set(suspendedIds); next.add(emp.id); setSuspendedIds(next); saveSuspended(next);
+    toast.success(`${emp.first_name} ${emp.last_name} sospeso ⏸`);
+  };
+  const handleUnsuspend = (emp) => {
+    const next = new Set(suspendedIds); next.delete(emp.id); setSuspendedIds(next); saveSuspended(next);
+    toast.success(`${emp.first_name} ${emp.last_name} riattivato ✅`);
+  };
 
   useEffect(() => { fetchEmployees(); }, [selectedStoreId]);
 
@@ -103,6 +121,7 @@ export default function EmployeesPage() {
 
   const filtered = employeesList
     .filter(e => e.status !== 'deleted')
+    .filter(e => showSuspended ? suspendedIds.has(e.id) : !suspendedIds.has(e.id))
     .filter(e =>
       e.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -164,12 +183,14 @@ export default function EmployeesPage() {
         <div className="table-toolbar">
           <div className="search-box">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color:'var(--muted)',flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input
-              placeholder="Cerca per nome..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
+            <input placeholder="Cerca per nome..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
+          <button
+            onClick={() => setShowSuspended(v => !v)}
+            style={{ marginLeft: 8, padding: '6px 14px', borderRadius: 8, border: '1px solid var(--color-border)', background: showSuspended ? '#FEF3C7' : 'var(--color-bg)', color: showSuspended ? '#B45309' : 'var(--muted)', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            ⏸ {showSuspended ? `Sospesi (${suspendedIds.size})` : `Mostra sospesi (${suspendedIds.size})`}
+          </button>
           <span style={{fontSize:12,color:'var(--muted)',marginLeft:'auto'}}>{filtered.length} risultati</span>
         </div>
         <table>
@@ -187,7 +208,7 @@ export default function EmployeesPage() {
           </thead>
           <tbody>
             {filtered.length > 0 ? filtered.map(employee => (
-              <tr key={employee.id}>
+              <tr key={employee.id} style={{ opacity: suspendedIds.has(employee.id) ? 0.5 : 1, transition: 'opacity 0.2s' }}>
                 <td>
                   <div className="avatar-cell">
                     <div className="avatar-sm" style={{ width: 36, height: 36, minWidth: 36, borderRadius: '50%', overflow: 'hidden', padding: 0, flexShrink: 0 }}>
@@ -228,9 +249,10 @@ export default function EmployeesPage() {
                 <td className="mono" style={{color:'var(--gold)'}}>{employee.points_balance || 0}</td>
                 <td style={{color:'var(--muted2)'}}>{formatDate(employee.last_sale_at)}</td>
                 <td>
-                  <span className={`badge ${employee.status === 'active' ? 'high' : 'mid'}`}>
+                  <span className={`badge ${suspendedIds.has(employee.id) ? '' : (employee.status === 'active' ? 'high' : 'mid')}`}
+                    style={suspendedIds.has(employee.id) ? { background:'#FEF3C7', color:'#B45309' } : {}}>
                     <span className="badge-dot" />
-                    {employee.status === 'active' ? 'Attivo' : 'Inattivo'}
+                    {suspendedIds.has(employee.id) ? '⏸ Sospeso' : (employee.status === 'active' ? 'Attivo' : 'Inattivo')}
                   </span>
                 </td>
                 <td>
@@ -238,6 +260,26 @@ export default function EmployeesPage() {
                     <button className="icon-action edit" onClick={() => handleOpenModal(employee)} title="Modifica">
                       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
+                    {/* Sospendi / Riattiva */}
+                    {suspendedIds.has(employee.id) ? (
+                      <button
+                        className="icon-action"
+                        style={{ color: '#16a34a', background: 'rgba(22,163,74,0.10)' }}
+                        title="Riattiva dipendente"
+                        onClick={() => handleUnsuspend(employee)}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      </button>
+                    ) : (
+                      <button
+                        className="icon-action"
+                        style={{ color: '#B45309', background: 'rgba(180,83,9,0.10)' }}
+                        title="Sospendi dipendente"
+                        onClick={() => handleSuspend(employee)}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                      </button>
+                    )}
                     <button className="icon-action danger" title="Elimina" onClick={() => handleDelete(employee)}>
                       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                     </button>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { attendance, shifts as shiftsApi, stores, clearApiCache } from '../api.jsx';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Copy, Loader, Clock, Trash, X, Palmtree, Stethoscope } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Loader, Clock, Trash, X, Download, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ShiftTemplateModal from '../components/ShiftTemplateModal.jsx';
 
@@ -193,7 +193,165 @@ function AbsenceModal({ emp, existing, onSave, onRemove, onClose }) {
   );
 }
 
-// ── Pagina principale ─────────────────────────────────────────────────────────
+// ── Gap detection ─────────────────────────────────────────────────────────────
+function detectGaps(shiftsMap, weekDays) {
+  const alerts = [];
+  weekDays.forEach(day => {
+    const intervals = [];
+    Object.entries(shiftsMap).forEach(([key, s]) => {
+      if (key.endsWith(`_${day.dateStr}`) && s.start_time && s.end_time) {
+        intervals.push({ start: s.start_time, end: s.end_time });
+      }
+    });
+    if (intervals.length < 2) return;
+    intervals.sort((a, b) => a.start.localeCompare(b.start));
+    let maxEnd = intervals[0].end;
+    for (let i = 1; i < intervals.length; i++) {
+      const { start, end } = intervals[i];
+      if (start > maxEnd) alerts.push({ day: day.label, from: maxEnd, to: start });
+      if (end > maxEnd) maxEnd = end;
+    }
+  });
+  return alerts;
+}
+
+// ── CSV export helper ─────────────────────────────────────────────────────────
+function timeToMinutes(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+function formatHours(mins) {
+  if (!mins || mins <= 0) return '0h 0m';
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+function downloadCSV(rows, filename) {
+  const BOM = '\uFEFF';
+  const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
+  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ── ExportModal ───────────────────────────────────────────────────────────────
+function ExportModal({ employees, onClose }) {
+  const today  = formatDate(new Date());
+  const weekAgo = formatDate(new Date(Date.now() - 7 * 86400000));
+  const [dateFrom,   setDateFrom]   = useState(weekAgo);
+  const [dateTo,     setDateTo]     = useState(today);
+  const [selected,   setSelected]   = useState(new Set(employees.map(e => e.id)));
+  const [exporting,  setExporting]  = useState(false);
+
+  const toggleAll = () =>
+    setSelected(prev => prev.size === employees.length ? new Set() : new Set(employees.map(e => e.id)));
+  const toggle = id =>
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const handleExport = async () => {
+    if (selected.size === 0) { toast.error('Seleziona almeno un dipendente'); return; }
+    if (!dateFrom || !dateTo)  { toast.error('Imposta le date'); return; }
+    setExporting(true);
+    try {
+      const empIds = [...selected];
+      // Carica turni e timbrature in parallelo
+      const [shRes, attRes] = await Promise.all([
+        shiftsApi.getAll({ start_date: dateFrom, end_date: dateTo }),
+        attendance.getHistory({ date_from: dateFrom, date_to: dateTo }),
+      ]);
+      const shiftList = shRes.data?.data || [];
+      const attList   = attRes.data?.data || [];
+
+      // Raggruppa: empId -> ore programmate (minuti), ore effettive (minuti)
+      const scheduled = {}; // empId -> minutes
+      const actual    = {}; // empId -> minutes
+      shiftList.forEach(s => {
+        if (!empIds.includes(s.employee_id)) return;
+        scheduled[s.employee_id] = (scheduled[s.employee_id] || 0) +
+          Math.max(0, timeToMinutes(s.end_time) - timeToMinutes(s.start_time));
+      });
+      attList.forEach(r => {
+        if (!empIds.includes(r.employee_id)) return;
+        if (!r.checked_in_at || !r.checked_out_at) return;
+        const mins = Math.round((new Date(r.checked_out_at) - new Date(r.checked_in_at)) / 60000);
+        if (mins > 0) actual[r.employee_id] = (actual[r.employee_id] || 0) + mins;
+      });
+
+      // Costruisci righe CSV
+      const header = ['Nome', 'Cognome', 'Ore Programmate', 'Ore Effettive', 'Ore Extra', 'Negozio'];
+      const rows   = [header];
+      employees.filter(e => selected.has(e.id)).forEach(e => {
+        const sched = scheduled[e.id] || 0;
+        const act   = actual[e.id]    || 0;
+        const extra = Math.max(0, act - sched);
+        rows.push([
+          e.first_name || '',
+          e.last_name  || '',
+          formatHours(sched),
+          formatHours(act),
+          formatHours(extra),
+          e.store_name || '',
+        ]);
+      });
+
+      downloadCSV(rows, `turni_${dateFrom}_${dateTo}.csv`);
+      toast.success('File scaricato! Aprilo con Excel.');
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Errore durante l\'esportazione');
+    } finally { setExporting(false); }
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:9100, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={onClose}>
+      <div style={{ background:'var(--color-surface)', borderRadius:20, padding:28, width:460, maxHeight:'85vh', display:'flex', flexDirection:'column', boxShadow:'0 24px 60px rgba(0,0,0,0.35)', border:'1px solid var(--color-border)' }} onClick={e=>e.stopPropagation()}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+          <div style={{ fontSize:18, fontWeight:900, color:'var(--color-text)' }}>📥 Esporta Turni</div>
+          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--color-text-tertiary)' }}><X size={18}/></button>
+        </div>
+
+        {/* Date */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:18 }}>
+          <div>
+            <label style={{ fontSize:11, fontWeight:700, color:'var(--color-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:5 }}>Dal</label>
+            <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:14, boxSizing:'border-box', outline:'none' }}/>
+          </div>
+          <div>
+            <label style={{ fontSize:11, fontWeight:700, color:'var(--color-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:5 }}>Al</label>
+            <input type="date" value={dateTo} min={dateFrom} onChange={e=>setDateTo(e.target.value)} style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:14, boxSizing:'border-box', outline:'none' }}/>
+          </div>
+        </div>
+
+        {/* Dipendenti */}
+        <div style={{ fontSize:11, fontWeight:700, color:'var(--color-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <span>Dipendenti</span>
+          <button onClick={toggleAll} style={{ fontSize:11, fontWeight:700, color:'var(--color-accent)', background:'none', border:'none', cursor:'pointer' }}>
+            {selected.size === employees.length ? 'Deseleziona tutti' : 'Seleziona tutti'}
+          </button>
+        </div>
+        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:6, marginBottom:20, maxHeight:200 }}>
+          {employees.map(e => (
+            <label key={e.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', borderRadius:10, cursor:'pointer', background: selected.has(e.id) ? 'var(--color-surface-hover)' : 'var(--color-bg)', border:'1px solid var(--color-border)', transition:'all 0.1s' }}>
+              <input type="checkbox" checked={selected.has(e.id)} onChange={()=>toggle(e.id)} style={{ accentColor:'var(--color-accent)', width:16, height:16 }}/>
+              <span style={{ fontWeight:700, fontSize:13, color:'var(--color-text)' }}>{e.first_name} {e.last_name}</span>
+              <span style={{ fontSize:11, color:'var(--color-text-tertiary)', marginLeft:'auto' }}>{e.store_name || ''}</span>
+            </label>
+          ))}
+        </div>
+
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'12px', borderRadius:12, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text-secondary)', fontWeight:700, fontSize:13, cursor:'pointer' }}>Annulla</button>
+          <button onClick={handleExport} disabled={exporting} style={{ flex:2, padding:'12px', borderRadius:12, border:'none', background:'var(--color-accent)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', opacity:exporting?0.7:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+            {exporting ? <Loader size={16} style={{animation:'spin 1s linear infinite'}}/> : <Download size={16}/>}
+            {exporting ? 'Elaborazione...' : `Scarica CSV (${selected.size} dip.)`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function ShiftsPage() {
   const { selectedStoreId } = useOutletContext?.() || {};
   const [storeId, setStoreId] = useState(selectedStoreId || '');
@@ -209,6 +367,10 @@ export default function ShiftsPage() {
   const [templates, setTemplates]   = useState([]);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [activeCell, setActiveCell] = useState(null);
+  const [showExport, setShowExport] = useState(false);  // NEW: Export modal
+
+  // ── Gap detection (ricalcola ogni volta che shifts cambia) ──────────────────
+  const gapAlerts = useMemo(() => detectGaps(shifts, weekDays), [shifts, weekDays]);
 
   // ── Assenze ────────────────────────────────────────────────────
   const [absences, setAbsences]       = useState(() => loadAbsences());
@@ -375,14 +537,34 @@ export default function ShiftsPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
-          <button onClick={() => setShowTemplatesModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)', padding: '10px 16px', borderRadius: 12, fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowTemplatesModal(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'var(--color-surface)', color:'var(--color-text)', border:'1px solid var(--color-border)', padding:'10px 16px', borderRadius:12, fontWeight:600, cursor:'pointer' }}>
             <Clock size={16} /> Modelli Orari (Template)
+          </button>
+          <button onClick={() => setShowExport(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'#6366F1', color:'#fff', border:'none', padding:'10px 16px', borderRadius:12, fontWeight:700, cursor:'pointer' }}>
+            <Download size={16} /> Esporta Excel
           </button>
           <button onClick={saveChanges} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-accent)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.8 : 1 }}>
             {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} Salva Configurazioni
           </button>
         </div>
       </div>
+
+      {/* Alert ore buche */}
+      {gapAlerts.length > 0 && (
+        <div style={{ background:'#FEF3C7', border:'1px solid #FCD34D', borderRadius:14, padding:'14px 20px', marginBottom:20, display:'flex', gap:12, alignItems:'flex-start' }}>
+          <AlertTriangle size={20} color="#B45309" style={{ flexShrink:0, marginTop:1 }}/>
+          <div>
+            <div style={{ fontWeight:800, fontSize:14, color:'#92400E', marginBottom:4 }}>⚠️ Ore buche rilevate nel calendario</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {gapAlerts.map((a, i) => (
+                <span key={i} style={{ background:'rgba(180,83,9,0.12)', color:'#B45309', borderRadius:8, padding:'3px 10px', fontSize:12, fontWeight:700 }}>
+                  {a.day}: senza copertura {a.from}–{a.to}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Navigazione settimana */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '16px 24px', borderRadius: '16px 16px 0 0', border: '1px solid var(--color-border)', borderBottom: 'none' }}>
@@ -545,6 +727,11 @@ export default function ShiftsPage() {
           onRemove={() => handleRemoveAbsence(absenceModal.emp.id)}
           onClose={() => setAbsenceModal(null)}
         />
+      )}
+
+      {/* Modal export */}
+      {showExport && (
+        <ExportModal employees={employees} onClose={() => setShowExport(false)} />
       )}
     </div>
   );
