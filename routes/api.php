@@ -323,6 +323,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/chat/messages', [ChatController::class, 'store']);
         Route::post('/chat/messages/read', [ChatController::class, 'markRead']);
 
+        // Employee barcode lookup — usato dalla chat per verificare il codice operatore
+        Route::get('/employees', [EmployeeController::class, 'index']);
+
+
         // Gamification
         Route::get('/gamification/missions', [GamificationController::class, 'missions']);
         Route::get('/gamification/team-challenges', [GamificationController::class, 'teamChallenges']);
