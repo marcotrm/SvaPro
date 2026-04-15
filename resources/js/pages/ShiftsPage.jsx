@@ -371,6 +371,15 @@ function ExportModal({ employees, onClose }) {
       const COL_COUNT = 10;
       let html = '<table>';
 
+      // Accumulatori per ogni dipendente (devono essere dichiarati prima del loop)
+      const totSched    = {};
+      const totAct      = {};
+      const totFerie    = {};
+      const totMalatt   = {};
+      const totPerm     = {};
+      const totAssente  = {};
+      const totPresente = {};
+
       employees.filter(e => selected.has(e.id)).forEach(emp => {
         totSched[emp.id]    = 0;
         totAct[emp.id]      = 0;
