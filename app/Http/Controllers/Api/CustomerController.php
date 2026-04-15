@@ -235,6 +235,9 @@ class CustomerController extends Controller
                 $join->on('lc.customer_id', '=', 'c.id')
                     ->where('lc.tenant_id', '=', $tenantId);
             })
+            ->leftJoin('employees as emp_reg', 'emp_reg.id', '=', 'c.created_by_employee_id')
+            ->leftJoin('users as u_creator', 'u_creator.id', '=', 'emp_reg.user_id')
+            ->leftJoin('users as u_direct', 'u_direct.id', '=', 'c.created_by_user_id')
             ->where('c.id', $customerId)
             ->where('c.tenant_id', $tenantId)
             ->select([
@@ -244,6 +247,11 @@ class CustomerController extends Controller
                 'order_stats.first_purchase_at',
                 'lc.card_code',
                 'lc.status as loyalty_status',
+                DB::raw("COALESCE(
+                    NULLIF(TRIM(CONCAT(COALESCE(emp_reg.first_name,''), ' ', COALESCE(emp_reg.last_name,''))), ''),
+                    u_creator.name,
+                    u_direct.name
+                ) as registered_by_name"),
             ])
             ->first();
 
@@ -318,16 +326,17 @@ class CustomerController extends Controller
         $customerType = $request->input('customer_type', 'privato');
 
         $rules = [
-            'customer_type' => ['nullable', 'in:privato,azienda'],
-            'code' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'customer_type'     => ['nullable', 'in:privato,azienda'],
+            'code'              => ['nullable', 'string', 'max:50'],
+            'email'             => ['nullable', 'email', 'max:255'],
+            'phone'             => ['nullable', 'string', 'max:50'],
             'marketing_consent' => ['nullable', 'boolean'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'province' => ['nullable', 'string', 'max:3'],
-            'zip_code' => ['nullable', 'string', 'max:10'],
-            'country' => ['nullable', 'string', 'max:2'],
+            'address'           => ['nullable', 'string', 'max:255'],
+            'city'              => ['nullable', 'string', 'max:100'],
+            'province'          => ['nullable', 'string', 'max:3'],
+            'zip_code'          => ['nullable', 'string', 'max:10'],
+            'country'           => ['nullable', 'string', 'max:2'],
+            'personal_discount' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ];
 
         if ($customerType === 'azienda') {
@@ -354,33 +363,33 @@ class CustomerController extends Controller
             $employeeId = DB::table('employees')->where('user_id', $request->user()?->id)->value('id');
 
             $id = DB::table('customers')->insertGetId([
-                'tenant_id' => $tenantId,
-                'customer_type' => $customerType,
-                'code' => $request->input('code') ?: null,
-                'first_name' => $isAzienda ? ($request->input('contact_person') ?: '') : $request->input('first_name'),
-                'last_name' => $isAzienda ? '' : $request->input('last_name'),
-                'company_name' => $isAzienda ? $request->input('company_name') : null,
-                'vat_number' => $isAzienda ? $request->input('vat_number') : null,
-                'sdi_code' => $isAzienda ? $request->input('sdi_code') : null,
-                'pec_email' => $isAzienda ? $request->input('pec_email') : null,
-                'contact_person' => $isAzienda ? $request->input('contact_person') : null,
-                'codice_fiscale' => ! $isAzienda ? $request->input('codice_fiscale') : null,
-                'email' => $request->input('email'),
-                'phone' => $request->input('phone'),
-                'birth_date' => ! $isAzienda ? $request->input('birth_date') : null,
-                'address' => $request->input('address'),
-                'city' => $request->input('city'),
-                'province' => $request->input('province'),
-                'zip_code' => $request->input('zip_code'),
-                'country' => $request->input('country', 'IT'),
-                'marketing_consent' => (bool) $request->boolean('marketing_consent'),
-                'status' => 'active', // Auto-attivazione: ogni nuovo cliente è attivo di default
-                'created_by_employee_id' => $employeeId, // Operatore registrante
-                'created_by_user_id'     => $request->user()?->id, // Utente registrante (fallback)
-
-                'uuid' => (string) Str::uuid(),
-                'created_at' => now(),
-                'updated_at' => now(),
+                'tenant_id'          => $tenantId,
+                'customer_type'      => $customerType,
+                'code'               => $request->input('code') ?: null,
+                'personal_discount'  => $request->filled('personal_discount') ? (float) $request->input('personal_discount') : 0,
+                'first_name'         => $isAzienda ? ($request->input('contact_person') ?: '') : $request->input('first_name'),
+                'last_name'          => $isAzienda ? '' : $request->input('last_name'),
+                'company_name'       => $isAzienda ? $request->input('company_name') : null,
+                'vat_number'         => $isAzienda ? $request->input('vat_number') : null,
+                'sdi_code'           => $isAzienda ? $request->input('sdi_code') : null,
+                'pec_email'          => $isAzienda ? $request->input('pec_email') : null,
+                'contact_person'     => $isAzienda ? $request->input('contact_person') : null,
+                'codice_fiscale'     => ! $isAzienda ? $request->input('codice_fiscale') : null,
+                'email'              => $request->input('email'),
+                'phone'              => $request->input('phone'),
+                'birth_date'         => ! $isAzienda ? $request->input('birth_date') : null,
+                'address'            => $request->input('address'),
+                'city'               => $request->input('city'),
+                'province'           => $request->input('province'),
+                'zip_code'           => $request->input('zip_code'),
+                'country'            => $request->input('country', 'IT'),
+                'marketing_consent'  => (bool) $request->boolean('marketing_consent'),
+                'status'             => 'active',
+                'created_by_employee_id' => $employeeId,
+                'created_by_user_id'     => $request->user()?->id,
+                'uuid'               => (string) Str::uuid(),
+                'created_at'         => now(),
+                'updated_at'         => now(),
             ]);
 
             // Auto-crea tessera loyalty se c'è il codice in fase di creazione!
@@ -426,28 +435,31 @@ class CustomerController extends Controller
             ->where('tenant_id', $tenantId)
             ->where('id', $customerId)
             ->update([
-                'customer_type' => $customerType,
-                'first_name' => $isAzienda ? ($request->input('contact_person') ?: $old->first_name) : ($request->input('first_name') ?? $old->first_name),
-                'last_name' => $isAzienda ? '' : ($request->input('last_name') ?? $old->last_name),
-                'company_name' => $isAzienda ? $request->input('company_name', $old->company_name) : null,
-                'vat_number' => $isAzienda ? $request->input('vat_number', $old->vat_number) : null,
-                'sdi_code' => $isAzienda ? $request->input('sdi_code', $old->sdi_code) : null,
-                'pec_email' => $isAzienda ? $request->input('pec_email', $old->pec_email) : null,
-                'contact_person' => $isAzienda ? $request->input('contact_person', $old->contact_person) : null,
-                'codice_fiscale' => ! $isAzienda ? $request->input('codice_fiscale', $old->codice_fiscale) : null,
-                'email' => $request->input('email', $old->email),
-                'phone' => $request->input('phone', $old->phone),
-                'birth_date' => ! $isAzienda ? $request->input('birth_date', $old->birth_date) : null,
-                'address' => $request->input('address', $old->address),
-                'city' => $request->input('city', $old->city),
-                'province' => $request->input('province', $old->province),
-                'zip_code' => $request->input('zip_code', $old->zip_code),
-                'country' => $request->input('country', $old->country ?? 'IT'),
-                'marketing_consent' => $request->has('marketing_consent')
+                'customer_type'      => $customerType,
+                'first_name'         => $isAzienda ? ($request->input('contact_person') ?: $old->first_name) : ($request->input('first_name') ?? $old->first_name),
+                'last_name'          => $isAzienda ? '' : ($request->input('last_name') ?? $old->last_name),
+                'company_name'       => $isAzienda ? $request->input('company_name', $old->company_name) : null,
+                'vat_number'         => $isAzienda ? $request->input('vat_number', $old->vat_number) : null,
+                'sdi_code'           => $isAzienda ? $request->input('sdi_code', $old->sdi_code) : null,
+                'pec_email'          => $isAzienda ? $request->input('pec_email', $old->pec_email) : null,
+                'contact_person'     => $isAzienda ? $request->input('contact_person', $old->contact_person) : null,
+                'codice_fiscale'     => ! $isAzienda ? $request->input('codice_fiscale', $old->codice_fiscale) : null,
+                'email'              => $request->input('email', $old->email),
+                'phone'              => $request->input('phone', $old->phone),
+                'birth_date'         => ! $isAzienda ? $request->input('birth_date', $old->birth_date) : null,
+                'address'            => $request->input('address', $old->address),
+                'city'               => $request->input('city', $old->city),
+                'province'           => $request->input('province', $old->province),
+                'zip_code'           => $request->input('zip_code', $old->zip_code),
+                'country'            => $request->input('country', $old->country ?? 'IT'),
+                'marketing_consent'  => $request->has('marketing_consent')
                     ? (bool) $request->boolean('marketing_consent')
                     : (bool) ($old->marketing_consent ?? false),
-                'status' => $newStatus,
-                'updated_at' => now(),
+                'personal_discount'  => $request->has('personal_discount')
+                    ? (float) $request->input('personal_discount')
+                    : (float) ($old->personal_discount ?? 0),
+                'status'             => $newStatus,
+                'updated_at'         => now(),
             ]);
 
         // ── Aggiorna/crea tessera fedeltà (loyalty_cards) se viene inviato un codice ──
@@ -562,6 +574,7 @@ class CustomerController extends Controller
                     'id' => (int) $customer->id,
                     'customer_type' => $customerType,
                     'code' => $customer->code,
+                    'personal_discount' => (float) ($customer->personal_discount ?? 0),
                     // Privato
                     'first_name' => $customer->first_name,
                     'last_name' => $customer->last_name,
@@ -579,7 +592,7 @@ class CustomerController extends Controller
                     'phone' => $customer->phone,
                     'phone_verified' => (bool) ($customer->phone_verified ?? false),
                     'marketing_consent' => (bool) $customer->marketing_consent,
-                    'status' => $customer->status ?? 'active', // attivo di default
+                    'status' => $customer->status ?? 'active',
                     // Indirizzo
                     'address' => $customer->address ?? null,
                     'city' => $customer->city ?? null,

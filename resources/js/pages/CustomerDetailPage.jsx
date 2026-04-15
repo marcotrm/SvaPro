@@ -155,12 +155,36 @@ export default function CustomerDetailPage() {
       {activeTab === 'anagrafica' && (
         <div className="card-v3" style={{ padding: 28 }}>
           <h2 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 20px', color: '#0f172a' }}>Dati Anagrafici</h2>
+
+          {/* ── Sconto Personalizzato Fidelity ── */}
+          {(customer.personal_discount > 0) && (
+            <div style={{
+              marginBottom: 20, padding: '16px 20px',
+              background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
+              borderRadius: 16, border: '2px solid #6ee7b7',
+              display: 'flex', alignItems: 'center', gap: 16,
+            }}>
+              <div style={{ fontSize: 36 }}>🏷️</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Sconto Personalizzato Fidelity
+                </div>
+                <div style={{ fontSize: 30, fontWeight: 900, color: '#059669', lineHeight: 1.1 }}>
+                  {customer.personal_discount}% <span style={{ fontSize: 14, fontWeight: 700, color: '#10b981' }}>su ogni acquisto</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#065f46', marginTop: 4 }}>
+                  Applicato automaticamente in tutti i negozi quando usa la fidelity card
+                </div>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
             {[
               ['Nome', `${customer.first_name || ''} ${customer.last_name || ''}`.trim()],
               ['Email', customer.email],
               ['Telefono', customer.phone],
-              ['Codice Fiscale', customer.fiscal_code],
+              ['Codice Fiscale', customer.codice_fiscale || customer.fiscal_code],
               ['Partita IVA', customer.vat_number],
               ['Indirizzo', customer.address],
               ['Città', `${customer.city || ''} ${customer.postal_code || ''}`.trim()],
@@ -175,6 +199,26 @@ export default function CustomerDetailPage() {
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{value}</div>
               </div>
             ) : null)}
+
+            {/* Registrato da */}
+            {customer.registered_by_name && (
+              <div style={{ background: '#f0f9ff', borderRadius: 12, padding: '14px 16px', border: '1px solid #bae6fd' }}>
+                <div style={{ fontSize: 11, color: '#0284c7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  👤 Fidelity creata da
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#0c4a6e' }}>{customer.registered_by_name}</div>
+              </div>
+            )}
+
+            {/* Sconto personalizzato (anche se 0, mostrarlo come campo) */}
+            {!customer.personal_discount && (
+              <div style={{ background: '#f8fafc', borderRadius: 12, padding: '14px 16px', border: '1px dashed #e2e8f0' }}>
+                <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                  🏷️ Sconto Fidelity
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8' }}>Nessuno sconto impostato</div>
+              </div>
+            )}
           </div>
 
           {customer.notes && (
@@ -185,6 +229,7 @@ export default function CustomerDetailPage() {
           )}
         </div>
       )}
+
 
       {/* ── ORDINI ── */}
       {activeTab === 'ordini' && (() => {

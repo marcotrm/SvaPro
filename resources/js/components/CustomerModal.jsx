@@ -172,6 +172,7 @@ export default function CustomerModal({ customer, onClose, onSave }) {
   const [formData, setFormData] = useState({
     customer_type:   initialType,
     code:            customer?.code || '',
+    personal_discount: customer?.personal_discount ?? 0,
     // Privato
     first_name:      customer?.first_name || '',
     last_name:       customer?.last_name || '',
@@ -482,7 +483,7 @@ export default function CustomerModal({ customer, onClose, onSave }) {
               </label>
             </div>
 
-            {/* ─── Codice tessera fidelity + Numero Cliente ─── */}
+            {/* ─── Codice tessera fidelity + Sconto Personale + Numero Cliente ─── */}
             <Field label="Codice Tessera Fidelity" error={fe('code')} full>
               <input
                 className={S.input}
@@ -496,6 +497,40 @@ export default function CustomerModal({ customer, onClose, onSave }) {
                 Codice univoco per la tessera fedeltà del cliente
               </p>
             </Field>
+
+            {/* ─── SCONTO PERSONALIZZATO FIDELITY ─── */}
+            <Field label="🏷️ Sconto Personalizzato Fidelity" error={fe('personal_discount')} full>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <input
+                    className={S.input}
+                    name="personal_discount"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    value={formData.personal_discount}
+                    onChange={handleChange}
+                    placeholder="0"
+                    style={{ paddingRight: 40, fontWeight: 800, fontSize: 18, color: formData.personal_discount > 0 ? '#059669' : undefined }}
+                  />
+                  <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 900, fontSize: 16, color: '#94a3b8' }}>%</span>
+                </div>
+                {formData.personal_discount > 0 && (
+                  <div style={{ padding: '8px 16px', background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', borderRadius: 12, border: '2px solid #6ee7b7', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 18 }}>🎯</span>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Sconto attivo</div>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: '#059669' }}>{formData.personal_discount}% OFF</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+                💡 Lo sconto viene applicato in automatico su ogni negozio quando il cliente usa la fidelity card. Lascia 0 per nessuno sconto.
+              </p>
+            </Field>
+
             {isEdit && (
               <Field label="N° Cliente (progressivo)">
                 <div style={{
