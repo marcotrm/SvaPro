@@ -12,7 +12,7 @@ class RestockOrderController extends Controller
     /** GET /restock-orders */
     public function index(Request $request)
     {
-        $tenantId = $request->user()->tenant_id;
+        $tenantId = (int) $request->attributes->get('tenant_id');
         $status   = $request->query('status');
         $storeId  = $request->query('store_id');
 
@@ -39,7 +39,7 @@ class RestockOrderController extends Controller
     /** GET /restock-orders/:id */
     public function show(Request $request, $id)
     {
-        $tenantId = $request->user()->tenant_id;
+        $tenantId = (int) $request->attributes->get('tenant_id');
 
         $order = DB::table('restock_orders as ro')
             ->where('ro.id', $id)
@@ -330,7 +330,7 @@ class RestockOrderController extends Controller
         return DB::table('warehouses')
             ->join('stores', 'stores.id', '=', 'warehouses.store_id')
             ->where('warehouses.tenant_id', $tenantId)
-            ->where('stores.is_main', 1)
+            ->where('stores.is_main', true)
             ->select('warehouses.id')
             ->first();
     }
