@@ -58,7 +58,6 @@ class RestockOrderController extends Controller
             ->select(
                 'ri.*',
                 'pv.sale_price',
-                'pv.on_hand',
                 DB::raw("COALESCE(ri.product_name, p.name, 'Prodotto senza nome') as product_name")
             )
             ->get();
