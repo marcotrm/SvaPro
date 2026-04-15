@@ -26,6 +26,7 @@ const DEFAULT_RULES = {
   min_items_qty:          5,    // R4: numero minimo pezzi in vendita
   pts_per_big_sale:       20,   // R4: punti se vendita ≥ min_items_qty pezzi
   pts_per_qscare:         40,   // R5: punti per ogni vendita con QScare
+  pts_per_featured:       15,   // R6: punti per ogni prodotto preferito venduto
 };
 
 export default function GamificationPage() {
@@ -87,9 +88,10 @@ export default function GamificationPage() {
     let pts = 0;
     const revenue      = parseFloat(order.grand_total)    || 0;
     const discountAmt  = parseFloat(order.discount_total) || 0;
-    const lineCount    = parseInt(order.line_count)        || 0; // totale pezzi nell'ordine
-    const hasQscare    = !!order.has_qscare;                    // flag QScare nell'ordine
-    const newCustomer  = !!order.new_customer_created;          // nuova fidelity card creata
+    const lineCount    = parseInt(order.line_count)        || 0;
+    const hasQscare    = !!order.has_qscare;
+    const newCustomer  = !!order.new_customer_created;
+    const featuredQty  = parseInt(order.featured_items_count) || 0;
 
     // R1 – 1 punto per ogni euro incassato
     pts += Math.floor(revenue * (r.pts_per_euro || 1));
@@ -105,6 +107,9 @@ export default function GamificationPage() {
 
     // R5 – QScare inclusa
     if (hasQscare) pts += (r.pts_per_qscare || 0);
+
+    // R6 – Prodotti Preferiti (per ogni prodotto preferito venduto)
+    pts += featuredQty * (r.pts_per_featured || 0);
 
     return pts;
   }, []);
@@ -132,7 +137,7 @@ export default function GamificationPage() {
         if (!empId) return;
         if (!statsMap[empId]) statsMap[empId] = {
           id: empId, orders: 0, revenue: 0, points: 0,
-          pts_r1: 0, pts_r2: 0, pts_r3: 0, pts_r4: 0, pts_r5: 0,
+          pts_r1: 0, pts_r2: 0, pts_r3: 0, pts_r4: 0, pts_r5: 0, pts_r6: 0,
         };
         const s = statsMap[empId];
         s.orders++;
@@ -144,12 +149,13 @@ export default function GamificationPage() {
         const r3 = (parseFloat(o.discount_total) || 0) > (rules.pts_discount_threshold || 25) ? (rules.pts_per_discount || 0) : 0;
         const r4 = (parseInt(o.line_count) || 0) >= (rules.min_items_qty || 5) ? (rules.pts_per_big_sale || 0) : 0;
         const r5 = o.has_qscare ? (rules.pts_per_qscare || 0) : 0;
-        s.pts_r1 += r1; s.pts_r2 += r2; s.pts_r3 += r3; s.pts_r4 += r4; s.pts_r5 += r5;
-        s.points += r1 + r2 + r3 + r4 + r5;
+        const r6 = (parseInt(o.featured_items_count) || 0) * (rules.pts_per_featured || 0);
+        s.pts_r1 += r1; s.pts_r2 += r2; s.pts_r3 += r3; s.pts_r4 += r4; s.pts_r5 += r5; s.pts_r6 += r6;
+        s.points += r1 + r2 + r3 + r4 + r5 + r6;
       });
 
       const lb = allEmps.map(emp => {
-        const stats = statsMap[emp.id] || { orders: 0, revenue: 0, points: 0, pts_r1:0, pts_r2:0, pts_r3:0, pts_r4:0, pts_r5:0 };
+        const stats = statsMap[emp.id] || { orders: 0, revenue: 0, points: 0, pts_r1:0, pts_r2:0, pts_r3:0, pts_r4:0, pts_r5:0, pts_r6:0 };
         const pts   = stats.points;
         return { ...emp, ...stats, points: pts, badge: getBadge(pts) };
       }).filter(e => e.points > 0 || isAdmin);
@@ -278,6 +284,7 @@ export default function GamificationPage() {
               <th title="Punti da sconto">🏷️</th>
               <th title="Punti da vendita voluminosa">📦</th>
               <th title="Punti da QScare">🛡</th>
+              <th title="Punti da prodotti preferiti">⭐</th>
               <th>Ordini</th><th>Fatturato</th>
             </tr></thead>
             <tbody>
@@ -315,11 +322,12 @@ export default function GamificationPage() {
                   <td style={{ color: '#d97706', fontWeight: 700, fontSize: 12 }}>{(emp.pts_r3||0).toLocaleString()}</td>
                   <td style={{ color: '#7c3aed', fontWeight: 700, fontSize: 12 }}>{(emp.pts_r4||0).toLocaleString()}</td>
                   <td style={{ color: '#0d9488', fontWeight: 700, fontSize: 12 }}>{(emp.pts_r5||0).toLocaleString()}</td>
+                  <td style={{ color: '#f59e0b', fontWeight: 700, fontSize: 12 }}>{(emp.pts_r6||0).toLocaleString()}</td>
                   <td>{emp.orders}</td>
                   <td style={{ color: '#16a34a', fontWeight: 700 }}>{fmt(emp.revenue)}</td>
                 </tr>
               )) : (
-                <tr><td colSpan="11" style={{ textAlign: 'center', padding: '40px', color: '#cbd5e1' }}>
+                <tr><td colSpan="12" style={{ textAlign: 'center', padding: '40px', color: '#cbd5e1' }}>
                   Nessun dato. Registra vendite con operatore assegnato via barcode.
                 </td></tr>
               )}
@@ -360,6 +368,7 @@ export default function GamificationPage() {
               { icon: '🏷️', label: `Sconto > €${rules.pts_discount_threshold}`, color: '#d97706', value: `+${rules.pts_per_discount} pt per vendita scontata`,                           desc: `Quando lo sconto applicato supera €${rules.pts_discount_threshold}` },
               { icon: '📦', label: `Vendita ≥ ${rules.min_items_qty} pezzi`, color: '#7c3aed', value: `+${rules.pts_per_big_sale} pt per vendita voluminosa`,                               desc: `Se la vendita include almeno ${rules.min_items_qty} prodotti` },
               { icon: '🛡',  label: 'Vendita con QScare inclusa',            color: '#0d9488', value: `+${rules.pts_per_qscare} pt per ogni QScare venduta`,                               desc: 'Ogni volta che viene aggiunta la garanzia QScare' },
+              { icon: '⭐',  label: 'Prodotto Preferito venduto',             color: '#f59e0b', value: `+${rules.pts_per_featured} pt per ogni prodotto preferito`,                         desc: 'Per ogni prodotto marcato come "Preferito" nel catalogo presente nella vendita' },
             ].map(r => (
               <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 18px', background: '#f8fafc', borderRadius: 14, border: '1px solid #f1f5f9' }}>
                 <span style={{ fontSize: 28, flexShrink: 0 }}>{r.icon}</span>
@@ -476,7 +485,7 @@ export default function GamificationPage() {
               </div>
 
               {/* Regola 5 — QScare */}
-              <div style={{ padding: '4px 0 8px' }}>
+              <div style={{ padding: '4px 0 8px', borderBottom: '2px solid #f1f5f9' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
                   REGOLA 5 · QScare
                 </div>
@@ -490,18 +499,37 @@ export default function GamificationPage() {
                 />
               </div>
 
+              {/* Regola 6 — Prodotto Preferito */}
+              <div style={{ padding: '4px 0 8px' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+                  REGOLA 6 · Prodotto Preferito
+                </div>
+                <RuleInput
+                  fieldKey="pts_per_featured"
+                  icon="⭐"
+                  label="Punti per ogni prodotto preferito venduto"
+                  desc='Per ogni articolo con flag "Preferito" nella vendita. Attiva il flag dal Catalogo Prodotti.'
+                  suffix="pt / prodotto"
+                  step={5}
+                />
+                <div style={{ marginTop: 8, padding: '10px 14px', background: '#fffbeb', borderRadius: 10, fontSize: 12, color: '#92400e', border: '1px solid #fde68a' }}>
+                  💡 Per marcare un prodotto come preferito, vai su <strong>Catalogo → Prodotti</strong> e attiva il toggle ⭐ sul prodotto.
+                </div>
+              </div>
+
             </div>
 
             {/* Anteprima formula */}
             <div style={{ marginTop: 24, padding: '18px 22px', background: 'linear-gradient(135deg, #1e1b4b, #312e81)', borderRadius: 16, color: '#fff' }}>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>📊 Esempio calcolo punti</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
                 {[
                   { label: 'Vendita €100', pts: Math.floor(100 * editRules.pts_per_euro), icon: '💰', color: '#86efac' },
                   { label: '+ Fidelity',   pts: editRules.pts_per_fidelity,               icon: '👤', color: '#7dd3fc' },
                   { label: '+ Sconto >€25',pts: editRules.pts_per_discount,               icon: '🏷️', color: '#fcd34d' },
                   { label: `+ ≥${editRules.min_items_qty}pz`, pts: editRules.pts_per_big_sale, icon: '📦', color: '#c4b5fd' },
                   { label: '+ QScare',     pts: editRules.pts_per_qscare,                 icon: '🛡', color: '#5eead4' },
+                  { label: '+ 1 Preferito',pts: editRules.pts_per_featured,               icon: '⭐', color: '#fde68a' },
                 ].map((item, i) => (
                   <div key={i} style={{ textAlign: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '10px 8px' }}>
                     <div style={{ fontSize: 18 }}>{item.icon}</div>
@@ -512,7 +540,7 @@ export default function GamificationPage() {
                 ))}
               </div>
               <div style={{ marginTop: 12, textAlign: 'center', color: '#c9a227', fontWeight: 900, fontSize: 15 }}>
-                Totale esempio: {Math.floor(100 * editRules.pts_per_euro) + editRules.pts_per_fidelity + editRules.pts_per_discount + editRules.pts_per_big_sale + editRules.pts_per_qscare} punti
+                Totale esempio: {Math.floor(100 * editRules.pts_per_euro) + editRules.pts_per_fidelity + editRules.pts_per_discount + editRules.pts_per_big_sale + editRules.pts_per_qscare + editRules.pts_per_featured} punti
               </div>
             </div>
 

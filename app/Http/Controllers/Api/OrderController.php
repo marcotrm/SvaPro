@@ -122,6 +122,7 @@ class OrderController extends Controller
                 'so.status',
                 'so.channel',
                 'so.grand_total',
+                'so.discount_total',
                 'so.currency',
                 'so.created_at',
                 'so.updated_at',
@@ -141,6 +142,7 @@ class OrderController extends Controller
                 'so.status',
                 'so.channel',
                 'so.grand_total',
+                'so.discount_total',
                 'so.currency',
                 'so.created_at',
                 'so.updated_at',
@@ -151,6 +153,8 @@ class OrderController extends Controller
                 'emp.first_name as employee_first_name',
                 'emp.last_name as employee_last_name',
                 DB::raw('COALESCE(SUM(ll.points_delta), 0) as loyalty_points_awarded'),
+                DB::raw('(SELECT COALESCE(SUM(sol2.qty),0) FROM sales_order_lines sol2 WHERE sol2.sales_order_id = so.id) as line_count'),
+                DB::raw('(SELECT COUNT(*) FROM sales_order_lines sol3 JOIN product_variants pv3 ON pv3.id = sol3.product_variant_id JOIN products p3 ON p3.id = pv3.product_id WHERE sol3.sales_order_id = so.id AND p3.is_featured = true) as featured_items_count'),
             ])
             ->orderByDesc('so.created_at')
             ->orderByDesc('so.id')
@@ -1387,6 +1391,9 @@ class OrderController extends Controller
             'customer_id' => $row->customer_id !== null ? (int) $row->customer_id : null,
             'grand_total' => (float) $row->grand_total,
             'total' => (float) $row->grand_total,
+            'discount_total' => (float) ($row->discount_total ?? 0),
+            'line_count' => (int) ($row->line_count ?? 0),
+            'featured_items_count' => (int) ($row->featured_items_count ?? 0),
             'currency' => (string) ($row->currency ?: 'EUR'),
             'created_at' => $row->created_at,
             'updated_at' => $row->updated_at,
