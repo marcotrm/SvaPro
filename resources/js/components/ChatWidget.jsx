@@ -328,15 +328,12 @@ function EmployeeChatPanel({ user, selectedStoreId, priority, onClose }) {
     if (!opCode.trim()) { setOpError('Inserisci il codice operatore'); return; }
     setOpVerifying(true); setOpError('');
     try {
-      const { employees: employeesApi } = await import('../api.jsx');
-      // Cerca per barcode, employee_code, id o nome
-      const res = await employeesApi.getEmployees({ barcode: opCode.trim(), limit: 5 });
+      const { default: api } = await import('../api.jsx');
+      const res = await api.get('/employees', { params: { barcode: opCode.trim() } });
       const empList = res.data?.data || [];
       const code = opCode.trim().toLowerCase();
-      // Match esatto su barcode o employee_code, poi fallback al primo risultato
       const emp = empList.find(e =>
         (e.barcode && e.barcode.toLowerCase() === code) ||
-        (e.employee_code && e.employee_code.toLowerCase() === code) ||
         String(e.id) === code
       ) || empList[0];
 
@@ -344,10 +341,11 @@ function EmployeeChatPanel({ user, selectedStoreId, priority, onClose }) {
         setOpName(`${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || opCode);
         setOpVerified(true);
       } else {
-        setOpError('Codice non trovato. Verifica il badge del dipendente.');
+        setOpError('Codice non trovato. Verifica il barcode del dipendente.');
       }
-    } catch {
-      setOpError('Errore di connessione. Riprova.');
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Errore sconosciuto';
+      setOpError(`Errore: ${msg}`);
     } finally { setOpVerifying(false); }
   };
 
