@@ -442,6 +442,7 @@ export default function InventoryPage() {
       {showMovementModal && (
         <InventoryMovementModal
           stock={stock}
+          storeId={selectedStoreId}
           onClose={() => setShowMovementModal(false)}
           onSaved={async () => { await fetchData(); setShowMovementModal(false); }}
         />

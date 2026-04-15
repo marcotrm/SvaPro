@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { X, Loader } from 'lucide-react';
-import { inventory } from '../api.jsx';
+import { inventory, catalog } from '../api.jsx';
 
 const MOVEMENT_TYPES = [
   { value: 'manual_adjustment', label: 'Rettifica manuale' },
@@ -11,13 +11,15 @@ const MOVEMENT_TYPES = [
   { value: 'damaged', label: 'Danneggiato / Scarto' },
 ];
 
-export default function InventoryMovementModal({ stock = [], onClose, onSaved }) {
+export default function InventoryMovementModal({ stock = [], storeId, onClose, onSaved }) {
+  // Warehouse dall'elenco stock già caricato
   const warehouses = useMemo(
     () => Array.from(new Map(stock.map((item) => [item.warehouse_id, { id: item.warehouse_id, name: item.warehouse_name }])).values()),
     [stock]
   );
 
-  const variants = useMemo(
+  // Varianti dalla lista stock oppure dal catalogo (se stock è vuoto)
+  const stockVariants = useMemo(
     () => Array.from(
       new Map(stock.map((item) => [
         item.product_variant_id,
@@ -29,6 +31,28 @@ export default function InventoryMovementModal({ stock = [], onClose, onSaved })
     ),
     [stock]
   );
+
+  const [catalogVariants, setCatalogVariants] = useState([]);
+  const noStock = warehouses.length === 0;
+
+  // Se non ci sono stock_items (magazzino vuoto) carica le varianti dal catalogo
+  useEffect(() => {
+    if (!noStock) return;
+    const params = storeId ? { store_id: storeId, limit: 500 } : { limit: 500 };
+    catalog.getProducts(params)
+      .then(res => {
+        const pvs = [];
+        (res.data?.data || []).forEach(p =>
+          (p.variants || []).forEach(v =>
+            pvs.push({ id: v.id, label: v.flavor ? `${p.name} - ${v.flavor}` : p.name })
+          )
+        );
+        setCatalogVariants(pvs);
+      })
+      .catch(() => {});
+  }, [noStock, storeId]);
+
+  const variants = noStock ? catalogVariants : stockVariants;
 
   const [formData, setFormData] = useState({
     warehouse_id: warehouses[0]?.id || '',
@@ -57,20 +81,33 @@ export default function InventoryMovementModal({ stock = [], onClose, onSaved })
       return;
     }
 
+    const pvId = Number(formData.product_variant_id);
+    if (!pvId) {
+      setError('Seleziona un prodotto.');
+      return;
+    }
+
+    // Costruisce il payload: usa warehouse_id se disponibile, altrimenti
+    // manda store_id e il backend auto-crea/risolve il magazzino
+    const warehouseId = Number(formData.warehouse_id) || null;
+    const payload = {
+      product_variant_id: pvId,
+      qty: formData.direction === 'out' ? -Math.abs(baseQty) : Math.abs(baseQty),
+      movement_type: formData.movement_type,
+      reference_type: formData.reference_type || null,
+      reference_id: formData.reference_id ? Number(formData.reference_id) : null,
+      unit_cost: formData.unit_cost ? Number(formData.unit_cost) : null,
+    };
+    if (warehouseId) {
+      payload.warehouse_id = warehouseId;
+    } else if (storeId) {
+      payload.store_id = storeId;
+    }
+
     try {
       setLoading(true);
       setError('');
-
-      await inventory.adjustStock({
-        warehouse_id: Number(formData.warehouse_id),
-        product_variant_id: Number(formData.product_variant_id),
-        qty: formData.direction === 'out' ? -Math.abs(baseQty) : Math.abs(baseQty),
-        movement_type: formData.movement_type,
-        reference_type: formData.reference_type || null,
-        reference_id: formData.reference_id ? Number(formData.reference_id) : null,
-        unit_cost: formData.unit_cost ? Number(formData.unit_cost) : null,
-      });
-
+      await inventory.adjustStock(payload);
       onSaved();
     } catch (err) {
       const serverErrors = err.response?.data?.errors;
@@ -102,21 +139,31 @@ export default function InventoryMovementModal({ stock = [], onClose, onSaved })
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Magazzino</label>
-              <select
-                name="warehouse_id"
-                value={formData.warehouse_id}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              >
-                <option value="">Seleziona magazzino</option>
-                {warehouses.map((warehouse) => (
-                  <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>
-                ))}
-              </select>
-            </div>
+            {/* Mostra dropdown warehouse solo se disponibili */}
+            {warehouses.length > 0 ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Magazzino</label>
+                <select
+                  name="warehouse_id"
+                  value={formData.warehouse_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  required
+                >
+                  <option value="">Seleziona magazzino</option>
+                  {warehouses.map((warehouse) => (
+                    <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Magazzino</label>
+                <div className="px-3 py-2 border border-blue-200 bg-blue-50 rounded-lg text-sm text-blue-700">
+                  Il magazzino verrà associato automaticamente al negozio selezionato.
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Prodotto / Variante</label>

@@ -143,11 +143,26 @@ class InventoryController extends Controller
 
         // ── Auto-resolve warehouse_id da store_id se necessario ──────────
         if (!$request->filled('warehouse_id') && $request->filled('store_id')) {
+            $sId = (int) $request->integer('store_id');
             $wh = DB::table('warehouses')
                 ->where('tenant_id', $tenantId)
-                ->where('store_id', (int) $request->integer('store_id'))
+                ->where('store_id', $sId)
                 ->orderBy('id')
                 ->value('id');
+
+            // Auto-crea il warehouse del negozio se non esiste ancora
+            if (!$wh) {
+                $storeName = DB::table('stores')->where('id', $sId)->value('name');
+                $wh = DB::table('warehouses')->insertGetId([
+                    'tenant_id'  => $tenantId,
+                    'store_id'   => $sId,
+                    'name'       => ($storeName ?: 'Negozio') . ' – Magazzino',
+                    'type'       => 'store',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
             if ($wh) {
                 $request->merge(['warehouse_id' => $wh]);
             }
