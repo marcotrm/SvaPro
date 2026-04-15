@@ -4,15 +4,15 @@ import { attendance, stores } from '../api.jsx';
 import DatePicker from '../components/DatePicker.jsx';
 
 /* â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-const fmtTime  = v => v ? new Date(v).toLocaleTimeString('it-IT',  { hour: '2-digit', minute: '2-digit' }) : 'â€”';
-const fmtDate  = v => v ? new Date(v).toLocaleDateString('it-IT',  { weekday: 'short', day: 'numeric', month: 'short' }) : 'â€”';
+const fmtTime  = v => v ? new Date(v).toLocaleTimeString('it-IT',  { hour: '2-digit', minute: '2-digit' }) : '—';
+const fmtDate  = v => v ? new Date(v).toLocaleDateString('it-IT',  { weekday: 'short', day: 'numeric', month: 'short' }) : '—';
 const initials = e => `${(e.first_name||'')[0]||''}${(e.last_name||'')[0]||''}`.toUpperCase() || '?';
 
 const AVATAR_COLORS = ['#7B6FD0','#F472B6','#34D399','#60A5FA','#FB923C','#A78BFA','#2DD4BF','#FBBF24'];
 const avatarColor   = id => AVATAR_COLORS[(id || 0) % AVATAR_COLORS.length];
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   ADMIN VIEW â€” Dashboard presenze in tempo reale
+   ADMIN VIEW — Dashboard presenze in tempo reale
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function AdminPresenceView() {
   const [activeTab,   setActiveTab]   = useState('live');  // 'live' | 'history'
@@ -91,9 +91,9 @@ function AdminPresenceView() {
   const liveIds = new Set(liveList.map(e => e.employee_id || e.id));
 
   const fmtMins = (m) => {
-    if (!m && m !== 0) return 'â€”';
+    if (!m && m !== 0) return '—';
     const total = Math.round(m);
-    if (total <= 0) return 'â€”';
+    if (total <= 0) return '—';
     const h   = Math.floor(total / 60);
     const min = total % 60;
     if (h === 0) return `${min}m`;
@@ -121,8 +121,8 @@ function AdminPresenceView() {
     <div style={{ maxWidth: 980, margin: '0 auto' }}>
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        <TabBtn id="live"    label="Presenze Live"       icon="ðŸŸ¢" />
-        <TabBtn id="history" label="Cronologia & Ore"   icon="ðŸ“‹" />
+        <TabBtn id="live"    label="Presenze Live"       icon="🟢" />
+        <TabBtn id="history" label="Cronologia & Ore"   icon="📋" />
       </div>
 
       {/* â”€â”€ TAB: LIVE â”€â”€ */}
@@ -159,21 +159,21 @@ function AdminPresenceView() {
             onClick={fetchPresence}
             style={{ alignSelf: 'center', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 14px', color: 'rgba(255,255,255,0.8)', fontSize: 12, cursor: 'pointer', height: 'fit-content' }}
           >
-            â†º Aggiorna
+            ↺ Aggiorna
           </button>
         </div>
       </div>
 
-      {/* â”€â”€ Chi Ã¨ in servizio ORA â”€â”€ */}
+      {/* â”€â”€ Chi è in servizio ORA â”€â”€ */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
-          ðŸŸ¢ Dipendenti in servizio ora ({liveList.length})
+          🟢 Dipendenti in servizio ora ({liveList.length})
         </div>
         {loadingLive ? (
           <div style={{ background: '#fff', borderRadius: 16, padding: 32, textAlign: 'center', color: '#9ca3af' }}>Caricamento...</div>
         ) : liveList.length === 0 ? (
           <div style={{ background: '#fff', borderRadius: 16, padding: 32, textAlign: 'center', color: '#9ca3af', border: '2px dashed #e5e7eb' }}>
-            <div style={{ fontSize: 40, marginBottom: 8 }}>ðŸ </div>
+            <div style={{ fontSize: 40, marginBottom: 8 }}>🏠</div>
             <div style={{ fontWeight: 700 }}>Nessun dipendente in servizio</div>
           </div>
         ) : (
@@ -203,9 +203,9 @@ function AdminPresenceView() {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, color: isPausa ? '#b45309' : '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
                     <div style={{ fontSize: 12, color: isPausa ? '#d97706' : '#22c55e', fontWeight: 600, marginTop: 2 }}>
-                      {isPausa ? 'â˜• In pausa da: ' : 'ðŸŸ¢ Entrata: '}{entry}
+                      {isPausa ? 'â˜• In pausa da: ' : '🟢 Entrata: '}{entry}
                     </div>
-                    {emp.store_name && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>ðŸ“ {emp.store_name}</div>}
+                    {emp.store_name && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>📍 {emp.store_name}</div>}
                   </div>
                 </div>
               );
@@ -217,7 +217,7 @@ function AdminPresenceView() {
       {/* â”€â”€ Storico timbrature â”€â”€ */}
       <div>
         <div style={{ fontSize: 13, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
-          ðŸ“‹ Timbrature del {new Date(filterDate).toLocaleDateString('it-IT')} ({todayList.length})
+          📋 Timbrature del {new Date(filterDate).toLocaleDateString('it-IT')} ({todayList.length})
         </div>
         {todayList.length === 0 ? (
           <div style={{ background: '#fff', borderRadius: 16, padding: 24, textAlign: 'center', color: '#9ca3af', border: '2px dashed #e5e7eb' }}>
@@ -253,7 +253,7 @@ function AdminPresenceView() {
                           <span style={{ fontWeight: 600, fontSize: 14, color: '#1f2937' }}>{name}</span>
                         </div>
                       </td>
-                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#6b7280' }}>{rec.store_name || 'â€”'}</td>
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#6b7280' }}>{rec.store_name || '—'}</td>
                       <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 700, color: '#22c55e' }}>{fmtTime(rec.checked_in_at)}</td>
                       <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 700, color: rec.checked_out_at ? '#ef4444' : '#d1d5db' }}>{fmtTime(rec.checked_out_at)}</td>
                       <td style={{ padding: '12px 16px' }}>
@@ -262,7 +262,7 @@ function AdminPresenceView() {
                           background: rec.status === 'pausa' ? '#FFFBEB' : (rec.status === 'presente' || isIn ? '#dcfce7' : '#f3f4f6'),
                           color: rec.status === 'pausa' ? '#B45309' : (rec.status === 'presente' || isIn ? '#16a34a' : '#6b7280'),
                         }}>
-                          {rec.status === 'pausa' ? 'â˜• Pausa' : (rec.status === 'presente' || isIn ? 'ðŸŸ¢ Presente' : 'âšª Uscito')}
+                          {rec.status === 'pausa' ? 'â˜• Pausa' : (rec.status === 'presente' || isIn ? '🟢 Presente' : '⚪ Uscito')}
                         </span>
                       </td>
                     </tr>
@@ -299,7 +299,7 @@ function AdminPresenceView() {
                   style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
                   onMouseEnter={ev => ev.currentTarget.style.background = '#f9fafb'}
                   onMouseLeave={ev => ev.currentTarget.style.background = ''}
-                >{e.first_name} {e.last_name} {e.barcode ? <span style={{ fontSize: 10, color: '#9ca3af' }}>Â· {e.barcode}</span> : ''}</div>
+                >{e.first_name} {e.last_name} {e.barcode ? <span style={{ fontSize: 10, color: '#9ca3af' }}>· {e.barcode}</span> : ''}</div>
               ))}
             </div>
           )}
@@ -315,7 +315,7 @@ function AdminPresenceView() {
         <div style={{ display: 'flex', alignItems: 'flex-end' }}>
           <button onClick={fetchHistory} disabled={histLoading}
             style={{ width: '100%', padding: '9px 18px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#7B6FD0,#4F46E5)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-            {histLoading ? 'Caricamentoâ€¦' : 'ðŸ” Cerca'}
+            {histLoading ? 'Caricamento…' : '🔍 Cerca'}
           </button>
         </div>
       </div>
@@ -341,7 +341,7 @@ function AdminPresenceView() {
                   <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 700 }}>GIORNI</div>
                 </div>
               </div>
-              {s.late_count > 0 && <div style={{ marginTop: 8, fontSize: 11, color: '#ef4444', fontWeight: 700 }}>âš  {s.late_count} ritardi</div>}
+              {s.late_count > 0 && <div style={{ marginTop: 8, fontSize: 11, color: '#ef4444', fontWeight: 700 }}>⚠ {s.late_count} ritardi</div>}
             </div>
           ))}
         </div>
@@ -358,7 +358,7 @@ function AdminPresenceView() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f9fafb' }}>
-                  {['Dipendente','Negozio','Data','Entrata','Uscita','Ore','â˜… Ritardo','Stato'].map(h => (
+                  {['Dipendente','Negozio','Data','Entrata','Uscita','Ore','★ Ritardo','Stato'].map(h => (
                     <th key={h} style={{ padding: '12px 14px', fontSize: 11, fontWeight: 700, color: '#6b7280', textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #f3f4f6', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -378,9 +378,9 @@ function AdminPresenceView() {
                         <span style={{ fontWeight: 600, fontSize: 13, color: '#1f2937', whiteSpace: 'nowrap' }}>{rec.employee_name}</span>
                       </div>
                     </td>
-                    <td style={{ padding: '11px 14px', fontSize: 12, color: '#6b7280' }}>{rec.store_name || 'â€”'}</td>
+                    <td style={{ padding: '11px 14px', fontSize: 12, color: '#6b7280' }}>{rec.store_name || '—'}</td>
                     <td style={{ padding: '11px 14px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      {rec.checked_in_at ? new Date(rec.checked_in_at).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }) : 'â€”'}
+                      {rec.checked_in_at ? new Date(rec.checked_in_at).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }) : '—'}
                     </td>
                     <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: '#22c55e' }}>{fmtTime(rec.checked_in_at)}</td>
                     <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: rec.checked_out_at ? '#ef4444' : '#d1d5db' }}>{fmtTime(rec.checked_out_at)}</td>
@@ -388,13 +388,13 @@ function AdminPresenceView() {
                     <td style={{ padding: '11px 14px' }}>
                       {rec.late_minutes > 0
                         ? <span style={{ background: '#fef2f2', color: '#dc2626', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>+{rec.late_minutes}m</span>
-                        : <span style={{ color: '#d1d5db', fontSize: 11 }}>â€”</span>}
+                        : <span style={{ color: '#d1d5db', fontSize: 11 }}>—</span>}
                     </td>
                     <td style={{ padding: '11px 14px' }}>
                       <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
                         background: rec.status === 'presente' ? '#dcfce7' : '#f3f4f6',
                         color: rec.status === 'presente' ? '#16a34a' : '#6b7280' }}>
-                        {rec.status === 'presente' ? 'ðŸŸ¢ Presente' : 'âšª Uscito'}
+                        {rec.status === 'presente' ? '🟢 Presente' : '⚪ Uscito'}
                       </span>
                     </td>
                   </tr>
@@ -411,7 +411,7 @@ function AdminPresenceView() {
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   EMPLOYEE KIOSK VIEW â€” Schermata timbratura touch
+   EMPLOYEE KIOSK VIEW — Schermata timbratura touch
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function KioskView() {
   const { selectedStoreId, user } = useOutletContext() || {};
@@ -451,7 +451,7 @@ function KioskView() {
     if (!employee && phase === 'idle' && !isDipendente) setTimeout(() => barcodeRef.current?.focus(), 100);
   }, [employee, phase, isDipendente]);
 
-  // Se l'utente Ã¨ un dipendente, trova automaticamente il suo ID
+  // Se l'utente è un dipendente, trova automaticamente il suo ID
   useEffect(() => {
     if (isDipendente && user && employees.length > 0 && phase === 'idle') {
       const found = employees.find(e => 
@@ -606,7 +606,7 @@ function KioskView() {
                 onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-                <span style={{ fontSize: 40 }}>âœ…</span>
+                <span style={{ fontSize: 40 }}>✅</span>
                 Inizia Turno (Entrata)
             </button>
 
@@ -630,7 +630,7 @@ function KioskView() {
                 onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-                <span style={{ fontSize: 40 }}>ðŸ”™</span>
+                <span style={{ fontSize: 40 }}>🔙</span>
                 Fine Pausa (Rientro)
             </button>
 
@@ -642,7 +642,7 @@ function KioskView() {
                 onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-                <span style={{ fontSize: 40 }}>ðŸšª</span>
+                <span style={{ fontSize: 40 }}>🚪</span>
                 Fine Turno (Uscita)
             </button>
         </div>
@@ -680,7 +680,7 @@ function KioskView() {
           fontSize: 52, marginBottom: 32,
           animation: 'bounceIn 0.4s cubic-bezier(.36,.07,.19,.97) both',
         }}>
-          {isIn ? 'âœ…' : 'ðŸ‘‹'}
+          {isIn ? '✅' : '👋'}
         </div>
 
         <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>
@@ -701,8 +701,8 @@ function KioskView() {
                 background: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: '10px 18px',
                 border: '1px solid rgba(255,255,255,0.12)', display: 'flex', gap: 12, alignItems: 'center',
               }}>
-                <span style={{ color: '#4ade80', fontWeight: 700, fontSize: 14 }}>ðŸŸ¢ {fmtTime(rec.clock_in)}</span>
-                {rec.clock_out && <span style={{ color: rec.is_break ? '#FCD34D' : '#f87171', fontWeight: 700, fontSize: 14 }}>{rec.is_break ? 'â˜•' : 'ðŸ”´'} {fmtTime(rec.clock_out)}</span>}
+                <span style={{ color: '#4ade80', fontWeight: 700, fontSize: 14 }}>🟢 {fmtTime(rec.clock_in)}</span>
+                {rec.clock_out && <span style={{ color: rec.is_break ? '#FCD34D' : '#f87171', fontWeight: 700, fontSize: 14 }}>{rec.is_break ? 'â˜•' : '🔴'} {fmtTime(rec.clock_out)}</span>}
               </div>
             ))}
           </div>
@@ -759,9 +759,9 @@ function KioskView() {
                       {new Date(rec.clock_in).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit' })}
                     </div>
                     <div style={{ display: 'flex', gap: 16 }}>
-                      <span style={{ color: '#4ade80', fontWeight: 700 }}>ðŸŸ¢ {new Date(rec.clock_in).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span style={{ color: '#4ade80', fontWeight: 700 }}>🟢 {new Date(rec.clock_in).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span>
                       <span style={{ color: rec.clock_out ? '#f87171' : 'rgba(255,255,255,0.2)', fontWeight: 700 }}>
-                        {rec.clock_out ? `ðŸ”´ ${new Date(rec.clock_out).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` : 'â€”'}
+                        {rec.clock_out ? `🔴 ${new Date(rec.clock_out).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` : '—'}
                       </span>
                     </div>
                   </div>
@@ -807,7 +807,7 @@ function KioskView() {
             color: message.type === 'error' ? '#fca5a5' : '#86efac',
             fontSize: 16, fontWeight: 700,
           }}>
-            {message.type === 'error' ? 'âš ï¸' : 'âœ…'} {message.text}
+            {message.type === 'error' ? '⚠️' : '✅'} {message.text}
           </div>
         )}
 
@@ -822,7 +822,7 @@ function KioskView() {
           }}
         >
           <div style={{ fontSize: 36, marginBottom: 10 }}>
-            {phase === 'ask_history' ? 'ðŸ“…' : (barcodeInput.length > 0 ? 'ðŸ”¦' : 'ðŸ“²')}
+            {phase === 'ask_history' ? '📅' : (barcodeInput.length > 0 ? 'ðŸ”¦' : '📲')}
           </div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
             {barcodeInput.length > 0
@@ -859,7 +859,7 @@ function KioskView() {
             <button 
                onClick={() => {
                  if (isDipendente) {
-                     setPhase('idle'); // ritornerÃ  ai bottoni personali
+                     setPhase('idle'); // ritornerà ai bottoni personali
                  } else {
                      setPhase(phase === 'ask_history' ? 'idle' : 'ask_history'); 
                      barcodeRef.current?.focus();
@@ -867,7 +867,7 @@ function KioskView() {
                }}
                style={{ background: phase === 'ask_history' ? 'rgba(255,255,255,0.15)' : 'transparent', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: 20, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 12, transition: 'all 0.2s' }}
             >
-               {phase === 'ask_history' ? 'ðŸ”™ Torna Indietro' : 'ðŸ•’ Vedi Storico'}
+               {phase === 'ask_history' ? '🔙 Torna Indietro' : 'ðŸ•’ Vedi Storico'}
             </button>
         </div>
       </div>
@@ -876,11 +876,11 @@ function KioskView() {
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   ENTRY POINT â€” Router in base al ruolo
+   ENTRY POINT — Router in base al ruolo
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 export default function ClockInPage() {
   const { user } = useOutletContext() || {};
-  // user.roles Ã¨ un array (es. ['superadmin'] o ['dipendente'])
+  // user.roles è un array (es. ['superadmin'] o ['dipendente'])
   const roles = user?.roles || [];
   const isAdmin = roles.includes('superadmin') || roles.includes('admin_cliente');
   return isAdmin ? <AdminPresenceView /> : <KioskView />;

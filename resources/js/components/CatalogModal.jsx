@@ -42,7 +42,7 @@ function ProductImageUpload({ currentImageUrl, onFileChange }) {
               style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 12, border: '2px solid var(--color-border)', display: 'block' }} />
             <button type="button" onClick={handleRemove}
               style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%', background: '#EF4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-              Ã—
+              ×
             </button>
           </div>
           <div style={{ paddingTop: 8 }}>
@@ -77,9 +77,9 @@ function ProductImageUpload({ currentImageUrl, onFileChange }) {
 
 const TAX_CLASSES = [
   { value: '', label: 'Seleziona IVA...', rate: 0 },
-  { value: '1', label: '22% â€” Standard',  rate: 22 },
-  { value: '2', label: '10% â€” Ridotta',   rate: 10 },
-  { value: '3', label: '4% â€” Agevolata',  rate: 4  },
+  { value: '1', label: '22% — Standard',  rate: 22 },
+  { value: '2', label: '10% — Ridotta',   rate: 10 },
+  { value: '3', label: '4% — Agevolata',  rate: 4  },
 ];
 
 // Dato prezzo netto e aliquota IVA, restituisce il prezzo ivato
@@ -212,7 +212,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
       };
 
       Object.entries(formData).forEach(([k, v]) => {
-        // subcategory_id non Ã¨ un campo backend: lo usiamo per sovrascrivere category_id se valorizzato
+        // subcategory_id non è un campo backend: lo usiamo per sovrascrivere category_id se valorizzato
         if (k === 'subcategory_id') return;
         if (k === 'category_id') {
           // Se l'utente ha scelto una sottocategoria, quella vince
@@ -337,7 +337,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               {product ? 'Modifica Prodotto' : 'Nuovo Prodotto'}
             </h2>
             <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
-              {product ? `ID: ${product.id} â€” SKU: ${product.sku}` : 'Aggiungi un nuovo prodotto al catalogo'}
+              {product ? `ID: ${product.id} — SKU: ${product.sku}` : 'Aggiungi un nuovo prodotto al catalogo'}
             </p>
           </div>
           <button onClick={onClose} style={{
@@ -400,7 +400,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               <div>
                 <label className="sp-label">Categoria</label>
                 <select className="sp-select" name="category_id" value={formData.category_id} onChange={handleCategoryChange}>
-                  <option value="">â€” Seleziona Categoria â€”</option>
+                  <option value="">— Seleziona Categoria —</option>
                   {parentCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
@@ -413,7 +413,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                   onChange={handleSubCategoryChange}
                   disabled={subCategories.length === 0}
                 >
-                  <option value="">{subCategories.length === 0 ? 'â€” Nessuna sottocategoria â€”' : 'â€” Seleziona Sottocategoria â€”'}</option>
+                  <option value="">{subCategories.length === 0 ? '— Nessuna sottocategoria —' : '— Seleziona Sottocategoria —'}</option>
                   {subCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
@@ -560,7 +560,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                       <input className="sp-input" type="number" min="1" value={v.pack_size} onChange={e => handleVariantChange(idx, 'pack_size', e.target.value)} />
                     </div>
                     <div>
-                      <label className="sp-label">ðŸ’° Listino 1 â€” Prezzo Vendita IVA incl. (â‚¬) *</label>
+                      <label className="sp-label">💰 Listino 1 — Prezzo Vendita IVA incl. (€) *</label>
                       <div style={{ position: 'relative' }}>
                         <input className="sp-input" type="number" step="0.01"
                           value={(() => {
@@ -584,28 +584,28 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                         const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id));
                         return tc?.rate ? (
                           <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>
-                            Imponibile (netto): â‚¬{parseFloat(v.sale_price).toFixed(2)} Â· IVA {tc.rate}%: â‚¬{(parseFloat(v.sale_price) * tc.rate / 100).toFixed(2)}
+                            Imponibile (netto): €{parseFloat(v.sale_price).toFixed(2)} · IVA {tc.rate}%: €{(parseFloat(v.sale_price) * tc.rate / 100).toFixed(2)}
                           </p>
                         ) : (
-                          <p style={{ fontSize: 11, color: '#F59E0B', marginTop: 3 }}>âš  Seleziona la Classe IVA per calcolare il prezzo ivato</p>
+                          <p style={{ fontSize: 11, color: '#F59E0B', marginTop: 3 }}>⚠ Seleziona la Classe IVA per calcolare il prezzo ivato</p>
                         );
                       })()}
                       {fv(idx, 'sale_price') && <p style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{fv(idx, 'sale_price')}</p>}
                     </div>
                     <div>
-                      <label className="sp-label">ðŸ’° Listino 2 (es. Ingrosso) (â‚¬)</label>
+                      <label className="sp-label">💰 Listino 2 (es. Ingrosso) (€)</label>
                       <input className="sp-input" type="number" step="0.01" value={v.price_list_2}
                         onChange={e => handleVariantChange(idx, 'price_list_2', e.target.value)}
                         placeholder="0.00" />
                     </div>
                     <div>
-                      <label className="sp-label">ðŸ’° Listino 3 (es. Promo/Staff) (â‚¬)</label>
+                      <label className="sp-label">💰 Listino 3 (es. Promo/Staff) (€)</label>
                       <input className="sp-input" type="number" step="0.01" value={v.price_list_3}
                         onChange={e => handleVariantChange(idx, 'price_list_3', e.target.value)}
                         placeholder="0.00" />
                     </div>
                     <div>
-                      <label className="sp-label">Costo (â‚¬)</label>
+                      <label className="sp-label">Costo (€)</label>
                       <input className="sp-input" type="number" step="0.01" value={v.cost_price} onChange={e => handleVariantChange(idx, 'cost_price', e.target.value)} placeholder="0.00" />
                     </div>
                     <div>
@@ -645,7 +645,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               {formData.variants.map((v, idx) => (
                 <React.Fragment key={idx}>
                   <div style={{ gridColumn: '1/-1', background: 'var(--color-bg)', borderRadius: 10, padding: 16 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 12 }}>Variante #{idx + 1} {v.flavor ? `â€” ${v.flavor}` : ''}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 12 }}>Variante #{idx + 1} {v.flavor ? `— ${v.flavor}` : ''}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                       <div>
                         <label className="sp-label">Classe IVA</label>
@@ -658,7 +658,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                         <input className="sp-input" value={v.excise_profile_code} onChange={e => handleVariantChange(idx, 'excise_profile_code', e.target.value)} placeholder="Es: E1" />
                       </div>
                       <div>
-                        <label className="sp-label">Accisa Unitaria Override (â‚¬)</label>
+                        <label className="sp-label">Accisa Unitaria Override (€)</label>
                         <input className="sp-input" type="number" step="0.001" value={v.excise_unit_amount_override} onChange={e => handleVariantChange(idx, 'excise_unit_amount_override', e.target.value)} placeholder="Auto da regole" />
                       </div>
                       <div>
@@ -676,8 +676,8 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                         <label className="sp-label">Prevalenza Tabaccosa</label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                           {[
-                            { val: 'PREVALENZA_SI', label: 'SÃ¬ â€” Prevalenza tabaccosa' },
-                            { val: '',              label: 'No â€” Non applicabile' },
+                            { val: 'PREVALENZA_SI', label: 'Sì — Prevalenza tabaccosa' },
+                            { val: '',              label: 'No — Non applicabile' },
                           ].map(opt => (
                             <button
                               key={opt.val}
