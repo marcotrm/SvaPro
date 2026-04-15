@@ -416,7 +416,7 @@ export default function Layout({ user, setUser }) {
           <div className="sp-topbar-actions">
             {storesList.length > 1 && (
               <select 
-                className="sp-select" 
+                className="sp-select sp-desktop-only" 
                 style={{ width: 200 }}
                 value={selectedStoreId} 
                 onChange={(e) => handleStoreChange(e.target.value)}
@@ -431,6 +431,7 @@ export default function Layout({ user, setUser }) {
             <button
               onClick={() => navigate('/dashboard')}
               title="Panoramica Generale"
+              className="sp-desktop-only"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '6px 14px', borderRadius: 10,
@@ -450,6 +451,7 @@ export default function Layout({ user, setUser }) {
             <button
               onClick={() => setShowStoreStats(true)}
               title={selectedStore ? `Vendite: ${selectedStore.name}` : 'Riepilogo vendite'}
+              className="sp-desktop-only"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '6px 14px', borderRadius: 10,
