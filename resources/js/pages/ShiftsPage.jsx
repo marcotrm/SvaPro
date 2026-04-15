@@ -1,25 +1,23 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { attendance, shifts as shiftsApi, stores, clearApiCache } from '../api.jsx';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Copy, Loader, Clock, Trash, X } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Copy, Loader, Clock, Trash, X, Palmtree, Stethoscope } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ShiftTemplateModal from '../components/ShiftTemplateModal.jsx';
 
-// Utility per date
+// ── Utility date ─────────────────────────────────────────────────────────────
 function getStartOfWeek(dateStr) {
   const d = dateStr ? new Date(dateStr) : new Date();
-  const day = d.getDay() || 7; // Rendiamo Sunday = 7
-  d.setDate(d.getDate() - day + 1); // Monday
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() - day + 1);
   return d;
 }
-
 function formatDate(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
-
 function generateWeekDays(startDate) {
   const days = [];
   const curr = new Date(startDate);
@@ -27,60 +25,222 @@ function generateWeekDays(startDate) {
     days.push({
       dateStr: formatDate(curr),
       label: curr.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }),
-      isToday: formatDate(curr) === formatDate(new Date())
+      isToday: formatDate(curr) === formatDate(new Date()),
     });
     curr.setDate(curr.getDate() + 1);
   }
   return days;
 }
 
+// ── Assenze LocalStorage key ──────────────────────────────────────────────────
+const ABSENCE_KEY = 'svapro_absences_v1';
+function loadAbsences() {
+  try { return JSON.parse(localStorage.getItem(ABSENCE_KEY) || '{}'); }
+  catch { return {}; }
+}
+function saveAbsencesToStorage(obj) {
+  try { localStorage.setItem(ABSENCE_KEY, JSON.stringify(obj)); } catch {}
+}
+
+// ── Popup assenza ─────────────────────────────────────────────────────────────
+function AbsenceModal({ emp, existing, onSave, onRemove, onClose }) {
+  const today = formatDate(new Date());
+  const [type, setType]       = useState(existing?.type || 'ferie');
+  const [from, setFrom]       = useState(existing?.from || today);
+  const [to,   setTo]         = useState(existing?.to   || today);
+
+  const typeOpts = [
+    { value: 'ferie',    label: '🌴 Ferie', color: '#3B82F6' },
+    { value: 'malattia', label: '🤒 Malattia', color: '#EF4444' },
+    { value: 'permesso', label: '📋 Permesso', color: '#F59E0B' },
+    { value: 'altro',    label: '⛔ Altro',    color: '#8B5CF6' },
+  ];
+  const chosen = typeOpts.find(o => o.value === type) || typeOpts[0];
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: 'var(--color-surface)', borderRadius: 20, padding: 28, width: 380, boxShadow: '0 24px 60px rgba(0,0,0,0.35)', border: '1px solid var(--color-border)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 2 }}>
+              Gestisci indisponibilità
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--color-text)' }}>{emp.name}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Tipo assenza */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>
+            Tipo
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {typeOpts.map(o => (
+              <button
+                key={o.value}
+                onClick={() => setType(o.value)}
+                style={{
+                  padding: '10px 12px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+                  border: `2px solid ${type === o.value ? o.color : 'var(--color-border)'}`,
+                  background: type === o.value ? `${o.color}18` : 'var(--color-bg)',
+                  color: type === o.value ? o.color : 'var(--color-text-secondary)',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Date */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>
+              Dal
+            </label>
+            <input
+              type="date"
+              value={from}
+              onChange={e => setFrom(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 14, boxSizing: 'border-box', outline: 'none' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>
+              Al
+            </label>
+            <input
+              type="date"
+              value={to}
+              min={from}
+              onChange={e => setTo(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 14, boxSizing: 'border-box', outline: 'none' }}
+            />
+          </div>
+        </div>
+
+        {/* Riepilogo */}
+        {from && to && (
+          <div style={{ background: `${chosen.color}12`, border: `1px solid ${chosen.color}40`, borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: chosen.color, fontWeight: 600 }}>
+            {chosen.label} dal {from.split('-').reverse().join('/')} al {to.split('-').reverse().join('/')}
+          </div>
+        )}
+
+        {/* Azioni */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          {existing && (
+            <button
+              onClick={onRemove}
+              style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#EF4444', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+            >
+              🗑 Rimuovi
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text-secondary)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+          >
+            Annulla
+          </button>
+          <button
+            onClick={() => {
+              if (!from || !to) { toast.error('Imposta le date di inizio e fine'); return; }
+              if (from > to)    { toast.error('La data inizio deve precedere la data fine'); return; }
+              onSave({ type, from, to });
+            }}
+            style={{ flex: 2, padding: '12px', borderRadius: 12, border: 'none', background: chosen.color, color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}
+          >
+            ✓ Conferma indisponibilità
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Pagina principale ─────────────────────────────────────────────────────────
 export default function ShiftsPage() {
   const { selectedStoreId } = useOutletContext?.() || {};
   const [storeId, setStoreId] = useState(selectedStoreId || '');
 
-  // Settimana
   const [weekStart, setWeekStart] = useState(() => getStartOfWeek());
   const weekDays = useMemo(() => generateWeekDays(weekStart), [weekStart]);
 
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  
+  const [loading, setLoading]   = useState(false);
+  const [saving, setSaving]     = useState(false);
   const [employees, setEmployees] = useState([]);
-  const [shifts, setShifts] = useState({}); // Mappa: "empId_dateStr" -> { start_time, end_time, color }
-  const [originalShifts, setOriginalShifts] = useState({}); // Per tracciare modifiche e delezioni
-
-  const [templates, setTemplates] = useState([]);
+  const [shifts, setShifts]       = useState({});
+  const [originalShifts, setOriginalShifts] = useState({});
+  const [templates, setTemplates]   = useState([]);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [activeCell, setActiveCell] = useState(null);
 
-  // Per menu contestuale della cella
-  const [activeCell, setActiveCell] = useState(null); // { empId, dateStr }
+  // ── Assenze ────────────────────────────────────────────────────
+  const [absences, setAbsences]       = useState(() => loadAbsences());
+  const [absenceModal, setAbsenceModal] = useState(null); // { emp } | null
+
+  const openAbsenceModal = (emp, e) => {
+    e.stopPropagation();
+    setAbsenceModal({ emp });
+    setActiveCell(null);
+  };
+
+  const handleSaveAbsence = (empId, data) => {
+    const next = { ...absences, [empId]: data };
+    setAbsences(next);
+    saveAbsencesToStorage(next);
+    toast.success(`Indisponibilità impostata per ${absenceModal.emp.name}`);
+    setAbsenceModal(null);
+  };
+
+  const handleRemoveAbsence = (empId) => {
+    const next = { ...absences };
+    delete next[empId];
+    setAbsences(next);
+    saveAbsencesToStorage(next);
+    toast.success('Indisponibilità rimossa');
+    setAbsenceModal(null);
+  };
+
+  const isAbsent = (empId, dateStr) => {
+    const a = absences[empId];
+    if (!a || !a.from || !a.to) return null;
+    return dateStr >= a.from && dateStr <= a.to ? a : null;
+  };
+
+  const absenceColor = type =>
+    type === 'ferie' ? '#3B82F6' : type === 'malattia' ? '#EF4444' : type === 'permesso' ? '#F59E0B' : '#8B5CF6';
+
+  const absenceLabel = type =>
+    type === 'ferie' ? '🌴 Ferie' : type === 'malattia' ? '🤒 Malattia' : type === 'permesso' ? '📋 Permesso' : '⛔ Indisponibile';
+  // ───────────────────────────────────────────────────────────────
+
+  useEffect(() => { if (selectedStoreId) setStoreId(selectedStoreId); }, [selectedStoreId]);
 
   useEffect(() => {
-    if (selectedStoreId) setStoreId(selectedStoreId);
-  }, [selectedStoreId]);
-
-  useEffect(() => {
-    if (storeId) {
-      loadData();
-    } else {
-      setEmployees([]);
-      setShifts({});
-      setOriginalShifts({});
-    }
+    if (storeId) loadData();
+    else { setEmployees([]); setShifts({}); setOriginalShifts({}); }
   }, [storeId, weekStart]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Carica i dipendenti di questo store (usiamo l'api kiosk che fa proprio questo)
       const empRes = await attendance.getEmployeesKiosk({ store_id: storeId });
       setEmployees(empRes.data?.data || []);
-
-      // 2. Carica i turni della settimana
       const startDateStr = weekDays[0].dateStr;
-      const endDateStr = weekDays[6].dateStr;
+      const endDateStr   = weekDays[6].dateStr;
       const shRes = await shiftsApi.getAll({ store_id: storeId, start_date: startDateStr, end_date: endDateStr });
-      
       const shiftsMap = {};
       (shRes.data?.data || []).forEach(s => {
         const key = `${s.employee_id}_${s.date}`;
@@ -88,28 +248,15 @@ export default function ShiftsPage() {
       });
       setShifts(shiftsMap);
       setOriginalShifts(JSON.parse(JSON.stringify(shiftsMap)));
-
-      // 3. Carica i template (solo per il popup contestuale)
       const tplRes = await shiftsApi.getTemplates();
       setTemplates(tplRes.data?.data || []);
-
-    } catch (err) {
+    } catch {
       toast.error('Errore caricamento dati');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const handlePrevWeek = () => {
-    const next = new Date(weekStart);
-    next.setDate(next.getDate() - 7);
-    setWeekStart(next);
-  };
-  const handleNextWeek = () => {
-    const next = new Date(weekStart);
-    next.setDate(next.getDate() + 7);
-    setWeekStart(next);
-  };
+  const handlePrevWeek = () => { const n = new Date(weekStart); n.setDate(n.getDate() - 7); setWeekStart(n); };
+  const handleNextWeek = () => { const n = new Date(weekStart); n.setDate(n.getDate() + 7); setWeekStart(n); };
 
   const onCellChange = (empId, dateStr, changes) => {
     const key = `${empId}_${dateStr}`;
@@ -128,11 +275,7 @@ export default function ShiftsPage() {
 
   const clearCell = (empId, dateStr) => {
     const key = `${empId}_${dateStr}`;
-    setShifts(prev => {
-      const copy = { ...prev };
-      delete copy[key];
-      return copy;
-    });
+    setShifts(prev => { const copy = { ...prev }; delete copy[key]; return copy; });
     setActiveCell(null);
   };
 
@@ -140,138 +283,91 @@ export default function ShiftsPage() {
     setSaving(true);
     try {
       const payload = { store_id: storeId, shifts: [], deletions: [] };
-      
-      // Calcola differenze
-      // Tutti quelli attualmente in shifts sono da salvare/aggiornare
       Object.keys(shifts).forEach(key => {
         const [empId, dateStr] = key.split('_');
-        payload.shifts.push({
-          employee_id: empId,
-          date: dateStr,
-          start_time: shifts[key].start_time,
-          end_time: shifts[key].end_time,
-          color: shifts[key].color
-        });
+        payload.shifts.push({ employee_id: empId, date: dateStr, start_time: shifts[key].start_time, end_time: shifts[key].end_time, color: shifts[key].color });
       });
-
-      // Se c'era in originalShifts ma non c'è più in shifts, va in deletions
       Object.keys(originalShifts).forEach(key => {
         if (!shifts[key]) {
           const [empId, dateStr] = key.split('_');
           payload.deletions.push({ employee_id: empId, date: dateStr });
         }
       });
-
       await shiftsApi.bulkSave(payload);
       toast.success('Turni salvati con successo');
       setOriginalShifts(JSON.parse(JSON.stringify(shifts)));
-
-    } catch (err) {
-      toast.error('Errore nel salvataggio');
-    } finally {
-      setSaving(false);
-    }
+    } catch { toast.error('Errore nel salvataggio'); }
+    finally { setSaving(false); }
   };
 
   const renderCellMenu = (empId, dateStr) => {
-    const isActive = activeCell?.empId === empId && activeCell?.dateStr === dateStr;
-    if (!isActive) return null;
-
+    if (!(activeCell?.empId === empId && activeCell?.dateStr === dateStr)) return null;
     return (
-      <div style={{
-        position: 'absolute', top: 5, left: '95%', zIndex: 100,
-        background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-        borderRadius: 12, padding: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.3)', width: 220
-      }}>
+      <div style={{ position: 'absolute', top: 5, left: '95%', zIndex: 100, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.3)', width: 220 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Seleziona Turno</div>
-          <button onClick={(e) => { e.stopPropagation(); setActiveCell(null); }} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}><X size={14} /></button>
+          <button onClick={e => { e.stopPropagation(); setActiveCell(null); }} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}><X size={14} /></button>
         </div>
-
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
           {templates.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '10px 0' }}>Nessun template.</div>
-          ) : (
-            templates.map(t => (
-              <button key={t.id} onClick={() => applyTemplate(empId, dateStr, t)} style={{
-                display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-bg)',
-                border: '1px solid var(--color-border)', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-                textAlign: 'left', transition: 'all 0.1s'
-              }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg)'}>
-                <div style={{ width: 12, height: 12, borderRadius: '50%', background: t.color || '#10B981' }} />
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>{t.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{t.start_time} - {t.end_time}</div>
-                </div>
-              </button>
-            ))
-          )}
+          ) : templates.map(t => (
+            <button key={t.id} onClick={() => applyTemplate(empId, dateStr, t)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', transition: 'all 0.1s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg)'}>
+              <div style={{ width: 12, height: 12, borderRadius: '50%', background: t.color || '#10B981' }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>{t.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{t.start_time} - {t.end_time}</div>
+              </div>
+            </button>
+          ))}
         </div>
-
         <div style={{ height: 1, background: 'var(--color-border)', margin: '10px 0' }} />
-        
-        <button onClick={() => clearCell(empId, dateStr)} style={{
-          display: 'flex', alignItems: 'center', gap: 6, color: '#EF4444', background: 'rgba(239, 68, 68, 0.1)',
-          border: 'none', width: '100%', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700
-        }}>
+        <button onClick={() => clearCell(empId, dateStr)} style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: 'none', width: '100%', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
           <Trash size={14} /> Cancella Turno (Riposo)
         </button>
       </div>
     );
   };
 
-  if (!storeId) {
-    return (
-      <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-        <CalendarIcon size={48} style={{ opacity: 0.2, margin: '0 auto 16px' }} />
-        <h2>Seleziona un negozio</h2>
-        <p>Devi selezionare un punto vendita dalla barra in alto per gestire i turni.</p>
-      </div>
-    );
-  }
+  if (!storeId) return (
+    <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+      <CalendarIcon size={48} style={{ opacity: 0.2, margin: '0 auto 16px' }} />
+      <h2>Seleziona un negozio</h2>
+      <p>Devi selezionare un punto vendita dalla barra in alto per gestire i turni.</p>
+    </div>
+  );
 
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
-      
+
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <CalendarIcon size={24} color="var(--color-accent)" /> 
-            Pianificazione Turni
+            <CalendarIcon size={24} color="var(--color-accent)" /> Pianificazione Turni
           </h1>
           <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>
-            Gestisci orari e turnazioni della settimana per il negozio selezionato. I riposi corrispondono semplicemente all'assenza di un turno per quella giornata.
+            Clicca sull'avatar di un dipendente per impostare ferie/malattia. Clicca su una cella giorno per assegnare il turno.
           </div>
         </div>
-        
         <div style={{ display: 'flex', gap: 12 }}>
-          <button 
-            onClick={() => setShowTemplatesModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)', padding: '10px 16px', borderRadius: 12, fontWeight: 600, cursor: 'pointer' }}
-          >
+          <button onClick={() => setShowTemplatesModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', color: 'var(--color-text)', border: '1px solid var(--color-border)', padding: '10px 16px', borderRadius: 12, fontWeight: 600, cursor: 'pointer' }}>
             <Clock size={16} /> Modelli Orari (Template)
           </button>
-          <button 
-            onClick={saveChanges} disabled={saving}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-accent)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.8 : 1 }}
-          >
-            {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} 
-            Salva Configurazioni
+          <button onClick={saveChanges} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-accent)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.8 : 1 }}>
+            {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} Salva Configurazioni
           </button>
         </div>
       </div>
 
-      {/* Controller Settimana */}
+      {/* Navigazione settimana */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '16px 24px', borderRadius: '16px 16px 0 0', border: '1px solid var(--color-border)', borderBottom: 'none' }}>
         <button onClick={handlePrevWeek} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--color-text)' }}>
           <ChevronLeft size={20} />
         </button>
-        
         <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text)' }}>
           Settimana dal {weekDays[0].dateStr.split('-').reverse().join('/')} al {weekDays[6].dateStr.split('-').reverse().join('/')}
         </div>
-
         <button onClick={handleNextWeek} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--color-text)' }}>
           <ChevronRight size={20} />
         </button>
@@ -286,13 +382,9 @@ export default function ShiftsPage() {
                 <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dipendente</div>
               </th>
               {weekDays.map(day => (
-                <th key={day.dateStr} style={{ padding: '12px 8px', borderBottom: '2px solid var(--color-border)', borderRight: '1px solid var(--color-border)', textAlign: 'center', width: `${100/7}%`, background: day.isToday ? 'rgba(16, 185, 129, 0.05)' : 'transparent' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: day.isToday ? 'var(--color-accent)' : 'var(--color-text)', textTransform: 'uppercase' }}>
-                    {day.label.split(' ')[0]} {/* es LUN */}
-                  </div>
-                  <div style={{ fontSize: 18, fontWeight: 900, color: day.isToday ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
-                    {day.label.split(' ')[1]} {/* es 12 */}
-                  </div>
+                <th key={day.dateStr} style={{ padding: '12px 8px', borderBottom: '2px solid var(--color-border)', borderRight: '1px solid var(--color-border)', textAlign: 'center', width: `${100/7}%`, background: day.isToday ? 'rgba(16,185,129,0.05)' : 'transparent' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: day.isToday ? 'var(--color-accent)' : 'var(--color-text)', textTransform: 'uppercase' }}>{day.label.split(' ')[0]}</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: day.isToday ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>{day.label.split(' ')[1]}</div>
                 </th>
               ))}
             </tr>
@@ -302,32 +394,85 @@ export default function ShiftsPage() {
               <tr><td colSpan={8} style={{ padding: 60, textAlign: 'center' }}><Loader size={32} className="animate-spin" style={{ color: 'var(--color-accent)' }} /></td></tr>
             ) : employees.length === 0 ? (
               <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Nessun dipendente trovato in questo negozio.</td></tr>
-            ) : (
-              employees.map(emp => (
+            ) : employees.map(emp => {
+              const empAbsence = absences[emp.id];
+              return (
                 <tr key={emp.id}>
-                  {/* Cella Dipendente */}
+                  {/* Cella dipendente — avatar cliccabile per ferie/malattia */}
                   <td style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: 'var(--color-text)' }}>
-                        {emp.name.charAt(0)}
-                      </div>
+                      {/* Avatar cliccabile */}
+                      <button
+                        onClick={e => openAbsenceModal(emp, e)}
+                        title="Imposta ferie / malattia"
+                        style={{
+                          width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                          background: empAbsence
+                            ? `${absenceColor(empAbsence.type)}20`
+                            : 'var(--color-surface)',
+                          border: empAbsence
+                            ? `2px solid ${absenceColor(empAbsence.type)}60`
+                            : '2px solid var(--color-border)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 16, fontWeight: 800,
+                          color: empAbsence ? absenceColor(empAbsence.type) : 'var(--color-text)',
+                          cursor: 'pointer', transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                      >
+                        {empAbsence
+                          ? (empAbsence.type === 'ferie' ? '🌴' : empAbsence.type === 'malattia' ? '🤒' : empAbsence.type === 'permesso' ? '📋' : '⛔')
+                          : emp.name.charAt(0)}
+                      </button>
                       <div>
                         <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--color-text)' }}>{emp.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', textTransform: 'capitalize' }}>{emp.role || 'Operatore'}</div>
+                        {empAbsence ? (
+                          <div style={{ fontSize: 11, color: absenceColor(empAbsence.type), fontWeight: 700 }}>
+                            {absenceLabel(empAbsence.type)} · {empAbsence.from?.slice(5).split('-').join('/')}→{empAbsence.to?.slice(5).split('-').join('/')}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', textTransform: 'capitalize' }}>{emp.role || 'Operatore'}</div>
+                        )}
                       </div>
                     </div>
                   </td>
 
-                  {/* Celle Giorni */}
+                  {/* Celle giorni */}
                   {weekDays.map(day => {
                     const key = `${emp.id}_${day.dateStr}`;
                     const shift = shifts[key];
                     const hasShift = shift && shift.start_time;
+                    const absence = isAbsent(emp.id, day.dateStr);
 
+                    // ── Cella ASSENZA ───────────────────────────────────────
+                    if (absence) {
+                      const c = absenceColor(absence.type);
+                      return (
+                        <td
+                          key={day.dateStr}
+                          style={{ padding: '8px', borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)', background: day.isToday ? 'rgba(16,185,129,0.02)' : 'transparent', verticalAlign: 'top' }}
+                        >
+                          <div style={{
+                            height: 60, borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                            background: `${c}10`, border: `1px solid ${c}40`,
+                          }}>
+                            <div style={{ fontSize: 18, lineHeight: 1 }}>
+                              {absence.type === 'ferie' ? '🌴' : absence.type === 'malattia' ? '🤒' : absence.type === 'permesso' ? '📋' : '⛔'}
+                            </div>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: c, textAlign: 'center', lineHeight: 1.2 }}>
+                              Indisponibile<br />{absence.type}
+                            </div>
+                          </div>
+                        </td>
+                      );
+                    }
+
+                    // ── Cella NORMALE ───────────────────────────────────────
                     return (
-                      <td 
-                        key={day.dateStr} 
-                        style={{ padding: '8px', borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)', position: 'relative', background: day.isToday ? 'rgba(16, 185, 129, 0.02)' : 'transparent', verticalAlign: 'top' }}
+                      <td
+                        key={day.dateStr}
+                        style={{ padding: '8px', borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)', position: 'relative', background: day.isToday ? 'rgba(16,185,129,0.02)' : 'transparent', verticalAlign: 'top' }}
                         onClick={() => setActiveCell({ empId: emp.id, dateStr: day.dateStr })}
                       >
                         {hasShift ? (
@@ -345,26 +490,32 @@ export default function ShiftsPage() {
                           </div>
                         )}
 
-                        {/* Menu testuale (solo quando cliccato) */}
                         {renderCellMenu(emp.id, day.dateStr)}
                       </td>
                     );
                   })}
                 </tr>
-              ))
-            )}
+              );
+            })}
           </tbody>
         </table>
       </div>
 
+      {/* Modal template */}
       {showTemplatesModal && (
-        <ShiftTemplateModal onClose={() => {
-          setShowTemplatesModal(false);
-          // Ricarica templates alla chiusura se necessario (sono caricati all'avvio in loadData)
-          loadData(); 
-        }} />
+        <ShiftTemplateModal onClose={() => { setShowTemplatesModal(false); loadData(); }} />
       )}
 
+      {/* Modal assenza */}
+      {absenceModal && (
+        <AbsenceModal
+          emp={absenceModal.emp}
+          existing={absences[absenceModal.emp.id]}
+          onSave={data => handleSaveAbsence(absenceModal.emp.id, data)}
+          onRemove={() => handleRemoveAbsence(absenceModal.emp.id)}
+          onClose={() => setAbsenceModal(null)}
+        />
+      )}
     </div>
   );
 }
