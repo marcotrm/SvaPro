@@ -604,10 +604,10 @@ export default function Layout({ user, setUser }) {
         </>
       )}
 
-      {/* ── MOBILE BOTTOM NAV ── */}
+      {/* ── MOBILE BOTTOM NAV — role-aware ── */}
       <nav className="sp-mobile-nav" aria-label="Navigazione principale mobile">
         <div className="sp-mobile-nav-inner">
-          {/* POS Cassa */}
+          {/* POS Cassa — tutti i ruoli */}
           <button
             className={`sp-mobile-nav-btn ${location.pathname === '/' || location.pathname === '/pos' ? 'active' : ''}`}
             onClick={() => navigate('/')}
@@ -615,33 +615,62 @@ export default function Layout({ user, setUser }) {
             <Monitor size={22} />
             <span>Cassa</span>
           </button>
-          {/* Dashboard o sezione principale */}
+
+          {/* DIPENDENTI: Timbra + Bolle */}
+          {userRoles.includes('dipendente') && !userRoles.includes('admin_cliente') && !userRoles.includes('superadmin') ? (
+            <>
+              <button
+                className={`sp-mobile-nav-btn ${location.pathname === '/clock-in' ? 'active' : ''}`}
+                onClick={() => navigate('/clock-in')}
+              >
+                <Fingerprint size={22} />
+                <span>Timbra</span>
+              </button>
+              <button
+                className={`sp-mobile-nav-btn ${location.pathname === '/warehouse/restock' ? 'active' : ''}`}
+                onClick={() => navigate('/warehouse/restock')}
+              >
+                <Package size={22} />
+                <span>Riassort.</span>
+              </button>
+              <button
+                className={`sp-mobile-nav-btn ${location.pathname === '/warehouse/delivery-notes' ? 'active' : ''}`}
+                onClick={() => navigate('/warehouse/delivery-notes')}
+              >
+                <Truck size={22} />
+                <span>Bolle</span>
+              </button>
+            </>
+          ) : (
+            /* ADMIN: Dashboard + Clienti + Ordini */
+            <>
+              <button
+                className={`sp-mobile-nav-btn ${location.pathname === '/dashboard' ? 'active' : ''}`}
+                onClick={() => navigate('/dashboard')}
+              >
+                <BarChart3 size={22} />
+                <span>Dashboard</span>
+              </button>
+              <button
+                className={`sp-mobile-nav-btn ${location.pathname.startsWith('/customers') ? 'active' : ''}`}
+                onClick={() => navigate('/customers')}
+              >
+                <Users size={22} />
+                <span>Clienti</span>
+              </button>
+              <button
+                className={`sp-mobile-nav-btn ${location.pathname === '/orders' ? 'active' : ''}`}
+                onClick={() => navigate('/orders')}
+              >
+                <ShoppingCart size={22} />
+                <span>Ordini</span>
+              </button>
+            </>
+          )}
+
+          {/* Menu — tutti */}
           <button
-            className={`sp-mobile-nav-btn ${location.pathname === '/dashboard' ? 'active' : ''}`}
-            onClick={() => navigate('/dashboard')}
-          >
-            <BarChart3 size={22} />
-            <span>Dashboard</span>
-          </button>
-          {/* Clienti */}
-          <button
-            className={`sp-mobile-nav-btn ${location.pathname.startsWith('/customers') ? 'active' : ''}`}
-            onClick={() => navigate('/customers')}
-          >
-            <Users size={22} />
-            <span>Clienti</span>
-          </button>
-          {/* Ordini */}
-          <button
-            className={`sp-mobile-nav-btn ${location.pathname === '/orders' ? 'active' : ''}`}
-            onClick={() => navigate('/orders')}
-          >
-            <ShoppingCart size={22} />
-            <span>Ordini</span>
-          </button>
-          {/* Menu (tutto il resto) */}
-          <button
-            className="sp-mobile-nav-btn"
+            className={`sp-mobile-nav-btn ${mobileDrawerOpen ? 'active' : ''}`}
             onClick={() => setMobileDrawerOpen(true)}
           >
             <Menu size={22} />
