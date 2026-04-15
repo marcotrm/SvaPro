@@ -300,6 +300,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // Attendance - accessibile anche ai dipendenti (per timbrare se stessi)
         Route::get('/attendance/live', [AttendanceController::class, 'live']);
         Route::get('/attendance/employees-for-kiosk', [AttendanceController::class, 'employeesForKiosk']);
+        Route::get('/attendance/history', [AttendanceController::class, 'history']); // per lo storico personale nel kiosk
         Route::post('/attendance/checkin', [AttendanceController::class, 'checkIn']);
         Route::post('/attendance/checkout', [AttendanceController::class, 'checkOut']);
 

@@ -518,9 +518,10 @@ function KioskView() {
 
   const performClock = async (emp, forceAction = null, isBreak = false) => {
     setLoading(true);
-    const storeId = getStoreId();
+    // Risolvi store: localStorage → user.employee_store_id → selectedStoreId (context) → emp.store_id
+    const storeId = getStoreId() || emp?.store_id;
     if (!storeId) {
-      setMessage({ text: 'Nessun negozio selezionato', type: 'error' });
+      setMessage({ text: 'Nessun negozio configurato. Contatta un amministratore.', type: 'error' });
       setLoading(false);
       return;
     }
