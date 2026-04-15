@@ -193,6 +193,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::put('/promotions/{id}', [PromotionController::class, 'update'])->middleware('permission:catalog.manage');
         Route::post('/promotions/{id}/toggle', [PromotionController::class, 'toggleActive'])->middleware('permission:catalog.manage');
         Route::delete('/promotions/{id}', [PromotionController::class, 'destroy'])->middleware('permission:catalog.manage');
+        Route::post('/promotions/validate-code', [PromotionController::class, 'validateCode']); // POS: valida codice promozionale
 
         // Inventory Count (Barcode Guided)
         Route::get('/inventory-counts', [InventoryCountController::class, 'sessions']);

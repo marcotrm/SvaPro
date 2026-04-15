@@ -216,4 +216,78 @@ class PromotionController extends Controller
 
         return response()->json(['message' => 'Promozione eliminata.']);
     }
+
+    /**
+     * POST /promotions/validate-code
+     * Valida un codice promozionale inserito nel POS.
+     * Corpo: { code: string, cart_total: float }
+     */
+    public function validateCode(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $validator = Validator::make($request->all(), [
+            'code'       => ['required', 'string'],
+            'cart_total' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Dati non validi.'], 422);
+        }
+
+        $code      = trim($request->input('code'));
+        $cartTotal = (float) $request->input('cart_total');
+
+        $promo = DB::table('promotions')
+            ->where('tenant_id', $tenantId)
+            ->whereRaw('LOWER(code) = ?', [strtolower($code)])
+            ->first();
+
+        if (! $promo) {
+            return response()->json(['message' => 'Codice promozionale non valido.'], 404);
+        }
+
+        if (! $promo->active) {
+            return response()->json(['message' => 'Questo codice promozionale non è attivo.'], 422);
+        }
+
+        if ($promo->starts_at && now()->lt($promo->starts_at)) {
+            return response()->json(['message' => 'Questo codice non è ancora valido.'], 422);
+        }
+
+        if ($promo->ends_at && now()->gt($promo->ends_at)) {
+            return response()->json(['message' => 'Questo codice è scaduto.'], 422);
+        }
+
+        if ($promo->min_order_amount && $cartTotal < (float) $promo->min_order_amount) {
+            return response()->json([
+                'message' => "Importo minimo richiesto: €" . number_format($promo->min_order_amount, 2, ',', '.'),
+            ], 422);
+        }
+
+        if ($promo->max_uses) {
+            $used = DB::table('orders')
+                ->where('tenant_id', $tenantId)
+                ->where('promotion_id', $promo->id)
+                ->count();
+            if ($used >= $promo->max_uses) {
+                return response()->json(['message' => 'Questo codice ha raggiunto il numero massimo di utilizzi.'], 422);
+            }
+        }
+
+        // Calcola lo sconto
+        $discount = 0;
+        if ($promo->type === 'percentage') {
+            $discount = round($cartTotal * ((float) $promo->value / 100), 2);
+        } elseif ($promo->type === 'fixed') {
+            $discount = min((float) $promo->value, $cartTotal);
+        }
+
+        return response()->json([
+            'valid'           => true,
+            'promotion'       => $promo,
+            'discount_amount' => $discount,
+            'message'         => "Codice applicato: {$promo->name}" . ($discount > 0 ? " (-€" . number_format($discount, 2, ',', '.') . ")" : ''),
+        ]);
+    }
 }

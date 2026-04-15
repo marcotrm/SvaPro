@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { orders as ordersApi, catalog, customers as customersApi, inventory, stores, getImageUrl, clearApiCache } from '../api.jsx';
+import { orders as ordersApi, catalog, customers as customersApi, inventory, stores, getImageUrl, clearApiCache, promotions as promotionsApi } from '../api.jsx';
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, X, User,
   MapPin, Zap, Package, ChevronRight, ReceiptText, Loader2,
@@ -282,6 +282,13 @@ export default function PosPage() {
 
   const [qscareLines, setQscareLines] = useState({}); // { [product_variant_id]: bool }
 
+  // ── Codice Promozionale ────────────────────────────────────────────────────
+  const [promoCode,    setPromoCode]    = useState('');
+  const [appliedPromo, setAppliedPromo] = useState(null); // { id, name, type, value, discount_amount }
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError,   setPromoError]   = useState('');
+  const promoRef = useRef(null);
+
   /* Load data */
   const fetchData = useCallback(async () => {
     try {
@@ -466,11 +473,36 @@ export default function PosPage() {
     }).filter(Boolean));
   };
 
-  const removeFromCart = (variantId) => setCartLines(prev => prev.filter(l => l.product_variant_id !== variantId));
+  const removeFromCart = (variantId) => {
+    setCartLines(prev => prev.filter(l => l.product_variant_id !== variantId));
+    // Rimuovendo prodotti il totale cambia: invalida promo se min_order_amount non soddisfatto
+    setAppliedPromo(null);
+    setPromoError('');
+  };
   const clearCart = () => setCartLines([]);
 
   const cartTotal = useMemo(() => cartLines.reduce((s, l) => s + l.price * l.qty, 0), [cartLines]);
   const cartCount = useMemo(() => cartLines.reduce((s, l) => s + l.qty, 0), [cartLines]);
+
+  // ── Funzione: applica codice promo ─────────────────────────────────────────
+  const applyPromoCode = async () => {
+    const code = promoCode.trim();
+    if (!code) return;
+    setPromoLoading(true);
+    setPromoError('');
+    try {
+      const res = await promotionsApi.validateCode({ code, cart_total: cartTotal });
+      const { promotion, discount_amount, message } = res.data;
+      setAppliedPromo({ ...promotion, discount_amount: parseFloat(discount_amount) || 0 });
+      setPromoCode('');
+      toast.success(message || `Codice "${code}" applicato!`, { icon: '🎟️', duration: 3000 });
+    } catch (err) {
+      const msg = err.response?.data?.message || err.userFriendlyMessage || 'Codice promozionale non valido';
+      setPromoError(msg);
+    } finally {
+      setPromoLoading(false);
+    }
+  };
 
   // Controlla se il carrello contiene dispositivi (categoria il cui nome contiene 'dispositiv' oppure product_type 'device')
   const cartHasDevice = useMemo(() => {
@@ -519,6 +551,8 @@ export default function PosPage() {
 
   const effectiveQscarePrice = cartQscarePrice; // somma delle QScare attivate per-riga
   const cartTotalWithQscare  = cartTotal + effectiveQscarePrice;
+  const promoDiscount        = appliedPromo?.discount_amount || 0;
+  const cartTotalFinal       = Math.max(0, cartTotalWithQscare - promoDiscount);
 
 
   const handleCheckout = async (payload) => {
@@ -553,6 +587,7 @@ export default function PosPage() {
         employee_id: empId,
         sold_by_employee_id: empId,
         customer_id: selectedCustomer?.id ?? null,
+        promotion_id: appliedPromo?.id ?? null,
         lines: [
           ...cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
           ...qscareServiceLines,
@@ -560,10 +595,11 @@ export default function PosPage() {
         notes: note + (payload.receipt_type ? ` [${payload.receipt_type}]` : ''),
         status: 'paid',
         payments: payload.payments,
-        order_discount_amount: payload.order_discount_amount,
+        order_discount_amount: promoDiscount > 0 ? promoDiscount : (payload.order_discount_amount ?? 0),
       });
       toast.success('✅ Vendita completata!');
       setCartLines([]); setSelectedCustomer(null); setNote(''); setShowCheckoutModal(false); setQscareLines({});
+      setAppliedPromo(null); setPromoCode(''); setPromoError('');
       // Reset operatore dopo ogni vendita (deve riscannerizzare)
       setSoldByEmployeeId(''); setOperatorBarcode(''); setOperatorName(''); setOperatorError('');
       setTimeout(() => operatorBarcodeRef.current?.focus(), 100);
@@ -1091,6 +1127,55 @@ export default function PosPage() {
                   style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 11, color: 'rgba(255,255,255,0.6)', outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
+
+              {/* Codice Promozionale */}
+              <div style={{ marginTop: 10 }}>
+                {appliedPromo ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.4)', borderRadius: 10, padding: '8px 12px' }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: '#a5b4fc' }}>🎟️ {appliedPromo.name}</div>
+                      <div style={{ fontSize: 10, color: 'rgba(165,180,252,0.7)', marginTop: 1 }}>
+                        Sconto: {appliedPromo.type === 'percentage' ? `${appliedPromo.value}%` : `€${appliedPromo.value}`}
+                      </div>
+                    </div>
+                    <button onClick={() => { setAppliedPromo(null); setPromoError(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(165,180,252,0.6)', display: 'flex' }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ flex: 1, position: 'relative' }}>
+                      <Tag size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: promoError ? '#fc8181' : 'rgba(255,255,255,0.3)', pointerEvents: 'none' }} />
+                      <input
+                        ref={promoRef}
+                        value={promoCode}
+                        onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); }}
+                        onKeyDown={e => e.key === 'Enter' && applyPromoCode()}
+                        placeholder="Codice promozionale..."
+                        style={{
+                          width: '100%', background: promoError ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)',
+                          border: `1px solid ${promoError ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.1)'}`,
+                          borderRadius: 10, padding: '8px 10px 8px 30px', fontSize: 11, fontWeight: 700,
+                          color: '#fff', outline: 'none', letterSpacing: '0.08em', boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={applyPromoCode}
+                      disabled={promoLoading || !promoCode.trim()}
+                      style={{
+                        flexShrink: 0, background: promoCode.trim() ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.06)',
+                        border: 'none', borderRadius: 10, padding: '0 14px', fontSize: 11, fontWeight: 800,
+                        color: promoCode.trim() ? '#fff' : 'rgba(255,255,255,0.25)', cursor: promoCode.trim() ? 'pointer' : 'not-allowed',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {promoLoading ? '...' : 'Applica'}
+                    </button>
+                  </div>
+                )}
+                {promoError && <div style={{ fontSize: 10, color: '#fc8181', marginTop: 5, paddingLeft: 4 }}>⚠ {promoError}</div>}
+              </div>
             </div>
           )}
         </div>
@@ -1179,20 +1264,26 @@ export default function PosPage() {
           )}
 
           {/* Totale */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: effectiveQscarePrice > 0 ? 4 : 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: effectiveQscarePrice > 0 ? 4 : 0 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Subtotale</span>
             <span style={{ fontSize: 20, fontWeight: 900, color: 'rgba(255,255,255,0.7)' }}>{fmt(cartTotal)}</span>
           </div>
           {effectiveQscarePrice > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#86efac' }}>🛡 QScare</span>
               <span style={{ fontSize: 14, fontWeight: 800, color: '#86efac' }}>+{fmt(effectiveQscarePrice)}</span>
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingTop: effectiveQscarePrice > 0 ? 8 : 0, borderTop: effectiveQscarePrice > 0 ? '1px solid rgba(255,255,255,0.1)' : 'none' }}>
+          {promoDiscount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#a5b4fc' }}>🎟️ Sconto promo</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#a5b4fc' }}>-{fmt(promoDiscount)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Totale</span>
-            <span style={{ fontSize: 28, fontWeight: 900, color: '#fff', letterSpacing: -1 }}>
-              {fmt(cartTotalWithQscare)}
+            <span style={{ fontSize: 28, fontWeight: 900, color: promoDiscount > 0 ? '#a5b4fc' : '#fff', letterSpacing: -1 }}>
+              {fmt(cartTotalFinal)}
             </span>
           </div>
 

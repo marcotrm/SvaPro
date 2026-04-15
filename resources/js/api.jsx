@@ -686,6 +686,7 @@ export const promotions = {
   update: (id, data) => api.put(`/promotions/${id}`, data),
   toggle: (id) => api.post(`/promotions/${id}/toggle`),
   remove: (id) => api.delete(`/promotions/${id}`),
+  validateCode: (data) => api.post('/promotions/validate-code', data), // POS: valida codice promo
 };
 
 // Inventory Count APIs
