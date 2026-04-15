@@ -574,15 +574,38 @@ class CatalogController extends Controller
                 if ($variantStoreRows !== []) {
                     DB::table('store_product_variants')->insert($variantStoreRows);
                 }
-                // Auto-crea stock_items con on_hand=0 per nuove varianti
-                // cosǪ il prodotto appare subito in tutti i magazzini dei negozi attivi
-                if (!$existingVariantId && !empty($storeIds)) {
-                    $warehouses = DB::table('warehouses')
+                // Auto-crea warehouse per ogni store che non ne ha uno, poi inizializza
+                // stock_items con on_hand=0 in TUTTI i warehouse del tenant.
+                // Così ogni prodotto nuovo è visibile in tutti i negozi sin dalla creazione.
+                if (!$existingVariantId) {
+                    $allTenantStores = DB::table('stores')
                         ->where('tenant_id', $tenantId)
-                        ->whereIn('store_id', $storeIds)
+                        ->get(['id', 'name']);
+
+                    foreach ($allTenantStores as $tenantStore) {
+                        $hasWarehouse = DB::table('warehouses')
+                            ->where('tenant_id', $tenantId)
+                            ->where('store_id', $tenantStore->id)
+                            ->exists();
+
+                        if (!$hasWarehouse) {
+                            DB::table('warehouses')->insert([
+                                'tenant_id'  => $tenantId,
+                                'store_id'   => $tenantStore->id,
+                                'name'       => $tenantStore->name . ' – Magazzino',
+                                'type'       => 'store',
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ]);
+                        }
+                    }
+
+                    // Crea stock_items (on_hand=0) per TUTTI i warehouse del tenant
+                    $allWarehouseIds = DB::table('warehouses')
+                        ->where('tenant_id', $tenantId)
                         ->pluck('id');
 
-                    foreach ($warehouses as $warehouseId) {
+                    foreach ($allWarehouseIds as $warehouseId) {
                         $alreadyExists = DB::table('stock_items')
                             ->where('tenant_id', $tenantId)
                             ->where('product_variant_id', $variantId)

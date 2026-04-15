@@ -377,6 +377,20 @@ class DeliveryNoteController extends Controller
             ->where('tenant_id', $tenantId)
             ->orderBy('id')->first();
 
+        // Auto-crea il warehouse del negozio destinazione se non esiste ancora
+        if (!$warehouse && $note->store_id) {
+            $storeName = DB::table('stores')->where('id', $note->store_id)->value('name');
+            $warehouseId = DB::table('warehouses')->insertGetId([
+                'tenant_id'  => $tenantId,
+                'store_id'   => $note->store_id,
+                'name'       => ($storeName ?? 'Negozio') . ' – Magazzino',
+                'type'       => 'store',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $warehouse = DB::table('warehouses')->where('id', $warehouseId)->first();
+        }
+
         if ($warehouse) {
             foreach ($items as $item) {
                 if (!$item->product_variant_id || $item->scanned_qty <= 0) continue;
@@ -468,6 +482,20 @@ class DeliveryNoteController extends Controller
             ->where('store_id', $note->store_id)
             ->where('tenant_id', $tenantId)
             ->orderBy('id')->first();
+
+        // Auto-crea il warehouse del negozio se non esiste ancora
+        if (!$warehouse && $note->store_id) {
+            $storeName = DB::table('stores')->where('id', $note->store_id)->value('name');
+            $warehouseId = DB::table('warehouses')->insertGetId([
+                'tenant_id'  => $tenantId,
+                'store_id'   => $note->store_id,
+                'name'       => ($storeName ?? 'Negozio') . ' – Magazzino',
+                'type'       => 'store',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $warehouse = DB::table('warehouses')->where('id', $warehouseId)->first();
+        }
 
         if ($warehouse && $item->product_variant_id && $delta !== 0) {
             $stock = DB::table('stock_items')
@@ -671,11 +699,31 @@ class DeliveryNoteController extends Controller
 
     private function getMainWarehouse($tenantId)
     {
-        return DB::table('warehouses')
-            ->join('stores', 'stores.id', '=', 'warehouses.store_id')
-            ->where('warehouses.tenant_id', $tenantId)
-            ->where('stores.is_main', 1)
-            ->select('warehouses.id')
-            ->first();
+        $mainStore = DB::table('stores')
+            ->where('tenant_id', $tenantId)
+            ->where('is_main', true)
+            ->first(['id', 'name']);
+
+        if (!$mainStore) return null;
+
+        $warehouse = DB::table('warehouses')
+            ->where('tenant_id', $tenantId)
+            ->where('store_id', $mainStore->id)
+            ->first('id');
+
+        // Auto-crea il warehouse del magazzino centrale se non esiste ancora
+        if (!$warehouse) {
+            $warehouseId = DB::table('warehouses')->insertGetId([
+                'tenant_id'  => $tenantId,
+                'store_id'   => $mainStore->id,
+                'name'       => $mainStore->name . ' – Magazzino Centrale',
+                'type'       => 'store',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $warehouse = DB::table('warehouses')->where('id', $warehouseId)->first('id');
+        }
+
+        return $warehouse;
     }
 }
