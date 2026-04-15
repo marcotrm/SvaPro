@@ -50,6 +50,7 @@ const AdminDeliveryNotesPage = lazy(() => import('./pages/AdminDeliveryNotesPage
 const RestockOrdersPage    = lazy(() => import('./pages/RestockOrdersPage.jsx'));
 const DeliveryNotesPage    = lazy(() => import('./pages/DeliveryNotesPage.jsx'));
 const AdmPage              = lazy(() => import('./pages/AdmPage.jsx'));
+const AutomazioniPage      = lazy(() => import('./pages/AutomazioniPage.jsx'));
 
 
 // Components
@@ -179,6 +180,7 @@ export default function App() {
               <Route path="/warehouse/restock" element={<RestockOrdersPage />} />
               <Route path="/warehouse/delivery-notes" element={<DeliveryNotesPage />} />
               <Route path="/adm" element={<AdmPage />} />
+              <Route path="/automazioni" element={<AutomazioniPage />} />
 
             </Route>
           </Route>

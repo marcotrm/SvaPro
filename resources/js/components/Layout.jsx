@@ -12,7 +12,7 @@ import {
   Receipt, Star, ArrowRightLeft, MapPin, ChevronLeft, ChevronRight,
   PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store, AlertCircle,
   LayoutDashboard, ShoppingCart, Megaphone, HandCoins,
-  Menu, X, Home, ChevronRight as ChevRight, Calendar, FileSpreadsheet
+  Menu, X, Home, ChevronRight as ChevRight, Calendar, FileSpreadsheet, Zap
 } from 'lucide-react';
 
 
@@ -76,6 +76,10 @@ const allNavigation = [
     { label: 'Report Fiscali PLI',     href: '/adm',          icon: FileSpreadsheet,  roles: ['superadmin','admin_cliente'] },
   ]},
 
+  // Automazioni ──────────────────────────────────────────────────────
+  { section: 'Automazioni', icon: Zap, items: [
+    { label: '⚡ Automazioni',           href: '/automazioni',  icon: Zap,             roles: ['superadmin','admin_cliente'] },
+  ]},
 
   // 10. Impostazioni ────────────────────────────────────────────────
   { section: 'Impostazioni', icon: Settings, items: [
