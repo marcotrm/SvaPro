@@ -328,21 +328,27 @@ function EmployeeChatPanel({ user, selectedStoreId, priority, onClose }) {
     if (!opCode.trim()) { setOpError('Inserisci il codice operatore'); return; }
     setOpVerifying(true); setOpError('');
     try {
-      // Usa l'istanza api già configurata (authToken + X-Tenant-Code corretti)
-      const { default: api } = await import('../api.jsx');
-      const res = await api.get('/employees', { params: { barcode: opCode.trim(), limit: 1 } });
+      const { employees: employeesApi } = await import('../api.jsx');
+      // Cerca per barcode, employee_code, id o nome
+      const res = await employeesApi.getEmployees({ barcode: opCode.trim(), limit: 5 });
       const empList = res.data?.data || [];
-      if (empList.length > 0) {
-        const emp = empList[0];
+      const code = opCode.trim().toLowerCase();
+      // Match esatto su barcode o employee_code, poi fallback al primo risultato
+      const emp = empList.find(e =>
+        (e.barcode && e.barcode.toLowerCase() === code) ||
+        (e.employee_code && e.employee_code.toLowerCase() === code) ||
+        String(e.id) === code
+      ) || empList[0];
+
+      if (emp) {
         setOpName(`${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || opCode);
         setOpVerified(true);
       } else {
         setOpError('Codice non trovato. Verifica il badge del dipendente.');
       }
-    } catch (err) {
+    } catch {
       setOpError('Errore di connessione. Riprova.');
-    }
-    finally { setOpVerifying(false); }
+    } finally { setOpVerifying(false); }
   };
 
   const handleSend = async (e) => {
@@ -482,8 +488,8 @@ export function ChatTopbarButtons({ user, selectedStoreId }) {
     <>
       {openPanel && (
         isAdmin
-          ? <AdminChatPanel user={user} priority={openPanel} onClose={() => setOpenPanel(null)} />
-          : <EmployeeChatPanel user={user} selectedStoreId={selectedStoreId} priority={openPanel} onClose={() => setOpenPanel(null)} />
+          ? <AdminChatPanel user={user} priority={openPanel === 'urgent' ? 'urgent' : 'normal'} onClose={() => setOpenPanel(null)} />
+          : <EmployeeChatPanel user={user} selectedStoreId={selectedStoreId} priority={openPanel === 'urgent' ? 'urgent' : 'normal'} onClose={() => setOpenPanel(null)} />
       )}
 
       {/* 🚨 */}
