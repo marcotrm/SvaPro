@@ -459,43 +459,10 @@ function KioskView() {
       .catch(() => setEmployees([]));
   }, []);
 
+  // Focus immediato sull'input codice — sempre, a prescindere dal ruolo
   useEffect(() => {
-    if (!employee && phase === 'idle' && !isDipendente) setTimeout(() => barcodeRef.current?.focus(), 100);
-  }, [employee, phase, isDipendente]);
-
-  // Se l'utente è un dipendente, trova automaticamente il suo record
-  useEffect(() => {
-    if (!isDipendente || !user || phase !== 'idle') return;
-
-    // 1. Cerca per employee_id (match esatto)
-    let found = employees.find(e =>
-      user.employee_id && e.id === user.employee_id
-    );
-
-    // 2. Cerca per barcode (se employee_id non ha match)
-    if (!found && user.employee_barcode) {
-      found = employees.find(e =>
-        e.barcode && e.barcode.toLowerCase() === user.employee_barcode.toLowerCase()
-      );
-    }
-
-    if (found) {
-      setEmployee(found);
-      setPhase('ask_action');
-    } else if (employees.length > 0 && (user.employee_id || user.employee_barcode)) {
-      // Fallback: costruisce il record dal user object (employee potrebbe non essere in kiosk list)
-      setEmployee({
-        id: user.employee_id || user.id,
-        first_name: user.first_name || user.name || '',
-        last_name: user.last_name || '',
-        barcode: user.employee_barcode || '',
-        name: `${user.first_name || user.name || ''} ${user.last_name || ''}`.trim(),
-        store_id: user.employee_store_id || null,
-      });
-      setPhase('ask_action');
-    }
-    // Se employees non è ancora caricato, wait (l'effect si riavvierà)
-  }, [isDipendente, user, employees, phase]);
+    if (phase === 'idle') setTimeout(() => barcodeRef.current?.focus(), 100);
+  }, [phase]);
 
   const getStoreId = () => {
     const v = localStorage.getItem('selectedStoreId');
