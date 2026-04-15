@@ -4,7 +4,7 @@ import { catalog, suppliers, inventory, orders as ordersApi, clearApiCache } fro
 import { getImageUrl } from '../api.jsx';
 import api from '../api.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
-import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, PackagePlus, Upload, X, CheckCircle, Loader2, ShoppingBag, Star } from 'lucide-react';
+import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function CatalogPage() {
@@ -19,7 +19,7 @@ export default function CatalogPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [suppliersList, setSuppliersList] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [stockPopover, setStockPopover] = useState(null);
+  const [duplicating, setDuplicating] = useState(null); // product id in corso
   const [showPsImport, setShowPsImport] = useState(false);
   const [showCsvImport, setShowCsvImport] = useState(false);
 
@@ -74,31 +74,60 @@ export default function CatalogPage() {
     }
   };
 
-  const handleQuickStock = async (variantId, qty) => {
-    if (!qty || isNaN(parseInt(qty)) || parseInt(qty) === 0) {
-      toast.error('Inserisci una quantità valida');
-      return;
-    }
-    // Se nessun negozio è selezionato, non sappiamo dove aggiungere la giacenza
-    if (!selectedStoreId) {
-      toast.error('Seleziona prima un negozio specifico dall\'header per aggiungere la quantità.');
-      return;
-    }
+  const handleDuplicate = async (product) => {
+    setDuplicating(product.id);
     try {
-      await inventory.adjustStock({
-        store_id: selectedStoreId,          // il backend risolve/crea il warehouse
-        product_variant_id: variantId,
-        qty: parseInt(qty),
-        movement_type: 'manual_adjustment',
-      });
-      toast.success(`Quantità aggiornata (+${qty})`);
-      setStockPopover(null);
+      // Genera un SKU univoco: SKU-COPIA, poi SKU-COPIA-2, -3, ...
+      const existingSkus = new Set(products.map(p => p.sku));
+      let newSku = product.sku ? `${product.sku}-COPIA` : `COPIA-${product.id}`;
+      let attempt = 1;
+      while (existingSkus.has(newSku)) {
+        attempt++;
+        newSku = product.sku ? `${product.sku}-COPIA-${attempt}` : `COPIA-${product.id}-${attempt}`;
+      }
+
+      const payload = {
+        sku:         newSku,
+        name:        product.name + ' (Copia)',
+        product_type: product.product_type || 'other',
+        pli_code:    product.pli_code    || undefined,
+        barcode:     undefined,                          // barcode univoco, non copiamo
+        brand_id:    product.brand_id    || undefined,
+        category_id: product.category_id || undefined,
+        image_url:   product.image_url   || undefined,
+        auto_reorder_enabled: product.auto_reorder_enabled ?? true,
+        reorder_days: product.reorder_days || 30,
+        min_stock_qty: product.min_stock_qty || 0,
+        nicotine_mg:  product.nicotine_mg  || undefined,
+        volume_ml:    product.volume_ml    || undefined,
+        variants: (product.variants || []).map(v => ({
+          // Non inviamo id: così il backend li crea come nuovi
+          flavor:           v.flavor           || undefined,
+          resistance_ohm:   v.resistance_ohm   || undefined,
+          nicotine_strength: v.nicotine_strength || undefined,
+          volume_ml:        v.volume_ml         || undefined,
+          color:            v.color             || undefined,
+          barcode:          undefined,                  // non duplichiamo il barcode
+          location:         v.location          || undefined,
+          pack_size:        v.pack_size         || 1,
+          cost_price:       v.cost_price        || 0,
+          sale_price:       v.sale_price        || 0,
+          price_list_2:     v.price_list_2      || undefined,
+          price_list_3:     v.price_list_3      || undefined,
+          tax_class_id:     v.tax_class_id      || undefined,
+        })),
+      };
+
+      const res = await catalog.createProduct(payload);
+      toast.success(`«${product.name}» duplicato con SKU ${newSku}`, { duration: 3000 });
       fetchData();
     } catch (err) {
-      const msgs = err.response?.data?.errors
-        ? Object.values(err.response.data.errors).flat().join(' • ')
-        : err.response?.data?.message || 'Errore aggiornamento stock';
-      toast.error(msgs);
+      const msg = err.response?.data?.message
+        || (err.response?.data?.errors ? Object.values(err.response.data.errors).flat().join(' | ') : null)
+        || 'Errore durante la duplicazione';
+      toast.error(msg);
+    } finally {
+      setDuplicating(null);
     }
   };
 
@@ -284,7 +313,7 @@ export default function CatalogPage() {
                     </button>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', position: 'relative' }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <button 
                         className="sp-btn sp-btn-ghost sp-btn-sm"
                         onClick={() => { setSelectedProduct(product); setShowModal(true); }}
@@ -292,37 +321,18 @@ export default function CatalogPage() {
                       >
                         <Edit3 size={14} />
                       </button>
-                      {/* Quick stock button */}
+                      {/* Duplica prodotto */}
                       <button
                         className="sp-btn sp-btn-ghost sp-btn-sm"
-                        title="Aggiungi quantità"
-                        onClick={() => setStockPopover(stockPopover?.variantId === variant?.id ? null : { variantId: variant?.id, productName: product.name, qty: '' })}
+                        title="Duplica prodotto"
+                        disabled={duplicating === product.id}
+                        onClick={() => handleDuplicate(product)}
+                        style={{ opacity: duplicating === product.id ? 0.5 : 1 }}
                       >
-                        <PackagePlus size={14} />
+                        {duplicating === product.id
+                          ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                          : <Copy size={14} />}
                       </button>
-                      {/* Popover stock */}
-                      {stockPopover?.variantId === variant?.id && (
-                        <div style={{
-                          position: 'absolute', right: 0, top: '100%', zIndex: 100, marginTop: 4,
-                          background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-                          borderRadius: 12, padding: 14, boxShadow: 'var(--shadow-md)', minWidth: 200,
-                        }}>
-                          <p style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--color-text)' }}>Aggiungi pezzi a magazzino</p>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <input
-                              autoFocus
-                              type="number" min="1"
-                              className="sp-input"
-                              style={{ fontSize: 13, width: 80 }}
-                              placeholder="Q.tà"
-                              value={stockPopover.qty}
-                              onChange={e => setStockPopover(p => ({ ...p, qty: e.target.value }))}
-                              onKeyDown={e => { if (e.key === 'Enter') handleQuickStock(variant.id, stockPopover.qty); if (e.key === 'Escape') setStockPopover(null); }}
-                            />
-                            <button className="sp-btn sp-btn-primary sp-btn-sm" onClick={() => handleQuickStock(variant.id, stockPopover.qty)}>OK</button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </td>
                 </tr>
