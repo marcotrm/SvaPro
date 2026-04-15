@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { attendance, stores, shifts as shiftsApi } from '../api.jsx';
 import DatePicker from '../components/DatePicker.jsx';
+import toast from 'react-hot-toast';
 
 /* â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const fmtTime  = v => v ? new Date(v).toLocaleTimeString('it-IT',  { hour: '2-digit', minute: '2-digit' }) : '—';
@@ -54,6 +55,7 @@ function AdminPresenceView() {
   const [todayList,   setTodayList]   = useState([]);
   const [todayShifts, setTodayShifts] = useState({});   // empId -> shift record
   const [loadingLive, setLoadingLive] = useState(true);
+  const notifiedRef = useRef(new Set());  // traccia ID già notificati
   const [clockStr,    setClockStr]    = useState('');
   const [dateStr,     setDateStr]     = useState('');
   const [filterDate,  setFilterDate]  = useState(new Date().toISOString().split('T')[0]);
@@ -143,6 +145,30 @@ function AdminPresenceView() {
 
   useEffect(() => { if (activeTab === 'history') fetchHistory(); }, [activeTab, fetchHistory]);
 
+  // ── Notifiche anomalie ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (todayList.length === 0) return;
+    todayList.forEach(rec => {
+      const shift    = todayShifts[String(rec.employee_id)];
+      const warnings = getMismatch(rec, shift);
+      if (warnings.length === 0) return;
+      // Chiave univoca: id record + ora entrata
+      const notifyKey = `${rec.id || rec.employee_id}_${rec.checked_in_at}`;
+      if (notifiedRef.current.has(notifyKey)) return;  // già notificato
+      notifiedRef.current.add(notifyKey);
+      const name = rec.employee_name ||
+        `${rec.first_name || ''} ${rec.last_name || ''}`.trim() ||
+        `Dipendente #${rec.employee_id}`;
+      warnings.forEach(w => {
+        toast(w.icon + '  ' + name + ': ' + w.text, {
+          duration: 8000,
+          style: { background: w.bg, color: w.color, fontWeight: 700, border: `1px solid ${w.color}40` },
+          icon: w.icon,
+        });
+      });
+    });
+  }, [todayList, todayShifts]);
+  // ────────────────────────────────────────────────────────────────────────
   const liveIds = new Set(liveList.map(e => e.employee_id || e.id));
 
   const fmtMins = (m) => {

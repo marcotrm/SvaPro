@@ -233,15 +233,21 @@ function downloadCSV(rows, filename) {
   const a    = document.createElement('a'); a.href = url; a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+function fmtTimeStr(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+}
 
 // ── ExportModal ───────────────────────────────────────────────────────────────
+const DAY_NAMES_IT = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+
 function ExportModal({ employees, onClose }) {
-  const today  = formatDate(new Date());
+  const today   = formatDate(new Date());
   const weekAgo = formatDate(new Date(Date.now() - 7 * 86400000));
-  const [dateFrom,   setDateFrom]   = useState(weekAgo);
-  const [dateTo,     setDateTo]     = useState(today);
-  const [selected,   setSelected]   = useState(new Set(employees.map(e => e.id)));
-  const [exporting,  setExporting]  = useState(false);
+  const [dateFrom,  setDateFrom]  = useState(weekAgo);
+  const [dateTo,    setDateTo]    = useState(today);
+  const [selected,  setSelected]  = useState(new Set(employees.map(e => e.id)));
+  const [exporting, setExporting] = useState(false);
 
   const toggleAll = () =>
     setSelected(prev => prev.size === employees.length ? new Set() : new Set(employees.map(e => e.id)));
@@ -250,55 +256,120 @@ function ExportModal({ employees, onClose }) {
 
   const handleExport = async () => {
     if (selected.size === 0) { toast.error('Seleziona almeno un dipendente'); return; }
-    if (!dateFrom || !dateTo)  { toast.error('Imposta le date'); return; }
+    if (!dateFrom || !dateTo) { toast.error('Imposta le date'); return; }
     setExporting(true);
     try {
-      const empIds = [...selected];
-      // Carica turni e timbrature in parallelo
+      // ── Genera array di date nel periodo ────────────────────────────────
+      const dates = [];
+      let curr = new Date(dateFrom + 'T00:00:00');
+      const end = new Date(dateTo + 'T00:00:00');
+      while (curr <= end) { dates.push(formatDate(curr)); curr.setDate(curr.getDate() + 1); }
+
+      // ── Leggi assenze da localStorage ───────────────────────────────────
+      let absenceData = {};
+      try { absenceData = JSON.parse(localStorage.getItem('svapro_absences_v1') || '{}'); } catch {}
+
+      // ── Carica turni + timbrature in parallelo ───────────────────────────
       const [shRes, attRes] = await Promise.all([
         shiftsApi.getAll({ start_date: dateFrom, end_date: dateTo }),
         attendance.getHistory({ date_from: dateFrom, date_to: dateTo }),
       ]);
-      const shiftList = shRes.data?.data || [];
+      const shiftList = shRes.data?.data  || [];
       const attList   = attRes.data?.data || [];
 
-      // Raggruppa: empId -> ore programmate (minuti), ore effettive (minuti)
-      const scheduled = {}; // empId -> minutes
-      const actual    = {}; // empId -> minutes
-      shiftList.forEach(s => {
-        if (!empIds.includes(s.employee_id)) return;
-        scheduled[s.employee_id] = (scheduled[s.employee_id] || 0) +
-          Math.max(0, timeToMinutes(s.end_time) - timeToMinutes(s.start_time));
-      });
+      // Indici per lookup O(1)
+      const shiftByKey = {};  // `${empId}_${date}` -> shift
+      shiftList.forEach(s => { shiftByKey[`${s.employee_id}_${s.date}`] = s; });
+
+      const attByKey = {};    // `${empId}_${date}` -> first attendance record
       attList.forEach(r => {
-        if (!empIds.includes(r.employee_id)) return;
-        if (!r.checked_in_at || !r.checked_out_at) return;
-        const mins = Math.round((new Date(r.checked_out_at) - new Date(r.checked_in_at)) / 60000);
-        if (mins > 0) actual[r.employee_id] = (actual[r.employee_id] || 0) + mins;
+        const date = (r.checked_in_at || '').split('T')[0] || r.date || '';
+        if (!date) return;
+        const k = `${r.employee_id}_${date}`;
+        if (!attByKey[k]) attByKey[k] = r;
       });
 
-      // Costruisci righe CSV
-      const header = ['Nome', 'Cognome', 'Ore Programmate', 'Ore Effettive', 'Ore Extra', 'Negozio'];
-      const rows   = [header];
-      employees.filter(e => selected.has(e.id)).forEach(e => {
-        const sched = scheduled[e.id] || 0;
-        const act   = actual[e.id]    || 0;
-        const extra = Math.max(0, act - sched);
+      const getAbsence = (empId, date) => {
+        const a = absenceData[empId];
+        if (!a || !a.from || !a.to) return null;
+        return date >= a.from && date <= a.to ? a : null;
+      };
+
+      // ── Costruisci righe CSV ─────────────────────────────────────────────
+      const header = [
+        'Nome','Cognome','Data','Giorno',
+        'Turno Programmato','Entrata Effettiva','Uscita Effettiva',
+        'Ore Lavorate','Stato','Note',
+      ];
+      const rows = [header];
+
+      const totSched = {};
+      const totAct   = {};
+
+      employees.filter(e => selected.has(e.id)).forEach(emp => {
+        totSched[emp.id] = 0;
+        totAct[emp.id]   = 0;
+
+        dates.forEach(date => {
+          const shift   = shiftByKey[`${emp.id}_${date}`];
+          const rec     = attByKey[`${emp.id}_${date}`];
+          const absence = getAbsence(emp.id, date);
+
+          const schedMins = shift
+            ? Math.max(0, timeToMinutes(shift.end_time) - timeToMinutes(shift.start_time))
+            : 0;
+          totSched[emp.id] += schedMins;
+
+          let actMins = 0;
+          if (rec?.checked_in_at && rec?.checked_out_at) {
+            actMins = Math.max(0, Math.round((new Date(rec.checked_out_at) - new Date(rec.checked_in_at)) / 60000));
+          }
+          totAct[emp.id] += actMins;
+
+          let stato = 'Assente';
+          if (absence) {
+            stato = absence.type === 'ferie' ? 'Ferie'
+                  : absence.type === 'malattia' ? 'Malattia'
+                  : absence.type === 'permesso' ? 'Permesso'
+                  : 'Indisponibile';
+          } else if (rec?.checked_in_at) {
+            stato = 'Presente';
+          }
+
+          const note = absence?.type === 'permesso' && absence.time_from
+            ? `Permesso ${absence.time_from}–${absence.time_to}`
+            : '';
+
+          rows.push([
+            emp.first_name || '',
+            emp.last_name  || '',
+            date,
+            DAY_NAMES_IT[new Date(date + 'T00:00:00').getDay()],
+            shift ? `${shift.start_time}–${shift.end_time}` : '—',
+            rec?.checked_in_at  ? fmtTimeStr(rec.checked_in_at)  : '—',
+            rec?.checked_out_at ? fmtTimeStr(rec.checked_out_at) : '—',
+            actMins > 0 ? formatHours(actMins) : '0h 0m',
+            stato,
+            note,
+          ]);
+        });
+
+        // Riga totale per questo dipendente
+        const extra = Math.max(0, totAct[emp.id] - totSched[emp.id]);
         rows.push([
-          e.first_name || '',
-          e.last_name  || '',
-          formatHours(sched),
-          formatHours(act),
-          formatHours(extra),
-          e.store_name || '',
+          `TOTALE ${emp.first_name} ${emp.last_name}`, '', '', '',
+          formatHours(totSched[emp.id]), '', formatHours(totAct[emp.id]),
+          extra > 0 ? `+ ${formatHours(extra)}` : '0h 0m',
+          '', emp.store_name || '',
         ]);
+        rows.push(Array(10).fill(''));
       });
 
       downloadCSV(rows, `turni_${dateFrom}_${dateTo}.csv`);
       toast.success('File scaricato! Aprilo con Excel.');
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Errore durante l\'esportazione');
+      toast.error(err?.response?.data?.message || 'Errore durante l\'esportazione');
     } finally { setExporting(false); }
   };
 
@@ -306,11 +377,13 @@ function ExportModal({ employees, onClose }) {
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:9100, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={onClose}>
       <div style={{ background:'var(--color-surface)', borderRadius:20, padding:28, width:460, maxHeight:'85vh', display:'flex', flexDirection:'column', boxShadow:'0 24px 60px rgba(0,0,0,0.35)', border:'1px solid var(--color-border)' }} onClick={e=>e.stopPropagation()}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <div style={{ fontSize:18, fontWeight:900, color:'var(--color-text)' }}>📥 Esporta Turni</div>
+          <div>
+            <div style={{ fontSize:18, fontWeight:900, color:'var(--color-text)' }}>📥 Esporta Turni</div>
+            <div style={{ fontSize:12, color:'var(--color-text-tertiary)', marginTop:3 }}>Una riga per giorno · ferie/permessi inclusi · riepilogo ore</div>
+          </div>
           <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--color-text-tertiary)' }}><X size={18}/></button>
         </div>
 
-        {/* Date */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:18 }}>
           <div>
             <label style={{ fontSize:11, fontWeight:700, color:'var(--color-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:5 }}>Dal</label>
@@ -322,28 +395,31 @@ function ExportModal({ employees, onClose }) {
           </div>
         </div>
 
-        {/* Dipendenti */}
         <div style={{ fontSize:11, fontWeight:700, color:'var(--color-text-secondary)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <span>Dipendenti</span>
-          <button onClick={toggleAll} style={{ fontSize:11, fontWeight:700, color:'var(--color-accent)', background:'none', border:'none', cursor:'pointer' }}>
+          <span>Dipendenti ({selected.size}/{employees.length})</span>
+          <button onClick={toggleAll} style={{ fontSize:11, fontWeight:700, color:'#6366F1', background:'none', border:'none', cursor:'pointer' }}>
             {selected.size === employees.length ? 'Deseleziona tutti' : 'Seleziona tutti'}
           </button>
         </div>
-        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:6, marginBottom:20, maxHeight:200 }}>
+        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:6, marginBottom:16, maxHeight:200 }}>
           {employees.map(e => (
-            <label key={e.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', borderRadius:10, cursor:'pointer', background: selected.has(e.id) ? 'var(--color-surface-hover)' : 'var(--color-bg)', border:'1px solid var(--color-border)', transition:'all 0.1s' }}>
-              <input type="checkbox" checked={selected.has(e.id)} onChange={()=>toggle(e.id)} style={{ accentColor:'var(--color-accent)', width:16, height:16 }}/>
+            <label key={e.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', borderRadius:10, cursor:'pointer', background: selected.has(e.id) ? 'rgba(99,102,241,0.08)' : 'var(--color-bg)', border:`1px solid ${selected.has(e.id) ? '#6366F1' : 'var(--color-border)'}`, transition:'all 0.1s' }}>
+              <input type="checkbox" checked={selected.has(e.id)} onChange={()=>toggle(e.id)} style={{ accentColor:'#6366F1', width:16, height:16 }}/>
               <span style={{ fontWeight:700, fontSize:13, color:'var(--color-text)' }}>{e.first_name} {e.last_name}</span>
               <span style={{ fontSize:11, color:'var(--color-text-tertiary)', marginLeft:'auto' }}>{e.store_name || ''}</span>
             </label>
           ))}
         </div>
 
+        <div style={{ background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.2)', borderRadius:10, padding:'10px 14px', marginBottom:16, fontSize:12, color:'#4338CA' }}>
+          📋 <strong>Colonne nel file:</strong> Nome · Cognome · Data · Giorno · Turno · Entrata · Uscita · Ore lavorate · Stato (Presente/Ferie/Malattia/Permesso/Assente) · Note
+        </div>
+
         <div style={{ display:'flex', gap:10 }}>
           <button onClick={onClose} style={{ flex:1, padding:'12px', borderRadius:12, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text-secondary)', fontWeight:700, fontSize:13, cursor:'pointer' }}>Annulla</button>
-          <button onClick={handleExport} disabled={exporting} style={{ flex:2, padding:'12px', borderRadius:12, border:'none', background:'var(--color-accent)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', opacity:exporting?0.7:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          <button onClick={handleExport} disabled={exporting} style={{ flex:2, padding:'12px', borderRadius:12, border:'none', background:'#6366F1', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', opacity:exporting?0.7:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
             {exporting ? <Loader size={16} style={{animation:'spin 1s linear infinite'}}/> : <Download size={16}/>}
-            {exporting ? 'Elaborazione...' : `Scarica CSV (${selected.size} dip.)`}
+            {exporting ? 'Generazione...' : `Scarica CSV (${selected.size} dip.)`}
           </button>
         </div>
       </div>
