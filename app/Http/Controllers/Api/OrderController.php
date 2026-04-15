@@ -633,10 +633,24 @@ class OrderController extends Controller
                     // Logic already exists for standard commissions
                 }
 
-                // New logic for points to the seller (Sold By)
+                // Punti operatore calcolati con gamification_rules del tenant
+                // (formula coerente con GamificationPage frontend)
                 if ($request->filled('sold_by_employee_id')) {
                     $sellerId = (int) $request->input('sold_by_employee_id');
-                    $points   = (int) $quote['employee']['points'];
+
+                    // Legge gamification_rules dal tenant settings
+                    $tenantSettingsJson = DB::table('tenants')
+                        ->where('id', $tenantId)
+                        ->value('settings_json');
+                    $tenantSettings = json_decode($tenantSettingsJson ?? '{}', true);
+                    $gamRules       = $tenantSettings['gamification_rules'] ?? [];
+                    $eurosPerPoint  = max(1, (int) ($gamRules['euros_per_point'] ?? 10));
+                    $pointsPerOrder = (int) ($gamRules['points_per_order'] ?? 2);
+
+                    // Stessa formula usata da GamificationPage:
+                    // floor(grand_total / euros_per_point) + points_per_order
+                    $grandTotal = $quote['totals']['grand_total'];
+                    $points     = (int) floor($grandTotal / $eurosPerPoint) + $pointsPerOrder;
 
                     DB::table('employee_point_wallets')->updateOrInsert(
                         ['tenant_id' => $tenantId, 'employee_id' => $sellerId],
