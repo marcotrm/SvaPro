@@ -63,8 +63,20 @@ function AdminPresenceView() {
 
   useEffect(() => {
     fetchPresence();
-    const id = setInterval(fetchPresence, 30_000);
-    return () => clearInterval(id);
+    // Polling ogni 10s — quasi real-time per il superadmin
+    const id = setInterval(fetchPresence, 10_000);
+
+    // Refresh immediato quando la tab torna attiva o la finestra riprende focus
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchPresence(); };
+    const onFocus   = () => fetchPresence();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [fetchPresence]);
 
   // Carica opzioni filtri history
@@ -844,84 +856,83 @@ function KioskView() {
         </div>
       </div>
 
-      {/* Zona scan badge */}
-      <div style={{ width: '100%', maxWidth: 560 }}>
+        {/* ─── Input codice operatore ─────────────────────────── */}
+        <div style={{ width: '100%', maxWidth: 500, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
-        {/* Messaggio errore */}
-        {message && (
-          <div style={{
-            marginBottom: 20, padding: '16px 24px', borderRadius: 16, textAlign: 'center',
-            background: message.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
-            border: `2px solid ${message.type === 'error' ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.5)'}`,
-            color: message.type === 'error' ? '#fca5a5' : '#86efac',
-            fontSize: 16, fontWeight: 700,
-          }}>
-            {message.type === 'error' ? '⚠️' : '✅'} {message.text}
-          </div>
-        )}
+          {/* Messaggio errore */}
+          {message && (
+            <div style={{
+              width: '100%', marginBottom: 20, padding: '16px 24px', borderRadius: 16, textAlign: 'center',
+              background: message.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
+              border: `2px solid ${message.type === 'error' ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.5)'}`,
+              color: message.type === 'error' ? '#fca5a5' : '#86efac',
+              fontSize: 16, fontWeight: 700,
+            }}>
+              {message.type === 'error' ? '⚠️' : '✅'} {message.text}
+            </div>
+          )}
 
-        {/* Scan area */}
-        <div
-          onClick={() => barcodeRef.current?.focus()}
-          style={{
-            background: barcodeInput.length > 0 ? 'rgba(123,111,208,0.12)' : 'rgba(255,255,255,0.03)',
-            border: `2px dashed ${barcodeInput.length > 0 ? '#7B6FD0' : 'rgba(255,255,255,0.12)'}`,
-            borderRadius: 20, padding: '28px 24px 20px', textAlign: 'center', cursor: 'text',
-            marginBottom: 24, transition: 'all 0.2s',
-          }}
-        >
-          <div style={{ fontSize: 36, marginBottom: 10 }}>
-            {phase === 'ask_history' ? '📅' : (barcodeInput.length > 0 ? '📦' : '📲')}
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 18, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            {phase === 'ask_history' ? '📅 Storico — inserisci codice' : '🔐 Inserisci il tuo codice operatore'}
           </div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
-            {barcodeInput.length > 0
-              ? <span style={{ color: '#a5b4fc', fontFamily: 'monospace', letterSpacing: 4 }}>{barcodeInput}</span>
-              : (phase === 'ask_history' ? 'Scansiona per il tuo storico' : 'Scansiona il tuo badge')
-            }
-          </div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 16 }}>
-            {barcodeInput.length > 0 ? 'Premi Invio per confermare' : 'oppure digita il tuo ID e premi Invio'}
-          </div>
+
+          {/* Input grande e prominente */}
           <input
             ref={barcodeRef}
             value={barcodeInput}
             onChange={e => setBarcodeInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleBarcodeSubmit(); }}
             autoFocus
+            autoComplete="off"
+            inputMode="text"
             style={{
-              width: '100%', maxWidth: 220,
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: 10, padding: '9px 14px', color: '#fff', fontSize: 14,
-              textAlign: 'center', outline: 'none', fontFamily: 'monospace', letterSpacing: 2,
-              boxSizing: 'border-box',
+              width: '100%',
+              background: barcodeInput.length > 0 ? 'rgba(123,111,208,0.15)' : 'rgba(255,255,255,0.06)',
+              border: `2px solid ${barcodeInput.length > 0 ? '#7B6FD0' : 'rgba(255,255,255,0.18)'}`,
+              borderRadius: 18, padding: '20px 28px', color: '#fff', fontSize: 30,
+              textAlign: 'center', outline: 'none', fontFamily: 'monospace', letterSpacing: 6,
+              fontWeight: 800, caretColor: '#a5b4fc', boxSizing: 'border-box', transition: 'all 0.2s',
             }}
-            placeholder="ID / Codice badge"
+            placeholder="_ _ _ _ _ _"
           />
-        </div>
 
-        {/* Istruzioni badge & Storico */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-            <div style={{ color: 'rgba(255,255,255,0.18)', fontSize: 12 }}>
-                Inserisci il codice del tuo badge e premi <kbd style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace', fontSize: 11 }}>Invio</kbd>
-            </div>
-            
-            <button 
-               onClick={() => {
-                 if (isDipendente) {
-                     setPhase('idle'); // ritornerà ai bottoni personali
-                 } else {
-                     setPhase(phase === 'ask_history' ? 'idle' : 'ask_history'); 
-                     barcodeRef.current?.focus();
-                 }
-               }}
-               style={{ background: phase === 'ask_history' ? 'rgba(255,255,255,0.15)' : 'transparent', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: 20, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 12, transition: 'all 0.2s' }}
+          {/* Bottone Conferma — appare appena l'utente inizia a digitare */}
+          <div style={{ marginTop: 16, width: '100%', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {barcodeInput.length > 0 ? (
+              <button
+                onClick={handleBarcodeSubmit}
+                disabled={loading}
+                style={{
+                  width: '100%', background: 'linear-gradient(135deg, #7B6FD0, #4F46E5)',
+                  border: 'none', borderRadius: 14, padding: '16px 0',
+                  color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer',
+                  opacity: loading ? 0.7 : 1, letterSpacing: '0.04em', transition: 'opacity 0.15s',
+                }}
+              >
+                {loading ? '⏳ Ricerca in corso...' : '✅ Conferma codice'}
+              </button>
+            ) : (
+              <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, textAlign: 'center' }}>
+                Digita il codice e premi <kbd style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '1px 8px', fontFamily: 'monospace', fontSize: 12 }}>Invio</kbd> oppure tap su Conferma
+              </div>
+            )}
+          </div>
+
+          {/* Link storico */}
+          {!isDipendente && (
+            <button
+              onClick={() => {
+                setPhase(phase === 'ask_history' ? 'idle' : 'ask_history');
+                barcodeRef.current?.focus();
+              }}
+              style={{ marginTop: 24, background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', padding: '8px 20px', borderRadius: 20, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 13, transition: 'all 0.2s' }}
             >
-               {phase === 'ask_history' ? '🔙 Torna Indietro' : '🕒 Vedi Storico'}
+              {phase === 'ask_history' ? '🔙 Torna alla timbratura' : '🕒 Vedi storico ore'}
             </button>
+          )}
         </div>
       </div>
-    </div>
-  );
+    );
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
