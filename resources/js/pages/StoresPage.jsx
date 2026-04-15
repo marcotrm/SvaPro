@@ -448,9 +448,10 @@ function StoreCard({ store, onEdit, onDelete }) {
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-text-secondary)' }}>
           🕐 Oggi: {hoursDisplay}
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--color-accent)' }} title="Calcolato automaticamente per eventuali conteggi e premi KPI.">
-          💰 Fatturato (h18): € {(store.revenue_18 || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--color-accent)' }} title="Media settimanale: fatturato accumulato entro le 18:00 per ogni giorno di questa settimana (lun→oggi), diviso per i giorni.">
+          📊 Media h18 (sett.): € {(store.revenue_18 || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
         </span>
+
       </div>
 
       {/* Orari accordion */}

@@ -27,22 +27,12 @@ class StoreController extends Controller
                 'auto_reorder_enabled',
             ])
             ->map(function ($s) use ($tenantId) {
-                // Calcola il fatturato di "oggi" entro le ore 18
-                $todayAuth = now()->toDateString();
-                $targetTime = now()->setTime(18, 0, 0);
-
-                $revenue18 = DB::table('sales_orders')
-                    ->where('tenant_id', $tenantId)
-                    ->where('store_id', $s->id)
-                    ->whereDate('created_at', $todayAuth)
-                    ->where('created_at', '<=', $targetTime)
-                    ->where('status', 'completed')
-                    ->sum('grand_total');
-
+                // Media settimanale fatturato h18 (lunedì → oggi)
                 $formatted = $this->formatStore($s);
-                $formatted['revenue_18'] = (float) $revenue18;
+                $formatted['revenue_18'] = $this->calculateRevenue18WeeklyAvg($tenantId, $s->id);
                 return $formatted;
             });
+
 
         return response()->json(['data' => $stores]);
     }
@@ -76,18 +66,8 @@ class StoreController extends Controller
                 'late_minutes'  => $r->late_minutes,
             ]);
 
-        $todayAuth = now()->toDateString();
-        $targetTime = now()->setTime(18, 0, 0);
-        $revenue18 = DB::table('sales_orders')
-            ->where('tenant_id', $tenantId)
-            ->where('store_id', $storeId)
-            ->whereDate('created_at', $todayAuth)
-            ->where('created_at', '<=', $targetTime)
-            ->where('status', 'completed')
-            ->sum('grand_total');
-
         $formattedStore = $this->formatStore($store);
-        $formattedStore['revenue_18'] = (float) $revenue18;
+        $formattedStore['revenue_18'] = $this->calculateRevenue18WeeklyAvg($tenantId, $storeId);
 
         return response()->json([
             'data' => array_merge(
@@ -365,6 +345,49 @@ class StoreController extends Controller
             'is_open_now'            => $isOpenNow,
             'auto_reorder_enabled'   => (bool) ($s->auto_reorder_enabled ?? true),
         ];
+    }
+
+    /**
+     * Calcola la media settimanale del fatturato entro le ore 18.
+     * Per ogni giorno dalla settimana corrente (lun → oggi), somma gli ordini
+     * con created_at <= {giorno} 18:00:00, poi divide per i giorni.
+     */
+    private function calculateRevenue18WeeklyAvg(int $tenantId, int $storeId): float
+    {
+        $tz          = 'Europe/Rome';
+        $now         = Carbon::now($tz);
+        $startOfWeek = $now->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+        $today       = $now->copy()->startOfDay();
+
+        // Costruisce array di date: lunedì → oggi
+        $dates  = [];
+        $cursor = $startOfWeek->copy();
+        while ($cursor->lte($today)) {
+            $dates[] = $cursor->toDateString();
+            $cursor->addDay();
+        }
+
+        if (empty($dates)) {
+            return 0.0;
+        }
+
+        $totalRevenue = 0.0;
+        foreach ($dates as $date) {
+            $cutoff = Carbon::createFromFormat('Y-m-d H:i:s', $date . ' 18:00:00', $tz)
+                ->setTimezone('UTC'); // confronto corretto con DB
+
+            $daily = (float) DB::table('sales_orders')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', $storeId)
+                ->whereDate('created_at', $date)
+                ->where('created_at', '<=', $cutoff)
+                ->whereIn('status', ['paid', 'completed'])
+                ->sum('grand_total');
+
+            $totalRevenue += $daily;
+        }
+
+        return round($totalRevenue / count($dates), 2);
     }
 
     // ─── Superadmin methods (unchanged) ─────────────────────────────
