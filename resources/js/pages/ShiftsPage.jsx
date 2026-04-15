@@ -461,7 +461,7 @@ function ExportModal({ employees, onClose }) {
           html += `<tr style="${rowStyle}">`
             + cell(dateIta,                         { bg: rowBg, bold: isWeekend, color: isWeekend ? '#6B7280' : '#1F2937', center: true })
             + cell(dayName,                         { bg: rowBg, bold: isWeekend, color: isWeekend ? '#9CA3AF' : '#1F2937', center: true })
-            + cell(shift ? `${shift.start_time}–${shift.end_time}` : '—', { bg: rowBg, center: true, color: '#374151' })
+            + cell(shift ? formatHours(schedMins) : '—', { bg: rowBg, center: true, color: '#374151' })
             + cell(rec?.checked_in_at  ? fmtTimeStr(rec.checked_in_at)  : '—', { bg: rowBg, center: true })
             + cell(rec?.checked_out_at ? fmtTimeStr(rec.checked_out_at) : '—', { bg: rowBg, center: true })
             + cell(actMins > 0 ? formatHours(actMins) : '—',                   { bg: rowBg, center: true, color: actMins > 0 ? '#065F46' : '#9CA3AF' })
