@@ -1,4 +1,4 @@
 providers = ["php", "node"]
 
 [start]
-cmd = "php artisan migrate --force && apache2-foreground"
+cmd = "php artisan migrate --force; apache2-foreground"
