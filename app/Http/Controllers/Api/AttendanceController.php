@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Http\Controllers\Api;
 
@@ -263,7 +263,7 @@ class AttendanceController extends Controller
         $employees = DB::table('employees')
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
-            ->select(['id', 'first_name', 'last_name', 'barcode', 'expected_start_time'])
+            ->select(['id', 'first_name', 'last_name', 'barcode', 'expected_start_time', 'store_id'])
             ->orderBy('first_name')
             ->get();
 
@@ -284,6 +284,7 @@ class AttendanceController extends Controller
                 'first_name'           => $emp->first_name,
                 'last_name'            => $emp->last_name,
                 'barcode'              => $emp->barcode,
+                'store_id'             => $emp->store_id,
                 'expected_start_time'  => $emp->expected_start_time,
                 'status'               => $att
                     ? ($att->checked_out_at ? ($att->notes === 'Pausa' ? 'pausa' : 'fuori') : 'presente')
