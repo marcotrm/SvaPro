@@ -234,7 +234,7 @@ function detectGaps(shiftsMap, weekDays) {
   return alerts;
 }
 
-// ── CSV export helper ─────────────────────────────────────────────────────────
+// ── XLS (HTML) export helper — Excel apre HTML con stili nativi ───────────────
 function timeToMinutes(t) {
   if (!t) return 0;
   const [h, m] = t.split(':').map(Number);
@@ -244,10 +244,51 @@ function formatHours(mins) {
   if (!mins || mins <= 0) return '0h 0m';
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
-function downloadCSV(rows, filename) {
-  const BOM = '\uFEFF';
-  const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
-  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+
+// Palette colori stato — sfondo cella
+const STATO_BG = {
+  Presente:      '#D1FAE5',  // verde chiaro
+  Ferie:         '#FEF3C7',  // giallo ambra
+  Malattia:      '#FEE2E2',  // rosso pallido
+  Permesso:      '#DBEAFE',  // blu chiaro
+  Assente:       '#F3F4F6',  // grigio chiaro
+  Indisponibile: '#EDE9FE',  // viola pallido
+};
+const STATO_COLOR = {
+  Presente:      '#065F46',
+  Ferie:         '#92400E',
+  Malattia:      '#991B1B',
+  Permesso:      '#1E40AF',
+  Assente:       '#6B7280',
+  Indisponibile: '#5B21B6',
+};
+const STATO_EMOJI = {
+  Presente:      '✅',
+  Ferie:         '🌴',
+  Malattia:      '🤒',
+  Permesso:      '🕐',
+  Assente:       '❌',
+  Indisponibile: '⛔',
+};
+
+function downloadXLS(htmlContent, filename) {
+  const full = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+    xmlns:x="urn:schemas-microsoft-com:office:excel"
+    xmlns="http://www.w3.org/TR/REC-html40">
+  <head>
+    <meta charset="UTF-8">
+    <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>
+      <x:ExcelWorksheet><x:Name>Turni</x:Name>
+      <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+      </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+    <style>
+      td, th { border: 1px solid #D1D5DB; padding: 6px 10px; font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+      table { border-collapse: collapse; width: 100%; }
+    </style>
+  </head>
+  <body>${htmlContent}</body>
+  </html>`;
+  const blob = new Blob([full], { type: 'application/vnd.ms-excel;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a'); a.href = url; a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -314,21 +355,21 @@ function ExportModal({ employees, onClose }) {
         return date >= a.from && date <= a.to ? a : null;
       };
 
-      // ── Costruisci righe CSV ─────────────────────────────────────────────
-      const header = [
-        'Nome','Cognome','Data','Giorno',
-        'Turno Programmato','Entrata Effettiva','Uscita Effettiva',
-        'Ore Lavorate','Stato','Note',
-      ];
-      const rows = [header];
+      // ── Costruisci HTML colorato ─────────────────────────────────────────────
+      const cell = (content, opts = {}) => {
+        const {
+          bg = '#fff', color = '#1F2937', bold = false, center = false,
+          size = '11pt', colspan = 1, border = true,
+        } = opts;
+        const bdr = border ? 'border:1px solid #D1D5DB;' : '';
+        const align = center ? 'text-align:center;' : '';
+        const weight = bold ? 'font-weight:700;' : '';
+        const colAttr = colspan > 1 ? ` colspan="${colspan}"` : '';
+        return `<td${colAttr} style="background:${bg};color:${color};${weight}${align}${bdr}padding:6px 10px;font-family:Calibri,Arial,sans-serif;font-size:${size};">${content ?? ''}</td>`;
+      };
 
-      const totSched    = {};
-      const totAct      = {};
-      const totFerie    = {};
-      const totMalatt   = {};
-      const totPerm     = {};
-      const totAssente  = {};
-      const totPresente = {};
+      const COL_COUNT = 10;
+      let html = '<table>';
 
       employees.filter(e => selected.has(e.id)).forEach(emp => {
         totSched[emp.id]    = 0;
@@ -339,6 +380,29 @@ function ExportModal({ employees, onClose }) {
         totAssente[emp.id]  = 0;
         totPresente[emp.id] = 0;
 
+        // ── Intestazione dipendente ────────────────────────────────────────────
+        html += `<tr><td colspan="${COL_COUNT}" style="background:#312E81;color:#fff;font-weight:800;font-size:12pt;padding:10px 14px;font-family:Calibri,Arial,sans-serif;border:1px solid #1E1B4B;letter-spacing:0.02em;">`
+             + `👤 ${emp.first_name || ''} ${emp.last_name || ''}`
+             + (emp.store_name ? `  <span style="font-size:10pt;font-weight:400;color:#C7D2FE;"> — ${emp.store_name}</span>` : '')
+             + `</td></tr>`;
+
+        // ── Intestazione colonne ───────────────────────────────────────────────
+        const headerStyle = 'background:#4338CA;color:#fff;font-weight:700;font-size:10pt;padding:7px 10px;font-family:Calibri,Arial,sans-serif;border:1px solid #3730A3;text-align:center;';
+        html += '<tr>'
+          + `<td style="${headerStyle}">Data</td>`
+          + `<td style="${headerStyle}">Giorno</td>`
+          + `<td style="${headerStyle}">Turno Prog.</td>`
+          + `<td style="${headerStyle}">Entrata</td>`
+          + `<td style="${headerStyle}">Uscita</td>`
+          + `<td style="${headerStyle}">Ore Lav.</td>`
+          + `<td style="${headerStyle}">Stato</td>`
+          + `<td style="${headerStyle}">Ferie/Perm.</td>`
+          + `<td style="${headerStyle}">Ore Extra</td>`
+          + `<td style="${headerStyle}">Note</td>`
+          + '</tr>';
+
+        // ── Righe giornaliere ─────────────────────────────────────────────────
+        let runningExtra = 0;
         dates.forEach(date => {
           const shift   = shiftByKey[`${emp.id}_${date}`];
           const rec     = attByKey[`${emp.id}_${date}`];
@@ -368,66 +432,91 @@ function ExportModal({ employees, onClose }) {
             totAssente[emp.id]++;
           }
 
+          const dayExtra = actMins > schedMins ? actMins - schedMins : 0;
+          runningExtra += dayExtra;
+
           const note = absence?.type === 'permesso' && absence.time_from
-            ? `Permesso ${absence.time_from}–${absence.time_to}`
+            ? `${absence.time_from}–${absence.time_to}`
             : '';
 
-          rows.push([
-            emp.first_name || '',
-            emp.last_name  || '',
-            date,
-            DAY_NAMES_IT[new Date(date + 'T00:00:00').getDay()],
-            shift ? `${shift.start_time}–${shift.end_time}` : '—',
-            rec?.checked_in_at  ? fmtTimeStr(rec.checked_in_at)  : '—',
-            rec?.checked_out_at ? fmtTimeStr(rec.checked_out_at) : '—',
-            actMins > 0 ? formatHours(actMins) : '0h 0m',
-            stato,
-            note,
-          ]);
+          const bg    = STATO_BG[stato]    || '#fff';
+          const color = STATO_COLOR[stato] || '#1F2937';
+          const emoji = STATO_EMOJI[stato] || '';
+          const rowStyle = `background:${bg};`;
+          const [y, m, d] = date.split('-');
+          const dateIta = `${d}/${m}/${y}`;
+          const dayName = DAY_NAMES_IT[new Date(date + 'T00:00:00').getDay()];
+          const isWeekend = [0,6].includes(new Date(date + 'T00:00:00').getDay());
+          const rowBg = isWeekend && stato === 'Assente' ? '#F9FAFB' : bg;
+
+          html += `<tr style="${rowStyle}">`
+            + cell(dateIta,                         { bg: rowBg, bold: isWeekend, color: isWeekend ? '#6B7280' : '#1F2937', center: true })
+            + cell(dayName,                         { bg: rowBg, bold: isWeekend, color: isWeekend ? '#9CA3AF' : '#1F2937', center: true })
+            + cell(shift ? `${shift.start_time}–${shift.end_time}` : '—', { bg: rowBg, center: true, color: '#374151' })
+            + cell(rec?.checked_in_at  ? fmtTimeStr(rec.checked_in_at)  : '—', { bg: rowBg, center: true })
+            + cell(rec?.checked_out_at ? fmtTimeStr(rec.checked_out_at) : '—', { bg: rowBg, center: true })
+            + cell(actMins > 0 ? formatHours(actMins) : '—',                   { bg: rowBg, center: true, color: actMins > 0 ? '#065F46' : '#9CA3AF' })
+            + cell(`${emoji} ${stato}`,             { bg, color, bold: true, center: true })
+            + cell(absence?.type ? (absence.type.charAt(0).toUpperCase() + absence.type.slice(1)) : '',  { bg: rowBg, color: '#6B7280', center: true })
+            + cell(dayExtra > 0 ? `+${formatHours(dayExtra)}` : '',            { bg: rowBg, center: true, color: '#059669', bold: dayExtra > 0 })
+            + cell(note,                            { bg: rowBg, color: '#6B7280' })
+            + '</tr>';
         });
 
-        // ── Riga TOTALE per dipendente (con ore extra + assenze) ────────────────
+        // ── Riga TOTALE dipendente ─────────────────────────────────────────────
         const extra = Math.max(0, totAct[emp.id] - totSched[emp.id]);
-        rows.push([
-          `── TOTALE ${emp.first_name} ${emp.last_name} ──`,
-          '',
-          '',
-          `Prog: ${formatHours(totSched[emp.id])}`,
-          `Effettive: ${formatHours(totAct[emp.id])}`,
-          extra > 0 ? `ORE EXTRA: +${formatHours(extra)}` : 'Ore extra: 0',
-          totFerie[emp.id]   > 0 ? `Ferie: ${totFerie[emp.id]}gg`     : '',
-          totMalatt[emp.id]  > 0 ? `Malattia: ${totMalatt[emp.id]}gg` : '',
-          totPerm[emp.id]    > 0 ? `Permessi: ${totPerm[emp.id]}gg`   : '',
-          totAssente[emp.id] > 0 ? `Assente: ${totAssente[emp.id]}gg` : '',
-        ]);
-        rows.push(Array(10).fill(''));
+        const totStyle = 'background:#0F766E;color:#fff;font-weight:700;font-size:11pt;padding:8px 10px;font-family:Calibri,Arial,sans-serif;border:1px solid #0D9488;';
+        html += '<tr>'
+          + `<td colspan="2" style="${totStyle}">📊 TOTALE ${emp.first_name} ${emp.last_name}</td>`
+          + `<td style="${totStyle}text-align:center;">Prog: ${formatHours(totSched[emp.id])}</td>`
+          + `<td colspan="2" style="${totStyle}text-align:center;">Effettive: ${formatHours(totAct[emp.id])}</td>`
+          + `<td style="${totStyle}text-align:center;color:${extra > 0 ? '#FDE68A' : '#99F6E4'};">` + (extra > 0 ? `⭐ +${formatHours(extra)}` : '—') + '</td>'
+          + `<td style="${totStyle}text-align:center;">✅ ${totPresente[emp.id]}gg</td>`
+          + `<td style="${totStyle}text-align:center;">🌴 ${totFerie[emp.id]}  🤒 ${totMalatt[emp.id]}  🕐 ${totPerm[emp.id]}  ❌ ${totAssente[emp.id]}</td>`
+          + `<td colspan="2" style="${totStyle}"></td>`
+          + '</tr>';
+
+        // ── Riga vuota separatrice ─────────────────────────────────────────────
+        html += `<tr><td colspan="${COL_COUNT}" style="background:#F9FAFB;border:none;padding:4px;"></td></tr>`;
       });
 
-      // ── RIEPILOGO FINALE (sezione separata con proprio header) ───────────────
-      rows.push(Array(10).fill(''));
-      rows.push(['═══ RIEPILOGO TOTALI ═══', ...Array(9).fill('')]);
-      rows.push([
-        'Nome','Cognome',
-        'Ore Programmate','Ore Effettive','ORE IN PIÙ',
-        'Gg Ferie','Gg Malattia','Gg Permesso','Gg Assenti','Negozio',
-      ]);
-      employees.filter(e => selected.has(e.id)).forEach(emp => {
+      // ── SEZIONE RIEPILOGO FINALE ─────────────────────────────────────────────
+      html += `<tr><td colspan="${COL_COUNT}" style="background:#1E1B4B;color:#C7D2FE;font-weight:900;font-size:13pt;padding:12px 14px;font-family:Calibri,Arial,sans-serif;border:1px solid #1E1B4B;letter-spacing:0.05em;">📋 RIEPILOGO TOTALI — ${dateFrom} → ${dateTo}</td></tr>`;
+
+      const rhStyle = 'background:#3730A3;color:#fff;font-weight:700;font-size:10pt;padding:7px 10px;font-family:Calibri,Arial,sans-serif;border:1px solid #312E81;text-align:center;';
+      html += '<tr>'
+        + `<td colspan="2" style="${rhStyle}">👤 Dipendente</td>`
+        + `<td style="${rhStyle}">Ore Prog.</td>`
+        + `<td style="${rhStyle}">Ore Effect.</td>`
+        + `<td style="${rhStyle}">⭐ ORE EXTRA</td>`
+        + `<td style="${rhStyle}">✅ Presenti</td>`
+        + `<td style="${rhStyle}">🌴 Ferie</td>`
+        + `<td style="${rhStyle}">🤒 Malattia</td>`
+        + `<td style="${rhStyle}">🕐 Permessi</td>`
+        + `<td style="${rhStyle}">❌ Assenti</td>`
+        + '</tr>';
+
+      employees.filter(e => selected.has(e.id)).forEach((emp, idx) => {
         const extra = Math.max(0, totAct[emp.id] - totSched[emp.id]);
-        rows.push([
-          emp.first_name || '',
-          emp.last_name  || '',
-          formatHours(totSched[emp.id]),
-          formatHours(totAct[emp.id]),
-          extra > 0 ? `+${formatHours(extra)}` : '0h 0m',
-          totFerie[emp.id]   || 0,
-          totMalatt[emp.id]  || 0,
-          totPerm[emp.id]    || 0,
-          totAssente[emp.id] || 0,
-          emp.store_name || '',
-        ]);
+        const evenBg = idx % 2 === 0 ? '#EEF2FF' : '#fff';
+        const sumStyle = (bg = evenBg, color = '#1F2937', bold = false) =>
+          `background:${bg};color:${color};${bold ? 'font-weight:700;' : ''}font-size:11pt;padding:7px 10px;font-family:Calibri,Arial,sans-serif;border:1px solid #C7D2FE;text-align:center;`;
+        html += '<tr>'
+          + `<td colspan="2" style="${sumStyle(evenBg, '#1F2937', true)}text-align:left;">${emp.first_name} ${emp.last_name}${ emp.store_name ? ' — ' + emp.store_name : ''}</td>`
+          + `<td style="${sumStyle()}">` + formatHours(totSched[emp.id]) + '</td>'
+          + `<td style="${sumStyle()}">` + formatHours(totAct[emp.id]) + '</td>'
+          + `<td style="${sumStyle(extra > 0 ? '#D1FAE5' : evenBg, extra > 0 ? '#065F46' : '#6B7280', true)}">` + (extra > 0 ? `+${formatHours(extra)}` : '0h 0m') + '</td>'
+          + `<td style="${sumStyle()}">` + (totPresente[emp.id] || 0) + '</td>'
+          + `<td style="${sumStyle(totFerie[emp.id] > 0 ? '#FEF3C7' : evenBg, totFerie[emp.id] > 0 ? '#92400E' : '#6B7280')}">` + (totFerie[emp.id] || 0) + '</td>'
+          + `<td style="${sumStyle(totMalatt[emp.id] > 0 ? '#FEE2E2' : evenBg, totMalatt[emp.id] > 0 ? '#991B1B' : '#6B7280')}">` + (totMalatt[emp.id] || 0) + '</td>'
+          + `<td style="${sumStyle(totPerm[emp.id] > 0 ? '#DBEAFE' : evenBg, totPerm[emp.id] > 0 ? '#1E40AF' : '#6B7280')}">` + (totPerm[emp.id] || 0) + '</td>'
+          + `<td style="${sumStyle(totAssente[emp.id] > 0 ? '#F3F4F6' : evenBg, '#6B7280')}">` + (totAssente[emp.id] || 0) + '</td>'
+          + '</tr>';
       });
 
-      downloadCSV(rows, `turni_${dateFrom}_${dateTo}.csv`);
+      html += '</table>';
+
+      downloadXLS(html, `turni_${dateFrom}_${dateTo}.xls`);
       toast.success('File scaricato! Aprilo con Excel.');
       onClose();
     } catch (err) {
