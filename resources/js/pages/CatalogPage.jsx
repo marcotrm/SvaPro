@@ -20,7 +20,6 @@ export default function CatalogPage() {
   const [suppliersList, setSuppliersList] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockPopover, setStockPopover] = useState(null);
-  const [warehousesList, setWarehousesList] = useState([]);
   const [showPsImport, setShowPsImport] = useState(false);
   const [showCsvImport, setShowCsvImport] = useState(false);
 
@@ -41,12 +40,6 @@ export default function CatalogPage() {
       setProducts(pRes.data?.data || []);
       setSuppliersList(sRes.data?.data || []);
       setCategories(cRes.data?.data || []);
-      // Carica magazzini dalle opzioni ordine (sempre disponibile)
-      try {
-        const oRes = await ordersApi.getOptions(sp);
-        const whs = oRes.data?.data?.warehouses || [];
-        if (whs.length > 0) setWarehousesList(whs);
-      } catch {}
     } catch (err) {
       setError(err.message || 'Errore caricamento dati');
     } finally { setLoading(false); }
@@ -86,17 +79,17 @@ export default function CatalogPage() {
       toast.error('Inserisci una quantità valida');
       return;
     }
-    const warehouseId = warehousesList[0]?.id;
-    if (!warehouseId) {
-      toast.error('Nessun magazzino configurato. Vai in Magazzino per crearne uno.');
+    // Se nessun negozio è selezionato, non sappiamo dove aggiungere la giacenza
+    if (!selectedStoreId) {
+      toast.error('Seleziona prima un negozio specifico dall\'header per aggiungere la quantità.');
       return;
     }
     try {
       await inventory.adjustStock({
-        warehouse_id: warehouseId,
+        store_id: selectedStoreId,          // il backend risolve/crea il warehouse
         product_variant_id: variantId,
         qty: parseInt(qty),
-        movement_type: 'adjustment',
+        movement_type: 'manual_adjustment',
       });
       toast.success(`Quantità aggiornata (+${qty})`);
       setStockPopover(null);
