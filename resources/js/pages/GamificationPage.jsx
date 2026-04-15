@@ -65,17 +65,36 @@ export default function GamificationPage() {
     } finally { setSavingRules(false); }
   };
 
+  // ── Helper: date range per periodo ─────────────────────────────────────────
+  const getPeriodDates = (p) => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    const today = fmt(now);
+    if (p === 'month') {
+      return { date_from: fmt(new Date(now.getFullYear(), now.getMonth(), 1)), date_to: today };
+    }
+    if (p === 'quarter') {
+      const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+      return { date_from: fmt(qStart), date_to: today };
+    }
+    if (p === 'year') {
+      return { date_from: fmt(new Date(now.getFullYear(), 0, 1)), date_to: today };
+    }
+    return {}; // 'all'
+  };
+
   // ── Carica leaderboard ──────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const { orders: ordersApi, employees: employeesApi } = await import('../api.jsx');
-      const params = { limit: 500 };
+      const params = { limit: 500, ...getPeriodDates(period) };
       if (selectedStoreId) params.store_id = selectedStoreId;
 
       const [ordRes, empRes] = await Promise.all([
         ordersApi.getOrders({ ...params, status: 'paid' }),
-        employeesApi?.getAll ? employeesApi.getAll({}) : Promise.resolve({ data: { data: [] } }),
+        employeesApi?.getEmployees ? employeesApi.getEmployees({}) : Promise.resolve({ data: { data: [] } }),
       ]);
 
       const allOrders = ordRes.data?.data || [];
@@ -83,11 +102,11 @@ export default function GamificationPage() {
 
       const statsMap = {};
       allOrders.forEach(o => {
-        const empId = o.employee_id || o.cashier_id;
+        const empId = o.sold_by_employee_id || o.employee_id;
         if (!empId) return;
         if (!statsMap[empId]) statsMap[empId] = { id: empId, orders: 0, revenue: 0 };
         statsMap[empId].orders++;
-        statsMap[empId].revenue += o.grand_total || 0;
+        statsMap[empId].revenue += parseFloat(o.grand_total) || 0;
       });
 
       const lb = allEmps.map(emp => {
@@ -102,7 +121,7 @@ export default function GamificationPage() {
     } catch (err) {
       console.error('Gamification load error:', err);
     } finally { setLoading(false); }
-  }, [selectedStoreId, rules, isAdmin]);
+  }, [selectedStoreId, rules, isAdmin, period]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

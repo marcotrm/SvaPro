@@ -636,7 +636,7 @@ class OrderController extends Controller
                 // New logic for points to the seller (Sold By)
                 if ($request->filled('sold_by_employee_id')) {
                     $sellerId = (int) $request->input('sold_by_employee_id');
-                    $points = (int) $quote['employee']['points']; // Use the same formula for simplicity or adjust as needed
+                    $points   = (int) $quote['employee']['points'];
 
                     DB::table('employee_point_wallets')->updateOrInsert(
                         ['tenant_id' => $tenantId, 'employee_id' => $sellerId],
@@ -652,15 +652,28 @@ class OrderController extends Controller
                         ]);
 
                     DB::table('employee_point_ledger')->insert([
-                        'tenant_id' => $tenantId,
-                        'employee_id' => $sellerId,
-                        'source_type' => 'pos_sale',
-                        'source_id' => $orderId,
+                        'tenant_id'    => $tenantId,
+                        'employee_id'  => $sellerId,
+                        'source_type'  => 'pos_sale',
+                        'source_id'    => $orderId,
                         'points_delta' => $points,
-                        'created_at' => $now,
-                        'updated_at' => $now,
+                        'created_at'   => $now,
+                        'updated_at'   => $now,
+                    ]);
+
+                    // Popola employee_sales_facts per KPI dashboard e anagrafica dipendenti
+                    DB::table('employee_sales_facts')->insert([
+                        'tenant_id'     => $tenantId,
+                        'employee_id'   => $sellerId,
+                        'order_id'      => $orderId,
+                        'net_amount'    => $quote['employee']['net_amount'],
+                        'margin_amount' => $quote['employee']['margin_amount'],
+                        'sold_at'       => $now,
+                        'created_at'    => $now,
+                        'updated_at'    => $now,
                     ]);
                 }
+
             }
 
             return $orderId;
