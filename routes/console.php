@@ -13,4 +13,4 @@ Schedule::command('loyalty:process-firebase-deliveries --limit=50')->everyMinute
 Schedule::command('inventory:auto-reorder --all --central')->dailyAt('04:10');
 Schedule::command('ops:backup-database --keep=14')->dailyAt('03:40');
 Schedule::command('woocommerce:sync')->hourly();
-Schedule::command('app:daily-report')->dailyAt('21:00');
+Schedule::command('app:daily-report')->dailyAt('22:15');
