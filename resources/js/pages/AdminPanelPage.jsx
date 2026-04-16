@@ -152,10 +152,17 @@ const SectionDashboard = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  const [trend, setTrend] = useState([]);
+
   useEffect(() => {
-    reports.summary()
-      .then(r => setStats(r.data?.data || r.data))
-      .catch(() => {}) // silenzioso — dashboard mostra placeholder
+    Promise.all([
+      reports.summary({ days: 30 }).catch(() => ({ data: {} })),
+      reports.revenueTrend({ period: 'monthly', days: 365 }).catch(() => ({ data: { data: [] } }))
+    ])
+      .then(([r1, r2]) => {
+        setStats(r1.data?.data || r1.data);
+        setTrend(r2.data?.data || []);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -165,10 +172,10 @@ const SectionDashboard = () => {
   return (
     <div>
       <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
-        <KPICard label="Fatturato Mese"  value={fmt(stats?.revenue_current_month)} loading={loading} trend={stats?.revenue_trend}  color={C.success} icon={TrendingUp}    />
-        <KPICard label="Ordini Mese"     value={num(stats?.orders_current_month)}  loading={loading}                                color={C.accent}  icon={ShoppingBag}  />
+        <KPICard label="Fatturato Mese"  value={fmt(stats?.revenue)}              loading={loading} trend={stats?.delta_revenue}  color={C.success} icon={TrendingUp}    />
+        <KPICard label="Ordini Mese"     value={num(stats?.orders)}               loading={loading}                                color={C.accent}  icon={ShoppingBag}  />
         <KPICard label="Clienti Totali"  value={num(stats?.total_customers)}       loading={loading}                                color={C.gold}    icon={Users}        />
-        <KPICard label="Scontrino Medio" value={fmt(stats?.avg_order_value)}       loading={loading}                                color={C.warning} icon={Receipt}      />
+        <KPICard label="Scontrino Medio" value={fmt(stats?.avg_order)}            loading={loading}                                color={C.warning} icon={Receipt}      />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16, marginBottom: 16 }}>
@@ -180,14 +187,33 @@ const SectionDashboard = () => {
               Vedi Report Completo <ExternalLink size={12} />
             </button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 120 }}>
-            {[60, 80, 70, 90, 85, 95, 110, 100, 88, 92, 105, 115].map((v, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <div style={{ width: '100%', height: `${v}%`, background: `linear-gradient(to top, ${C.accent}, ${C.accent}66)`, borderRadius: '3px 3px 0 0' }} />
-                <div style={{ fontSize: 9, color: C.muted }}>{['G','F','M','A','M','G','L','A','S','O','N','D'][i]}</div>
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} className="sp-spin" color={C.muted} /></div>
+          ) : trend.length === 0 ? (
+            <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13 }}>Nessun dato</div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 120 }}>
+              {(() => {
+                const max = Math.max(...trend.map(t => parseFloat(t.revenue) || 0), 1);
+                return trend.slice(-12).map((t, i) => {
+                  const val = parseFloat(t.revenue) || 0;
+                  const pct = Math.max((val / max) * 100, 5);
+                  // parse label (e.g. 2026-04 -> Apr)
+                  let lbl = t.period || t.label || '';
+                  if (lbl.includes('-')) {
+                    const d = new Date(lbl + '-01');
+                    lbl = d.toLocaleDateString('it-IT', { month: 'short' });
+                  }
+                  return (
+                    <div key={i} title={`€ ${val.toLocaleString('it-IT')}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <div style={{ width: '100%', height: `${pct}%`, background: `linear-gradient(to top, ${C.accent}, ${C.accent}66)`, borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease' }} />
+                      <div style={{ fontSize: 9, color: C.muted, textTransform: 'capitalize' }}>{lbl}</div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          )}
         </div>
 
         {/* Accesso rapido */}

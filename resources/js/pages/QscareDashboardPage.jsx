@@ -223,7 +223,7 @@ export default function QscareDashboardPage() {
       if (period === 'anno' || period === 'trimestre') {
         label = d.toLocaleDateString('it-IT', { month: 'short' }); // raggruppato per mese
         const key = raw.slice(0, 7); // YYYY-MM
-        if (!map[key]) map[key] = { label, revenue: 0, qty: 0 };
+        if (!map[key]) map[key] = { key, label, revenue: 0, qty: 0 };
         map[key].revenue += parseFloat(r.line_total || 0);
         map[key].qty += parseInt(r.qty || 0);
         return;
@@ -232,11 +232,11 @@ export default function QscareDashboardPage() {
       } else {
         label = d.getDate().toString();
       }
-      if (!map[raw]) map[raw] = { label, revenue: 0, qty: 0 };
+      if (!map[raw]) map[raw] = { key: raw, label, revenue: 0, qty: 0 };
       map[raw].revenue += parseFloat(r.line_total || 0);
       map[raw].qty += parseInt(r.qty || 0);
     });
-    return Object.values(map).sort((a, b) => a.label.localeCompare(b.label));
+    return Object.keys(map).sort().map(k => map[k]);
   }, [data, period]);
 
   const chartByEmployee = useMemo(() => {
