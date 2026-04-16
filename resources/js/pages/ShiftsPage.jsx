@@ -661,9 +661,14 @@ export default function ShiftsPage() {
   useEffect(() => { if (selectedStoreId) setStoreId(selectedStoreId); }, [selectedStoreId]);
 
   useEffect(() => {
+    // Reset tutto immediatamente quando lo store cambia
+    setEmployees([]);
+    setShifts({});
+    setOriginalShifts({});
+    setExtraEmployees([]);
     if (storeId) loadData();
-    else { setEmployees([]); setShifts({}); setOriginalShifts({}); }
   }, [storeId, weekStart]);
+
 
   const loadData = async () => {
     setLoading(true);
