@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { loyalty } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
+import ConfirmModal from '../components/ConfirmModal.jsx';
 
 export default function LoyaltyTiersPage() {
   const { selectedStoreId } = useOutletContext();
@@ -20,6 +21,7 @@ export default function LoyaltyTiersPage() {
   const [form, setForm] = useState({
     name: '', code: '', min_points: '', multiplier: '1', cashback_percent: '0', color: '#c9a227', sort_order: '0', benefits_json: '',
   });
+  const [confirmToDelete, setConfirmToDelete] = useState(null);
 
   useEffect(() => { fetchData(); }, [tab]);
 
@@ -81,8 +83,13 @@ export default function LoyaltyTiersPage() {
     } finally { setSaving(false); }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Eliminare questo tier?')) return;
+  const handleDelete = (id) => {
+    setConfirmToDelete(id);
+  };
+
+  const doDelete = async () => {
+    const id = confirmToDelete;
+    setConfirmToDelete(null);
     try {
       await loyalty.deleteTier(id);
       await fetchData();
@@ -226,6 +233,13 @@ export default function LoyaltyTiersPage() {
           </div>
         </>
       )}
+      <ConfirmModal
+        isOpen={confirmToDelete !== null}
+        title="Elimina tier loyalty"
+        message="Vuoi eliminare questo tier? I clienti in questo livello rimarranno senza tier fino al prossimo ricalcolo."
+        onConfirm={doDelete}
+        onCancel={() => setConfirmToDelete(null)}
+      />
     </>
   );
 }

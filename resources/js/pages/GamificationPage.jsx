@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Trophy, Star, Medal, Save, CheckCircle2, AlertCircle, Zap, ShieldCheck, Users, Tag, Package } from 'lucide-react';
-import { stores as storesApi } from '../api.jsx';
+import { Save, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { stores as storesApi, gamification as gamApi } from '../api.jsx';
 
 // ── Badge tiers ───────────────────────────────────────────────────────────────
 const BADGE_TIERS = [
@@ -114,62 +114,33 @@ export default function GamificationPage() {
     return pts;
   }, []);
 
-  // ── Carica leaderboard ──────────────────────────────────────────────────────
+  // ── Carica leaderboard dal ledger reale ────────────────────────────────────
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const { orders: ordersApi, employees: employeesApi } = await import('../api.jsx');
-      const params = { limit: 500, ...getPeriodDates(period) };
+      const params = { period };
       if (selectedStoreId) params.store_id = selectedStoreId;
 
-      const [ordRes, empRes] = await Promise.all([
-        ordersApi.getOrders({ ...params, status: 'paid' }),
-        employeesApi?.getEmployees ? employeesApi.getEmployees({}) : Promise.resolve({ data: { data: [] } }),
-      ]);
+      const res = await gamApi.getLeaderboard(params);
+      const data = res.data?.data || [];
 
-      const allOrders = ordRes.data?.data || [];
-      const allEmps   = empRes.data?.data || [];
+      const lb = data.map(emp => ({
+        ...emp,
+        id:     emp.employee_id,
+        points: Math.max(0, emp.points || 0),
+        badge:  getBadge(Math.max(0, emp.points || 0)),
+      }));
 
-      // Agrega per dipendente
-      const statsMap = {};
-      allOrders.forEach(o => {
-        const empId = o.sold_by_employee_id || o.employee_id;
-        if (!empId) return;
-        if (!statsMap[empId]) statsMap[empId] = {
-          id: empId, orders: 0, revenue: 0, points: 0,
-          pts_r1: 0, pts_r2: 0, pts_r3: 0, pts_r4: 0, pts_r5: 0, pts_r6: 0,
-        };
-        const s = statsMap[empId];
-        s.orders++;
-        s.revenue += parseFloat(o.grand_total) || 0;
-
-        // Calcola singole regole per breakdown
-        const r1 = Math.floor((parseFloat(o.grand_total) || 0) * (rules.pts_per_euro || 1));
-        const r2 = o.new_customer_created  ? (rules.pts_per_fidelity || 0) : 0;
-        const r3 = (parseFloat(o.discount_total) || 0) > (rules.pts_discount_threshold || 25) ? (rules.pts_per_discount || 0) : 0;
-        const r4 = (parseInt(o.line_count) || 0) >= (rules.min_items_qty || 5) ? (rules.pts_per_big_sale || 0) : 0;
-        const r5 = o.has_qscare ? (rules.pts_per_qscare || 0) : 0;
-        const r6 = (parseInt(o.featured_items_count) || 0) * (rules.pts_per_featured || 0);
-        s.pts_r1 += r1; s.pts_r2 += r2; s.pts_r3 += r3; s.pts_r4 += r4; s.pts_r5 += r5; s.pts_r6 += r6;
-        s.points += r1 + r2 + r3 + r4 + r5 + r6;
-      });
-
-      const lb = allEmps.map(emp => {
-        const stats = statsMap[emp.id] || { orders: 0, revenue: 0, points: 0, pts_r1:0, pts_r2:0, pts_r3:0, pts_r4:0, pts_r5:0, pts_r6:0 };
-        const pts   = stats.points;
-        return { ...emp, ...stats, points: pts, badge: getBadge(pts) };
-      }).filter(e => e.points > 0 || isAdmin);
-
-      lb.sort((a, b) => b.points - a.points);
       setLeaderboard(lb);
     } catch (err) {
       console.error('Gamification load error:', err);
     } finally { setLoading(false); }
-  }, [selectedStoreId, rules, isAdmin, period, calcOrderPoints]);
+  }, [selectedStoreId, period]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   const fmt = v => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+  const fmtPts = n => Number(n || 0).toLocaleString('it-IT');
 
   // ── Helper campo input per le regole ────────────────────────────────────────
   const RuleInput = ({ label, desc, icon, fieldKey, prefix, suffix, step = 1, sub }) => (
@@ -276,22 +247,28 @@ export default function GamificationPage() {
       {/* ── LEADERBOARD ── */}
       {activeTab === 'leaderboard' && (
         <div className="card-v3 overflow-hidden">
+          <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)' }}>
+              {leaderboard.length} dipendenti in classifica
+            </span>
+            <button onClick={loadData} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }}>
+              <RefreshCw size={13} /> Aggiorna
+            </button>
+          </div>
           <table className="table-v3">
             <thead><tr>
-              <th>#</th><th>Dipendente</th><th>Badge</th><th>Punti Tot.</th>
-              <th title="Punti da fatturato">💰</th>
-              <th title="Punti da fidelity card">👤</th>
-              <th title="Punti da sconto">🏷️</th>
-              <th title="Punti da vendita voluminosa">📦</th>
-              <th title="Punti da QScare">🛡</th>
-              <th title="Punti da prodotti preferiti">⭐</th>
-              <th>Ordini</th><th>Fatturato</th>
+              <th style={{ width: 40 }}>#</th>
+              <th>Dipendente</th>
+              <th>Negozio</th>
+              <th>Badge</th>
+              <th>Punti Totali</th>
+              <th>Periodo</th>
             </tr></thead>
             <tbody>
               {leaderboard.length > 0 ? leaderboard.map((emp, i) => (
-                <tr key={emp.id} style={{ background: i < 3 ? `${['#fffbeb','#f8fafc','#fff7ed'][i]}55` : 'transparent' }}>
+                <tr key={emp.employee_id || emp.id} style={{ background: i < 3 ? `${['rgba(201,162,39,0.06)','rgba(100,116,139,0.05)','rgba(180,83,9,0.04)'][i]}` : 'transparent' }}>
                   <td>
-                    <span style={{ fontWeight: 900, fontSize: 16, color: ['#c9a227','#64748b','#b45309','#94a3b8'][i] || '#94a3b8' }}>
+                    <span style={{ fontWeight: 900, fontSize: 16, color: ['#c9a227','#64748b','#b45309'][i] || '#94a3b8' }}>
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}
                     </span>
                   </td>
@@ -303,32 +280,44 @@ export default function GamificationPage() {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontWeight: 900, color: emp.badge.color, fontSize: 14,
                       }}>
-                        {((emp.first_name || emp.name || '?')[0]).toUpperCase()}
+                        {((emp.first_name || emp.employee_name || '?')[0]).toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{emp.first_name || ''} {emp.last_name || emp.name}</div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{emp.store_name || emp.role}</div>
+                        <div style={{ fontWeight: 700, color: 'var(--color-text)' }}>{emp.first_name} {emp.last_name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{emp.employee_name}</div>
                       </div>
                     </div>
                   </td>
+                  <td style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{emp.store_name || '—'}</td>
                   <td>
-                    <span style={{ background: emp.badge.bg, color: emp.badge.color, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+                    <span style={{ background: emp.badge.bg, color: emp.badge.color, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'inline-block' }}>
                       {emp.badge.icon} {emp.badge.label}
                     </span>
                   </td>
-                  <td><strong style={{ fontSize: 16, color: '#4f46e5' }}>{emp.points.toLocaleString()}</strong></td>
-                  <td style={{ color: '#16a34a', fontWeight: 700, fontSize: 12 }}>{(emp.pts_r1||0).toLocaleString()}</td>
-                  <td style={{ color: '#0891b2', fontWeight: 700, fontSize: 12 }}>{(emp.pts_r2||0).toLocaleString()}</td>
-                  <td style={{ color: '#d97706', fontWeight: 700, fontSize: 12 }}>{(emp.pts_r3||0).toLocaleString()}</td>
-                  <td style={{ color: '#7c3aed', fontWeight: 700, fontSize: 12 }}>{(emp.pts_r4||0).toLocaleString()}</td>
-                  <td style={{ color: '#0d9488', fontWeight: 700, fontSize: 12 }}>{(emp.pts_r5||0).toLocaleString()}</td>
-                  <td style={{ color: '#f59e0b', fontWeight: 700, fontSize: 12 }}>{(emp.pts_r6||0).toLocaleString()}</td>
-                  <td>{emp.orders}</td>
-                  <td style={{ color: '#16a34a', fontWeight: 700 }}>{fmt(emp.revenue)}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                      <strong style={{ fontSize: 20, color: '#4f46e5', fontWeight: 900 }}>{fmtPts(emp.points)}</strong>
+                      <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>pt</span>
+                    </div>
+                    {/* Progress bar verso prossimo badge */}
+                    {(() => { const tiers = BADGE_TIERS; const cur = tiers.findIndex(t => emp.points >= t.min && emp.points <= t.max); const next = tiers[cur+1]; if (!next) return null; const pct = Math.min(100, ((emp.points - tiers[cur].min) / (next.min - tiers[cur].min)) * 100); return (
+                      <div style={{ marginTop: 4, height: 4, background: 'var(--color-border)', borderRadius: 99, overflow: 'hidden', width: 100 }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: emp.badge.color, borderRadius: 99, transition: 'width 0.5s' }} />
+                      </div>
+                    ); })()}
+                  </td>
+                  <td style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>
+                    {period === 'month' ? '📅 Mese' : period === 'quarter' ? '📅 Trimestre' : period === 'year' ? '📅 Anno' : '📅 Tutto'}
+                  </td>
                 </tr>
               )) : (
-                <tr><td colSpan="12" style={{ textAlign: 'center', padding: '40px', color: '#cbd5e1' }}>
-                  Nessun dato. Registra vendite con operatore assegnato via barcode.
+                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px' }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
+                  <div style={{ fontWeight: 700, color: 'var(--color-text)', marginBottom: 6 }}>Nessun punteggio per il periodo selezionato</div>
+                  <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', maxWidth: 380, margin: '0 auto', lineHeight: 1.6 }}>
+                    I punti vengono assegnati automaticamente quando si effettua una vendita dal POS
+                    con un <strong>operatore assegnato tramite scansione barcode</strong>.
+                  </div>
                 </td></tr>
               )}
             </tbody>

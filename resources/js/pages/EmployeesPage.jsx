@@ -5,6 +5,7 @@ import { EmployeesSkeleton } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import EmployeeModal from '../components/EmployeeModal.jsx';
 import EmployeeShiftsTab from '../components/EmployeeShiftsTab.jsx';
+import ConfirmModal from '../components/ConfirmModal.jsx';
 import toast from 'react-hot-toast';
 
 // ── Sospensione ──────────────────────────────────────────────────────
@@ -27,6 +28,7 @@ export default function EmployeesPage() {
   const [showSuspended, setShowSuspended] = useState(false);
   // Modal turni dipendente
   const [shiftsEmployee, setShiftsEmployee] = useState(null);
+  const [confirmToDelete, setConfirmToDelete] = useState(null);
 
   const handleSuspend = (emp) => {
     const next = new Set(suspendedIds); next.add(emp.id); setSuspendedIds(next); saveSuspended(next);
@@ -107,18 +109,23 @@ export default function EmployeesPage() {
     }
   };
 
-  const handleDelete = async (employee) => {
-    if (!window.confirm(`Eliminare il dipendente ${employee.first_name} ${employee.last_name}?\nQuesta azione non può essere annullata.`)) return;
+  const handleDelete = (employee) => {
+    setConfirmToDelete(employee);
+  };
+
+  const doDelete = async () => {
+    const employee = confirmToDelete;
+    if (!employee) return;
+    setConfirmToDelete(null);
     // Rimuovi immediatamente dalla lista (ottimistic)
     setEmployeesList(prev => prev.filter(e => e.id !== employee.id));
     try {
       await employees.deleteEmployee(employee.id);
-      // Refresh silenzioso in background per confermare
       fetchEmployees().catch(() => {});
     } catch (err) {
       // Rollback: ripristina il dipendente se l'eliminazione fallisce
       setEmployeesList(prev => [...prev, employee].sort((a, b) => a.id - b.id));
-      setError(err.response?.data?.message || 'Errore durante l\'eliminazione');
+      setError(err.response?.data?.message || "Errore durante l'eliminazione");
     }
   };
 
@@ -374,6 +381,13 @@ export default function EmployeesPage() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        isOpen={!!confirmToDelete}
+        title="Elimina dipendente"
+        message={confirmToDelete ? `Stai per eliminare ${confirmToDelete.first_name} ${confirmToDelete.last_name}. Tutti i dati associati (turni, punti, vendite) verranno rimossi.` : ''}
+        onConfirm={doDelete}
+        onCancel={() => setConfirmToDelete(null)}
+      />
     </>
   );
 }

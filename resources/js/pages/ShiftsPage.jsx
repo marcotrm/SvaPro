@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { attendance, shifts as shiftsApi, stores, clearApiCache } from '../api.jsx';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Loader, Clock, Trash, X, Download, AlertTriangle } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Loader, Clock, Trash, X, Download, AlertTriangle, Search, User, Users } from 'lucide-react';
+import { attendance, shifts as shiftsApi, stores, employees as employeesApi, clearApiCache } from '../api.jsx';
 import toast from 'react-hot-toast';
 import ShiftTemplateModal from '../components/ShiftTemplateModal.jsx';
 
@@ -603,7 +603,16 @@ export default function ShiftsPage() {
   const [templates, setTemplates]   = useState([]);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [activeCell, setActiveCell] = useState(null);
-  const [showExport, setShowExport] = useState(false);  // NEW: Export modal
+  const [showExport, setShowExport] = useState(false);
+
+  // ── Ricerca globale dipendente (cross-store) ──────────────────────────
+  const [allEmployees, setAllEmployees]     = useState([]);
+  const [globalSearch, setGlobalSearch]     = useState('');
+  const [globalResults, setGlobalResults]   = useState([]);
+  const [globalEmp, setGlobalEmp]           = useState(null);
+  const [globalShifts, setGlobalShifts]     = useState([]);
+  const [showGlobalDrop, setShowGlobalDrop] = useState(false);
+  const globalRef = useRef(null);
 
   // ── Gap detection (ricalcola ogni volta che shifts cambia) ──────────────────
   const gapAlerts = useMemo(() => detectGaps(shifts, weekDays), [shifts, weekDays]);
@@ -676,6 +685,42 @@ export default function ShiftsPage() {
       toast.error('Errore caricamento dati');
     } finally { setLoading(false); }
   };
+
+  // Carica tutti i dipendenti (tutti gli store) per la ricerca globale
+  useEffect(() => {
+    employeesApi.getEmployees({ limit: 500 }).then(res => {
+      setAllEmployees(res.data?.data || []);
+    }).catch(() => {});
+  }, []);
+
+  // Filtra dipendenti per la ricerca globale
+  useEffect(() => {
+    if (!globalSearch || globalSearch.length < 2) { setGlobalResults([]); return; }
+    const q = globalSearch.toLowerCase();
+    setGlobalResults(
+      allEmployees.filter(e =>
+        `${e.first_name} ${e.last_name}`.toLowerCase().includes(q)
+      ).slice(0, 8)
+    );
+  }, [globalSearch, allEmployees]);
+
+  // Carica turni del dipendente selezionato su tutti gli store
+  const loadGlobalEmpShifts = useCallback(async (emp) => {
+    setGlobalEmp(emp);
+    setShowGlobalDrop(false);
+    setGlobalSearch(`${emp.first_name} ${emp.last_name}`);
+    const startDateStr = weekDays[0].dateStr;
+    const endDateStr   = weekDays[6].dateStr;
+    try {
+      const res = await shiftsApi.getByEmployee(emp.id, { start_date: startDateStr, end_date: endDateStr });
+      setGlobalShifts(res.data?.data || []);
+    } catch { setGlobalShifts([]); }
+  }, [weekDays]);
+
+  // Ricarica turni globali quando cambia la settimana
+  useEffect(() => {
+    if (globalEmp) loadGlobalEmpShifts(globalEmp);
+  }, [weekStart]); // eslint-disable-line
 
   const handlePrevWeek = () => { const n = new Date(weekStart); n.setDate(n.getDate() - 7); setWeekStart(n); };
   const handleNextWeek = () => { const n = new Date(weekStart); n.setDate(n.getDate() + 7); setWeekStart(n); };
@@ -752,10 +797,63 @@ export default function ShiftsPage() {
   };
 
   if (!storeId) return (
-    <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-      <CalendarIcon size={48} style={{ opacity: 0.2, margin: '0 auto 16px' }} />
-      <h2>Seleziona un negozio</h2>
-      <p>Devi selezionare un punto vendita dalla barra in alto per gestire i turni.</p>
+    <div style={{ padding: '32px' }}>
+      {/* Global search available even without store selection */}
+      <div style={{ maxWidth: 520, margin: '0 auto 32px', padding: 24, background: 'var(--color-surface)', borderRadius: 20, border: '1px solid var(--color-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <Users size={20} color="var(--color-accent)" />
+          <div>
+            <div style={{ fontWeight: 800, color: 'var(--color-text)' }}>Cerca Dipendente (tutti i negozi)</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Visualizza i turni di un dipendente indipendentemente dal punto vendita</div>
+          </div>
+        </div>
+        <div style={{ position: 'relative' }} ref={globalRef}>
+          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
+          <input
+            className="sp-input"
+            style={{ paddingLeft: 36 }}
+            placeholder="Nome dipendente..."
+            value={globalSearch}
+            onFocus={() => setShowGlobalDrop(true)}
+            onChange={e => { setGlobalSearch(e.target.value); setShowGlobalDrop(true); }}
+          />
+          {showGlobalDrop && globalResults.length > 0 && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', overflow: 'hidden', marginTop: 4 }}>
+              {globalResults.map(emp => (
+                <button key={emp.id} onClick={() => loadGlobalEmpShifts(emp)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(123,111,208,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'var(--color-accent)', fontSize: 12 }}>{(emp.first_name || '?')[0]}</div>
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--color-text)', fontSize: 13 }}>{emp.first_name} {emp.last_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{emp.store_name || 'N/D'}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      {globalEmp && globalShifts.length > 0 && (
+        <div style={{ maxWidth: 700, margin: '0 auto', padding: 24, background: 'var(--color-surface)', borderRadius: 20, border: '1px solid var(--color-border)' }}>
+          <div style={{ fontWeight: 800, marginBottom: 14, color: 'var(--color-text)' }}>Turni di {globalEmp.first_name} {globalEmp.last_name} — settimana corrente</div>
+          {globalShifts.map(s => (
+            <div key={s.id} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 12px', background: 'var(--color-bg)', borderRadius: 10, marginBottom: 6 }}>
+              <span style={{ fontWeight: 700, color: 'var(--color-text)', width: 100 }}>{s.date}</span>
+              <span style={{ color: 'var(--color-accent)', fontWeight: 700 }}>{s.start_time} – {s.end_time}</span>
+              {s.store && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.store.name}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      {globalEmp && globalShifts.length === 0 && (
+        <div style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center', padding: 32, color: 'var(--color-text-tertiary)' }}>
+          Nessun turno trovato per {globalEmp.first_name} {globalEmp.last_name} questa settimana.
+        </div>
+      )}
+      <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', marginTop: 32 }}>
+        <CalendarIcon size={48} style={{ opacity: 0.2, margin: '0 auto 16px' }} />
+        <h2>Seleziona un negozio</h2>
+        <p>Devi selezionare un punto vendita dalla barra in alto per gestire i turni del negozio.</p>
+      </div>
     </div>
   );
 
@@ -763,7 +861,7 @@ export default function ShiftsPage() {
     <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <CalendarIcon size={24} color="var(--color-accent)" /> Pianificazione Turni
@@ -783,6 +881,58 @@ export default function ShiftsPage() {
             {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} Salva Configurazioni
           </button>
         </div>
+      </div>
+
+      {/* ── Ricerca globale dipendente (cross-store) ── */}
+      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ position: 'relative', flex: '0 0 300px' }} ref={globalRef}>
+          <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)', pointerEvents: 'none' }} />
+          <input
+            className="sp-input"
+            style={{ paddingLeft: 34, paddingRight: globalEmp ? 32 : undefined }}
+            placeholder="🔍 Cerca dipendente (tutti i negozi)..."
+            value={globalSearch}
+            onFocus={() => setShowGlobalDrop(true)}
+            onChange={e => { setGlobalSearch(e.target.value); setShowGlobalDrop(true); if (!e.target.value) { setGlobalEmp(null); setGlobalShifts([]); } }}
+          />
+          {globalEmp && (
+            <button onClick={() => { setGlobalEmp(null); setGlobalShifts([]); setGlobalSearch(''); }} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', padding: 4 }}>
+              <X size={13} />
+            </button>
+          )}
+          {showGlobalDrop && globalResults.length > 0 && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.2)', overflow: 'hidden', marginTop: 4 }}>
+              {globalResults.map(emp => (
+                <button key={emp.id} onClick={() => loadGlobalEmpShifts(emp)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid var(--color-border)' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(123,111,208,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'var(--color-accent)', fontSize: 11 }}>{(emp.first_name || '?')[0]}</div>
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--color-text)', fontSize: 13 }}>{emp.first_name} {emp.last_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{emp.store_name || 'N/D'}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {globalEmp && (
+          <div style={{ flex: 1, background: 'rgba(99,102,241,0.06)', border: '1.5px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '10px 16px' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--color-accent)', marginBottom: 6 }}>
+              📅 Turni di {globalEmp.first_name} {globalEmp.last_name} — settimana corrente
+            </div>
+            {globalShifts.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {globalShifts.map(s => (
+                  <div key={s.id} style={{ fontSize: 12, padding: '4px 10px', background: 'rgba(99,102,241,0.1)', borderRadius: 8, color: 'var(--color-text)', fontWeight: 700 }}>
+                    {s.date} · {s.start_time}–{s.end_time}
+                    {s.store && <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)', marginLeft: 4 }}>({s.store.name})</span>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Nessun turno questa settimana.</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Analisi copertura turni — sempre visibile */}

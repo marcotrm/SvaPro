@@ -4,6 +4,7 @@ import { catalog, suppliers, inventory, orders as ordersApi, clearApiCache } fro
 import { getImageUrl } from '../api.jsx';
 import api from '../api.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
+import ConfirmModal from '../components/ConfirmModal.jsx';
 import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -13,6 +14,7 @@ export default function CatalogPage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirmToDelete, setConfirmToDelete] = useState(null); // product | null
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -130,15 +132,18 @@ export default function CatalogPage() {
   };
 
   const handleDelete = async (product) => {
-    if (!window.confirm(`Eliminare definitivamente «${product.name}»?
+    setConfirmToDelete(product);
+  };
 
-Questa azione è irreversibile e rimuoverà tutte le varianti e i dati di stock associati.`)) return;
+  const doDelete = async () => {
+    if (!confirmToDelete) return;
     try {
-      await catalog.deleteProduct(product.id);
-      toast.success(`«${product.name}» eliminato`);
+      await catalog.deleteProduct(confirmToDelete.id);
+      toast.success(`«${confirmToDelete.name}» eliminato`);
+      setConfirmToDelete(null);
       fetchData();
     } catch (err) {
-      const msg = err.response?.data?.message || 'Errore durante l\'eliminazione';
+      const msg = err.response?.data?.message || "Errore durante l'eliminazione";
       toast.error(msg);
     }
   };
@@ -150,6 +155,14 @@ Questa azione è irreversibile e rimuoverà tutte le varianti e i dati di stock 
   );
 
   return (
+    <>
+    <ConfirmModal
+      isOpen={!!confirmToDelete}
+      title="Elimina prodotto"
+      message={`Stai per eliminare definitivamente «${confirmToDelete?.name}». Tutte le varianti e i dati di stock associati verranno rimossi.`}
+      onConfirm={doDelete}
+      onCancel={() => setConfirmToDelete(null)}
+    />
     <div className="sp-animate-in">
       {/* Header */}
       <div className="sp-page-header">
@@ -726,5 +739,6 @@ function PrestashopImportModal({ onClose, onImported }) {
         </div>
       </div>
     </div>
+    </>
   );
 }

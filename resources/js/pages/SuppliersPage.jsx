@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { suppliers } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
+import ConfirmModal from '../components/ConfirmModal.jsx';
 
 export default function SuppliersPage() {
   const { selectedStoreId } = useOutletContext();
@@ -14,6 +15,7 @@ export default function SuppliersPage() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', code: '', email: '', phone: '', vat_number: '', address: '', city: '', province: '', zip: '', country: 'IT', notes: '' });
+  const [confirmToDelete, setConfirmToDelete] = useState(null);
 
   useEffect(() => { fetchList(); }, []);
 
@@ -58,8 +60,13 @@ export default function SuppliersPage() {
     } finally { setSaving(false); }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Eliminare questo fornitore?')) return;
+  const handleDelete = (id) => {
+    setConfirmToDelete(id);
+  };
+
+  const doDelete = async () => {
+    const id = confirmToDelete;
+    setConfirmToDelete(null);
     try {
       await suppliers.remove(id);
       await fetchList();
@@ -154,6 +161,13 @@ export default function SuppliersPage() {
           </tbody>
         </table>
       </div>
+      <ConfirmModal
+        isOpen={confirmToDelete !== null}
+        title="Elimina fornitore"
+        message="Vuoi eliminare questo fornitore? Tutte le fatture associate potrebbero essere influenzate."
+        onConfirm={doDelete}
+        onCancel={() => setConfirmToDelete(null)}
+      />
     </>
   );
 }

@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { catalog } from '../api.jsx';
 import { Plus, Trash2, FolderTree, ChevronRight, Loader, Pencil, X } from 'lucide-react';
 import ErrorAlert from '../components/ErrorAlert.jsx';
+import ConfirmModal from '../components/ConfirmModal.jsx';
 
 export default function CategoryPage() {
   const [categories, setCategories]   = useState([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState('');
   const [saving, setSaving]           = useState(false);
+  const [confirmToDelete, setConfirmToDelete] = useState(null); // id | null
 
   // Modalità: 'create' | 'edit'
   const [mode, setMode]       = useState('create');
@@ -65,8 +67,14 @@ export default function CategoryPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Eliminare questa categoria?')) return;
+  const handleDelete = (id) => {
+    setConfirmToDelete(id);
+  };
+
+  const doDelete = async () => {
+    const id = confirmToDelete;
+    if (!id) return;
+    setConfirmToDelete(null);
     try {
       await catalog.deleteCategory(id);
       if (editTarget?.id === id) cancelEdit();
@@ -88,6 +96,7 @@ export default function CategoryPage() {
   const isEdit = mode === 'edit';
 
   return (
+    <>
     <div className="space-y-8 animate-v3">
 
       {error && <ErrorAlert message={error} onRetry={fetchCategories} />}
@@ -255,5 +264,13 @@ export default function CategoryPage() {
 
       </div>
     </div>
+    <ConfirmModal
+      isOpen={confirmToDelete !== null}
+      title="Elimina categoria"
+      message="Vuoi eliminare questa categoria? Le sottocategorie collegate potrebbero essere rimosse o diventare orfane."
+      onConfirm={doDelete}
+      onCancel={() => setConfirmToDelete(null)}
+    />
+    </>
   );
 }

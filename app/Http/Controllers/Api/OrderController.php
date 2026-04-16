@@ -634,53 +634,100 @@ class OrderController extends Controller
                     );
                 }
 
-                if ($request->filled('employee_id') && !$request->boolean('is_employee_purchase')) {
-                    // Logic already exists for standard commissions
-                }
-
-                // Punti operatore calcolati con gamification_rules del tenant
-                // (formula coerente con GamificationPage frontend)
+                // ── Gamification: assegna punti al venditore ──────────────────────
+                // Calcola punti seguendo le STESSE 6 regole configurate nel frontend GamificationPage
                 if ($request->filled('sold_by_employee_id')) {
                     $sellerId = (int) $request->input('sold_by_employee_id');
 
-                    // Legge gamification_rules dal tenant settings
-                    $tenantSettingsJson = DB::table('tenants')
-                        ->where('id', $tenantId)
-                        ->value('settings_json');
-                    $tenantSettings = json_decode($tenantSettingsJson ?? '{}', true);
-                    $gamRules       = $tenantSettings['gamification_rules'] ?? [];
-                    $eurosPerPoint  = max(1, (int) ($gamRules['euros_per_point'] ?? 10));
-                    $pointsPerOrder = (int) ($gamRules['points_per_order'] ?? 2);
+                    $tenantSettingsJson = DB::table('tenants')->where('id', $tenantId)->value('settings_json');
+                    $tenantSettings     = json_decode($tenantSettingsJson ?? '{}', true);
+                    $gamRules           = $tenantSettings['gamification_rules'] ?? [];
 
-                    // Stessa formula usata da GamificationPage:
-                    // floor(grand_total / euros_per_point) + points_per_order
-                    $grandTotal = $quote['totals']['grand_total'];
-                    $points     = (int) floor($grandTotal / $eurosPerPoint) + $pointsPerOrder;
+                    $grandTotal    = (float) $quote['totals']['grand_total'];
+                    $discountTotal = (float) $quote['totals']['discount_total'];
 
+                    // Conta pezzi totali nell'ordine
+                    $lineCount = (int) array_sum(array_column($quote['lines'], 'qty'));
+
+                    // Rileva QScare e prodotti preferiti
+                    $hasQscare     = false;
+                    $featuredCount = 0;
+                    $variantIds    = array_values(array_filter(array_column($quote['lines'], 'product_variant_id')));
+                    if (!empty($variantIds)) {
+                        $prods = DB::table('product_variants as pv')
+                            ->join('products as p', 'p.id', '=', 'pv.product_id')
+                            ->whereIn('pv.id', $variantIds)
+                            ->get(['p.product_type', 'p.is_featured']);
+                        foreach ($prods as $prd) {
+                            if (in_array($prd->product_type, ['qscare', 'service_qscare', 'qscare_kit'], true)) {
+                                $hasQscare = true;
+                            }
+                            if ($prd->is_featured) {
+                                $featuredCount++;
+                            }
+                        }
+                    }
+
+                    // R1 – punti per euro di vendita
+                    $pts = (int) floor($grandTotal * max(0, (int) ($gamRules['pts_per_euro'] ?? 1)));
+
+                    // R2 – punti per nuova card fidelity (cliente creato negli ultimi 5 min = "nuovo")
+                    if ($request->filled('customer_id')) {
+                        $custCreatedAt = DB::table('customers')
+                            ->where('id', (int) $request->input('customer_id'))
+                            ->value('created_at');
+                        if ($custCreatedAt && now()->diffInMinutes($custCreatedAt) <= 5) {
+                            $pts += (int) ($gamRules['pts_per_fidelity'] ?? 50);
+                        }
+                    }
+
+                    // R3 – punti se sconto totale > soglia
+                    $discThreshold = (float) ($gamRules['pts_discount_threshold'] ?? 25);
+                    if ($discountTotal > $discThreshold) {
+                        $pts += (int) ($gamRules['pts_per_discount'] ?? 30);
+                    }
+
+                    // R4 – punti se numero pezzi ≥ soglia
+                    $minItemsQty = (int) ($gamRules['min_items_qty'] ?? 5);
+                    if ($lineCount >= $minItemsQty) {
+                        $pts += (int) ($gamRules['pts_per_big_sale'] ?? 20);
+                    }
+
+                    // R5 – punti per QScare presente nell'ordine
+                    if ($hasQscare) {
+                        $pts += (int) ($gamRules['pts_per_qscare'] ?? 40);
+                    }
+
+                    // R6 – punti per ogni prodotto preferito
+                    $pts += $featuredCount * (int) ($gamRules['pts_per_featured'] ?? 15);
+
+                    $pts = max(0, $pts);
+
+                    // Aggiorna wallet punti dipendente
                     DB::table('employee_point_wallets')->updateOrInsert(
                         ['tenant_id' => $tenantId, 'employee_id' => $sellerId],
                         ['points_balance' => 0, 'created_at' => $now, 'updated_at' => $now]
                     );
-
                     DB::table('employee_point_wallets')
                         ->where('tenant_id', $tenantId)
                         ->where('employee_id', $sellerId)
                         ->update([
-                            'points_balance' => DB::raw('points_balance + '.$points),
-                            'updated_at' => $now,
+                            'points_balance' => DB::raw('points_balance + ' . $pts),
+                            'updated_at'     => $now,
                         ]);
 
+                    // Scrive nel ledger storico punti
                     DB::table('employee_point_ledger')->insert([
                         'tenant_id'    => $tenantId,
                         'employee_id'  => $sellerId,
                         'source_type'  => 'pos_sale',
                         'source_id'    => $orderId,
-                        'points_delta' => $points,
+                        'points_delta' => $pts,
                         'created_at'   => $now,
                         'updated_at'   => $now,
                     ]);
 
-                    // Popola employee_sales_facts per KPI dashboard e anagrafica dipendenti
+                    // Popola employee_sales_facts per KPI dashboard
                     DB::table('employee_sales_facts')->insert([
                         'tenant_id'     => $tenantId,
                         'employee_id'   => $sellerId,

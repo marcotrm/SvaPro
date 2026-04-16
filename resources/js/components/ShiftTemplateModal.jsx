@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { shifts } from '../api.jsx';
 import { X, Plus, Trash2, Clock, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ConfirmModal from './ConfirmModal.jsx';
 
 export default function ShiftTemplateModal({ onClose }) {
   const [templates, setTemplates] = useState([]);
@@ -9,6 +10,7 @@ export default function ShiftTemplateModal({ onClose }) {
   const [adding, setAdding] = useState(false);
   
   const [form, setForm] = useState({ name: '', start_time: '09:00', end_time: '18:00', color: '#10B981' });
+  const [confirmToDelete, setConfirmToDelete] = useState(null);
 
   useEffect(() => { loadTemplates(); }, []);
 
@@ -42,14 +44,19 @@ export default function ShiftTemplateModal({ onClose }) {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Eliminare questo template?')) return;
+  const handleDelete = (id) => {
+    setConfirmToDelete(id);
+  };
+
+  const doDelete = async () => {
+    const id = confirmToDelete;
+    setConfirmToDelete(null);
     try {
       await shifts.deleteTemplate(id);
-      toast.success('Eliminato');
+      toast.success('Template eliminato');
       setTemplates(t => t.filter(x => x.id !== id));
     } catch {
-      toast.error('Errore durante l\'eliminazione');
+      toast.error("Errore durante l'eliminazione");
     }
   };
 
@@ -111,6 +118,13 @@ export default function ShiftTemplateModal({ onClose }) {
         </div>
 
       </div>
+      <ConfirmModal
+        isOpen={confirmToDelete !== null}
+        title="Elimina template turno"
+        message="Vuoi eliminare questo modello orario? Non sarà più disponibile per l'assegnazione dei turni."
+        onConfirm={doDelete}
+        onCancel={() => setConfirmToDelete(null)}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, useLocation } from 'react-router-dom';
 import { inventory, stores as storesApi } from '../api.jsx';
 import InventoryMovementModal from '../components/InventoryMovementModal.jsx';
@@ -79,6 +79,28 @@ export default function InventoryPage() {
   });
 
   const fmt = (v) => v ? new Date(v).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+  // ── Rotazione magazzino: giorni stimati all'esaurimento scorte ──────────────
+  // Basata sui movimenti in uscita (qty < 0, tipo 'sale') degli ultimi 30 giorni
+  const ROTATION_DAYS = 30;
+  const now30 = new Date(); now30.setDate(now30.getDate() - ROTATION_DAYS);
+
+  const calcRotation = (item) => {
+    const onHand = item.available ?? item.on_hand;
+    if (onHand <= 0) return 0; // già esaurito
+    const outflows = movements.filter(m =>
+      m.product_name === item.product_name &&
+      m.qty < 0 &&
+      new Date(m.occurred_at) >= now30
+    );
+    const totalOut = outflows.reduce((sum, m) => sum + Math.abs(m.qty), 0);
+    if (totalOut <= 0) return null; // nessuna vendita nel periodo
+    const dailyUsage = totalOut / ROTATION_DAYS;
+    return Math.ceil(onHand / dailyUsage);
+  };
+
+  const rotationValues = filtered.map(item => calcRotation(item)).filter(v => v !== null && v > 0);
+  const avgRotation = rotationValues.length > 0 ? Math.round(rotationValues.reduce((a, b) => a + b, 0) / rotationValues.length) : null;
 
   const printBollaScarico = () => {
     const w = window.open('', '_blank');
@@ -210,6 +232,13 @@ export default function InventoryPage() {
           <div className="sp-stat-label">Movimenti Recenti</div>
           <div className="sp-stat-value">{movements.length}</div>
         </div>
+        <div className="sp-stat-card" title="Giorni medi all'esaurimento, basati sulle vendite degli ultimi 30gg">
+          <div className="sp-stat-label">Rotazione Media</div>
+          <div className="sp-stat-value" style={{ color: avgRotation === null ? 'var(--color-text-tertiary)' : avgRotation <= 7 ? 'var(--color-error)' : avgRotation <= 30 ? 'var(--color-warning)' : 'var(--color-success)' }}>
+            {avgRotation === null ? '—' : `${avgRotation} gg`}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>est. giorni stock</div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -250,6 +279,7 @@ export default function InventoryPage() {
                 <th>Disponibile</th>
                 <th>Riservato</th>
                 <th>Pt. Riordino</th>
+                <th title="Giorni stimati all'esaurimento scorte (ultimi 30 gg)">Rotazione (gg)</th>
                 <th>Stato</th>
               </tr>
             </thead>
@@ -278,6 +308,19 @@ export default function InventoryPage() {
                     </td>
                     <td className="sp-cell-secondary sp-font-mono">{item.reserved || 0}</td>
                     <td className="sp-cell-secondary sp-font-mono">{item.reorder_point || '—'}</td>
+                    <td>
+                      {(() => {
+                        const rot = calcRotation(item);
+                        if (rot === null) return <span className="sp-cell-secondary" title="Nessuna vendita registrata negli ultimi 30 giorni">—</span>;
+                        if (rot === 0) return <span style={{ color: 'var(--color-error)', fontWeight: 700, fontSize: 13 }}>Esaurito</span>;
+                        const color = rot <= 7 ? 'var(--color-error)' : rot <= 30 ? 'var(--color-warning)' : 'var(--color-success)';
+                        return (
+                          <span title={`A questo ritmo di vendita, le scorte si esauriranno in circa ${rot} giorni`} style={{ fontWeight: 700, color, fontSize: 13 }}>
+                            {rot} gg
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td>
                       {isOut ? (
                         <span className="sp-badge sp-badge-error"><span className="sp-badge-dot" /> Esaurito</span>

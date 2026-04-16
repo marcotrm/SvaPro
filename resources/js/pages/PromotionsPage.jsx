@@ -4,6 +4,7 @@ import { promotions } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import DatePicker from '../components/DatePicker.jsx';
+import ConfirmModal from '../components/ConfirmModal.jsx';
 
 const PROMO_TYPES = [
   { value: 'percentage', label: 'Percentuale (%)' },
@@ -26,6 +27,7 @@ export default function PromotionsPage() {
     name: '', code: '', type: 'percentage', value: '', min_order_amount: '',
     max_uses: '', starts_at: '', ends_at: '',
   });
+  const [confirmToDelete, setConfirmToDelete] = useState(null);
 
   useEffect(() => { fetchList(); }, [filter]);
 
@@ -88,8 +90,13 @@ export default function PromotionsPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Eliminare questa promozione?')) return;
+  const handleDelete = (id) => {
+    setConfirmToDelete(id);
+  };
+
+  const doDelete = async () => {
+    const id = confirmToDelete;
+    setConfirmToDelete(null);
     try {
       await promotions.remove(id);
       await fetchList();
@@ -226,6 +233,13 @@ export default function PromotionsPage() {
           </tbody>
         </table>
       </div>
+      <ConfirmModal
+        isOpen={confirmToDelete !== null}
+        title="Elimina promozione"
+        message="Vuoi eliminare questa promozione? I codici sconto non saranno più validi."
+        onConfirm={doDelete}
+        onCancel={() => setConfirmToDelete(null)}
+      />
     </>
   );
 }

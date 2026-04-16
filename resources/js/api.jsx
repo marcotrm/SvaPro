@@ -721,10 +721,20 @@ export const attendance = {
 // Shifts APIs (Pianificazione Turni)
 export const shifts = {
   getAll:         (params = {}) => api.get('/shifts', { params }),
+  getByEmployee:  (employeeId, params = {}) =>
+    api.get('/shifts', { params: { ...params, employee_id: employeeId } }),
   bulkSave:       (data)        => api.post('/shifts/bulk', data),
   getTemplates:   ()            => api.get('/shifts/templates'),
   saveTemplate:   (data)        => api.post('/shifts/templates', data),
   deleteTemplate: (id)          => api.delete(`/shifts/templates/${id}`),
+};
+
+// ── Gamification ──────────────────────────────────────────────────────
+export const gamification = {
+  getLeaderboard:    (params = {}) => api.get('/gamification/leaderboard', { params }),
+  getPlayerStats:    (params = {}) => api.get('/gamification/player-stats', { params }),
+  getMissions:       (params = {}) => api.get('/gamification/missions', { params }),
+  getTeamChallenges: ()            => api.get('/gamification/team-challenges'),
 };
 
 // Stock Transfers / DDT

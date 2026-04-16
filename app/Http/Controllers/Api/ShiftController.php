@@ -22,15 +22,30 @@ class ShiftController extends Controller
         if (!Schema::hasTable('employee_shifts')) {
             return response()->json(['data' => [], '_note' => 'Tabella turni non ancora migrata. Esegui php artisan migrate.']);
         }
-        $tenantId = (int)$request->attributes->get('tenant_id');
-        $storeId = $request->integer('store_id');
+        $tenantId  = (int)$request->attributes->get('tenant_id');
+        $storeId   = $request->integer('store_id', 0);
+        $empId     = $request->integer('employee_id', 0);
         $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
+        $endDate   = $request->input('end_date');
 
-        $shifts = Shift::where('tenant_id', $tenantId)
-            ->where('store_id', $storeId)
-            ->whereBetween('date', [$startDate, $endDate])
-            ->get();
+        $query = Shift::with('store:id,name')
+            ->where('tenant_id', $tenantId);
+
+        // Filtro per negozio (opzionale se usiamo la ricerca globale per dipendente)
+        if ($storeId) {
+            $query->where('store_id', $storeId);
+        }
+
+        // Filtro per dipendente (cross-store, nessun filtro su store_id)
+        if ($empId) {
+            $query->where('employee_id', $empId);
+        }
+
+        if ($startDate && $endDate) {
+            $query->whereBetween('date', [$startDate, $endDate]);
+        }
+
+        $shifts = $query->orderBy('date')->get();
 
         return response()->json(['data' => $shifts]);
     }
