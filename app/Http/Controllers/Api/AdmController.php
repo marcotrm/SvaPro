@@ -113,25 +113,20 @@ class AdmController extends Controller
         $tenant   = DB::table('tenants')->where('id', $tenantId)->first(['name', 'vat_number', 'settings_json']);
         $settings = json_decode($tenant?->settings_json ?? '{}', true);
 
-        $tenantInfo = [
-            'ragione_sociale' => $tenant?->name       ?? 'N/D',
-            'partita_iva'     => $tenant?->vat_number ?? 'N/D',
-            'codice_imposta'  => $settings['depositary_pli_code'] ?? 'N/D',
-        ];
+        $ragioneSociale = $tenant?->name       ?? null;
+        $partitaIva     = $tenant?->vat_number ?? null;
+        $codiceImposta  = $settings['depositary_pli_code'] ?? null;
 
-        $prospettoRows = DB::select("
+        // ── Sheet3 (Prospetto vendite) — tutti i prodotti venduti nel periodo ──
+        // I campi ADM (pli_code, nicotine_strength, volume_ml) sono NULL se non compilati
+        $sheet3Rows = DB::select("
             SELECT
-                '{$tenantInfo['ragione_sociale']}' AS ragione_sociale_depositario,
-                '{$tenantInfo['partita_iva']}' AS partita_iva_depositario,
-                '{$tenantInfo['codice_imposta']}' AS codice_imposta_depositario,
-                '{$finePeriodo}' AS data_fine_periodo,
-                'DC' AS tipo_consumatore,
-                COALESCE(NULLIF(pv.flavor, ''), p.name) AS denominazione_prodotto,
-                COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku) AS codice_prodotto,
-                COALESCE(pv.volume_ml, p.volume_ml, 0)::numeric AS capacita_confezione_ml,
-                COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric, 0) AS nicotina_mg_per_ml,
-                SUM(sol.qty)::integer AS totale_pezzi_venduti,
-                1 AS valore_soglia_nicotina
+                COALESCE(NULLIF(pv.flavor, ''), p.name)                         AS denominazione_prodotto,
+                NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku), '') AS codice_prodotto,
+                COALESCE(pv.volume_ml, p.volume_ml)::numeric                    AS capacita_confezione_ml,
+                COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric)          AS nicotina_mg_per_ml,
+                SUM(sol.qty)::integer                                            AS totale_pezzi_venduti,
+                '{$finePeriodo}'                                                 AS data_mese
             FROM sales_order_lines sol
             JOIN sales_orders so ON so.id = sol.sales_order_id
                 AND so.tenant_id = {$tenantId}
@@ -140,47 +135,37 @@ class AdmController extends Controller
                 AND so.created_at <= '{$endDate}'
             JOIN product_variants pv ON pv.id = sol.product_variant_id
             JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
-            WHERE (
-                (p.pli_code IS NOT NULL AND p.pli_code != '')
-                OR (pv.nicotine_strength IS NOT NULL AND pv.nicotine_strength > 0)
-                OR (p.nicotine_mg IS NOT NULL AND p.nicotine_mg > 0)
-                OR p.product_type IN ('liquid', 'e-liquid', 'eliquid', 'nicotine')
-            )
             GROUP BY pv.flavor, p.name, p.pli_code, pv.barcode, p.barcode, p.sku,
                      pv.volume_ml, p.volume_ml, pv.nicotine_strength, p.nicotine_mg
             HAVING SUM(sol.qty) > 0
             ORDER BY denominazione_prodotto
         ");
 
-        $giacenzaRows = DB::select("
+        // ── Sheet2 (Giacenza finale) — tutti i prodotti in stock ──
+        $sheet2Rows = DB::select("
             SELECT
-                COALESCE(NULLIF(pv.flavor, ''), p.name) AS denominazione_prodotto,
-                COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku) AS codice_prodotto,
-                COALESCE(pv.volume_ml, p.volume_ml, 0)::numeric AS capacita_confezione_ml,
-                COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric, 0) AS nicotina_mg_per_ml,
-                COALESCE(SUM(si.on_hand), 0)::integer AS giacenza_finale
+                COALESCE(NULLIF(pv.flavor, ''), p.name)                         AS denominazione_prodotto,
+                NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku), '') AS codice_prodotto,
+                COALESCE(pv.volume_ml, p.volume_ml)::numeric                    AS capacita_confezione_ml,
+                COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric)          AS nicotina_mg_per_ml,
+                COALESCE(SUM(si.on_hand), 0)::integer                           AS giacenza_finale
             FROM stock_items si
             JOIN product_variants pv ON pv.id = si.product_variant_id
             JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
             WHERE si.tenant_id = {$tenantId}
-            AND (
-                (p.pli_code IS NOT NULL AND p.pli_code != '')
-                OR (pv.nicotine_strength IS NOT NULL AND pv.nicotine_strength > 0)
-                OR (p.nicotine_mg IS NOT NULL AND p.nicotine_mg > 0)
-                OR p.product_type IN ('liquid', 'e-liquid', 'eliquid', 'nicotine')
-            )
             GROUP BY pv.flavor, p.name, p.pli_code, pv.barcode, p.barcode, p.sku,
                      pv.volume_ml, p.volume_ml, pv.nicotine_strength, p.nicotine_mg
             ORDER BY denominazione_prodotto
         ");
 
-        $resiRows = DB::select("
+        // ── Sheet4 (Resi) — resi nel periodo ──
+        $sheet4Rows = DB::select("
             SELECT
-                COALESCE(NULLIF(pv.flavor, ''), p.name) AS denominazione_prodotto,
-                COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku) AS codice_prodotto,
-                SUM(crl.quantity)::integer AS quantita_resa,
-                cr.reason AS motivo_reso,
-                TO_CHAR(cr.created_at, 'DD/MM/YYYY') AS data_reso
+                COALESCE(NULLIF(pv.flavor, ''), p.name)                         AS denominazione_prodotto,
+                NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku), '') AS codice_prodotto,
+                SUM(crl.quantity)::integer                                       AS quantita_resa,
+                cr.reason                                                        AS motivo_reso,
+                TO_CHAR(cr.created_at, 'DD/MM/YYYY')                            AS data_reso
             FROM customer_returns cr
             JOIN customer_return_lines crl ON crl.customer_return_id = cr.id
             JOIN product_variants pv ON pv.id = crl.product_variant_id
@@ -188,14 +173,41 @@ class AdmController extends Controller
             WHERE cr.tenant_id = {$tenantId}
                 AND cr.created_at >= '{$startDate}'
                 AND cr.created_at <= '{$endDate}'
-            AND (
-                (p.pli_code IS NOT NULL AND p.pli_code != '')
-                OR (pv.nicotine_strength IS NOT NULL AND pv.nicotine_strength > 0)
-                OR p.product_type IN ('liquid', 'e-liquid', 'eliquid', 'nicotine')
-            )
             GROUP BY pv.flavor, p.name, p.pli_code, pv.barcode, p.barcode, p.sku, cr.reason, cr.created_at
             ORDER BY data_reso
         ");
+
+        // Mappa i campi ai nomi esatti attesi da server.js dell'excel-api
+        $mapSheet3 = array_map(fn($r) => [
+            'ragione_sociale_depositario' => $ragioneSociale,
+            'partita_iva_depositario'     => $partitaIva,
+            'codice_imposta_depositario'  => $codiceImposta,
+            'data_mese'                   => $r->data_mese,
+            'denominazione_prodotto'      => $r->denominazione_prodotto,
+            'codice_prodotto'             => $r->codice_prodotto,
+            'capacita_confezione_ml'      => $r->capacita_confezione_ml,
+            'nicotina_mg_ml'              => $r->nicotina_mg_per_ml,
+            'numero_confezioni'           => $r->totale_pezzi_venduti,
+            'quantita_totale_ml'          => $r->capacita_confezione_ml !== null
+                ? round($r->capacita_confezione_ml * $r->totale_pezzi_venduti, 2)
+                : null,
+        ], $sheet3Rows);
+
+        $mapSheet2 = array_map(fn($r) => [
+            'denominazione_prodotto' => $r->denominazione_prodotto,
+            'codice_prodotto'        => $r->codice_prodotto,
+            'capacita_confezione_ml' => $r->capacita_confezione_ml,
+            'nicotina_mg_ml'         => $r->nicotina_mg_per_ml,
+            'giacenza_finale'        => $r->giacenza_finale,
+        ], $sheet2Rows);
+
+        $mapSheet4 = array_map(fn($r) => [
+            'denominazione_prodotto' => $r->denominazione_prodotto,
+            'codice_prodotto'        => $r->codice_prodotto,
+            'quantita_resa'          => $r->quantita_resa,
+            'motivo_reso'            => $r->motivo_reso,
+            'data_reso'              => $r->data_reso,
+        ], $sheet4Rows);
 
         // Chiama excel-api direttamente
         $excelApiUrl = rtrim(env('EXCEL_API_URL', 'http://localhost:3001'), '/');
@@ -204,9 +216,9 @@ class AdmController extends Controller
         try {
             $response = Http::timeout(60)
                 ->post($excelApiUrl . $endpoint, [
-                    'prospetto' => array_map(fn($r) => (array) $r, $prospettoRows),
-                    'giacenza'  => array_map(fn($r) => (array) $r, $giacenzaRows),
-                    'resi'      => array_map(fn($r) => (array) $r, $resiRows),
+                    'sheet3'    => $mapSheet3,
+                    'sheet2'    => $mapSheet2,
+                    'sheet4'    => $mapSheet4,
                     'periodo'   => $periodoLabel,
                     'tipo'      => $type,
                     'nome_file' => $nomeFile,
@@ -214,7 +226,7 @@ class AdmController extends Controller
 
             if ($response->failed()) {
                 return response()->json([
-                    'message' => 'Errore durante la generazione Excel. Configura N8N_WEBHOOK_URL o EXCEL_API_URL su Railway.',
+                    'message' => 'Errore durante la generazione Excel.',
                     'detail'  => $response->body(),
                 ], 502);
             }
@@ -227,7 +239,7 @@ class AdmController extends Controller
 
         } catch (\Throwable $e) {
             return response()->json([
-                'message' => 'Impossibile contattare il servizio di generazione Excel. Configura N8N_WEBHOOK_URL su Railway.',
+                'message' => 'Impossibile contattare il servizio di generazione Excel.',
                 'detail'  => $e->getMessage(),
             ], 503);
         }
@@ -238,3 +250,4 @@ class AdmController extends Controller
         return response()->json(['data' => []]);
     }
 }
+
