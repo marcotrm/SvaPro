@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache, cashMovements as cashApi } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
@@ -555,7 +555,7 @@ export default function Layout({ user, setUser }) {
               onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #d97706, #f59e0b)'; e.currentTarget.style.color = '#fff'; }}
               onMouseLeave={e => { e.currentTarget.style.background = showMichelePanel ? 'linear-gradient(135deg, #d97706, #f59e0b)' : 'rgba(245,158,11,0.12)'; e.currentTarget.style.color = showMichelePanel ? '#fff' : '#f59e0b'; }}
             >
-              ðŸ”° Scheda
+              📋 Scheda
             </button>
 
             {/* Bottone riepilogo vendite */}
@@ -648,7 +648,8 @@ export default function Layout({ user, setUser }) {
                     )}
                   </div>
 
-                  {/* Footer */}
+                  {/* Footer: shortcuts solo per superadmin/admin */}
+                  {!userRoles.includes('dipendente') && (
                   <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: 8 }}>
                     <button
                       onClick={() => { navigate('/admin-panel'); setShowNotifPanel(false); }}
@@ -659,6 +660,7 @@ export default function Layout({ user, setUser }) {
                       style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                     >Automazioni</button>
                   </div>
+                  )}
                   {cashAlertStores.length > 0 && (
                     <div style={{ padding: '8px 16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                       <button

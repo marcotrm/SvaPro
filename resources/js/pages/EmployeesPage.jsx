@@ -175,17 +175,21 @@ export default function EmployeesPage() {
             boxShadow: activeTab === t.id ? '0 2px 8px rgba(123,111,208,0.35)' : 'none',
           }}>{t.label}</button>
         ))}
-        <button onClick={() => window.open('/clock-in', '_blank')} title="Apre il kiosk in una nuova finestra" style={{
-          padding: '8px 14px', borderRadius: 10, border: '1px solid var(--color-border)', cursor: 'pointer', fontWeight: 700, fontSize: 13,
-          background: 'transparent', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4,
-        }}>
-          <Monitor size={13} /> Kiosk ↗
-        </button>
       </div>
 
       {/* ── Tab: Presenze (inline) ── */}
       {activeTab === 'presenze' && (
-        <AttendanceContent selectedStoreId={selectedStoreId} />
+        <div>
+          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={() => window.open('/clock-in', '_blank')} title="Apri Kiosk Timbratura in una nuova finestra" style={{
+              padding: '7px 14px', borderRadius: 10, border: '1px solid var(--color-border)', cursor: 'pointer', fontWeight: 700, fontSize: 12,
+              background: 'transparent', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <Monitor size={12} /> 🖥 Apri Kiosk \u2197
+            </button>
+          </div>
+          <AttendanceContent selectedStoreId={selectedStoreId} />
+        </div>
       )}
 
       {/* ── Tab: Anagrafica ── */}
