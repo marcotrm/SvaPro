@@ -64,14 +64,24 @@ export default function CatalogPage() {
 
   const handleToggleFeatured = async (product) => {
     const newVal = !product.is_featured;
-    // Aggiornamento ottimistico immediato
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_featured: newVal } : p));
     try {
       await catalog.toggleFeatured(product.id, newVal);
       toast.success(newVal ? `⭐ "${product.name}" messo in evidenza nel POS` : `"${product.name}" rimosso dall'evidenza`, { duration: 2000 });
     } catch (err) {
-      // Rollback in caso di errore
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_featured: !newVal } : p));
+      toast.error('Errore nell\'aggiornamento');
+    }
+  };
+
+  const handleToggleOnline = async (product) => {
+    const newVal = !product.is_online;
+    setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_online: newVal } : p));
+    try {
+      await catalog.updateProduct(product.id, { is_online: newVal });
+      toast.success(newVal ? `🌐 "${product.name}" attivo online` : `🚫 "${product.name}" nascosto online`, { duration: 2000 });
+    } catch (err) {
+      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_online: !newVal } : p));
       toast.error('Errore nell\'aggiornamento');
     }
   };
@@ -253,7 +263,8 @@ export default function CatalogPage() {
               <th>Prezzo</th>
               <th>Stock</th>
               <th>Stato</th>
-              <th style={{ textAlign: 'center' }}>POS</th>
+              <th style={{ textAlign: 'center' }}>POS ⭐</th>
+              <th style={{ textAlign: 'center' }}>Online 🌐</th>
               <th></th>
             </tr>
           </thead>
@@ -335,6 +346,23 @@ export default function CatalogPage() {
                         color={product.is_featured ? '#FBBF24' : 'var(--color-text-tertiary)'}
                         strokeWidth={2}
                       />
+                    </button>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    {/* Toggle Online */}
+                    <button
+                      title={product.is_online ? 'Visibile online — clicca per nascondere' : 'Nascosto online — clicca per attivare'}
+                      onClick={() => handleToggleOnline(product)}
+                      style={{
+                        background: product.is_online ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.08)',
+                        border: `1.5px solid ${product.is_online ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.2)'}`,
+                        color: product.is_online ? '#16a34a' : '#ef4444',
+                        cursor: 'pointer', padding: '3px 10px', borderRadius: 20,
+                        fontSize: 11, fontWeight: 800, transition: 'all 0.15s',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {product.is_online ? '🌐 Online' : '🚫 Offline'}
                     </button>
                   </td>
                   <td>

@@ -328,16 +328,24 @@ class ReportController extends Controller
 
         // JSON path expressions differ by driver
         if ($driver === 'pgsql') {
-            $serviceNameExpr = "COALESCE(sales_order_lines.tax_snapshot_json::json->>'service_name', 'QScare')";
-            $productTypeFilter = "sales_order_lines.tax_snapshot_json::json->>'product_type' = 'service'";
+            $serviceNameExpr    = "COALESCE(sales_order_lines.tax_snapshot_json::json->>'service_name', 'QScare')";
+            $productTypeFilter  = "sales_order_lines.tax_snapshot_json::json->>'product_type' = 'service'";
+            $serviceNameFilter  = "LOWER(sales_order_lines.tax_snapshot_json::json->>'service_name') LIKE '%qscare%'";
         } elseif ($driver === 'sqlite') {
-            $serviceNameExpr = "COALESCE(json_extract(sales_order_lines.tax_snapshot_json, '$.service_name'), 'QScare')";
-            $productTypeFilter = "json_extract(sales_order_lines.tax_snapshot_json, '$.product_type') = 'service'";
+            $serviceNameExpr    = "COALESCE(json_extract(sales_order_lines.tax_snapshot_json, '$.service_name'), 'QScare')";
+            $productTypeFilter  = "json_extract(sales_order_lines.tax_snapshot_json, '$.product_type') = 'service'";
+            $serviceNameFilter  = "LOWER(json_extract(sales_order_lines.tax_snapshot_json, '$.service_name')) LIKE '%qscare%'";
         } else {
             // MySQL / MariaDB
-            $serviceNameExpr = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.service_name')), 'QScare')";
-            $productTypeFilter = "JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.product_type')) = 'service'";
+            $serviceNameExpr    = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.service_name')), 'QScare')";
+            $productTypeFilter  = "JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.product_type')) = 'service'";
+            $serviceNameFilter  = "LOWER(JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.service_name'))) LIKE '%qscare%'";
         }
+
+        // Build the employee full name concat (driver-safe)
+        $empNameExpr = $driver === 'pgsql'
+            ? "COALESCE(employees.first_name || ' ' || employees.last_name, '—')"
+            : "COALESCE(CONCAT(employees.first_name, ' ', employees.last_name), '—')";
 
         $query = DB::table('sales_order_lines')
             ->join('sales_orders', 'sales_order_lines.sales_order_id', '=', 'sales_orders.id')
@@ -345,10 +353,14 @@ class ReportController extends Controller
             ->leftJoin('stores', 'sales_orders.store_id', '=', 'stores.id')
             ->where('sales_orders.tenant_id', $tenantId)
             ->where('sales_orders.status', 'paid')
-            // QScare lines: no product_variant_id, tax_snapshot_json present and product_type = service
+            // QScare lines: no product_variant_id + snapshot present
+            // Accept either strict product_type='service' OR service_name contains 'qscare'
             ->whereNull('sales_order_lines.product_variant_id')
             ->whereNotNull('sales_order_lines.tax_snapshot_json')
-            ->whereRaw($productTypeFilter)
+            ->where(function ($q) use ($productTypeFilter, $serviceNameFilter) {
+                $q->whereRaw($productTypeFilter)
+                  ->orWhereRaw($serviceNameFilter);
+            })
             ->select(
                 'sales_orders.id as order_id',
                 'sales_orders.created_at',
@@ -357,7 +369,7 @@ class ReportController extends Controller
                 DB::raw($serviceNameExpr . ' as service_name'),
                 DB::raw('COALESCE(sales_order_lines.line_total, sales_order_lines.qty * sales_order_lines.unit_price) as line_total'),
                 'stores.name as store_name',
-                DB::raw("COALESCE(employees.first_name || ' ' || employees.last_name, '—') as employee_name")
+                DB::raw($empNameExpr . ' as employee_name')
             );
 
         if ($storeId) {
@@ -387,4 +399,6 @@ class ReportController extends Controller
         ]);
     }
 }
+
+
 

@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 
 const QUICK_AMOUNTS = [5, 10, 20, 50, 100];
 
-export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
+export default function PosCheckoutModal({ cartTotal, onComplete, onCancel, lockDiscount = false }) {
   const [discountType, setDiscountType] = useState('none');
   const [discountValue, setDiscountValue] = useState('');
   const [cashAmount, setCashAmount] = useState(() => cartTotal > 0 ? cartTotal.toFixed(2) : '');
@@ -129,6 +129,8 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
               )}
             </div>
 
+            {/* Sconto — nascosto per dipendenti */}
+            {!lockDiscount && (
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8 }}>Applica Sconto / Modifica Totale</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
@@ -137,7 +139,6 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
                 <button className={`sp-chip ${discountType === 'value' ? 'active' : ''}`} onClick={() => setDiscountType('value')}>Sconto €</button>
                 <button className={`sp-chip ${discountType === 'total_override' ? 'active' : ''}`} onClick={() => setDiscountType('total_override')}>Forza Totale</button>
               </div>
-              
               {discountType !== 'none' && (
                 <input 
                   type="number"
@@ -150,6 +151,7 @@ export default function PosCheckoutModal({ cartTotal, onComplete, onCancel }) {
                 />
               )}
             </div>
+            )}
 
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8 }}>Tipo di Stampa</div>

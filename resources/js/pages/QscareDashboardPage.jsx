@@ -392,6 +392,32 @@ export default function QscareDashboardPage() {
           </div>
         </div>
 
+        {/* Riepilogo per operatore selezionato */}
+        {employeeId && !loading && (
+          <div style={{ padding: '14px 20px', background: 'linear-gradient(135deg, #ecfdf5, #eff6ff)', borderBottom: '1px solid #d1fae5', display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Users size={16} color="#10B981" />
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#065f46' }}>
+                {employeesList.find(e => String(e.id) === String(employeeId))?.first_name || 'Operatore'} · {periodLabel}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ background: '#fff', borderRadius: 12, padding: '8px 16px', border: '1px solid #a7f3d0', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tot. Attivazioni</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: '#10B981' }}>{summary.total_qty}</div>
+              </div>
+              <div style={{ background: '#fff', borderRadius: 12, padding: '8px 16px', border: '1px solid #a7f3d0', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tot. Fatturato</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: '#059669' }}>{fmt(summary.total_revenue)}</div>
+              </div>
+              <div style={{ background: '#fff', borderRadius: 12, padding: '8px 16px', border: '1px solid #a7f3d0', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ticket Medio</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: '#6366f1' }}>{fmt(avgTicket)}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Tabella */}
         <div style={{ overflowX: 'auto' }}>
           <table className="sp-table">

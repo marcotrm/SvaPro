@@ -559,6 +559,9 @@ export default function PosPage() {
   const cartTotalFinal       = Math.max(0, cartTotalWithQscare - promoDiscount - customerDiscountAmt);
 
 
+  // Sconto totale combinato (promo codice + sconto personale cliente)
+  const totalCombinedDiscount = promoDiscount + customerDiscountAmt;
+
   const handleCheckout = async (payload) => {
     if (!cartLines.length) return toast.error('Carrello vuoto');
     // Risolvi operatore dal barcode
@@ -599,7 +602,9 @@ export default function PosPage() {
         notes: note + (payload.receipt_type ? ` [${payload.receipt_type}]` : ''),
         status: 'paid',
         payments: payload.payments,
-        order_discount_amount: promoDiscount > 0 ? promoDiscount : (payload.order_discount_amount ?? 0),
+        // Invia lo sconto combinato (promo + cliente) calcolato nel POS
+        // NON sommiamo il payload.order_discount_amount del modal (che già parte da cartTotalFinal)
+        order_discount_amount: totalCombinedDiscount > 0 ? totalCombinedDiscount : (payload.order_discount_amount ?? 0),
       });
       toast.success('✅ Vendita completata!');
       setCartLines([]); setSelectedCustomer(null); setNote(''); setShowCheckoutModal(false); setQscareLines({});
@@ -1348,6 +1353,7 @@ export default function PosPage() {
           cartTotal={cartTotalFinal}
           onComplete={handleCheckout}
           onCancel={() => setShowCheckoutModal(false)}
+          lockDiscount={isDipendente}
         />
       )}
 

@@ -211,6 +211,21 @@ export default function PurchaseOrdersPage() {
     po.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const [poFulfillment, setPoFulfillment] = useState({});
+  const FULFIL_OPTS = [
+    { key: 'scaricato',   label: '📥 Scaricato',   bg: '#dbeafe', color: '#1d4ed8' },
+    { key: 'controllato', label: '✅ Controllato',  bg: '#d1fae5', color: '#065f46' },
+    { key: 'pagato',      label: '💰 Pagato',       bg: '#fef3c7', color: '#92400e' },
+  ];
+  const cycleFulfil = (poId) => {
+    setPoFulfillment(prev => {
+      const cur = prev[poId];
+      const keys = FULFIL_OPTS.map(o => o.key);
+      const next = cur ? (keys[(keys.indexOf(cur) + 1) % keys.length]) : keys[0];
+      return { ...prev, [poId]: next };
+    });
+  };
+
   if (loading) return <SkeletonTable />;
 
   return (
@@ -409,6 +424,7 @@ export default function PurchaseOrdersPage() {
               <th>PO #</th>
               <th>Fornitore</th>
               <th>Stato</th>
+              <th>Lavorazione</th>
               <th>Totale</th>
               <th>Data prevista</th>
               <th>Creato</th>
@@ -426,6 +442,26 @@ export default function PurchaseOrdersPage() {
                 </td>
                 <td style={{ fontWeight: 600, color: 'var(--text)' }}>{po.supplier_name || '—'}</td>
                 <td><span className={`badge ${statusClass(po.status)}`}><span className="badge-dot" />{statusLabels[po.status] || po.status}</span></td>
+                <td>
+                  {(() => {
+                    const f = poFulfillment[po.id];
+                    const opt = FULFIL_OPTS.find(o => o.key === f);
+                    return (
+                      <button
+                        onClick={() => cycleFulfil(po.id)}
+                        title="Clicca per cambiare stato lavorazione"
+                        style={{
+                          padding: '3px 10px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                          background: opt?.bg || '#f3f4f6', color: opt?.color || '#6b7280',
+                          fontSize: 11, fontWeight: 800, transition: 'all 0.15s',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {opt?.label || '— Non impostato'}
+                      </button>
+                    );
+                  })()}
+                </td>
                 <td className="mono">{fmtCurrency(po.total_net)}</td>
                 <td style={{ color: 'var(--muted2)' }}>{fmtDate(po.expected_at)}</td>
                 <td style={{ color: 'var(--muted2)' }}>{fmtDate(po.created_at)}</td>
