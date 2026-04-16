@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { employees } from '../api.jsx';
 import { EmployeesSkeleton } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import EmployeeModal from '../components/EmployeeModal.jsx';
 import EmployeeShiftsTab from '../components/EmployeeShiftsTab.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
-import DipendentiTabs from '../components/DipendentiTabs.jsx';
+import { AttendanceContent } from './AttendancePage.jsx';
+import { Monitor } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // ── Sospensione ──────────────────────────────────────────────────────
@@ -17,6 +18,8 @@ const saveSuspended = (s) => { try { localStorage.setItem(SUSP_KEY, JSON.stringi
 
 export default function EmployeesPage() {
   const { selectedStoreId, selectedStore, storesList } = useOutletContext();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('anagrafica'); // 'anagrafica' | 'presenze'
   const [employeesList, setEmployeesList] = useState([]);
   const [analytics,     setAnalytics]     = useState(null);
   const [loading,       setLoading]       = useState(true);
@@ -162,8 +165,31 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      {/* Sub-tabs Dipendenti */}
-      <DipendentiTabs />
+      {/* ── Tab bar Dipendenti ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 20, background: 'var(--color-surface)', borderRadius: 14, padding: 4, border: '1px solid var(--color-border)', width: 'fit-content' }}>
+        {[{ id: 'anagrafica', label: '👥 Anagrafica' }, { id: 'presenze', label: '⏱ Presenze & Timbrature' }].map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+            padding: '8px 18px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, transition: 'all 0.15s',
+            background: activeTab === t.id ? 'linear-gradient(135deg, var(--color-accent), #6d5fd5)' : 'transparent',
+            color: activeTab === t.id ? '#fff' : 'var(--color-text-secondary)',
+            boxShadow: activeTab === t.id ? '0 2px 8px rgba(123,111,208,0.35)' : 'none',
+          }}>{t.label}</button>
+        ))}
+        <button onClick={() => window.open('/clock-in', '_blank')} title="Apre il kiosk in una nuova finestra" style={{
+          padding: '8px 14px', borderRadius: 10, border: '1px solid var(--color-border)', cursor: 'pointer', fontWeight: 700, fontSize: 13,
+          background: 'transparent', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4,
+        }}>
+          <Monitor size={13} /> Kiosk ↗
+        </button>
+      </div>
+
+      {/* ── Tab: Presenze (inline) ── */}
+      {activeTab === 'presenze' && (
+        <AttendanceContent selectedStoreId={selectedStoreId} />
+      )}
+
+      {/* ── Tab: Anagrafica ── */}
+      {activeTab === 'anagrafica' && (<>
 
       {analytics && (
         <div className="kpi-grid">
@@ -385,6 +411,7 @@ export default function EmployeesPage() {
           </div>
         </div>
       )}
+      </>)}
       <ConfirmModal
         isOpen={!!confirmToDelete}
         title="Elimina dipendente"

@@ -243,11 +243,35 @@ export default function Layout({ user, setUser }) {
 
   // ─── Notifiche cassa ────────────────────────────────────────────────
   const CASH_THRESHOLD = 1000;
+  const SNOOZE_MS = 3 * 60 * 60 * 1000; // 3 ore
+  const SNOOZE_KEY = 'svapro_notif_snooze_v1';
+
   const [cashAlertStores, setCashAlertStores] = React.useState([]);
   const [showNotifPanel, setShowNotifPanel]   = React.useState(false);
   const [unreadAlerts,   setUnreadAlerts]     = React.useState(0);
   const prevAlertIdsRef = useRef(new Set());
   const notifPanelRef   = useRef();
+
+  // Legge le snooze attive dal localStorage
+  const getSnoozed = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(SNOOZE_KEY) || '{}');
+      const now = Date.now();
+      // Rimuovi snooze scaduti
+      const fresh = Object.fromEntries(Object.entries(raw).filter(([, ts]) => now - ts < SNOOZE_MS));
+      if (Object.keys(fresh).length !== Object.keys(raw).length) {
+        localStorage.setItem(SNOOZE_KEY, JSON.stringify(fresh));
+      }
+      return fresh;
+    } catch { return {}; }
+  };
+
+  const snoozeAlerts = (storeIds) => {
+    const now = Date.now();
+    const current = getSnoozed();
+    storeIds.forEach(id => { current[String(id)] = now; });
+    localStorage.setItem(SNOOZE_KEY, JSON.stringify(current));
+  };
 
   // Poll cassa ogni 30s
   useEffect(() => {
@@ -255,16 +279,19 @@ export default function Layout({ user, setUser }) {
       try {
         const res = await cashApi.balances();
         const balances = res.data?.data || [];
-        const alerts = balances.filter(b => parseFloat(b.balance) >= CASH_THRESHOLD);
-        setCashAlertStores(alerts);
-        // Conta solo le nuove allerte (store che non erano già in alert)
-        const newAlerts = alerts.filter(a => !prevAlertIdsRef.current.has(a.store_id ?? a.id));
+        const allAlerts = balances.filter(b => parseFloat(b.balance) >= CASH_THRESHOLD);
+        const snoozed = getSnoozed();
+        // Mostra solo allerte non in snooze
+        const visibleAlerts = allAlerts.filter(a => !snoozed[String(a.store_id ?? a.id)]);
+        setCashAlertStores(visibleAlerts);
+        // Conta solo le nuove allerte visibili (store che non erano già in alert)
+        const newAlerts = visibleAlerts.filter(a => !prevAlertIdsRef.current.has(a.store_id ?? a.id));
         if (newAlerts.length > 0) {
           setUnreadAlerts(prev => prev + newAlerts.length);
           newAlerts.forEach(a => prevAlertIdsRef.current.add(a.store_id ?? a.id));
         }
         // Rimuovi dalla lista prev gli store che non sono più in allerta
-        const alertIds = new Set(alerts.map(a => a.store_id ?? a.id));
+        const alertIds = new Set(visibleAlerts.map(a => a.store_id ?? a.id));
         [...prevAlertIdsRef.current].forEach(id => { if (!alertIds.has(id)) prevAlertIdsRef.current.delete(id); });
       } catch { /* silent */ }
     };
@@ -285,6 +312,17 @@ export default function Layout({ user, setUser }) {
     setShowNotifPanel(v => !v);
     setUnreadAlerts(0); // segna come lette
   };
+
+  // Chiude il pannello e silenzia le allerte correnti per 3 ore
+  const dismissNotifPanel = () => {
+    const ids = cashAlertStores.map(s => s.store_id ?? s.id);
+    if (ids.length > 0) snoozeAlerts(ids);
+    setCashAlertStores([]);
+    setUnreadAlerts(0);
+    prevAlertIdsRef.current.clear();
+    setShowNotifPanel(false);
+  };
+
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
@@ -599,6 +637,18 @@ export default function Layout({ user, setUser }) {
                       style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                     >Automazioni</button>
                   </div>
+                  {cashAlertStores.length > 0 && (
+                    <div style={{ padding: '8px 16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                      <button
+                        onClick={dismissNotifPanel}
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                        title="Le allerte ricompariranno automaticamente dopo 3 ore se il saldo è ancora alto"
+                      >
+                        ⏰ Chiudi & Ricorda tra 3 ore
+                      </button>
+                    </div>
+                  )}
+
                 </div>
               )}
             </div>

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { attendance as attendanceApi } from '../api.jsx';
 import { CheckCircle, LogIn, LogOut, Clock, AlertTriangle, Loader, RefreshCw, Wifi, WifiOff } from 'lucide-react';
-import DipendentiTabs from '../components/DipendentiTabs.jsx';
 
 const STATUS_COLOR = {
   presente: { bg: '#ECFDF5', text: '#065F46', border: '#6EE7B7', label: 'Presente', avatarBg: 'linear-gradient(135deg, #10B981, #059669)' },
@@ -51,8 +50,11 @@ function FeedbackBanner({ message, type }) {
   );
 }
 
-export default function AttendancePage() {
-  const { selectedStoreId } = useOutletContext?.() || {};
+// Named export: può essere embeddato come tab in altre pagine
+export function AttendanceContent({ selectedStoreId: propStoreId } = {}) {
+  const ctx = useOutletContext?.() || {};
+  const selectedStoreId = propStoreId ?? ctx.selectedStoreId;
+
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(null); // employee_id in lavorazione
@@ -146,9 +148,7 @@ export default function AttendancePage() {
   const absent = employees.filter(e => e.status === 'assente').length;
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1100, margin: '0 auto' }}>
-      {/* Sub-tabs Dipendenti */}
-      <DipendentiTabs />
+    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
       {/* Info banner: how to clock in */}
       <div style={{
@@ -379,4 +379,9 @@ export default function AttendancePage() {
       <FeedbackBanner message={feedback?.message} type={feedback?.type} />
     </div>
   );
+}
+
+// Default export: usato dalla route /attendance come pagina standalone
+export default function AttendancePage() {
+  return <AttendanceContent />;
 }
