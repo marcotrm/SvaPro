@@ -77,7 +77,6 @@ export default function CatalogPage() {
   const handleDuplicate = async (product) => {
     setDuplicating(product.id);
     try {
-      // Genera un SKU univoco: SKU-COPIA, poi SKU-COPIA-2, -3, ...
       const existingSkus = new Set(products.map(p => p.sku));
       let newSku = product.sku ? `${product.sku}-COPIA` : `COPIA-${product.id}`;
       let attempt = 1;
@@ -91,7 +90,7 @@ export default function CatalogPage() {
         name:        product.name + ' (Copia)',
         product_type: product.product_type || 'other',
         pli_code:    product.pli_code    || undefined,
-        barcode:     undefined,                          // barcode univoco, non copiamo
+        barcode:     undefined,
         brand_id:    product.brand_id    || undefined,
         category_id: product.category_id || undefined,
         image_url:   product.image_url   || undefined,
@@ -101,13 +100,12 @@ export default function CatalogPage() {
         nicotine_mg:  product.nicotine_mg  || undefined,
         volume_ml:    product.volume_ml    || undefined,
         variants: (product.variants || []).map(v => ({
-          // Non inviamo id: così il backend li crea come nuovi
           flavor:           v.flavor           || undefined,
           resistance_ohm:   v.resistance_ohm   || undefined,
           nicotine_strength: v.nicotine_strength || undefined,
           volume_ml:        v.volume_ml         || undefined,
           color:            v.color             || undefined,
-          barcode:          undefined,                  // non duplichiamo il barcode
+          barcode:          undefined,
           location:         v.location          || undefined,
           pack_size:        v.pack_size         || 1,
           cost_price:       v.cost_price        || 0,
@@ -118,7 +116,7 @@ export default function CatalogPage() {
         })),
       };
 
-      const res = await catalog.createProduct(payload);
+      await catalog.createProduct(payload);
       toast.success(`«${product.name}» duplicato con SKU ${newSku}`, { duration: 3000 });
       fetchData();
     } catch (err) {
@@ -128,6 +126,20 @@ export default function CatalogPage() {
       toast.error(msg);
     } finally {
       setDuplicating(null);
+    }
+  };
+
+  const handleDelete = async (product) => {
+    if (!window.confirm(`Eliminare definitivamente «${product.name}»?
+
+Questa azione è irreversibile e rimuoverà tutte le varianti e i dati di stock associati.`)) return;
+    try {
+      await catalog.deleteProduct(product.id);
+      toast.success(`«${product.name}» eliminato`);
+      fetchData();
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Errore durante l\'eliminazione';
+      toast.error(msg);
     }
   };
 
@@ -332,6 +344,15 @@ export default function CatalogPage() {
                         {duplicating === product.id
                           ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
                           : <Copy size={14} />}
+                      </button>
+                      {/* Elimina prodotto */}
+                      <button
+                        className="sp-btn sp-btn-ghost sp-btn-sm"
+                        title="Elimina prodotto"
+                        onClick={() => handleDelete(product)}
+                        style={{ color: 'var(--color-error)' }}
+                      >
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </td>

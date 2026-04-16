@@ -468,6 +468,7 @@ export const catalog = {
     }
     return api.put(`/catalog/products/${id}`, data);
   },
+  deleteProduct: (id) => api.delete(`/catalog/products/${id}`),
   importProducts: (formData) => api.post('/catalog/products/import', formData),
   toggleFeatured: (id, isFeatured) => api.patch(`/catalog/products/${id}/featured`, { is_featured: isFeatured }),
   getBrands: () => api.get('/catalog/brands'),

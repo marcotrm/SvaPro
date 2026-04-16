@@ -362,6 +362,8 @@ class CatalogController extends Controller
             'store_ids.*' => ['integer'],
             'nicotine_mg' => ['nullable', 'integer', 'min:0'],
             'volume_ml' => ['nullable', 'integer', 'min:0'],
+            'denominazione_prodotto' => ['nullable', 'string', 'max:255'],
+            'numero_confezioni'     => ['nullable', 'integer', 'min:0'],
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.sale_price' => ['required', 'numeric', 'min:0'],
             'qscare_price' => ['nullable', 'numeric', 'min:0'],
@@ -369,6 +371,7 @@ class CatalogController extends Controller
             'variants.*.price_list_2' => ['nullable', 'numeric', 'min:0'],
             'variants.*.price_list_3' => ['nullable', 'numeric', 'min:0'],
             'variants.*.pack_size' => ['nullable', 'integer', 'min:1'],
+            'variants.*.sku' => ['nullable', 'string', 'max:100'],
             'variants.*.flavor' => ['nullable', 'string', 'max:120'],
             'variants.*.nicotine_strength' => ['nullable', 'numeric', 'min:0'],
             'variants.*.volume_ml' => ['nullable', 'numeric', 'min:0'],
@@ -381,6 +384,7 @@ class CatalogController extends Controller
             'variants.*.excise_unit_amount_override' => ['nullable', 'numeric', 'min:0'],
             'variants.*.prevalenza_code' => ['nullable', 'string', 'max:50'],
             'variants.*.prevalenza_label' => ['nullable', 'string', 'max:120'],
+            'variants.*.cli_code' => ['nullable', 'string', 'max:50'],
             'variants.*.id' => $productId === null ? ['nullable'] : ['nullable', 'integer'],
         ];
     }
@@ -476,6 +480,8 @@ class CatalogController extends Controller
             'min_stock_qty' => (int) $request->input('min_stock_qty', 0),
             'nicotine_mg' => $request->input('nicotine_mg'),
             'volume_ml' => $request->input('volume_ml'),
+            'denominazione_prodotto' => $request->input('denominazione_prodotto'),
+            'numero_confezioni'      => $request->filled('numero_confezioni') ? (int) $request->input('numero_confezioni') : null,
             'qscare_price' => $request->has('qscare_price') && $request->input('qscare_price') !== '' ? (float) $request->input('qscare_price') : null,
             'is_active' => true,
             'updated_at' => $now,
@@ -516,6 +522,7 @@ class CatalogController extends Controller
                 $variantPayload = [
                     'tenant_id' => $tenantId,
                     'product_id' => $productId,
+                    'sku' => $variant['sku'] ?? null,
                     'flavor' => $variant['flavor'] ?? null,
                     'resistance_ohm' => $variant['resistance_ohm'] ?? null,
                     'nicotine_strength' => $variant['nicotine_strength'] ?? null,
@@ -533,6 +540,7 @@ class CatalogController extends Controller
                     'excise_unit_amount_override' => $variant['excise_unit_amount_override'] ?? null,
                     'prevalenza_code' => $variant['prevalenza_code'] ?? null,
                     'prevalenza_label' => $variant['prevalenza_label'] ?? null,
+                    'cli_code' => $variant['cli_code'] ?? null,
                     'is_active' => true,
                     'updated_at' => $now,
                 ];
@@ -688,6 +696,54 @@ class CatalogController extends Controller
             'message'     => $isFeatured ? 'Prodotto messo in evidenza.' : 'Prodotto rimosso dall\'evidenza.',
             'is_featured' => $isFeatured,
         ]);
+    }
+
+    public function destroy(Request $request, int $productId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $product = DB::table('products')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $productId)
+            ->first(['id', 'name']);
+
+        if (!$product) {
+            return response()->json(['message' => 'Prodotto non trovato.'], 404);
+        }
+
+        DB::transaction(function () use ($tenantId, $productId) {
+            $variantIds = DB::table('product_variants')
+                ->where('tenant_id', $tenantId)
+                ->where('product_id', $productId)
+                ->pluck('id')
+                ->all();
+
+            if (!empty($variantIds)) {
+                DB::table('store_product_variants')
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('product_variant_id', $variantIds)
+                    ->delete();
+
+                DB::table('stock_items')
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('product_variant_id', $variantIds)
+                    ->delete();
+
+                DB::table('product_variants')
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('id', $variantIds)
+                    ->delete();
+            }
+
+            DB::table('products')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $productId)
+                ->delete();
+        });
+
+        AuditLogger::log($request, 'delete', 'product', $productId, $product->name);
+
+        return response()->json(['message' => 'Prodotto eliminato.']);
     }
 
     public function storeCategory(Request $request): JsonResponse

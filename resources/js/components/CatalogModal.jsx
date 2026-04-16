@@ -96,6 +96,7 @@ const withoutVat = (gross, rate) => {
 };
 
 const createEmptyVariant = () => ({
+  sku: '',
   sale_price: '',
   cost_price: '',
   price_list_2: '',
@@ -118,6 +119,7 @@ const createEmptyVariant = () => ({
 
 const normalizeVariant = (v = {}) => ({
   id: v.id,
+  sku: v.sku ?? '',
   sale_price: v.sale_price ?? '',
   cost_price: v.cost_price ?? '',
   price_list_2: v.price_list_2 ?? '',
@@ -153,6 +155,8 @@ const normalizeProduct = (product, storesList, selectedStoreId = '') => {
     subcategory_id: '',
     barcode: product?.barcode || '',
     pli_code: product?.pli_code || '',
+    denominazione_prodotto: product?.denominazione_prodotto || '',
+    numero_confezioni: product?.numero_confezioni ?? '',
     default_supplier_id: product?.default_supplier_id ?? '',
     nicotine_mg: product?.nicotine_mg ?? '',
     volume_ml: product?.volume_ml ?? '',
@@ -424,10 +428,6 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                   {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="sp-label">Codice PLI (Accise)</label>
-                <input className="sp-input" name="pli_code" value={formData.pli_code} onChange={handleChange} placeholder="Es: 9041" />
-              </div>
               {(formData.product_type === 'device' || (() => {
                 const cat = categories.find(c => String(c.id) === String(formData.subcategory_id || formData.category_id));
                 const n = cat?.name?.toLowerCase() || '';
@@ -536,6 +536,10 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                     <div>
+                      <label className="sp-label">SKU Variante</label>
+                      <input className="sp-input" value={v.sku} onChange={e => handleVariantChange(idx, 'sku', e.target.value)} placeholder="Es: KWI-BLU" style={{ fontFamily: 'monospace' }} />
+                    </div>
+                    <div>
                       <label className="sp-label">Gusto / Flavor</label>
                       <input className="sp-input" value={v.flavor} onChange={e => handleVariantChange(idx, 'flavor', e.target.value)} placeholder="Es: Menta Ghiaccio" />
                     </div>
@@ -632,12 +636,25 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
           {activeTab === 'fiscal' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               <div>
-                <label className="sp-label">Nicotina Prodotto (mg)</label>
+                <label className="sp-label">Codice PLI (Accise)</label>
+                <input className="sp-input" name="pli_code" value={formData.pli_code} onChange={handleChange} placeholder="Es: 9041" style={{ fontFamily: 'monospace' }} />
+              </div>
+              <div>
+                <label className="sp-label">Denominazione Prodotto</label>
+                <input className="sp-input" name="denominazione_prodotto" value={formData.denominazione_prodotto} onChange={handleChange} placeholder="Es: Preparazione per sigaretta elettronica" />
+              </div>
+              <div>
+                <label className="sp-label">Nicotina (mg/ml)</label>
                 <input className="sp-input" type="number" step="0.1" name="nicotine_mg" value={formData.nicotine_mg} onChange={handleChange} placeholder="Es: 3" />
               </div>
               <div>
-                <label className="sp-label">Volume Prodotto (ml)</label>
+                <label className="sp-label">Capacità della confezione (ml)</label>
                 <input className="sp-input" type="number" step="1" name="volume_ml" value={formData.volume_ml} onChange={handleChange} placeholder="Es: 10" />
+              </div>
+              <div>
+                <label className="sp-label">Numero Confezioni</label>
+                <input className="sp-input" type="number" step="1" min="0" name="numero_confezioni" value={formData.numero_confezioni} onChange={handleChange} placeholder="Es: 10" />
+                <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '3px 0 0' }}>Numero di confezioni per unità di vendita</p>
               </div>
               <div style={{ gridColumn: '1/-1' }}>
                 <h4 style={{ fontSize: 13, fontWeight: 700, margin: '8px 0 16px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Accise per Variante</h4>
