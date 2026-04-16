@@ -249,4 +249,80 @@ class InventoryController extends Controller
 
         return response()->json(['message' => 'Movimento registrato.']);
     }
+
+    /**
+     * GET /inventory/cross-store?q=&product_variant_id=
+     * Mostra la giacenza di un prodotto (o tutti i prodotti ricercati) su TUTTI i negozi del tenant.
+     * Visibile a qualsiasi store admin — permette di vedere disponibilità negli altri negozi.
+     */
+    public function crossStore(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $q        = trim((string) $request->input('q', ''));
+        $variantId = $request->filled('product_variant_id') ? (int) $request->integer('product_variant_id') : null;
+
+        $query = DB::table('stock_items as si')
+            ->join('warehouses as w', 'w.id', '=', 'si.warehouse_id')
+            ->join('stores as s', 's.id', '=', 'w.store_id')
+            ->join('product_variants as pv', 'pv.id', '=', 'si.product_variant_id')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->where('si.tenant_id', $tenantId)
+            ->where('si.on_hand', '>', 0)  // mostra solo magazzini con stock > 0
+            ->select([
+                'si.product_variant_id',
+                'p.name as product_name',
+                'pv.flavor',
+                'pv.sku as variant_sku',
+                'pv.sale_price',
+                's.id as store_id',
+                's.name as store_name',
+                's.city as store_city',
+                'w.id as warehouse_id',
+                'w.name as warehouse_name',
+                'si.on_hand',
+                'si.reserved',
+                DB::raw('(si.on_hand - si.reserved) as available'),
+                'si.reorder_point',
+            ]);
+
+        if ($variantId) {
+            $query->where('si.product_variant_id', $variantId);
+        } elseif ($q) {
+            $query->where(function ($inner) use ($q) {
+                $inner->where('p.name', 'ilike', "%{$q}%")
+                    ->orWhere('pv.sku', 'ilike', "%{$q}%")
+                    ->orWhere('pv.flavor', 'ilike', "%{$q}%");
+            });
+        } else {
+            // Senza filtri ritorna solo i prodotti con scarsa disponibilità
+            $query->where('si.on_hand', '<=', DB::raw('si.reorder_point + 5'));
+        }
+
+        $rows = $query->orderBy('p.name')->orderBy('s.name')->limit(300)->get();
+
+        // Raggruppa per prodotto
+        $grouped = $rows->groupBy('product_variant_id')->map(function ($items) {
+            $first = $items->first();
+            return [
+                'product_variant_id' => $first->product_variant_id,
+                'product_name'       => $first->product_name,
+                'flavor'             => $first->flavor,
+                'sku'                => $first->variant_sku,
+                'sale_price'         => $first->sale_price,
+                'stores'             => $items->map(fn($i) => [
+                    'store_id'      => $i->store_id,
+                    'store_name'    => $i->store_name,
+                    'store_city'    => $i->store_city,
+                    'warehouse_id'  => $i->warehouse_id,
+                    'on_hand'       => $i->on_hand,
+                    'available'     => $i->available,
+                    'reorder_point' => $i->reorder_point,
+                ])->values(),
+                'total_available'    => $items->sum('available'),
+            ];
+        })->values();
+
+        return response()->json(['data' => $grouped]);
+    }
 }
+

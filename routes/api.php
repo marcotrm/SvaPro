@@ -134,6 +134,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::put('/shipping/shipments/{shipmentId}', [ShippingController::class, 'updateShipmentStatus'])->middleware('permission:shipping.manage');
 
         Route::post('/inventory/adjust', [InventoryController::class, 'adjust'])->middleware('permission:inventory.manage');
+        Route::get('/inventory/cross-store', [InventoryController::class, 'crossStore']);
 
         Route::get('/orders/stock-alerts', [OrderController::class, 'stockAlerts']);
         Route::post('/orders/stock-alerts/{alertId}/resolve', [OrderController::class, 'resolveStockAlert']);

@@ -171,9 +171,9 @@ class AttendanceController extends Controller
         $employeeName = trim("{$employee->first_name} {$employee->last_name}");
         $storeName    = DB::table('stores')->where('id', $storeId)->value('name') ?? "Negozio #{$storeId}";
 
-        // Notifica WhatsApp immediata se in ritardo di piÃ¹ di 10 minuti
+        // Notifica WhatsApp immediata se in ritardo di più di 10 minuti
         if ($lateMinutes && $lateMinutes > 10) {
-            $this->notifyLate($tenantId, $employeeName, $storeName, (int) $lateMinutes);
+            $this->notifyLate($tenantId, $employeeName, $storeName, (int) $lateMinutes, $storeId);
             DB::table('employee_attendances')->where('id', $id)->update(['late_notified' => true]);
         }
 
@@ -321,21 +321,39 @@ class AttendanceController extends Controller
         return null;
     }
 
-    private function notifyLate(int $tenantId, string $employeeName, string $storeName, int $lateMinutes): void
+    private function notifyLate(int $tenantId, string $employeeName, string $storeName, int $lateMinutes, int $storeId = 0): void
     {
-        // Trova i numeri degli admin del tenant da notificare
-        $admins = DB::table('users')
-            ->where('tenant_id', $tenantId)
-            ->whereIn('role', ['superadmin', 'admin_cliente'])
-            ->whereNotNull('phone')
-            ->pluck('phone');
+        $body = "⏰ *Ritardo dipendente*\n"
+              . "📍 Negozio: *{$storeName}*\n"
+              . "👤 {$employeeName} è arrivato con *{$lateMinutes} minuti* di ritardo.\n"
+              . "🕐 Ora: " . now()->setTimezone('Europe/Rome')->format('H:i');
 
-        $body = "â° *Ritardo dipendente*\n"
-              . "ðŸ“ Negozio: *{$storeName}*\n"
-              . "ðŸ‘¤ {$employeeName} Ã¨ arrivato con *{$lateMinutes} minuti* di ritardo.\n"
-              . "ðŸ• Ora: " . now()->format('H:i');
+        $phones = collect();
 
-        foreach ($admins as $phone) {
+        // 1. Primo: usa il numero WhatsApp configurato sul negozio
+        if ($storeId > 0) {
+            $storePhone = DB::table('stores')
+                ->where('id', $storeId)
+                ->value('whatsapp_notify_phone');
+            if ($storePhone) {
+                $phones->push(trim($storePhone));
+            }
+        }
+
+        // 2. Fallback: cerca utenti admin del tenant con phone compilato
+        if ($phones->isEmpty()) {
+            $adminPhones = DB::table('users as u')
+                ->join('user_roles as ur', 'ur.user_id', '=', 'u.id')
+                ->join('roles as r', 'r.id', '=', 'ur.role_id')
+                ->where('u.tenant_id', $tenantId)
+                ->whereIn('r.code', ['superadmin', 'admin_cliente'])
+                ->whereNotNull('u.phone')
+                ->where('u.phone', '!=', '')
+                ->pluck('u.phone');
+            $phones = $phones->merge($adminPhones);
+        }
+
+        foreach ($phones->unique() as $phone) {
             try {
                 $this->whatsapp->send($phone, $body);
             } catch (\Exception $e) {
@@ -343,6 +361,7 @@ class AttendanceController extends Controller
             }
         }
     }
+
     /**
      * GET /attendance/history â€” cronologia completa con range date (solo admin)
      * Params: date_from, date_to, employee_id, store_id

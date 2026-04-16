@@ -34,7 +34,15 @@ class OrderController extends Controller
         }
 
         $orderDiscount = (float) $request->input('order_discount_amount', 0);
-        return response()->json($this->buildQuote($tenantId, (array) $request->input('lines'), $orderDiscount));
+        // Applica sconto personale cliente (se presente)
+        $customerDiscountPct = 0.0;
+        if ($request->filled('customer_id')) {
+            $customerDiscountPct = (float) (DB::table('customers')
+                ->where('id', (int) $request->input('customer_id'))
+                ->where('tenant_id', $tenantId)
+                ->value('personal_discount') ?? 0);
+        }
+        return response()->json($this->buildQuote($tenantId, (array) $request->input('lines'), $orderDiscount, $customerDiscountPct));
     }
     
     public function index(Request $request): JsonResponse
@@ -398,7 +406,15 @@ class OrderController extends Controller
         }
 
         $orderDiscount = (float) $request->input('order_discount_amount', 0);
-        $quote = $this->buildQuote($tenantId, (array) $request->input('lines'), $orderDiscount);
+        // Applica sconto personale cliente (se presente)
+        $customerDiscountPct = 0.0;
+        if ($request->filled('customer_id')) {
+            $customerDiscountPct = (float) (DB::table('customers')
+                ->where('id', (int) $request->input('customer_id'))
+                ->where('tenant_id', $tenantId)
+                ->value('personal_discount') ?? 0);
+        }
+        $quote = $this->buildQuote($tenantId, (array) $request->input('lines'), $orderDiscount, $customerDiscountPct);
         $status = (string) ($request->input('status') ?: 'paid');
         $now = now();
         $stockAlerts = [];
@@ -907,7 +923,7 @@ class OrderController extends Controller
         return response()->json(['message' => 'Alert risolto con successo.']);
     }
 
-    private function buildQuote(int $tenantId, array $lines, float $globalDiscount = 0.0): array
+    private function buildQuote(int $tenantId, array $lines, float $globalDiscount = 0.0, float $customerDiscountPct = 0.0): array
     {
         $subtotal = 0.0;
         $discountTotal = 0.0;
@@ -987,6 +1003,11 @@ class OrderController extends Controller
                 'lineSubtotal' => $lineSubtotal,
                 'initialLineNet' => $initialLineNet,
             ];
+        }
+
+        // Applica sconto % cliente al totale netto iniziale
+        if ($customerDiscountPct > 0 && $totalInitialNet > 0) {
+            $globalDiscount += round($totalInitialNet * ($customerDiscountPct / 100), 2);
         }
 
         // Safety cap for global discount
@@ -1086,7 +1107,10 @@ class OrderController extends Controller
             ];
         }
 
-        $grandTotal = round($subtotal - $discountTotal + $taxTotal + $exciseTotal, 2);
+        // grandTotal = prezzo finale pagato dal cliente
+        // subtotal = somma dei sale_price (già LORDI: IVA + accisa inclusi)
+        // taxTotal / exciseTotal sono solo per la RENDICONTAZIONE contabile, NON si aggiungono al totale
+        $grandTotal = round($subtotal - $discountTotal, 2);
 
         $earnedLoyaltyPoints = (int) floor($grandTotal / 10);
         $loyaltyMonetary = round($earnedLoyaltyPoints * 0.05, 2);

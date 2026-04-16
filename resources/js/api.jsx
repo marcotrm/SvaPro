@@ -514,6 +514,7 @@ export const inventory = {
   runSmartReorderAuto: (data = {}) => api.post('/inventory/smart-reorder/run-auto', data),
   getHealthScan: () => api.get('/health-scan'),
   getForecast: () => api.get('/inventory/forecast'),
+  getCrossStore: (params = {}) => api.get('/inventory/cross-store', { params }),
 };
 
 // Customer APIs

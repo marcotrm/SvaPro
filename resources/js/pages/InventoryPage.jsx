@@ -20,6 +20,12 @@ export default function InventoryPage() {
   const [expandedStores, setExpandedStores] = useState({});
   const [byStoreSearch, setByStoreSearch] = useState('');
 
+  // Cross-store state
+  const [crossStoreSearch, setCrossStoreSearch] = useState('');
+  const [crossStoreData, setCrossStoreData] = useState([]);
+  const [crossStoreLoading, setCrossStoreLoading] = useState(false);
+  const crossStoreDebounce = React.useRef(null);
+
   const location = useLocation();
 
   // Attiva filtro stock basso se arrivi dalla Dashboard con ?filter=low
@@ -64,6 +70,24 @@ export default function InventoryPage() {
     };
     loadAllStock();
   }, [activeTab, isSuperAdmin]);
+
+  // Cross-store search with debounce
+  const fetchCrossStore = React.useCallback(async (q) => {
+    try {
+      setCrossStoreLoading(true);
+      const res = await inventory.getCrossStore(q ? { q } : {});
+      setCrossStoreData(res.data?.data || []);
+    } catch {
+      setCrossStoreData([]);
+    } finally { setCrossStoreLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'cross_store') return;
+    clearTimeout(crossStoreDebounce.current);
+    crossStoreDebounce.current = setTimeout(() => fetchCrossStore(crossStoreSearch), 500);
+  }, [activeTab, crossStoreSearch, fetchCrossStore]);
+
 
   const lowCount = stock.filter(i => i.on_hand < (i.reorder_point || 5)).length;
   const outCount = stock.filter(i => i.on_hand <= 0).length;
@@ -245,9 +269,12 @@ export default function InventoryPage() {
       <div className="sp-tabs">
         <button className={`sp-tab ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}>Giacenze</button>
         <button className={`sp-tab ${activeTab === 'movements' ? 'active' : ''}`} onClick={() => setActiveTab('movements')}>Movimenti</button>
+        <button className={`sp-tab ${activeTab === 'cross_store' ? 'active' : ''}`} onClick={() => setActiveTab('cross_store')}>
+          <MapPin size={13} style={{ marginRight: 5 }} />Disponibilità Negozi
+        </button>
         {isSuperAdmin && (
           <button className={`sp-tab ${activeTab === 'by_store' ? 'active' : ''}`} onClick={() => setActiveTab('by_store')}>
-            <Store size={13} style={{ marginRight: 5 }} />Per Negozio
+            <Store size={13} style={{ marginRight: 5 }} />Per Negozio (Admin)
           </button>
         )}
       </div>
@@ -379,8 +406,94 @@ export default function InventoryPage() {
         </div>
       )}
 
+      {/* Cross-Store Tab — tutti i negozi */}
+      {activeTab === 'cross_store' && (
+        <div className="sp-table-wrap">
+          <div className="sp-table-toolbar" style={{ padding: '16px 20px' }}>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px', color: 'var(--color-text)' }}>🔍 Disponibilità Prodotti per Negozio</h3>
+              <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: 0 }}>
+                Cerca un prodotto per vedere le giacenze disponibili in tutti i negozi.
+              </p>
+            </div>
+            <div className="sp-search-box" style={{ width: 280 }}>
+              <Search size={14} />
+              <input
+                autoFocus
+                placeholder="Cerca prodotto, gusto, SKU..."
+                value={crossStoreSearch}
+                onChange={e => setCrossStoreSearch(e.target.value)}
+                className="sp-search-input"
+              />
+            </div>
+          </div>
+
+          {crossStoreLoading ? (
+            <div style={{ textAlign: 'center', padding: 48 }}>
+              <div style={{ width: 28, height: 28, border: '3px solid var(--color-border)', borderTopColor: 'var(--color-accent)', borderRadius: '50%', margin: '0 auto' }} className="sp-spin" />
+            </div>
+          ) : crossStoreData.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--color-text-tertiary)' }}>
+              <MapPin size={40} style={{ opacity: 0.15, margin: '0 auto 12px', display: 'block' }} />
+              {crossStoreSearch
+                ? <p>Nessun risultato per "<strong>{crossStoreSearch}</strong>"</p>
+                : <p>Inserisci un termine di ricerca o vedi i prodotti con stock basso.</p>
+              }
+            </div>
+          ) : (
+            <div style={{ padding: '0 0 16px' }}>
+              {crossStoreData.map(product => (
+                <div key={product.product_variant_id} style={{ borderBottom: '1px solid var(--color-border)', padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--color-text)' }}>
+                        {product.product_name}
+                        {product.flavor && <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}> — {product.flavor}</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                        SKU: {product.sku || '—'} · €{parseFloat(product.sale_price || 0).toFixed(2)}
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 900, fontSize: 18, color: product.total_available > 0 ? 'var(--color-success)' : 'var(--color-error)' }}>
+                      Totale: {product.total_available}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {product.stores.map(s => {
+                      const avail = parseInt(s.available || 0);
+                      const isLow = avail <= (s.reorder_point || 5) && avail > 0;
+                      const isOut = avail <= 0;
+                      return (
+                        <div key={s.store_id} style={{
+                          display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px',
+                          borderRadius: 100, border: '1px solid var(--color-border)',
+                          background: isOut ? '#fef2f2' : isLow ? '#fffbeb' : '#ecfdf5',
+                          fontSize: 12, fontWeight: 700,
+                        }}>
+                          <MapPin size={11} color={isOut ? '#ef4444' : isLow ? '#f59e0b' : '#10b981'} />
+                          <span style={{ color: 'var(--color-text)' }}>{s.store_name}</span>
+                          {s.store_city && <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 400 }}>{s.store_city}</span>}
+                          <span style={{
+                            background: isOut ? '#fee2e2' : isLow ? '#fef3c7' : '#d1fae5',
+                            color: isOut ? '#991b1b' : isLow ? '#92400e' : '#065f46',
+                            padding: '1px 8px', borderRadius: 100, fontSize: 11, fontWeight: 800,
+                          }}>
+                            {avail > 0 ? `${avail} disp.` : 'Esaurito'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* By Store Tab — superadmin only */}
       {activeTab === 'by_store' && isSuperAdmin && (() => {
+
         // Raggruppa stock per warehouse_id → store
         const stockByWarehouse = {};
         allStoresStock.forEach(item => {

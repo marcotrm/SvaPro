@@ -552,7 +552,11 @@ export default function PosPage() {
   const effectiveQscarePrice = cartQscarePrice; // somma delle QScare attivate per-riga
   const cartTotalWithQscare  = cartTotal + effectiveQscarePrice;
   const promoDiscount        = appliedPromo?.discount_amount || 0;
-  const cartTotalFinal       = Math.max(0, cartTotalWithQscare - promoDiscount);
+  const customerDiscountPct  = parseFloat(selectedCustomer?.personal_discount || 0);
+  const customerDiscountAmt  = customerDiscountPct > 0
+    ? Math.round(Math.max(0, cartTotalWithQscare - promoDiscount) * customerDiscountPct * 100) / 10000
+    : 0;
+  const cartTotalFinal       = Math.max(0, cartTotalWithQscare - promoDiscount - customerDiscountAmt);
 
 
   const handleCheckout = async (payload) => {
@@ -1057,6 +1061,9 @@ export default function PosPage() {
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{selectedCustomer.name}</div>
                     {selectedCustomer.email && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{selectedCustomer.email}</div>}
+                    {customerDiscountPct > 0 && (
+                      <div style={{ fontSize: 10, fontWeight: 800, color: '#86efac', marginTop: 2 }}>🎟️ Sconto personale: {customerDiscountPct}%</div>
+                    )}
                   </div>
                 </div>
                 <button onClick={() => setSelectedCustomer(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex' }}>
@@ -1280,9 +1287,15 @@ export default function PosPage() {
               <span style={{ fontSize: 14, fontWeight: 800, color: '#a5b4fc' }}>-{fmt(promoDiscount)}</span>
             </div>
           )}
+          {customerDiscountAmt > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#86efac' }}>👤 Sconto cliente ({customerDiscountPct}%)</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#86efac' }}>-{fmt(customerDiscountAmt)}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Totale</span>
-            <span style={{ fontSize: 28, fontWeight: 900, color: promoDiscount > 0 ? '#a5b4fc' : '#fff', letterSpacing: -1 }}>
+            <span style={{ fontSize: 28, fontWeight: 900, color: (promoDiscount > 0 || customerDiscountAmt > 0) ? '#86efac' : '#fff', letterSpacing: -1 }}>
               {fmt(cartTotalFinal)}
             </span>
           </div>
@@ -1332,7 +1345,7 @@ export default function PosPage() {
       {/* ─── Checkout Modal ─── */}
       {showCheckoutModal && (
         <PosCheckoutModal
-          cartTotal={cartTotalWithQscare}
+          cartTotal={cartTotalFinal}
           onComplete={handleCheckout}
           onCancel={() => setShowCheckoutModal(false)}
         />

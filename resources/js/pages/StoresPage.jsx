@@ -58,6 +58,7 @@ const emptyStore = () => ({
   opening_hours: DEFAULT_HOURS,
   default_start_time: '09:00',
   late_tolerance_minutes: 10,
+  whatsapp_notify_phone: '',
   numero_esercizio: '',
   numero_ordinale: '',
   parent_store_id: '',
@@ -197,6 +198,7 @@ function StoreModal({ store, onClose, onSaved }) {
     opening_hours: store.opening_hours || DEFAULT_HOURS,
     default_start_time: store.default_start_time || '09:00',
     late_tolerance_minutes: store.late_tolerance_minutes ?? 10,
+    whatsapp_notify_phone: store.whatsapp_notify_phone || '',
     numero_esercizio: store.numero_esercizio || '',
     numero_ordinale: store.numero_ordinale || '',
     parent_store_id: store.parent_store_id || '',
@@ -410,12 +412,29 @@ function StoreModal({ store, onClose, onSaved }) {
                 </div>
               </div>
 
+              <div style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 16, border: '1px solid var(--color-border)' }}>
+                <h4 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>📲 Numero WhatsApp per Notifiche Ritardo</h4>
+                <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
+                  Inserisci il numero internazionale che riceverà le notifiche WhatsApp.
+                  Es. <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 4 }}>+393401234567</code>
+                </p>
+                <input
+                  type="tel"
+                  className="sp-input"
+                  value={form.whatsapp_notify_phone}
+                  onChange={e => set('whatsapp_notify_phone', e.target.value)}
+                  placeholder="+39 340 1234567"
+                  style={{ maxWidth: 260 }}
+                />
+              </div>
+
               <div style={{ padding: '12px 16px', background: 'rgba(155,143,212,0.08)', borderRadius: 10, border: '1px solid rgba(155,143,212,0.2)', fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
                 <strong>ℹ️ Come funziona:</strong><br />
                 1. Il dipendente tocca la sua card sulla pagina <strong>Timbrature</strong><br />
                 2. Il sistema confronta l'orario di arrivo con <em>orario inizio turno</em><br />
                 3. Se il ritardo supera la <em>soglia</em>, arriva una notifica WhatsApp immediata all'admin
               </div>
+
             </div>
           )}
           {/* TAB ACCESSI */}
