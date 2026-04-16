@@ -467,6 +467,8 @@ function StoreAccessTab({ store }) {
   const [showPassword, setShowPassword] = useState(false);
   const [existingEmail, setExistingEmail] = useState(null);
   const [copied, setCopied] = useState('');
+  // Password recuperata dal backend (sempre aggiornata, funziona su qualsiasi dispositivo)
+  const [backendPassword, setBackendPassword] = useState(null);
 
   // Legge il ruolo utente da localStorage (senza bisogno di prop)
   const userFromStorage = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
@@ -498,16 +500,23 @@ function StoreAccessTab({ store }) {
       setForm({ email: cached.email, password: cached.password || '' });
     }
 
-    // 2. Verifica/aggiorna email dal backend (la password non viaggia via rete)
+    // 2. Verifica/aggiorna email dal backend (e recupera password salvata nei settings)
     setLoadingCreds(true);
     storesApi.getCredentials(store.id)
       .then(res => {
         if (res.data?.has_credentials && res.data?.email) {
           setExistingEmail(res.data.email);
-          // Aggiorna email dal backend, mantieni la password in cache
-          const pw = loadFromCache()?.password || '';
           setForm(p => ({ ...p, email: res.data.email }));
-          saveToCache(res.data.email, pw);
+          // Usa la password dal backend se disponibile (priorità massima)
+          if (res.data.store_password) {
+            setBackendPassword(res.data.store_password);
+            saveToCache(res.data.email, res.data.store_password);
+            setForm(p => ({ ...p, email: res.data.email }));
+          } else {
+            // Fallback: usa password dalla cache locale
+            const pw = loadFromCache()?.password || '';
+            saveToCache(res.data.email, pw);
+          }
         }
       })
       .catch(() => {})
@@ -529,7 +538,8 @@ function StoreAccessTab({ store }) {
       setLoading(true); setErrors({});
       await storesApi.createCredentials(store.id, form);
       setExistingEmail(form.email);
-      saveToCache(form.email, form.password); // salva ENTRAMBI
+      if (form.password) setBackendPassword(form.password); // mostra subito la nuova password
+      saveToCache(form.email, form.password || backendPassword || ''); // salva ENTRAMBI
       toast.success('Credenziali salvate con successo!');
     } catch (err) {
       if (err.response?.data?.errors) setErrors(err.response.data.errors);
@@ -566,8 +576,8 @@ function StoreAccessTab({ store }) {
         )}
       </div>
 
-      {/* 👑 Pannello SuperAdmin — password in chiaro */}
-      {isSuperAdmin && storedCreds?.email && (
+      {/* 👑 Pannello SuperAdmin — password in chiaro (recuperata dal backend) */}
+      {isSuperAdmin && existingEmail && (
         <div style={{
           background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.08))',
           border: '1px solid rgba(99,102,241,0.25)', borderRadius: 12, padding: '14px 16px',
@@ -580,8 +590,8 @@ function StoreAccessTab({ store }) {
             <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 8, padding: '8px 12px' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>EMAIL</div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', wordBreak: 'break-all' }}>{storedCreds.email}</span>
-                <button onClick={() => copyToClipboard(storedCreds.email, 'email')}
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', wordBreak: 'break-all' }}>{existingEmail}</span>
+                <button onClick={() => copyToClipboard(existingEmail, 'email')}
                   style={{ flexShrink: 0, padding: '2px 8px', fontSize: 10, fontWeight: 700, borderRadius: 6, border: 'none', cursor: 'pointer', background: copied === 'email' ? '#22c55e' : 'rgba(99,102,241,0.2)', color: copied === 'email' ? '#fff' : '#a5b4fc', transition: 'all 0.2s' }}>
                   {copied === 'email' ? '✓' : 'Copia'}
                 </button>
@@ -591,16 +601,20 @@ function StoreAccessTab({ store }) {
             <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 8, padding: '8px 12px' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>PASSWORD</div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                {storedCreds.password ? (
+                {(backendPassword || loadFromCache()?.password) ? (
                   <>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '0.05em', fontFamily: 'monospace' }}>{storedCreds.password}</span>
-                    <button onClick={() => copyToClipboard(storedCreds.password, 'password')}
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '0.05em', fontFamily: 'monospace' }}>
+                      {backendPassword || loadFromCache()?.password}
+                    </span>
+                    <button onClick={() => copyToClipboard(backendPassword || loadFromCache()?.password, 'password')}
                       style={{ flexShrink: 0, padding: '2px 8px', fontSize: 10, fontWeight: 700, borderRadius: 6, border: 'none', cursor: 'pointer', background: copied === 'password' ? '#22c55e' : 'rgba(99,102,241,0.2)', color: copied === 'password' ? '#fff' : '#a5b4fc', transition: 'all 0.2s' }}>
                       {copied === 'password' ? '✓' : 'Copia'}
                     </button>
                   </>
                 ) : (
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Password impostata prima del pannello admin.<br/>Aggiorna le credenziali per visualizzarla.</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>
+                    {loadingCreds ? 'Caricamento...' : '⚠ Password non trovata. Aggiorna le credenziali per salvarla.'}
+                  </span>
                 )}
               </div>
             </div>
