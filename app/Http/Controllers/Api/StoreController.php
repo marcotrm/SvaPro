@@ -311,12 +311,16 @@ class StoreController extends Controller
 
             // Salva password in chiaro nei settings del negozio (recovery superadmin)
             if ($password) {
-                $settings = json_decode($store->settings_json ?? '{}', true) ?? [];
-                $settings['store_access_password'] = $password;
-                DB::table('stores')->where('id', $storeId)->update([
-                    'settings_json' => json_encode($settings),
-                    'updated_at' => now(),
-                ]);
+                try {
+                    $settings = json_decode($store->settings_json ?? '{}', true) ?? [];
+                    $settings['store_access_password'] = $password;
+                    DB::table('stores')->where('id', $storeId)->update([
+                        'settings_json' => json_encode($settings),
+                        'updated_at' => now(),
+                    ]);
+                } catch (\Throwable $e) {
+                    \Log::warning('settings_json non disponibile, skip password save: ' . $e->getMessage());
+                }
             }
 
             return response()->json([
@@ -382,12 +386,16 @@ class StoreController extends Controller
         AuditLogger::log($request, 'create_credentials', 'store', $storeId, "Credenziali create: $email");
 
         // Salva password in chiaro nei settings del negozio (recovery superadmin)
-        $settings = json_decode($store->settings_json ?? '{}', true) ?? [];
-        $settings['store_access_password'] = $password;
-        DB::table('stores')->where('id', $storeId)->update([
-            'settings_json' => json_encode($settings),
-            'updated_at' => now(),
-        ]);
+        try {
+            $settings = json_decode($store->settings_json ?? '{}', true) ?? [];
+            $settings['store_access_password'] = $password;
+            DB::table('stores')->where('id', $storeId)->update([
+                'settings_json' => json_encode($settings),
+                'updated_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            \Log::warning('settings_json non disponibile, skip password save: ' . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Credenziali generate con successo!',
@@ -442,7 +450,10 @@ class StoreController extends Controller
             'email'           => $user->email,
             'has_credentials' => true,
             'user_id'         => $user->id,
-            'store_password'  => json_decode($store->settings_json ?? '{}', true)['store_access_password'] ?? null,
+            'store_password'  => (function() use ($store) {
+                try { return json_decode($store->settings_json ?? '{}', true)['store_access_password'] ?? null; }
+                catch (\Throwable $e) { return null; }
+            })(),
         ]);
     }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Loader, User, Building2, CheckCircle, Mail, Phone, RefreshCw, Upload, FileText, Trash2, Sparkles } from 'lucide-react';
+import { X, Loader, User, Building2, CheckCircle, Mail, Phone, RefreshCw, Upload, FileText, Trash2, Sparkles, Shield, Settings } from 'lucide-react';
 import { customers as customersApi } from '../api.jsx';
 import { calcolaCodiceFiscale, cercaComune } from '../utils/codiceFiscale.js';
 import DatePicker from './DatePicker.jsx';
@@ -173,6 +173,7 @@ export default function CustomerModal({ customer, onClose, onSave }) {
     customer_type:   initialType,
     code:            customer?.code || '',
     personal_discount: customer?.personal_discount ?? 0,
+    is_military:     customer?.is_military || false,
     // Privato
     first_name:      customer?.first_name || '',
     last_name:       customer?.last_name || '',
@@ -267,6 +268,33 @@ export default function CustomerModal({ customer, onClose, onSave }) {
 
   const fe = (field) => fieldErrors[field]?.[0];
   const isEdit = !!customer?.id;
+
+  // ── Preset sconto militare (configurabile dal superadmin) ──
+  const MILITARY_KEY = 'svapro_military_discount_pct';
+  const [militaryPreset, setMilitaryPreset] = useState(() => {
+    const v = parseFloat(localStorage.getItem(MILITARY_KEY));
+    return isNaN(v) ? 15 : v;
+  });
+  const [editingPreset, setEditingPreset] = useState(false);
+  const userRole = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}')?.roles || []; } catch { return []; } })();
+  const isSuperAdmin = userRole.includes('superadmin');
+
+  const saveMilitaryPreset = (v) => {
+    const n = Math.max(0, Math.min(100, parseFloat(v) || 0));
+    setMilitaryPreset(n);
+    localStorage.setItem(MILITARY_KEY, String(n));
+    setEditingPreset(false);
+  };
+
+  // Quando cambia il preset, aggiorna il discount se military è attivo
+  const handleMilitaryToggle = (checked) => {
+    setFormData(prev => ({
+      ...prev,
+      is_military: checked,
+      personal_discount: checked ? militaryPreset : (prev.personal_discount || 0),
+    }));
+  };
+
 
   return (
     <div style={{
@@ -483,7 +511,79 @@ export default function CustomerModal({ customer, onClose, onSave }) {
               </label>
             </div>
 
+            {/* ─── SCONTO MILITARE (solo in creazione) ─── */}
+            {!isEdit && (
+              <div style={{ ...S.fullRow }}>
+                <div style={{
+                  padding: '14px 18px', borderRadius: 14,
+                  background: formData.is_military
+                    ? 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(59,130,246,0.10))'
+                    : 'var(--color-bg)',
+                  border: `2px solid ${formData.is_military ? 'rgba(99,102,241,0.4)' : 'var(--color-border)'}`,
+                  transition: 'all 0.2s',
+                }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={formData.is_military}
+                      onChange={e => handleMilitaryToggle(e.target.checked)}
+                      style={{ width: 18, height: 18, accentColor: '#6366f1', flexShrink: 0 }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 14, color: formData.is_military ? '#6366f1' : 'var(--color-text)' }}>
+                        <Shield size={16} color={formData.is_military ? '#6366f1' : undefined} />
+                        🔰 Cliente Militare / Forze Armate
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                        Applica automaticamente lo sconto militare al {militaryPreset}%
+                        {isSuperAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingPreset(v => !v)}
+                            style={{ marginLeft: 8, fontSize: 10, color: 'var(--color-accent)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                          >
+                            ⚙ Cambia preset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {formData.is_military && (
+                      <div style={{ padding: '4px 14px', background: '#6366f1', color: '#fff', borderRadius: 100, fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}>
+                        -{militaryPreset}%
+                      </div>
+                    )}
+                  </label>
+                  {editingPreset && isSuperAdmin && (
+                    <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>Preset sconto militare:</span>
+                      <input
+                        type="number" min="0" max="100" step="0.5"
+                        defaultValue={militaryPreset}
+                        className="sp-input"
+                        style={{ width: 100, fontWeight: 800 }}
+                        onKeyDown={e => e.key === 'Enter' && saveMilitaryPreset(e.target.value)}
+                        id="military-preset-input"
+                      />
+                      <span style={{ fontWeight: 700 }}>%</span>
+                      <button
+                        type="button"
+                        onClick={() => saveMilitaryPreset(document.getElementById('military-preset-input')?.value)}
+                        className="sp-btn sp-btn-primary sp-btn-sm"
+                      >Salva preset</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {isEdit && customer?.is_military && (
+              <div style={{ ...S.fullRow, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: 'rgba(99,102,241,0.08)', borderRadius: 10, border: '1px solid rgba(99,102,241,0.2)' }}>
+                <Shield size={14} color="#6366f1" />
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#6366f1' }}>Cliente Militare / Forze Armate</span>
+              </div>
+            )}
+
             {/* ─── Codice tessera fidelity + Sconto Personale + Numero Cliente ─── */}
+
             <Field label="Codice Tessera Fidelity" error={fe('code')} full>
               <input
                 className={S.input}
