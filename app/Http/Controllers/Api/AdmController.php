@@ -117,8 +117,8 @@ class AdmController extends Controller
             // Vendite nel periodo (LEFT JOIN per product_variant_id nullable)
             $venditeRows = DB::select("
                 SELECT
-                    COALESCE(NULLIF(pv.flavor, ''), p.name, sol.product_name)       AS denominazione_prodotto,
-                    NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku, sol.product_name), '') AS codice_prodotto,
+                    COALESCE(NULLIF(pv.flavor, ''), p.name)                         AS denominazione_prodotto,
+                    NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku), '') AS codice_prodotto,
                     COALESCE(pv.volume_ml, p.volume_ml)::numeric                    AS capacita_confezione_ml,
                     COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric)          AS nicotina_mg_ml,
                     SUM(sol.qty)::integer                                            AS numero_confezioni
@@ -130,12 +130,13 @@ class AdmController extends Controller
                     AND so.created_at <= '{$endDate}'
                 LEFT JOIN product_variants pv ON pv.id = sol.product_variant_id
                 LEFT JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
-                GROUP BY pv.flavor, p.name, sol.product_name, p.pli_code,
+                GROUP BY pv.flavor, p.name, p.pli_code,
                          pv.barcode, p.barcode, p.sku,
                          pv.volume_ml, p.volume_ml, pv.nicotine_strength, p.nicotine_mg
                 HAVING SUM(sol.qty) > 0
                 ORDER BY denominazione_prodotto
             ");
+
 
             // Giacenza finale
             $giacenzaRows = DB::select("
