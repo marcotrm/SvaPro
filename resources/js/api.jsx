@@ -736,7 +736,18 @@ export const stockTransfers = {
   delete:  (id)          => api.delete(`/stock-transfers/${id}`),
 };
 
+// ── ADM / Reportistica Fiscale PLI ─────────────────────────────────
+export const adm = {
+  generateReport: (data) => api.post('/adm/generate-report', data, {
+    responseType: 'blob',
+    headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    timeout: 120000, // 2 min — la query DB può essere lenta
+  }),
+  getHistory: () => api.get('/adm/history'),
+};
+
 export default api;
+
 
 // ── Delivery Notes (Bolle di Scarico) ──────────────────────────────
 export const deliveryNotes = {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { FileSpreadsheet, Download, Loader2, Calendar, AlertTriangle, CheckCircle, ChevronDown } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import { adm } from '../api';
 
 /* ─── Helper ───────────────────────────────────────────────────── */
 const MONTHS = [
@@ -121,26 +121,12 @@ export default function AdmPage() {
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const apiBase = window.location.origin;
-      const tenantCode = localStorage.getItem('tenantCode') || 'svapro';
-      const token = localStorage.getItem('authToken');
-
-      const response = await axios.post(
-        `/api/${tenantCode}/adm/generate-report`,
-        {
-          type: reportType,
-          year: parseInt(selectedYear),
-          month: parseInt(selectedMonth),
-          half: reportType === 'quindicinale' ? half : null,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          },
-          responseType: 'blob',
-        }
-      );
+      const response = await adm.generateReport({
+        type: reportType,
+        year: parseInt(selectedYear),
+        month: parseInt(selectedMonth),
+        half: reportType === 'quindicinale' ? half : null,
+      });
 
       // Trigger browser download
       const blob = new Blob([response.data], {
@@ -167,7 +153,7 @@ export default function AdmPage() {
           msg = parsed.message || msg;
         } catch {}
       } else {
-        msg = err.response?.data?.message || err.message || msg;
+        msg = err.userFriendlyMessage || err.response?.data?.message || err.message || msg;
       }
       toast.error(msg);
     } finally {
