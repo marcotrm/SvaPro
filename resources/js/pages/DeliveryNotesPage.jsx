@@ -6,10 +6,15 @@ import { Package, X, CheckCircle, AlertTriangle, Truck, RefreshCw, Edit3, Search
 
 /* ─── Costanti ─────────────────────────────────────────── */
 const STATUS = {
-  pending:     { label: '📦 In Consegna',     color: '#7c3aed', bg: '#ede9fe' },
-  in_progress: { label: '🔄 In Controllo',    color: '#d97706', bg: '#fef3c7' },
-  received:    { label: '✅ Controllata',      color: '#059669', bg: '#d1fae5' },
-  discrepancy: { label: '⚠️ Discrepanze',      color: '#dc2626', bg: '#fee2e2' },
+  pending:     { label: '📦 In Consegna',       color: '#7c3aed', bg: '#ede9fe' },
+  shipped:     { label: '🚛 In Transit',         color: '#3b82f6', bg: '#dbeafe' },
+  in_transit:  { label: '🚛 In Transito',        color: '#3b82f6', bg: '#dbeafe' },
+  in_progress: { label: '🔄 In Controllo',       color: '#d97706', bg: '#fef3c7' },
+  received:    { label: '✅ Ricevuta',            color: '#059669', bg: '#d1fae5' },
+  completed:   { label: '✅ Completata',          color: '#059669', bg: '#d1fae5' },
+  verified:    { label: '✅ Verificata',          color: '#059669', bg: '#d1fae5' },
+  discrepancy: { label: '⚠️ Discrepanze',         color: '#dc2626', bg: '#fee2e2' },
+  cancelled:   { label: '❌ Annullata',           color: '#6b7280', bg: '#f3f4f6' },
 };
 
 const fmtDT  = v => v ? new Date(v).toLocaleString('it-IT') : '–';
