@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useOutletContext } from 'react-router-dom';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Loader, Clock, Trash, X, Download, AlertTriangle, Search, User, Users } from 'lucide-react';
 import { attendance, shifts as shiftsApi, stores, employees as employeesApi, clearApiCache } from '../api.jsx';
+import api from '../api.jsx';
+
 import toast from 'react-hot-toast';
 import ShiftTemplateModal from '../components/ShiftTemplateModal.jsx';
 
@@ -606,14 +608,16 @@ export default function ShiftsPage() {
   const [showExport, setShowExport] = useState(false);
 
   // ── Ricerca globale dipendente (cross-store) ──────────────────────────
-  const [allEmployees, setAllEmployees]     = useState([]);
+
+
   const [globalSearch, setGlobalSearch]     = useState('');
   const [globalResults, setGlobalResults]   = useState([]);
   const [globalEmp, setGlobalEmp]           = useState(null);
   const [globalShifts, setGlobalShifts]     = useState([]);
   const [showGlobalDrop, setShowGlobalDrop] = useState(false);
+  const [globalSearchLoading, setGlobalSearchLoading] = useState(false);
   const globalRef = useRef(null);
-  const [extraEmployees, setExtraEmployees] = useState([]); // dipendenti ospiti da altri negozi
+  const [extraEmployees, setExtraEmployees] = useState([]);
 
   // ── Gap detection (ricalcola ogni volta che shifts cambia) ──────────────────
   const gapAlerts = useMemo(() => detectGaps(shifts, weekDays), [shifts, weekDays]);
@@ -692,23 +696,32 @@ export default function ShiftsPage() {
     } finally { setLoading(false); }
   };
 
-  // Carica tutti i dipendenti (tutti gli store) per la ricerca globale
-  useEffect(() => {
-    employeesApi.getEmployees({ limit: 500 }).then(res => {
-      setAllEmployees(res.data?.data || []);
-    }).catch(() => {});
-  }, []);
-
-  // Filtra dipendenti per la ricerca globale
+  // Ricerca globale dipendenti — server-side con debounce (usa LIKE su first_name/last_name)
   useEffect(() => {
     if (!globalSearch || globalSearch.length < 2) { setGlobalResults([]); return; }
-    const q = globalSearch.toLowerCase();
-    setGlobalResults(
-      allEmployees.filter(e =>
-        `${e.first_name} ${e.last_name}`.toLowerCase().includes(q)
-      ).slice(0, 8)
-    );
-  }, [globalSearch, allEmployees]);
+    setGlobalSearchLoading(true);
+    const timer = setTimeout(() => {
+      api.get('/employees', { params: { barcode: globalSearch } })
+        .then(res => {
+          setGlobalResults((res.data?.data || []).slice(0, 8));
+          setShowGlobalDrop(true);
+        })
+        .catch(() => setGlobalResults([]))
+        .finally(() => setGlobalSearchLoading(false));
+    }, 300);  // 300ms debounce
+    return () => clearTimeout(timer);
+  }, [globalSearch]);
+
+  // Click-outside per chiudere il dropdown della ricerca globale
+  useEffect(() => {
+    const handler = (e) => {
+      if (globalRef.current && !globalRef.current.contains(e.target)) {
+        setShowGlobalDrop(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Carica turni del dipendente selezionato su tutti gli store
   const loadGlobalEmpShifts = useCallback(async (emp) => {
@@ -849,8 +862,13 @@ export default function ShiftsPage() {
             onFocus={() => setShowGlobalDrop(true)}
             onChange={e => { setGlobalSearch(e.target.value); setShowGlobalDrop(true); }}
           />
-          {showGlobalDrop && globalResults.length > 0 && (
+          {showGlobalDrop && (globalResults.length > 0 || globalSearchLoading) && (
             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', overflow: 'hidden', marginTop: 4 }}>
+              {globalSearchLoading && (
+                <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Loader size={12} style={{ animation: 'spin 0.8s linear infinite' }} /> Ricerca in corso...
+                </div>
+              )}
               {globalResults.map(emp => (
                 <button key={emp.id} onClick={() => loadGlobalEmpShifts(emp)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(123,111,208,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'var(--color-accent)', fontSize: 12 }}>{(emp.first_name || '?')[0]}</div>
@@ -932,8 +950,14 @@ export default function ShiftsPage() {
               <X size={13} />
             </button>
           )}
-          {showGlobalDrop && globalResults.length > 0 && (
+          {showGlobalDrop && (globalResults.length > 0 || globalSearchLoading) && (
             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.2)', overflow: 'hidden', marginTop: 4 }}>
+              {globalSearchLoading && (
+                <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Loader size={12} style={{ animation: 'spin 0.8s linear infinite' }} /> Ricerca in corso...
+                </div>
+              )}
+
               {globalResults.map(emp => (
                 <button key={emp.id} onClick={() => loadGlobalEmpShifts(emp)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid var(--color-border)' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <div style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(123,111,208,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'var(--color-accent)', fontSize: 11 }}>{(emp.first_name || '?')[0]}</div>
