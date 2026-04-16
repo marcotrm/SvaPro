@@ -30,16 +30,17 @@ const C = {
 
 // ── Menu sezioni interne ─────────────────────────────────────────────────────
 const SECTIONS = [
-  { id: 'dashboard',    label: 'Dashboard',      icon: BarChart3   },
-  { id: 'anagrafiche',  label: 'Anagrafiche',    icon: Users       },
-  { id: 'vendite',      label: 'Vendite',        icon: ShoppingBag },
-  { id: 'acquisti',     label: 'Acquisti',       icon: Truck       },
-  { id: 'tesoreria',    label: 'Tesoreria',      icon: Landmark    },
-  { id: 'scadenziario', label: 'Scadenziario',   icon: Calendar    },
-  { id: 'contabilita',  label: 'Contabilità',    icon: BookOpen    },
-  { id: 'iva',          label: 'IVA e Fiscale',  icon: PieChart    },
-  { id: 'documenti',    label: 'Documenti',      icon: FolderOpen  },
-  { id: 'report',       label: 'Report',         icon: TrendingUp  },
+  { id: 'dashboard',       label: 'Dashboard',         icon: BarChart3   },
+  { id: 'anagrafiche',     label: 'Anagrafiche',       icon: Users       },
+  { id: 'vendite',         label: 'Vendite',           icon: ShoppingBag },
+  { id: 'acquisti',        label: 'Acquisti',          icon: Truck       },
+  { id: 'tesoreria',       label: 'Tesoreria',         icon: Landmark    },
+  { id: 'scadenziario',    label: 'Scadenziario',      icon: Calendar    },
+  { id: 'contabilita',     label: 'Contabilità',       icon: BookOpen    },
+  { id: 'iva',             label: 'IVA e Fiscale',     icon: PieChart    },
+  { id: 'conto_economico', label: 'Conto Economico',   icon: TrendingDown},
+  { id: 'documenti',       label: 'Documenti',         icon: FolderOpen  },
+  { id: 'report',          label: 'Report',            icon: TrendingUp  },
 ];
 
 // ── Componenti riutilizzabili ────────────────────────────────────────────────
@@ -703,6 +704,219 @@ const SectionReport = () => {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// CONTO ECONOMICO NEGOZIO
+// ══════════════════════════════════════════════════════════════════════════════
+
+const DEFAULT_CATEGORIES = [
+  { id: 'affitto',        label: 'Affitto / Leasing',       icon: '🏠' },
+  { id: 'corrente',       label: 'Corrente Elettrica',       icon: '⚡' },
+  { id: 'gas',            label: 'Gas',                      icon: '🔥' },
+  { id: 'telefono',       label: 'Telefono / Internet',      icon: '📱' },
+  { id: 'dipendenti',     label: 'Stipendi Dipendenti',      icon: '👥' },
+  { id: 'contributi',     label: 'Contributi / INPS',        icon: '🏛️' },
+  { id: 'pubblicita',     label: 'Pubblicità & Marketing',   icon: '📣' },
+  { id: 'forniture',      label: 'Forniture & Materiali',    icon: '📦' },
+  { id: 'commercialista', label: 'Commercialista / Consulenze', icon: '📋' },
+  { id: 'assicurazione',  label: 'Assicurazione',            icon: '🛡️' },
+  { id: 'tasse',          label: 'Tasse & Imposte',          icon: '🏦' },
+  { id: 'altro',          label: 'Altri Costi',              icon: '📎' },
+];
+
+const SectionContoEconomico = () => {
+  const now = new Date();
+  const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`);
+  const [storesList, setStoresList] = useState([]);
+  const [storeId, setStoreId] = useState('all');
+  const [revenue, setRevenue] = useState(null);
+  const [loadingRevenue, setLoadingRevenue] = useState(false);
+  const [expenses, setExpenses] = useState({});
+  const [customCats, setCustomCats] = useState([]);
+  const [newCatLabel, setNewCatLabel] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const lsKey = `svapro_conto_eco_${storeId}_${month}`;
+
+  // Carica negozi
+  useEffect(() => {
+    storesApi.getStores().then(r => setStoresList(r.data?.data || [])).catch(() => {});
+  }, []);
+
+  // Carica spese dal localStorage
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(lsKey) || '{}');
+      setExpenses(saved.expenses || {});
+      setCustomCats(saved.customCats || []);
+    } catch { setExpenses({}); setCustomCats([]); }
+  }, [lsKey]);
+
+  // Carica ricavi dal backend
+  useEffect(() => {
+    const fetchRevenue = async () => {
+      setLoadingRevenue(true);
+      try {
+        const [y, m] = month.split('-');
+        const params = { year: y, month: m, ...(storeId !== 'all' ? { store_id: storeId } : {}) };
+        const res = await reports.getSummary?.(params) || await reports.getCashSummary?.(params);
+        const data = res?.data?.data || res?.data || {};
+        setRevenue(parseFloat(data.total_net_revenue ?? data.net_revenue ?? data.total_revenue ?? data.total ?? 0));
+      } catch { setRevenue(null); }
+      finally { setLoadingRevenue(false); }
+    };
+    fetchRevenue();
+  }, [month, storeId]);
+
+  const allCats = [...DEFAULT_CATEGORIES, ...customCats.map(c => ({ id: c.id, label: c.label, icon: '💼' }))];
+
+  const totalExpenses = allCats.reduce((acc, c) => acc + (parseFloat(expenses[c.id]) || 0), 0);
+  const utile = revenue != null ? (revenue - totalExpenses) : null;
+
+  const handleExpenseChange = (id, val) => {
+    setExpenses(prev => ({ ...prev, [id]: val }));
+  };
+
+  const handleSave = () => {
+    setSaving(true);
+    localStorage.setItem(lsKey, JSON.stringify({ expenses, customCats }));
+    setTimeout(() => setSaving(false), 600);
+  };
+
+  const addCustomCat = () => {
+    if (!newCatLabel.trim()) return;
+    const id = `custom_${Date.now()}`;
+    setCustomCats(prev => [...prev, { id, label: newCatLabel.trim() }]);
+    setNewCatLabel('');
+  };
+
+  const removeCustomCat = (id) => {
+    setCustomCats(prev => prev.filter(c => c.id !== id));
+    setExpenses(prev => { const n = {...prev}; delete n[id]; return n; });
+  };
+
+  const fmt = (v) => v != null ? `€ ${Number(v).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Filtri */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Negozio</div>
+          <select value={storeId} onChange={e => setStoreId(e.target.value)}
+            style={{ padding: '9px 14px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, cursor: 'pointer', background: '#fff' }}>
+            <option value="all">Tutti i negozi</option>
+            {storesList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Mese di competenza</div>
+          <input type="month" value={month} onChange={e => setMonth(e.target.value)}
+            style={{ padding: '9px 14px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13 }} />
+        </div>
+        <button onClick={handleSave} style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: saving ? C.success : C.accent, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s' }}>
+          {saving ? <><CheckCircle2 size={14} /> Salvato!</> : <><Download size={14} /> Salva Dati</>}
+        </button>
+      </div>
+
+      {/* KPI Riepilogo */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>💰 Ricavi (Vendite)</div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: C.success }}>
+            {loadingRevenue ? <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} /> : fmt(revenue)}
+          </div>
+          <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>Fatturato netto da ordini</div>
+        </div>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>📉 Totale Spese</div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: C.danger }}>{fmt(totalExpenses)}</div>
+          <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>Somma di tutti i costi</div>
+        </div>
+        <div style={{ background: utile != null && utile >= 0 ? '#F0FDF4' : '#FEF2F2', border: `2px solid ${utile != null && utile >= 0 ? C.success : C.danger}`, borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, color: utile != null && utile >= 0 ? C.success : C.danger }}>
+            {utile != null && utile >= 0 ? '📈 Utile Netto' : '📉 Perdita'}
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 900, color: utile != null && utile >= 0 ? C.success : C.danger }}>
+            {utile != null ? fmt(utile) : '—'}
+          </div>
+          {utile != null && revenue != null && revenue > 0 && (
+            <div style={{ fontSize: 11, marginTop: 4, color: utile >= 0 ? C.success : C.danger }}>
+              Margine: {((utile / revenue) * 100).toFixed(1)}%
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tabella spese */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontWeight: 800, fontSize: 15, color: C.text }}>📋 Voci di Costo</div>
+          <div style={{ fontSize: 12, color: C.textSub }}>Inserisci gli importi mensili per ogni voce</div>
+        </div>
+        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {allCats.map(cat => {
+            const val = expenses[cat.id] ?? '';
+            const isCustom = customCats.some(c => c.id === cat.id);
+            return (
+              <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: val && parseFloat(val) > 0 ? '#FEF9EC' : '#F8FAFC', border: `1px solid ${val && parseFloat(val) > 0 ? '#FDE68A' : C.border}`, transition: 'all 0.15s' }}>
+                <span style={{ fontSize: 18, flexShrink: 0 }}>{cat.icon}</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: C.text }}>{cat.label}</span>
+                <div style={{ position: 'relative', width: 160 }}>
+                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: C.muted, fontWeight: 700 }}>€</span>
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={val}
+                    onChange={e => handleExpenseChange(cat.id, e.target.value)}
+                    placeholder="0,00"
+                    style={{ width: '100%', padding: '8px 10px 8px 28px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontWeight: 700, color: val && parseFloat(val) > 0 ? C.danger : C.text, textAlign: 'right', boxSizing: 'border-box', background: '#fff', outline: 'none' }}
+                  />
+                </div>
+                {val && parseFloat(val) > 0 && (
+                  <span style={{ fontSize: 12, fontWeight: 800, color: C.danger, minWidth: 90, textAlign: 'right' }}>{fmt(parseFloat(val))}</span>
+                )}
+                {isCustom && (
+                  <button onClick={() => removeCustomCat(cat.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: 4, display: 'flex', alignItems: 'center' }}>
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Aggiungi voce personalizzata */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
+            <input value={newCatLabel} onChange={e => setNewCatLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomCat()}
+              placeholder="+ Aggiungi voce personalizzata (es: Manutenzione)..."
+              style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, background: '#F8FAFC', outline: 'none' }} />
+            <button onClick={addCustomCat} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+              <Plus size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Riepilogo finale */}
+      {utile != null && (
+        <div style={{ padding: '20px 24px', background: utile >= 0 ? 'linear-gradient(135deg, #F0FDF4, #DCFCE7)' : 'linear-gradient(135deg, #FEF2F2, #FEE2E2)', border: `2px solid ${utile >= 0 ? '#86EFAC' : '#FCA5A5'}`, borderRadius: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: utile >= 0 ? '#166534' : '#991B1B', marginBottom: 4 }}>
+                {utile >= 0 ? '✅ Risultato Positivo' : '⚠️ Risultato Negativo'} — {month.split('-').reverse().join('/')}
+              </div>
+              <div style={{ fontSize: 11, color: utile >= 0 ? '#166534' : '#991B1B', opacity: 0.7 }}>
+                Ricavi {fmt(revenue)} — Costi {fmt(totalExpenses)}
+              </div>
+            </div>
+            <div style={{ fontSize: 36, fontWeight: 900, color: utile >= 0 ? '#166534' : '#991B1B', letterSpacing: '-0.02em' }}>
+              {fmt(utile)}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // PAGINA PRINCIPALE
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -712,17 +926,18 @@ export default function AdminPanelPage() {
 
   const content = useMemo(() => {
     switch (active) {
-      case 'dashboard':    return <SectionDashboard />;
-      case 'anagrafiche':  return <SectionAnagrafiche />;
-      case 'vendite':      return <SectionVendite />;
-      case 'acquisti':     return <SectionAcquisti />;
-      case 'tesoreria':    return <SectionTesoreria />;
-      case 'scadenziario': return <SectionScadenziario />;
-      case 'contabilita':  return <SectionContabilita />;
-      case 'iva':          return <SectionIva />;
-      case 'documenti':    return <SectionDocumenti />;
-      case 'report':       return <SectionReport />;
-      default:             return null;
+      case 'dashboard':        return <SectionDashboard />;
+      case 'anagrafiche':      return <SectionAnagrafiche />;
+      case 'vendite':          return <SectionVendite />;
+      case 'acquisti':         return <SectionAcquisti />;
+      case 'tesoreria':        return <SectionTesoreria />;
+      case 'scadenziario':     return <SectionScadenziario />;
+      case 'contabilita':      return <SectionContabilita />;
+      case 'iva':              return <SectionIva />;
+      case 'conto_economico':  return <SectionContoEconomico />;
+      case 'documenti':        return <SectionDocumenti />;
+      case 'report':           return <SectionReport />;
+      default:                 return null;
     }
   }, [active]);
 

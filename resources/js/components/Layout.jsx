@@ -5,6 +5,7 @@ import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
 import { Toaster } from 'react-hot-toast';
 import ChatWidget, { ChatTopbarButtons } from './ChatWidget.jsx';
 import StoreStatsDrawer from './StoreStatsDrawer.jsx';
+import MichelePanelModal from './MichelePanelModal.jsx';
 import { 
   BarChart3, Package, Warehouse, ClipboardList, ShoppingBag,
   Users, Monitor, Truck, Settings, LogOut, Bell,
@@ -249,6 +250,7 @@ export default function Layout({ user, setUser }) {
   const [cashAlertStores, setCashAlertStores] = React.useState([]);
   const [showNotifPanel, setShowNotifPanel]   = React.useState(false);
   const [unreadAlerts,   setUnreadAlerts]     = React.useState(0);
+  const [showMichelePanel, setShowMichelePanel] = React.useState(false);
   const prevAlertIdsRef = useRef(new Set());
   const notifPanelRef   = useRef();
 
@@ -517,7 +519,7 @@ export default function Layout({ user, setUser }) {
               </select>
             )}
             {/* Bottone Panoramica Generale */}
-            <button
+             <button
               onClick={() => navigate('/dashboard')}
               title="Panoramica Generale"
               className="sp-desktop-only"
@@ -536,6 +538,26 @@ export default function Layout({ user, setUser }) {
               <LayoutDashboard size={14} />
               Panoramica
             </button>
+            {/* Bottone pannello Michele (VapeCalc) */}
+            <button
+              onClick={() => setShowMichelePanel(true)}
+              title="Pannello Michele — Tabelle Nicotina"
+              className="sp-desktop-only"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 14px', borderRadius: 10,
+                background: showMichelePanel ? 'linear-gradient(135deg, #d97706, #f59e0b)' : 'rgba(245,158,11,0.12)',
+                color: showMichelePanel ? '#fff' : '#f59e0b',
+                border: '1px solid rgba(245,158,11,0.3)',
+                cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                transition: 'all 0.15s', whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #d97706, #f59e0b)'; e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = showMichelePanel ? 'linear-gradient(135deg, #d97706, #f59e0b)' : 'rgba(245,158,11,0.12)'; e.currentTarget.style.color = showMichelePanel ? '#fff' : '#f59e0b'; }}
+            >
+              🔰 Michele
+            </button>
+
             {/* Bottone riepilogo vendite */}
             <button
               onClick={() => setShowStoreStats(true)}
@@ -849,5 +871,6 @@ export default function Layout({ user, setUser }) {
         </div>
       </nav>
     </div>
+    {showMichelePanel && <MichelePanelModal onClose={() => setShowMichelePanel(false)} />}
   );
 }
