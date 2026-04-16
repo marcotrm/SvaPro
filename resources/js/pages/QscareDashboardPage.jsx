@@ -29,17 +29,22 @@ function MiniBarChart({ data, valueKey, colorStart = '#10B981', colorEnd = '#636
           const ratio = data.length > 1 ? i / (data.length - 1) : 0;
           const r1 = parseInt(colorStart.slice(1,3), 16), g1 = parseInt(colorStart.slice(3,5), 16), b1 = parseInt(colorStart.slice(5,7), 16);
           const r2 = parseInt(colorEnd.slice(1,3), 16), g2 = parseInt(colorEnd.slice(3,5), 16), b2 = parseInt(colorEnd.slice(5,7), 16);
-          const color = `rgb(${Math.round(r1 + (r2-r1)*ratio)},${Math.round(g1 + (g2-g1)*ratio)},${Math.round(b1 + (b2-b1)*ratio)})`;
+          const r = Math.round(r1 + (r2-r1)*ratio);
+          const g = Math.round(g1 + (g2-g1)*ratio);
+          const b = Math.round(b1 + (b2-b1)*ratio);
+          const color = `rgb(${r},${g},${b})`;
+          const colorStart = `rgba(${r},${g},${b},0.6)`;
+          const colorShadow = `rgba(${r},${g},${b},0.3)`;
           const valLabel = formatValue ? formatValue(d[valueKey]) : d[valueKey];
           return (
             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, height: '100%', position: 'relative' }} title={`${d[labelKey]}: ${valLabel}`}>
               <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end' }}>
                 <div style={{
                   width: '80%', height: barH,
-                  background: `linear-gradient(to top, ${color}cc, ${color})`,
+                  background: `linear-gradient(to top, ${colorStart}, ${color})`,
                   borderRadius: '4px 4px 2px 2px',
                   transition: 'height 0.4s ease',
-                  boxShadow: `0 2px 8px ${color}55`,
+                  boxShadow: `0 2px 8px ${colorShadow}`,
                   minHeight: 4,
                 }} />
               </div>
