@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { auth, stores, clearApiCache } from '../api.jsx';
+import { auth, stores, clearApiCache, cashMovements as cashApi } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
 import { Toaster } from 'react-hot-toast';
 import ChatWidget, { ChatTopbarButtons } from './ChatWidget.jsx';
@@ -239,6 +239,51 @@ export default function Layout({ user, setUser }) {
   const [lowStockCount, setLowStockCount] = React.useState(0);
   const [showStoreStats, setShowStoreStats] = React.useState(false);
 
+  // ─── Notifiche cassa ────────────────────────────────────────────────
+  const CASH_THRESHOLD = 1000;
+  const [cashAlertStores, setCashAlertStores] = React.useState([]);
+  const [showNotifPanel, setShowNotifPanel]   = React.useState(false);
+  const [unreadAlerts,   setUnreadAlerts]     = React.useState(0);
+  const prevAlertIdsRef = useRef(new Set());
+  const notifPanelRef   = useRef();
+
+  // Poll cassa ogni 30s
+  useEffect(() => {
+    const checkCash = async () => {
+      try {
+        const res = await cashApi.balances();
+        const balances = res.data?.data || [];
+        const alerts = balances.filter(b => parseFloat(b.balance) >= CASH_THRESHOLD);
+        setCashAlertStores(alerts);
+        // Conta solo le nuove allerte (store che non erano già in alert)
+        const newAlerts = alerts.filter(a => !prevAlertIdsRef.current.has(a.store_id ?? a.id));
+        if (newAlerts.length > 0) {
+          setUnreadAlerts(prev => prev + newAlerts.length);
+          newAlerts.forEach(a => prevAlertIdsRef.current.add(a.store_id ?? a.id));
+        }
+        // Rimuovi dalla lista prev gli store che non sono più in allerta
+        const alertIds = new Set(alerts.map(a => a.store_id ?? a.id));
+        [...prevAlertIdsRef.current].forEach(id => { if (!alertIds.has(id)) prevAlertIdsRef.current.delete(id); });
+      } catch { /* silent */ }
+    };
+    checkCash();
+    const t = setInterval(checkCash, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Chiudi pannello notifiche cliccando fuori
+  useEffect(() => {
+    if (!showNotifPanel) return;
+    const handler = (e) => { if (notifPanelRef.current && !notifPanelRef.current.contains(e.target)) setShowNotifPanel(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showNotifPanel]);
+
+  const openNotifPanel = () => {
+    setShowNotifPanel(v => !v);
+    setUnreadAlerts(0); // segna come lette
+  };
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
 
@@ -472,22 +517,89 @@ export default function Layout({ user, setUser }) {
               <BarChart3 size={14} />
               Vendite
             </button>
-            <button
-              className="sp-btn sp-btn-ghost sp-btn-icon"
-              title={lowStockCount > 0 ? `${lowStockCount} alert stock` : 'Notifiche'}
-              style={{ position: 'relative' }}
-            >
-              <Bell size={18} />
-              {lowStockCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: 6, right: 6,
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: '#EF4444',
-                  border: '2px solid white',
-                  animation: 'spBadgePulse 1.5s ease-out infinite',
-                }} />
+            {/* ── CAMPANELLA NOTIFICHE ── */}
+            <div ref={notifPanelRef} style={{ position: 'relative' }}>
+              <button
+                className="sp-btn sp-btn-ghost sp-btn-icon"
+                title={unreadAlerts > 0 ? `${unreadAlerts} nuov${unreadAlerts === 1 ? 'a allerta' : 'e allerte'} cassa` : cashAlertStores.length > 0 ? `${cashAlertStores.length} negozi in allerta cassa` : 'Notifiche'}
+                style={{ position: 'relative' }}
+                onClick={openNotifPanel}
+              >
+                <Bell size={18} />
+                {(unreadAlerts > 0 || cashAlertStores.length > 0) && (
+                  <span style={{
+                    position: 'absolute', top: 4, right: 4,
+                    minWidth: 16, height: 16, borderRadius: 8,
+                    background: '#EF4444', border: '2px solid white',
+                    fontSize: 9, fontWeight: 900, color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '0 3px',
+                    animation: unreadAlerts > 0 ? 'spBadgePulse 1.5s ease-out infinite' : 'none',
+                  }}>
+                    {cashAlertStores.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Dropdown notifiche */}
+              {showNotifPanel && (
+                <div style={{
+                  position: 'absolute', right: 0, top: 'calc(100% + 8px)',
+                  width: 300, background: '#1C1B2E',
+                  border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14,
+                  boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
+                  zIndex: 9999, overflow: 'hidden',
+                  animation: 'flyoutIn 0.15s ease',
+                }}>
+                  {/* Header */}
+                  <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: '#fff' }}>🔔 Notifiche Cassa</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Soglia: €{CASH_THRESHOLD.toLocaleString()}</div>
+                  </div>
+
+                  {/* Lista allerte */}
+                  <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                    {cashAlertStores.length === 0 ? (
+                      <div style={{ padding: '24px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>
+                        ✅ Nessuna allerta cassa attiva<br />
+                        <span style={{ fontSize: 11 }}>Tutti i negozi sono sotto €{CASH_THRESHOLD.toLocaleString()}</span>
+                      </div>
+                    ) : (
+                      cashAlertStores.map((s, i) => (
+                        <div key={s.store_id ?? s.id ?? i} style={{
+                          padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          borderBottom: '1px solid rgba(255,255,255,0.05)',
+                          background: i % 2 === 0 ? 'rgba(239,68,68,0.05)' : 'transparent',
+                        }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>{s.store_name ?? s.name ?? `Negozio ${s.store_id}`}</div>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>Saldo cassa attuale</div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontWeight: 900, fontSize: 14, color: '#ef4444' }}>
+                              {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(s.balance)}
+                            </div>
+                            <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: 8 }}>⚠ ALLERTA</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => { navigate('/admin-panel'); setShowNotifPanel(false); }}
+                      style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none', background: 'rgba(99,102,241,0.2)', color: '#a5b4fc', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                    >Amm. &gt; Tesoreria</button>
+                    <button
+                      onClick={() => { navigate('/automazioni'); setShowNotifPanel(false); }}
+                      style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                    >Automazioni</button>
+                  </div>
+                </div>
               )}
-            </button>
+            </div>
           </div>
         </header>
 
