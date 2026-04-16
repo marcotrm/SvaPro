@@ -41,6 +41,13 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/loyalty-card/{uuid}', [LoyaltyCardController::class, 'show']);
 Route::post('/webhooks/woocommerce/order', [WooCommerceWebhookController::class, 'handleOrder']);
+Route::get('/test-report-serale', function() {
+    \Illuminate\Support\Facades\Artisan::call('app:daily-report');
+    return response()->json([
+        'message' => 'Test Report Completato. Notifiche attivate!',
+        'output' => \Illuminate\Support\Facades\Artisan::output()
+    ]);
+});
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
 
