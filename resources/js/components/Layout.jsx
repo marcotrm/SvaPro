@@ -1,6 +1,6 @@
-﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { auth, stores, clearApiCache, cashMovements as cashApi } from '../api.jsx';
+import { auth, stores, clearApiCache, cashMovements as cashApi, reports, exports_ } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
 import { Toaster } from 'react-hot-toast';
 import ChatWidget, { ChatTopbarButtons } from './ChatWidget.jsx';
@@ -251,6 +251,8 @@ export default function Layout({ user, setUser }) {
   const [showNotifPanel, setShowNotifPanel]   = React.useState(false);
   const [unreadAlerts,   setUnreadAlerts]     = React.useState(0);
   const [showMichelePanel, setShowMichelePanel] = React.useState(false);
+  const [dailyReportAvailable, setDailyReportAvailable] = React.useState(false);
+  const [dailyReportBody, setDailyReportBody] = React.useState('');
   const prevAlertIdsRef = useRef(new Set());
   const notifPanelRef   = useRef();
 
@@ -301,6 +303,29 @@ export default function Layout({ user, setUser }) {
     const t = setInterval(checkCash, 30000);
     return () => clearInterval(t);
   }, []);
+
+  // Poll report chiusura ogni 5 minuti
+  useEffect(() => {
+    const checkReport = async () => {
+      try {
+        const res = await reports.dailyLatest();
+        if (res.data?.available) {
+          setDailyReportAvailable(prev => {
+            if (!prev) setUnreadAlerts(u => u + 1);
+            return true;
+          });
+          setDailyReportBody(res.data.message);
+        } else {
+          setDailyReportAvailable(false);
+        }
+      } catch { /* silent */ }
+    };
+    if (!userRoles.includes('dipendente')) {
+      checkReport();
+      const t2 = setInterval(checkReport, 300000);
+      return () => clearInterval(t2);
+    }
+  }, [userRoles]);
 
   // Chiudi pannello notifiche cliccando fuori
   useEffect(() => {
@@ -621,10 +646,28 @@ export default function Layout({ user, setUser }) {
 
                   {/* Lista allerte */}
                   <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-                    {cashAlertStores.length === 0 ? (
+                    {dailyReportAvailable && (
+                      <div style={{
+                        padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        background: 'rgba(99,102,241,0.1)', cursor: 'pointer'
+                      }}
+                      onClick={() => {
+                        exports_.download(reports.downloadDaily(), 'Report_Serale.pdf');
+                        setShowNotifPanel(false);
+                      }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: 13, color: '#a5b4fc' }}>📄 Report di Chiusura Pronto</div>
+                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>{dailyReportBody}</div>
+                        </div>
+                        <div style={{ textAlign: 'right', color: '#a5b4fc', fontSize: 11, fontWeight: 'bold', minWidth: 60 }}>
+                          Scarica PDF
+                        </div>
+                      </div>
+                    )}
+                    {!dailyReportAvailable && cashAlertStores.length === 0 ? (
                       <div style={{ padding: '24px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>
-                        âœ… Nessuna allerta cassa attiva<br />
-                        <span style={{ fontSize: 11 }}>Tutti i negozi sono sotto â‚¬{CASH_THRESHOLD.toLocaleString()}</span>
+                        âœ… Nessuna allerta attiva
                       </div>
                     ) : (
                       cashAlertStores.map((s, i) => (

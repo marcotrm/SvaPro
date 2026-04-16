@@ -183,6 +183,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/returns/{id}/status', [CustomerReturnController::class, 'updateStatus'])->middleware('permission:orders.manage');
 
         // Reports
+        Route::get('/reports/daily/latest', [\App\Http\Controllers\Api\DailyReportController::class, 'getLatest']);
+        Route::get('/reports/daily/download', [\App\Http\Controllers\Api\DailyReportController::class, 'download']);
         Route::get('/reports/revenue-trend', [ReportController::class, 'revenueTrend']);
         Route::get('/reports/top-products', [ReportController::class, 'topProducts']);
         Route::get('/reports/customer-acquisition', [ReportController::class, 'customerAcquisition']);
