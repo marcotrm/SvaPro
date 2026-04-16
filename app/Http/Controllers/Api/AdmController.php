@@ -15,11 +15,11 @@ class AdmController extends Controller
      * Genera il report Excel ADM/PLI on-demand.
      *
      * Flusso:
-     *   1. Se N8N_WEBHOOK_URL è configurato → chiama il workflow n8n e restituisce il file che n8n restituisce.
+     *   1. Se N8N_WEBHOOK_URL è configurato → chiama il workflow n8n.
      *   2. Altrimenti → fallback: query DB + chiamata diretta all'excel-api.
      *
-     * POST /api/{tenant}/adm/generate-report
-     * Body: { type: 'mensile'|'quindicinale', year: '2025', month: '07', half: 1|2 }
+     * POST /api/adm/generate-report
+     * Body: { type: 'mensile'|'quindicinale', year: 2026, month: 4, half: 1|2 }
      */
     public function generateReport(Request $request): Response|JsonResponse
     {
@@ -36,7 +36,7 @@ class AdmController extends Controller
         $type     = $validated['type'];
         $half     = (int) ($validated['half'] ?? 1);
 
-        // Calcola range date e nome file
+        // ── Calcola range date e nome file ──────────────────────────────────
         if ($type === 'mensile') {
             $startDate    = sprintf('%04d-%02d-01 00:00:00', $year, $month);
             $lastDay      = (int) date('t', mktime(0, 0, 0, $month, 1, $year));
@@ -60,14 +60,12 @@ class AdmController extends Controller
 
         $finePeriodo = \Carbon\Carbon::parse($endDate)->format('d/m/Y');
 
-        // ──────────────────────────────────────────────────────────────────────
-        // OPZIONE A — Chiama il workflow n8n se N8N_WEBHOOK_URL è configurato
-        // ──────────────────────────────────────────────────────────────────────
+        // ── OPZIONE A — n8n webhook ──────────────────────────────────────────
         $n8nWebhookUrl = env('N8N_WEBHOOK_URL');
 
         if ($n8nWebhookUrl) {
             try {
-                $response = Http::timeout(120) // n8n può impiegare qualche secondo
+                $response = Http::timeout(120)
                     ->withHeaders(['Content-Type' => 'application/json'])
                     ->post($n8nWebhookUrl, [
                         'type'         => $type,
@@ -84,12 +82,11 @@ class AdmController extends Controller
 
                 if ($response->failed()) {
                     return response()->json([
-                        'message' => 'Il workflow n8n ha restituito un errore. Controlla il log n8n su Railway.',
+                        'message' => 'Il workflow n8n ha restituito un errore.',
                         'detail'  => $response->body(),
                     ], 502);
                 }
 
-                // n8n deve restituire il file Excel direttamente
                 $contentType = $response->header('Content-Type')
                     ?? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -101,15 +98,13 @@ class AdmController extends Controller
 
             } catch (\Throwable $e) {
                 return response()->json([
-                    'message' => 'Impossibile raggiungere il workflow n8n. Controlla la variabile N8N_WEBHOOK_URL.',
+                    'message' => 'Impossibile raggiungere il workflow n8n.',
                     'detail'  => $e->getMessage(),
                 ], 503);
             }
         }
 
-        // ──────────────────────────────────────────────────────────────────────
-        // OPZIONE B — Fallback: query DB + excel-api diretta
-        // ──────────────────────────────────────────────────────────────────────
+        // ── OPZIONE B — Query DB + excel-api diretta ─────────────────────────
         $tenant   = DB::table('tenants')->where('id', $tenantId)->first(['name', 'vat_number', 'settings_json']);
         $settings = json_decode($tenant?->settings_json ?? '{}', true);
 
@@ -117,37 +112,37 @@ class AdmController extends Controller
         $partitaIva     = $tenant?->vat_number ?? null;
         $codiceImposta  = $settings['depositary_pli_code'] ?? null;
 
-        // ── Sheet3 (Prospetto vendite) — tutti i prodotti venduti nel periodo ──
-        // I campi ADM (pli_code, nicotine_strength, volume_ml) sono NULL se non compilati
-        $sheet3Rows = DB::select("
+        // Vendite nel periodo — LEFT JOIN per gestire product_variant_id nullable
+        // Campi ADM null in DB → restano null nel payload → celle vuote in Excel
+        $venditeRows = DB::select("
             SELECT
-                COALESCE(NULLIF(pv.flavor, ''), p.name)                         AS denominazione_prodotto,
-                NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku), '') AS codice_prodotto,
+                COALESCE(NULLIF(pv.flavor, ''), p.name, sol.product_name)       AS denominazione_prodotto,
+                NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku, sol.product_name), '') AS codice_prodotto,
                 COALESCE(pv.volume_ml, p.volume_ml)::numeric                    AS capacita_confezione_ml,
-                COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric)          AS nicotina_mg_per_ml,
-                SUM(sol.qty)::integer                                            AS totale_pezzi_venduti,
-                '{$finePeriodo}'                                                 AS data_mese
+                COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric)          AS nicotina_mg_ml,
+                SUM(sol.qty)::integer                                            AS numero_confezioni
             FROM sales_order_lines sol
             JOIN sales_orders so ON so.id = sol.sales_order_id
                 AND so.tenant_id = {$tenantId}
                 AND so.status = 'paid'
                 AND so.created_at >= '{$startDate}'
                 AND so.created_at <= '{$endDate}'
-            JOIN product_variants pv ON pv.id = sol.product_variant_id
-            JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
-            GROUP BY pv.flavor, p.name, p.pli_code, pv.barcode, p.barcode, p.sku,
+            LEFT JOIN product_variants pv ON pv.id = sol.product_variant_id
+            LEFT JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
+            GROUP BY pv.flavor, p.name, sol.product_name, p.pli_code,
+                     pv.barcode, p.barcode, p.sku,
                      pv.volume_ml, p.volume_ml, pv.nicotine_strength, p.nicotine_mg
             HAVING SUM(sol.qty) > 0
             ORDER BY denominazione_prodotto
         ");
 
-        // ── Sheet2 (Giacenza finale) — tutti i prodotti in stock ──
-        $sheet2Rows = DB::select("
+        // Giacenza finale (tutti i prodotti in stock)
+        $giacenzaRows = DB::select("
             SELECT
                 COALESCE(NULLIF(pv.flavor, ''), p.name)                         AS denominazione_prodotto,
                 NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku), '') AS codice_prodotto,
                 COALESCE(pv.volume_ml, p.volume_ml)::numeric                    AS capacita_confezione_ml,
-                COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric)          AS nicotina_mg_per_ml,
+                COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric)          AS nicotina_mg_ml,
                 COALESCE(SUM(si.on_hand), 0)::integer                           AS giacenza_finale
             FROM stock_items si
             JOIN product_variants pv ON pv.id = si.product_variant_id
@@ -158,8 +153,8 @@ class AdmController extends Controller
             ORDER BY denominazione_prodotto
         ");
 
-        // ── Sheet4 (Resi) — resi nel periodo ──
-        $sheet4Rows = DB::select("
+        // Resi nel periodo
+        $resiRows = DB::select("
             SELECT
                 COALESCE(NULLIF(pv.flavor, ''), p.name)                         AS denominazione_prodotto,
                 NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku), '') AS codice_prodotto,
@@ -177,52 +172,78 @@ class AdmController extends Controller
             ORDER BY data_reso
         ");
 
-        // Mappa i campi ai nomi esatti attesi da server.js dell'excel-api
-        $mapSheet3 = array_map(fn($r) => [
-            'ragione_sociale_depositario' => $ragioneSociale,
-            'partita_iva_depositario'     => $partitaIva,
-            'codice_imposta_depositario'  => $codiceImposta,
-            'data_mese'                   => $r->data_mese,
-            'denominazione_prodotto'      => $r->denominazione_prodotto,
-            'codice_prodotto'             => $r->codice_prodotto,
-            'capacita_confezione_ml'      => $r->capacita_confezione_ml,
-            'nicotina_mg_ml'              => $r->nicotina_mg_per_ml,
-            'numero_confezioni'           => $r->totale_pezzi_venduti,
-            'quantita_totale_ml'          => $r->capacita_confezione_ml !== null
-                ? round($r->capacita_confezione_ml * $r->totale_pezzi_venduti, 2)
-                : null,
-        ], $sheet3Rows);
-
-        $mapSheet2 = array_map(fn($r) => [
-            'denominazione_prodotto' => $r->denominazione_prodotto,
-            'codice_prodotto'        => $r->codice_prodotto,
-            'capacita_confezione_ml' => $r->capacita_confezione_ml,
-            'nicotina_mg_ml'         => $r->nicotina_mg_per_ml,
-            'giacenza_finale'        => $r->giacenza_finale,
-        ], $sheet2Rows);
-
-        $mapSheet4 = array_map(fn($r) => [
-            'denominazione_prodotto' => $r->denominazione_prodotto,
-            'codice_prodotto'        => $r->codice_prodotto,
-            'quantita_resa'          => $r->quantita_resa,
-            'motivo_reso'            => $r->motivo_reso,
-            'data_reso'              => $r->data_reso,
-        ], $sheet4Rows);
-
-        // Chiama excel-api direttamente
+        // ── Payload specifico per endpoint (struttura esatta di server.js) ──
         $excelApiUrl = rtrim(env('EXCEL_API_URL', 'http://localhost:3001'), '/');
-        $endpoint    = $type === 'quindicinale' ? '/genera-excel-quindicinale' : '/genera-excel';
 
+        if ($type === 'mensile') {
+            // /genera-excel → sheet3 (DC consumatori) + sheet2 (depositi riforniti, vuoto per retail)
+            // Ordine campi = ordine colonne Excel (server.js usa Object.values())
+            $sheet3 = array_map(fn($r) => [
+                'ragione_sociale_depositario' => $ragioneSociale,
+                'partita_iva_depositario'     => $partitaIva,
+                'codice_imposta_depositario'  => $codiceImposta,
+                'data_mese'                   => $finePeriodo,
+                'denominazione_prodotto'      => $r->denominazione_prodotto,
+                'codice_prodotto'             => $r->codice_prodotto,
+                'capacita_confezione_ml'      => $r->capacita_confezione_ml,
+                'nicotina_mg_ml'              => $r->nicotina_mg_ml,
+                'numero_confezioni'           => $r->numero_confezioni,
+                'quantita_totale_ml'          => ($r->capacita_confezione_ml !== null && $r->numero_confezioni !== null)
+                    ? round((float) $r->capacita_confezione_ml * (int) $r->numero_confezioni, 2)
+                    : null,
+            ], $venditeRows);
+
+            $payload  = ['sheet3' => $sheet3, 'sheet2' => []];
+            $endpoint = '/genera-excel';
+
+        } else {
+            // /genera-excel-quindicinale → prospetto, giacenza, resi
+            $prospetto = array_map(fn($r) => [
+                'ragione_sociale_depositario' => $ragioneSociale,
+                'partita_iva_depositario'     => $partitaIva,
+                'codice_imposta_depositario'  => $codiceImposta,
+                'data_fine_quindicina'        => $finePeriodo,
+                'tipo_consumatore'            => 'DC',
+                'denominazione_prodotto'      => $r->denominazione_prodotto,
+                'codice_prodotto'             => $r->codice_prodotto,
+                'capacita_confezione_ml'      => $r->capacita_confezione_ml,
+                'nicotina_mg_ml'              => $r->nicotina_mg_ml,
+                'prezzo_confezione'           => null,
+                'numero_confezioni'           => $r->numero_confezioni,
+                'quantita_totale_ml'          => ($r->capacita_confezione_ml !== null && $r->numero_confezioni !== null)
+                    ? round((float) $r->capacita_confezione_ml * (int) $r->numero_confezioni, 2)
+                    : null,
+                'imposta_unitaria'            => null,
+                'imposta_totale'              => null,
+            ], $venditeRows);
+
+            $giacenza = array_map(fn($r) => [
+                'ragione_sociale_depositario' => $ragioneSociale,
+                'partita_iva_depositario'     => $partitaIva,
+                'codice_imposta_depositario'  => $codiceImposta,
+                'data_fine_quindicina'        => $finePeriodo,
+                'denominazione_prodotto'      => $r->denominazione_prodotto,
+                'codice_prodotto'             => $r->codice_prodotto,
+                'capacita_confezione_ml'      => $r->capacita_confezione_ml,
+                'nicotina_mg_ml'              => $r->nicotina_mg_ml,
+                'giacenza_finale'             => $r->giacenza_finale,
+            ], $giacenzaRows);
+
+            $resi = array_map(fn($r) => [
+                'denominazione_prodotto' => $r->denominazione_prodotto,
+                'codice_prodotto'        => $r->codice_prodotto,
+                'quantita_resa'          => $r->quantita_resa,
+                'motivo_reso'            => $r->motivo_reso,
+                'data_reso'              => $r->data_reso,
+            ], $resiRows);
+
+            $payload  = ['prospetto' => $prospetto, 'giacenza' => $giacenza, 'resi' => $resi];
+            $endpoint = '/genera-excel-quindicinale';
+        }
+
+        // ── Chiama excel-api e restituisce il file con il nome corretto ──────
         try {
-            $response = Http::timeout(60)
-                ->post($excelApiUrl . $endpoint, [
-                    'sheet3'    => $mapSheet3,
-                    'sheet2'    => $mapSheet2,
-                    'sheet4'    => $mapSheet4,
-                    'periodo'   => $periodoLabel,
-                    'tipo'      => $type,
-                    'nome_file' => $nomeFile,
-                ]);
+            $response = Http::timeout(90)->post($excelApiUrl . $endpoint, $payload);
 
             if ($response->failed()) {
                 return response()->json([
@@ -250,4 +271,3 @@ class AdmController extends Controller
         return response()->json(['data' => []]);
     }
 }
-
