@@ -652,9 +652,10 @@ export default function Layout({ user, setUser }) {
                         borderBottom: '1px solid rgba(255,255,255,0.05)',
                         background: 'rgba(99,102,241,0.1)', cursor: 'pointer'
                       }}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         exports_.download(reports.downloadDaily(), 'Report_Serale.pdf');
-                        setShowNotifPanel(false);
+                        // Non chiudiamo il pannello così l'utente vede il feedback
                       }}>
                         <div>
                           <div style={{ fontWeight: 800, fontSize: 13, color: '#a5b4fc' }}>📄 Report di Chiusura Pronto</div>
