@@ -241,7 +241,7 @@ class StoreController extends Controller
         return response()->json(['message' => 'Negozio eliminato.']);
     }
 
-    // ─── Crea Credenziali Negozio ───────────────────────────────────
+    // ─── Crea Credenziali Negozio ──────────────────────────────────────
     public function createCredentials(Request $request, int $storeId): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
@@ -253,47 +253,76 @@ class StoreController extends Controller
 
         $request->validate([
             'email'    => ['required', 'email'],
-            'password' => ['required', 'string', 'min:6'],
+            // Password opzionale se si vogliono aggiornare solo le credenziali senza cambiarla
+            'password' => ['nullable', 'string', 'min:6'],
         ]);
 
-        $email = strtolower(trim($request->input('email')));
-        
+        $email    = strtolower(trim($request->input('email')));
+        $password = $request->input('password'); // null se non fornita
+
         $existingUser = DB::table('users')->where('email', $email)->first();
 
         if ($existingUser) {
-            DB::table('users')->where('id', $existingUser->id)->update([
-                'password' => \Illuminate\Support\Facades\Hash::make($request->input('password')),
-                'updated_at' => now(),
-            ]);
-            
+            // Aggiorna password solo se fornita
+            if ($password) {
+                DB::table('users')->where('id', $existingUser->id)->update([
+                    'password'   => \Illuminate\Support\Facades\Hash::make($password),
+                    'updated_at' => now(),
+                ]);
+            }
+
             // Assicuriamoci che esista come dipendente nel negozio corrente
             $employeeExists = DB::table('employees')
                 ->where('user_id', $existingUser->id)
                 ->where('store_id', $storeId)
                 ->exists();
-                
+
             if (!$employeeExists) {
-                DB::table('employees')->insert([
-                    'tenant_id'     => $tenantId,
-                    'store_id'      => $storeId,
-                    'user_id'       => $existingUser->id,
-                    'first_name'    => preg_replace('/\s+/', ' ', trim(explode('@', $email)[0])),
-                    'last_name'     => '',
-                    'barcode'       => 'DIP-' . $store->code . '-' . rand(1000, 9999),
-                    'status'        => 'active',
-                    'created_at'    => now(),
-                    'updated_at'    => now(),
-                ]);
+                // Cerca un employee DIP- da riutilizzare invece di creare uno nuovo
+                $dipEmployee = DB::table('employees')
+                    ->where('store_id', $storeId)
+                    ->where('tenant_id', $tenantId)
+                    ->where('barcode', 'like', 'DIP-%')
+                    ->whereNull('user_id')
+                    ->first();
+
+                if ($dipEmployee) {
+                    DB::table('employees')->where('id', $dipEmployee->id)->update([
+                        'user_id'    => $existingUser->id,
+                        'first_name' => preg_replace('/\s+/', ' ', trim(explode('@', $email)[0])),
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    DB::table('employees')->insert([
+                        'tenant_id'  => $tenantId,
+                        'store_id'   => $storeId,
+                        'user_id'    => $existingUser->id,
+                        'first_name' => preg_replace('/\s+/', ' ', trim(explode('@', $email)[0])),
+                        'last_name'  => '',
+                        'barcode'    => 'DIP-' . $store->code . '-' . rand(1000, 9999),
+                        'status'     => 'active',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
             }
-            
-            AuditLogger::log($request, 'update_credentials', 'store', $storeId, "Password aggiornata per: $email");
-            return response()->json(['message' => 'Password aggiornata con successo per l\'utente esistente!']);
+
+            AuditLogger::log($request, 'update_credentials', 'store', $storeId, "Credenziali aggiornate per: $email");
+            return response()->json([
+                'message' => 'Credenziali aggiornate con successo!',
+                'email'   => $email,
+            ]);
+        }
+
+        // ─ Nuovo utente ────────────────────────────────────
+        if (!$password) {
+            return response()->json(['message' => 'La password è obbligatoria per un nuovo utente.'], 422);
         }
 
         $userId = DB::table('users')->insertGetId([
             'name'       => explode('@', $email)[0],
             'email'      => $email,
-            'password'   => \Illuminate\Support\Facades\Hash::make($request->input('password')),
+            'password'   => \Illuminate\Support\Facades\Hash::make($password),
             'tenant_id'  => $tenantId,
             'status'     => 'active',
             'created_at' => now(),
@@ -301,7 +330,6 @@ class StoreController extends Controller
         ]);
 
         $roleId = DB::table('roles')->where('code', 'dipendente')->value('id');
-
         if ($roleId) {
             DB::table('user_roles')->insert([
                 'user_id'   => $userId,
@@ -310,21 +338,42 @@ class StoreController extends Controller
             ]);
         }
 
-        DB::table('employees')->insert([
-            'tenant_id'     => $tenantId,
-            'store_id'      => $storeId,
-            'user_id'       => $userId,
-            'first_name'    => explode('@', $email)[0],
-            'last_name'     => '',
-            'barcode'       => 'DIP-' . $store->code . '-' . rand(1000, 9999),
-            'status'        => 'active',
-            'created_at'    => now(),
-            'updated_at'    => now(),
+        // Cerca un employee DIP- esistente da riutilizzare invece di crearne uno nuovo
+        // Questo evita l'accumulo di employee quando si cambiano le credenziali più volte
+        $existingDipEmployee = DB::table('employees')
+            ->where('store_id', $storeId)
+            ->where('tenant_id', $tenantId)
+            ->where('barcode', 'like', 'DIP-%')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if ($existingDipEmployee) {
+            // Riutilizza il DIP- esistente puntandolo al nuovo user
+            DB::table('employees')->where('id', $existingDipEmployee->id)->update([
+                'user_id'    => $userId,
+                'first_name' => explode('@', $email)[0],
+                'updated_at' => now(),
+            ]);
+        } else {
+            DB::table('employees')->insert([
+                'tenant_id'  => $tenantId,
+                'store_id'   => $storeId,
+                'user_id'    => $userId,
+                'first_name' => explode('@', $email)[0],
+                'last_name'  => '',
+                'barcode'    => 'DIP-' . $store->code . '-' . rand(1000, 9999),
+                'status'     => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        AuditLogger::log($request, 'create_credentials', 'store', $storeId, "Credenziali create: $email");
+
+        return response()->json([
+            'message' => 'Credenziali generate con successo!',
+            'email'   => $email,
         ]);
-
-        AuditLogger::log($request, 'create_credentials', 'store', $storeId, "Auto-created dipendente: $email");
-
-        return response()->json(['message' => 'Credenziali generate con successo!']);
     }
 
     /**
@@ -340,13 +389,25 @@ class StoreController extends Controller
             return response()->json(['message' => 'Negozio non trovato.'], 404);
         }
 
-        // Cerca il dipendente collegato al negozio con un user_id valido
+        // Cerca prima il dipendente con barcode DIP- (creato dal sistema credenziali)
+        // Ordine DESC per prendere il più recente in caso di più record
         $employee = DB::table('employees')
             ->where('store_id', $storeId)
             ->where('tenant_id', $tenantId)
+            ->where('barcode', 'like', 'DIP-%')
             ->whereNotNull('user_id')
-            ->orderBy('id', 'asc')
+            ->orderBy('id', 'desc')
             ->first();
+
+        // Fallback: qualsiasi dipendente con user_id (es. dati demo)
+        if (!$employee) {
+            $employee = DB::table('employees')
+                ->where('store_id', $storeId)
+                ->where('tenant_id', $tenantId)
+                ->whereNotNull('user_id')
+                ->orderBy('id', 'desc')
+                ->first();
+        }
 
         if (!$employee || !$employee->user_id) {
             return response()->json(['email' => null, 'has_credentials' => false]);
