@@ -56,9 +56,10 @@ class GenerateDailyReport extends Command
 
                 // Resi
                 $returns = DB::table('customer_returns')
-                    ->where('tenant_id', $tenantId)
-                    ->where('store_id', $store->id)
-                    ->whereBetween('created_at', [$startOfDay, $endOfDay])
+                    ->join('sales_orders', 'customer_returns.order_id', '=', 'sales_orders.id')
+                    ->where('customer_returns.tenant_id', $tenantId)
+                    ->where('sales_orders.store_id', $store->id)
+                    ->whereBetween('customer_returns.created_at', [$startOfDay, $endOfDay])
                     ->count();
 
                 // Dipendente top
