@@ -51,7 +51,7 @@ class GenerateDailyReport extends Command
                     ->where('store_id', $store->id)
                     ->where('status', 'paid')
                     ->whereBetween('created_at', [$startOfDay, $endOfDay])
-                    ->select(DB::raw('COUNT(id) as count'), DB::raw('SUM(total_amount) as total'))
+                    ->select(DB::raw('COUNT(id) as count'), DB::raw('SUM(grand_total) as total'))
                     ->first();
 
                 // Resi
@@ -69,7 +69,7 @@ class GenerateDailyReport extends Command
                     ->whereBetween('created_at', [$startOfDay, $endOfDay])
                     ->whereNotNull('employee_id')
                     ->groupBy('employee_id')
-                    ->select('employee_id', DB::raw('SUM(total_amount) as total_sold'))
+                    ->select('employee_id', DB::raw('SUM(grand_total) as total_sold'))
                     ->orderByDesc('total_sold')
                     ->first();
 
