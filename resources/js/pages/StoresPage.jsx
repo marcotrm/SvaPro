@@ -4,6 +4,7 @@ import { stores as storesApi } from '../api.jsx';
 import {
   Plus, Edit3, Trash2, Store, MapPin, Phone, Mail, Clock,
   CheckCircle, XCircle, AlertTriangle, Loader, X, Users, ChevronDown, ChevronUp,
+  Eye, EyeOff, Building2, GitBranch,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -35,6 +36,9 @@ const emptyStore = () => ({
   opening_hours: DEFAULT_HOURS,
   default_start_time: '09:00',
   late_tolerance_minutes: 10,
+  numero_esercizio: '',
+  numero_ordinale: '',
+  parent_store_id: '',
 });
 
 // ─── Griglia orari ─────────────────────────────────────────────────
@@ -103,10 +107,23 @@ function StoreModal({ store, onClose, onSaved }) {
     opening_hours: store.opening_hours || DEFAULT_HOURS,
     default_start_time: store.default_start_time || '09:00',
     late_tolerance_minutes: store.late_tolerance_minutes ?? 10,
+    numero_esercizio: store.numero_esercizio || '',
+    numero_ordinale: store.numero_ordinale || '',
+    parent_store_id: store.parent_store_id || '',
   } : emptyStore());
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const [tab, setTab] = useState('info'); // 'info' | 'hours' | 'attendance'
+  const [tab, setTab] = useState('info');
+  // Lista negozi disponibili come padre (esclude se stesso)
+  const [storesList, setStoresList] = useState([]);
+  useEffect(() => {
+    storesApi.getStores()
+      .then(r => {
+        const all = r.data?.data || [];
+        setStoresList(store?.id ? all.filter(s => s.id !== store.id) : all);
+      })
+      .catch(() => {});
+  }, [store?.id]);
 
   const fe = (f) => errors[f]?.[0];
   const errStyle = (f) => fe(f) ? { borderColor: 'var(--color-error)', boxShadow: '0 0 0 2px rgba(239,68,68,0.15)' } : {};
@@ -219,6 +236,36 @@ function StoreModal({ store, onClose, onSaved }) {
                 <input className="sp-input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="negozio@esempio.it" style={errStyle('email')} />
               </div>
               <div>
+                <label className="sp-label">Numero Esercizio</label>
+                <input className="sp-input" value={form.numero_esercizio} onChange={e => set('numero_esercizio', e.target.value)}
+                  placeholder="Es: 001" />
+                <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 3 }}>Numero esercizio fiscale ADM</p>
+              </div>
+              <div>
+                <label className="sp-label">Numero Ordinale</label>
+                <input className="sp-input" value={form.numero_ordinale} onChange={e => set('numero_ordinale', e.target.value)}
+                  placeholder="Es: 001" />
+                <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 3 }}>Numero ordinale fiscale ADM</p>
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label className="sp-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <GitBranch size={13} /> Negozio Madre (Categoria)
+                </label>
+                <select
+                  className="sp-select"
+                  value={form.parent_store_id}
+                  onChange={e => set('parent_store_id', e.target.value)}
+                >
+                  <option value="">— Nessun negozio madre (categoria radice) —</option>
+                  {storesList.map(s => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
+                  ))}
+                </select>
+                <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 3 }}>
+                  Seleziona un negozio padre per creare una gerarchia categoria/sottocategoria.
+                </p>
+              </div>
+              <div>
                 <label className="sp-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" checked={form.is_main} onChange={e => set('is_main', e.target.checked)}
                     style={{ width: 15, height: 15, accentColor: 'var(--color-accent)' }} />
@@ -307,6 +354,7 @@ function StoreAccessTab({ store }) {
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
 
   if (!store?.id) {
     return (
@@ -350,7 +398,24 @@ function StoreAccessTab({ store }) {
         </div>
         <div>
           <label className="sp-label">Password Segreta</label>
-          <input type="password" className="sp-input" value={form.password} onChange={e => set('password', e.target.value)} placeholder="Inserisci o aggiorna la password..." />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              className="sp-input"
+              value={form.password}
+              onChange={e => set('password', e.target.value)}
+              placeholder="Inserisci o aggiorna la password..."
+              style={{ paddingRight: 40 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', padding: 4 }}
+              title={showPassword ? 'Nascondi password' : 'Mostra password'}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
           {errors.password && <div style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{errors.password[0]}</div>}
         </div>
       </div>

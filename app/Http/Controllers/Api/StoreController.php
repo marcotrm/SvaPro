@@ -24,7 +24,7 @@ class StoreController extends Controller
                 'id', 'code', 'name', 'address', 'city', 'zip_code', 'country',
                 'phone', 'email', 'timezone', 'is_main',
                 'opening_hours', 'default_start_time', 'late_tolerance_minutes',
-                'auto_reorder_enabled',
+                'auto_reorder_enabled', 'numero_esercizio', 'numero_ordinale', 'parent_store_id',
             ])
             ->map(function ($s) use ($tenantId) {
                 // Media settimanale fatturato h18 (lunedì → oggi)
@@ -96,6 +96,9 @@ class StoreController extends Controller
             'opening_hours'          => ['nullable', 'array'],
             'default_start_time'     => ['nullable', 'string', 'regex:/^\d{2}:\d{2}$/'],
             'late_tolerance_minutes' => ['nullable', 'integer', 'min:0', 'max:120'],
+            'numero_esercizio'       => ['nullable', 'string', 'max:20'],
+            'numero_ordinale'        => ['nullable', 'string', 'max:20'],
+            'parent_store_id'        => ['nullable', 'integer'],
         ]);
 
         // Codice univoco per tenant
@@ -121,6 +124,9 @@ class StoreController extends Controller
                 : null,
             'default_start_time'     => $request->input('default_start_time'),
             'late_tolerance_minutes' => (int) $request->input('late_tolerance_minutes', 10),
+            'numero_esercizio'       => $request->input('numero_esercizio'),
+            'numero_ordinale'        => $request->input('numero_ordinale'),
+            'parent_store_id'        => $request->filled('parent_store_id') ? (int) $request->input('parent_store_id') : null,
             'auto_reorder_enabled'   => true,
             'created_at'             => $now,
             'updated_at'             => $now,
@@ -171,6 +177,9 @@ class StoreController extends Controller
             'opening_hours'          => ['nullable', 'array'],
             'default_start_time'     => ['nullable', 'string', 'regex:/^\d{2}:\d{2}$/'],
             'late_tolerance_minutes' => ['nullable', 'integer', 'min:0', 'max:120'],
+            'numero_esercizio'       => ['nullable', 'string', 'max:20'],
+            'numero_ordinale'        => ['nullable', 'string', 'max:20'],
+            'parent_store_id'        => ['nullable', 'integer'],
         ]);
 
         $payload = array_filter([
@@ -186,7 +195,15 @@ class StoreController extends Controller
             'default_start_time'     => $request->input('default_start_time'),
             'late_tolerance_minutes' => $request->filled('late_tolerance_minutes')
                 ? (int) $request->input('late_tolerance_minutes') : null,
+            'numero_esercizio'       => $request->input('numero_esercizio'),
+            'numero_ordinale'        => $request->input('numero_ordinale'),
         ], fn($v) => $v !== null);
+
+        // parent_store_id: gestisce esplicitamente null (rimuovi relazione)
+        if ($request->has('parent_store_id')) {
+            $payload['parent_store_id'] = $request->filled('parent_store_id')
+                ? (int) $request->input('parent_store_id') : null;
+        }
 
         if ($request->has('is_main')) {
             $payload['is_main'] = (bool) $request->boolean('is_main');
@@ -346,6 +363,9 @@ class StoreController extends Controller
             'late_tolerance_minutes' => (int) ($s->late_tolerance_minutes ?? 10),
             'is_open_now'            => $isOpenNow,
             'auto_reorder_enabled'   => (bool) ($s->auto_reorder_enabled ?? true),
+            'numero_esercizio'       => $s->numero_esercizio ?? null,
+            'numero_ordinale'        => $s->numero_ordinale ?? null,
+            'parent_store_id'        => $s->parent_store_id ?? null,
         ];
     }
 
