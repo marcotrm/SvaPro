@@ -447,34 +447,53 @@ function StoreAccessTab({ store }) {
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [existingEmail, setExistingEmail] = useState(null);
+  const [copied, setCopied] = useState('');
 
-  const CACHE_KEY = store?.id ? `store_cred_email_${store.id}` : null;
+  // Legge il ruolo utente da localStorage (senza bisogno di prop)
+  const userFromStorage = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
+  const isSuperAdmin = userFromStorage?.roles?.includes('superadmin');
 
-  // Carica email esistente: prima da localStorage (istantaneo), poi verifica dal backend
+  // Chiave cache: salva ENTRAMBI email e password
+  const CREDS_KEY = store?.id ? `store_creds_${store.id}` : null;
+
+  const saveToCache = (email, password) => {
+    if (!CREDS_KEY) return;
+    localStorage.setItem(CREDS_KEY, JSON.stringify({ email, password }));
+    // Mantieni anche la chiave legacy
+    localStorage.setItem(`store_cred_email_${store.id}`, email);
+  };
+
+  const loadFromCache = () => {
+    if (!CREDS_KEY) return null;
+    try { return JSON.parse(localStorage.getItem(CREDS_KEY)); } catch { return null; }
+  };
+
+  // Carica credenziali: prima da localStorage (istantaneo), poi verifica dal backend
   useEffect(() => {
     if (!store?.id) return;
 
-    // 1. Carica subito da cache locale (se presente)
-    const cached = CACHE_KEY ? localStorage.getItem(CACHE_KEY) : null;
-    if (cached) {
-      setExistingEmail(cached);
-      setForm(p => ({ ...p, email: cached }));
+    // 1. Carica subito dalla cache locale
+    const cached = loadFromCache();
+    if (cached?.email) {
+      setExistingEmail(cached.email);
+      setForm({ email: cached.email, password: cached.password || '' });
     }
 
-    // 2. Verifica/aggiorna dal backend
+    // 2. Verifica/aggiorna email dal backend (la password non viaggia via rete)
     setLoadingCreds(true);
     storesApi.getCredentials(store.id)
       .then(res => {
         if (res.data?.has_credentials && res.data?.email) {
           setExistingEmail(res.data.email);
+          // Aggiorna email dal backend, mantieni la password in cache
+          const pw = loadFromCache()?.password || '';
           setForm(p => ({ ...p, email: res.data.email }));
-          if (CACHE_KEY) localStorage.setItem(CACHE_KEY, res.data.email);
+          saveToCache(res.data.email, pw);
         }
       })
-      .catch(() => {}) // se l'API fallisce, va bene — usiamo la cache
+      .catch(() => {})
       .finally(() => setLoadingCreds(false));
   }, [store?.id]);
-
 
   if (!store?.id) {
     return (
@@ -491,7 +510,7 @@ function StoreAccessTab({ store }) {
       setLoading(true); setErrors({});
       await storesApi.createCredentials(store.id, form);
       setExistingEmail(form.email);
-      if (CACHE_KEY) localStorage.setItem(CACHE_KEY, form.email); // persiste per riutilizzo
+      saveToCache(form.email, form.password); // salva ENTRAMBI
       toast.success('Credenziali salvate con successo!');
     } catch (err) {
       if (err.response?.data?.errors) setErrors(err.response.data.errors);
@@ -501,9 +520,19 @@ function StoreAccessTab({ store }) {
     }
   };
 
+  const copyToClipboard = (text, label) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(label);
+      setTimeout(() => setCopied(''), 2000);
+    });
+  };
+
+  const storedCreds = loadFromCache();
+
   return (
-    <div style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 20, border: '1px solid var(--color-border)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+    <div style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 20, border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Header status */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>Accesso Negozio: {store.name}</h4>
         {loadingCreds ? (
           <Loader size={14} style={{ animation: 'spin 1s linear infinite', opacity: 0.5 }} />
@@ -517,16 +546,56 @@ function StoreAccessTab({ store }) {
           </span>
         )}
       </div>
-      <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 20, marginTop: 4 }}>
+
+      {/* 👑 Pannello SuperAdmin — password in chiaro */}
+      {isSuperAdmin && storedCreds?.email && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.08))',
+          border: '1px solid rgba(99,102,241,0.25)', borderRadius: 12, padding: '14px 16px',
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6366f1', marginBottom: 10 }}>
+            👑 Accesso Admin — credenziali in chiaro
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {/* Email */}
+            <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>EMAIL</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', wordBreak: 'break-all' }}>{storedCreds.email}</span>
+                <button onClick={() => copyToClipboard(storedCreds.email, 'email')}
+                  style={{ flexShrink: 0, padding: '2px 8px', fontSize: 10, fontWeight: 700, borderRadius: 6, border: 'none', cursor: 'pointer', background: copied === 'email' ? '#22c55e' : 'rgba(99,102,241,0.2)', color: copied === 'email' ? '#fff' : '#a5b4fc', transition: 'all 0.2s' }}>
+                  {copied === 'email' ? '✓' : 'Copia'}
+                </button>
+              </div>
+            </div>
+            {/* Password */}
+            <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>PASSWORD</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                {storedCreds.password ? (
+                  <>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '0.05em', fontFamily: 'monospace' }}>{storedCreds.password}</span>
+                    <button onClick={() => copyToClipboard(storedCreds.password, 'password')}
+                      style={{ flexShrink: 0, padding: '2px 8px', fontSize: 10, fontWeight: 700, borderRadius: 6, border: 'none', cursor: 'pointer', background: copied === 'password' ? '#22c55e' : 'rgba(99,102,241,0.2)', color: copied === 'password' ? '#fff' : '#a5b4fc', transition: 'all 0.2s' }}>
+                      {copied === 'password' ? '✓' : 'Copia'}
+                    </button>
+                  </>
+                ) : (
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Password impostata prima del pannello admin.<br/>Aggiorna le credenziali per visualizzarla.</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>
         {existingEmail
           ? 'Modifica email o password dell\'utente collegato a questo negozio.'
           : 'Crea un accesso dipendente per questo negozio.'}
       </p>
 
-      <div style={{ padding: '12px 14px', background: 'rgba(155,143,212,0.08)', borderRadius: 10, border: '1px solid rgba(155,143,212,0.2)', fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
-        <strong>ℹ️ Info:</strong> Alla creazione, il sistema genererà automaticamente anche il tag/pin per la Cassa POS associato a questo utente.
-        {existingEmail && <><br /><strong>🔑 Email attuale:</strong> {existingEmail}</>}
-      </div>
+      {/* Form modifica */}
       <div style={{ display: 'grid', gap: 14, gridTemplateColumns: '1fr 1fr' }}>
         <div>
           <label className="sp-label">Email di Login</label>
@@ -535,7 +604,7 @@ function StoreAccessTab({ store }) {
         </div>
         <div>
           <label className="sp-label">
-            Password Segreta
+            Nuova Password
             {existingEmail && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginLeft: 6 }}>(lascia vuota per non cambiare)</span>}
           </label>
           <div style={{ position: 'relative' }}>
@@ -544,14 +613,12 @@ function StoreAccessTab({ store }) {
               className="sp-input"
               value={form.password}
               onChange={e => set('password', e.target.value)}
-              placeholder={existingEmail ? '••••••  (lascia vuota per non cambiare)' : 'Inserisci la password...'}
+              placeholder={existingEmail ? 'Lascia vuota per non cambiare...' : 'Inserisci la password...'}
               style={{ paddingRight: 40 }}
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword(v => !v)}
+            <button type="button" onClick={() => setShowPassword(v => !v)}
               style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', padding: 4 }}
-              title={showPassword ? 'Nascondi password' : 'Mostra password'}
+              title={showPassword ? 'Nascondi' : 'Mostra'}
             >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
@@ -560,7 +627,7 @@ function StoreAccessTab({ store }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 24, textAlign: 'right' }}>
+      <div style={{ textAlign: 'right' }}>
         <button className="sp-btn sp-btn-primary" onClick={handleSubmit}
           disabled={loading || !form.email || (!existingEmail && !form.password)}>
           {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : (existingEmail ? 'Aggiorna Credenziali' : 'Salva Credenziali')}
@@ -569,6 +636,7 @@ function StoreAccessTab({ store }) {
     </div>
   );
 }
+
 
 // ─── Card negozio ──────────────────────────────────────────────────
 function StoreCard({ store, onEdit, onDelete }) {
