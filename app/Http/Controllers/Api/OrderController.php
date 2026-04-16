@@ -681,9 +681,9 @@ class OrderController extends Controller
                         }
                     }
 
-                    // R3 – punti se sconto totale > soglia
-                    $discThreshold = (float) ($gamRules['pts_discount_threshold'] ?? 25);
-                    if ($discountTotal > $discThreshold) {
+                    // R3 – punti se totale scontrino >= soglia (non più sconto > soglia)
+                    $receiptThreshold = (float) ($gamRules['pts_receipt_threshold'] ?? $gamRules['pts_discount_threshold'] ?? 25);
+                    if ($grandTotal >= $receiptThreshold) {
                         $pts += (int) ($gamRules['pts_per_discount'] ?? 30);
                     }
 

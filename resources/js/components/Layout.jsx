@@ -33,7 +33,8 @@ const allNavigation = [
     { label: 'Carico Merce (DDT)',     href: '/supplier-delivery',    icon: Truck,          roles: ['superadmin','admin_cliente'] },
     { label: 'Resi',                   href: '/returns',              icon: RotateCcw,      roles: ['superadmin','admin_cliente'] },
     { label: 'Trasferimenti',          href: '/stock-transfers',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
-    { label: 'Inventario Guidato',     href: '/inventory/count',      icon: ClipboardList,  roles: ['superadmin','admin_cliente'] },
+
+
     { label: '📋 Ordini Riassortimento', href: '/warehouse/restock',         icon: ClipboardList,  roles: ['superadmin','admin_cliente'] },
     { label: '📄 Bolle di Scarico',      href: '/warehouse/delivery-notes',  icon: Truck,          roles: ['superadmin','admin_cliente','dipendente'] },
   ]},

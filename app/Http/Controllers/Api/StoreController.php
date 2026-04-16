@@ -604,19 +604,33 @@ class StoreController extends Controller
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
 
-        $updated = DB::table('tenants')->where('id', $tenantId)->update([
-            'name'          => $request->input('name'),
-            'vat_number'    => $request->input('vat_number'),
-            'timezone'      => $request->input('timezone', 'Europe/Rome'),
-            'settings_json' => $request->has('settings_json') ? json_encode($request->input('settings_json')) : DB::raw('settings_json'),
-            'updated_at'    => now(),
-        ]);
+        // Costruisce solo i campi effettivamente inviati (evita di sovrascrivere con NULL)
+        $update = ['updated_at' => now()];
 
-        if (!$updated) {
+        if ($request->has('name'))          $update['name']          = $request->input('name');
+        if ($request->has('vat_number'))    $update['vat_number']    = $request->input('vat_number');
+        if ($request->has('timezone'))      $update['timezone']      = $request->input('timezone');
+        if ($request->has('settings_json')) {
+            // Merge con settings_json esistenti per non perdere altre chiavi
+            $existing = DB::table('tenants')->where('id', $tenantId)->value('settings_json');
+            $existing = json_decode($existing ?? '{}', true) ?: [];
+            $new      = $request->input('settings_json');
+            $merged   = array_merge($existing, is_array($new) ? $new : []);
+            // Deep merge per gamification_rules
+            if (isset($new['gamification_rules']) && isset($existing['gamification_rules'])) {
+                $merged['gamification_rules'] = array_merge($existing['gamification_rules'], $new['gamification_rules']);
+            }
+            $update['settings_json'] = json_encode($merged);
+        }
+
+        $tenant = DB::table('tenants')->where('id', $tenantId)->first();
+        if (!$tenant) {
             return response()->json(['message' => 'Tenant non trovato.'], 404);
         }
 
-        AuditLogger::log($request, 'update', 'tenant', $tenantId, $request->input('name'));
+        DB::table('tenants')->where('id', $tenantId)->update($update);
+
+        AuditLogger::log($request, 'update', 'tenant', $tenantId, $tenant->name);
 
         return response()->json(['message' => 'Impostazioni tenant aggiornate.']);
     }
