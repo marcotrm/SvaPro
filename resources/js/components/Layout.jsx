@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache, cashMovements as cashApi } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
@@ -22,8 +22,7 @@ const allNavigation = [
   { section: 'Principale', icon: LayoutDashboard, items: [
     { label: 'POS Cassa',              href: '/',             icon: Monitor,     roles: ['superadmin','admin_cliente','dipendente'] },
     { label: 'Report & Analisi',       href: '/reports',      icon: Activity,    roles: ['superadmin','admin_cliente'] },
-    { label: 'â± Timbra Entrata/Uscita', href: '/clock-in',   icon: Fingerprint, roles: ['dipendente'] },
-    { label: 'ðŸ“„ Bolle in Arrivo',       href: '/warehouse/delivery-notes', icon: Truck, roles: ['dipendente'] },
+    { label: 'Bolle in Arrivo',       href: '/warehouse/delivery-notes', icon: Truck, roles: ['dipendente'] },
     { label: 'Clienti',                href: '/customers',    icon: Users,       roles: ['dipendente'] },
   ]},
 
@@ -36,8 +35,8 @@ const allNavigation = [
     { label: 'Trasferimenti',          href: '/stock-transfers',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
 
 
-    { label: 'ðŸ“‹ Ordini Riassortimento', href: '/warehouse/restock',         icon: ClipboardList,  roles: ['superadmin','admin_cliente'] },
-    { label: 'ðŸ“„ Bolle di Scarico',      href: '/warehouse/delivery-notes',  icon: Truck,          roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Ordini Riassortimento', href: '/warehouse/restock',         icon: ClipboardList,  roles: ['superadmin','admin_cliente'] },
+    { label: 'Bolle di Scarico',      href: '/warehouse/delivery-notes',  icon: Truck,          roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
 
   // 5. Acquisti / Fornitori â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -59,8 +58,9 @@ const allNavigation = [
     { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente'] },
     { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin'] },
     { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin'] },
+    { label: 'Timbra Entrata/Uscita',  href: '/clock-in',     icon: Fingerprint, roles: ['dipendente'] },
     { label: 'Pianificazione Turni',   href: '/shifts',       icon: Calendar,    roles: ['superadmin','admin_cliente'] },
-    { label: 'ðŸ† Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
 
   // Amministrazione â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -81,7 +81,7 @@ const allNavigation = [
 
   // Automazioni â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { section: 'Automazioni', icon: Zap, items: [
-    { label: 'âš¡ Automazioni',           href: '/automazioni',  icon: Zap,             roles: ['superadmin','admin_cliente'] },
+    { label: 'Automazioni',           href: '/automazioni',  icon: Zap,             roles: ['superadmin','admin_cliente'] },
   ]},
 
   // 10. Impostazioni â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
