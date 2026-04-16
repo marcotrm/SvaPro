@@ -263,6 +263,7 @@ class AttendanceController extends Controller
         $employees = DB::table('employees')
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
+            ->when($storeId, fn($q) => $q->where('store_id', $storeId))
             ->select(['id', 'first_name', 'last_name', 'barcode', 'expected_start_time', 'store_id'])
             ->orderBy('first_name')
             ->get();
