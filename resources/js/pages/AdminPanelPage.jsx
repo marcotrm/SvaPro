@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   BarChart3, Users, ShoppingBag, Truck, Landmark, Calendar,
   BookOpen, TrendingUp, FileText, FolderOpen, PieChart,
@@ -6,7 +7,10 @@ import {
   Plus, Filter, Download, Eye, Edit2, Trash2, ChevronRight,
   AlertCircle, CheckCircle2, Clock, Ban, Building2, Receipt,
   DollarSign, TrendingDown, Target, RefreshCw, Send, Copy,
+  Loader, ExternalLink, UserCheck, Package,
 } from 'lucide-react';
+import { customers as customersApi, suppliers as suppliersApi, employees as employeesApi, reports, orders as ordersApi } from '../api.jsx';
+import { toast } from 'react-hot-toast';
 
 // ── Palette colori ──────────────────────────────────────────────────────────
 const C = {
@@ -24,36 +28,6 @@ const C = {
   textSub:   '#64748B',
 };
 
-// ── Dati mock ───────────────────────────────────────────────────────────────
-const MOCK_CLIENTI = [
-  { id: 1, nome: 'Rossi Srl',       piva: '02764000730', contatto: '340-1234567', scadenza: '31/05/2025', stato: 'attivo'  },
-  { id: 2, nome: 'Rey Gi',          piva: '02842001',     contatto: '320-9876543', scadenza: '31/03/2025', stato: 'scaduto' },
-  { id: 3, nome: 'Rossi Srl',       piva: '02764000730', contatto: '340-1234567', scadenza: '21/03/2025', stato: 'attivo'  },
-  { id: 4, nome: 'Senoni Srl',      piva: '08726541001', contatto: '347-5550099', scadenza: '21/03/2025', stato: 'attivo'  },
-  { id: 5, nome: 'Resi Gi',         piva: '02842001',     contatto: '320-9876543', scadenza: '24/10/2025', stato: 'sospeso' },
-];
-
-const MOCK_FATTURE = [
-  { id: 'DOC-001', data: '30/09/2023', cliente: 'NasoSrl',        totale: 30000, stato: 'SU_Lead',   pagamento: 'bonifico' },
-  { id: 'DOC-002', data: '41/09/2023', cliente: 'NasoSrl001',     totale: 20000, stato: 'SU_Lead',   pagamento: 'contanti' },
-  { id: 'DOC-003', data: '11/09/2023', cliente: 'NasoSrlLarange', totale: 16000, stato: 'Testabile', pagamento: 'carta'    },
-  { id: 'DOC-004', data: '22/09/2023', cliente: 'NasoSrl2nto',    totale: 30000, stato: 'SU_Lead',   pagamento: 'bonifico' },
-];
-
-const MOCK_MOVIMENTI = [
-  { data: '30/04/2024', desc: 'Incasso Pos&cali', conto: 'Cassa',    entrata: 15200, uscita: 0,      stato: 'Abbinato' },
-  { data: '30/04/2024', desc: 'Fornitura',        conto: 'Banca',    entrata: 0,     uscita: 21000,  stato: 'In Attesa' },
-  { data: '30/04/2024', desc: 'Gare Banco',       conto: 'Banca',    entrata: 25000, uscita: 0,      stato: 'Abbinato' },
-  { data: '30/04/2024', desc: 'Quele Lavoro',     conto: 'Banca',    entrata: 14000, uscita: 160.00, stato: 'In Attesa' },
-];
-
-const MOCK_SCADENZE = [
-  { scadenza: '08/03/2023', soggetto: 'Banco Corso',  documento: 'boo0',  totale: 10400, pagato: 0,     residuo: 10400, stato: 'In Scadenza' },
-  { scadenza: '10/03/2023', soggetto: 'Podenho',      documento: 'boo0',  totale: 25000, pagato: 0,     residuo: 25000, stato: 'SR Made'     },
-  { scadenza: '40/11/2023', soggetto: 'Banco Corso',  documento: 'B300',  totale: 15000, pagato: 5000,  residuo: 10000, stato: 'SR Made'     },
-  { scadenza: '20/11/2023', soggetto: 'Banco Corso',  documento: 'Pragas',totale: 29000, pagato: 0,     residuo: 29000, stato: 'In Scadenza' },
-];
-
 // ── Menu sezioni interne ─────────────────────────────────────────────────────
 const SECTIONS = [
   { id: 'dashboard',    label: 'Dashboard',      icon: BarChart3   },
@@ -69,12 +43,14 @@ const SECTIONS = [
 ];
 
 // ── Componenti riutilizzabili ────────────────────────────────────────────────
-const KPICard = ({ label, value, sub, color = C.accent, icon: Icon, trend }) => (
+const KPICard = ({ label, value, sub, color = C.accent, icon: Icon, trend, loading }) => (
   <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '20px 22px', flex: 1, minWidth: 160 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
       <div>
         <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
-        <div style={{ fontSize: 26, fontWeight: 900, color: C.text, letterSpacing: '-0.03em' }}>{value}</div>
+        <div style={{ fontSize: 26, fontWeight: 900, color: C.text, letterSpacing: '-0.03em' }}>
+          {loading ? <Loader size={18} style={{ animation: 'spin 1s linear infinite', color: C.muted }} /> : value}
+        </div>
         {sub && <div style={{ fontSize: 12, color: C.textSub, marginTop: 4 }}>{sub}</div>}
       </div>
       {Icon && <div style={{ width: 42, height: 42, borderRadius: 12, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -93,33 +69,36 @@ const KPICard = ({ label, value, sub, color = C.accent, icon: Icon, trend }) => 
 const StatoBadge = ({ stato }) => {
   const map = {
     attivo:      { bg: '#F0FDF4', color: '#166534', label: 'Attivo'     },
+    active:      { bg: '#F0FDF4', color: '#166534', label: 'Attivo'     },
     scaduto:     { bg: '#FEF2F2', color: '#991B1B', label: 'Scaduto'    },
     sospeso:     { bg: '#FFFBEB', color: '#92400E', label: 'Sospeso'    },
+    suspended:   { bg: '#FFFBEB', color: '#92400E', label: 'Sospeso'    },
     bozza:       { bg: '#F8FAFC', color: '#475569', label: 'Bozza'      },
     inviato:     { bg: '#EFF6FF', color: '#1D4ED8', label: 'Inviato'    },
-    pagato:      { bg: '#F0FDF4', color: '#166534', label: 'Pagato'      },
+    pagato:      { bg: '#F0FDF4', color: '#166534', label: 'Pagato'     },
+    paid:        { bg: '#F0FDF4', color: '#166534', label: 'Pagato'     },
+    pending:     { bg: '#FFFBEB', color: '#92400E', label: 'In Attesa'  },
     'In Scadenza': { bg: '#FFFBEB', color: '#92400E', label: 'In Scadenza' },
-    'SR Made':   { bg: '#F0FDF4', color: '#166534', label: 'SR Made'    },
-    'Abbinato':  { bg: '#EFF6FF', color: '#1D4ED8', label: 'Abbinato'   },
-    'In Attesa': { bg: '#FEF9EC', color: '#B45309', label: 'In Attesa'  },
-    'SU_Lead':   { bg: '#FEF9EC', color: '#B45309', label: 'Su Lead'    },
-    'Testabile': { bg: '#EDE9FE', color: '#6D28D9', label: 'Testabile'  },
+    'Abbinato':  { bg: '#EFF6FF', color: '#1D4ED8', label: 'Abbinato'  },
+    'In Attesa': { bg: '#FEF9EC', color: '#B45309', label: 'In Attesa' },
   };
   const s = map[stato] || { bg: '#F1F5F9', color: '#475569', label: stato };
   return <span style={{ background: s.bg, color: s.color, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>{s.label}</span>;
 };
 
-const SearchBar = ({ placeholder = 'Cerca...', onNew, newLabel = 'Nuovo' }) => (
+const SearchBar = ({ placeholder = 'Cerca...', onNew, newLabel = 'Nuovo', value, onChange }) => (
   <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
     <div style={{ flex: 1, position: 'relative' }}>
       <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted }} />
-      <input placeholder={placeholder} style={{ width: '100%', padding: '10px 12px 10px 34px', border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, outline: 'none', background: '#F8FAFC' }} />
+      <input
+        placeholder={placeholder}
+        value={value || ''}
+        onChange={e => onChange?.(e.target.value)}
+        style={{ width: '100%', padding: '10px 12px 10px 34px', border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, outline: 'none', background: '#F8FAFC', boxSizing: 'border-box' }}
+      />
     </div>
-    <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', border: `1px solid ${C.border}`, borderRadius: 10, background: '#F8FAFC', color: C.textSub, fontSize: 13, cursor: 'pointer' }}>
-      <Filter size={14} /> Filtri
-    </button>
     {onNew && (
-      <button onClick={onNew} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', border: 'none', borderRadius: 10, background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+      <button onClick={onNew} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', border: 'none', borderRadius: 10, background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
         <Plus size={14} /> {newLabel}
       </button>
     )}
@@ -145,97 +124,213 @@ const Td = ({ children, mono }) => (
   <td style={{ padding: '12px 14px', fontSize: 13, color: C.text, borderBottom: `1px solid ${C.border}`, fontFamily: mono ? 'monospace' : undefined }}>{children}</td>
 );
 
-const RowActions = () => (
-  <div style={{ display: 'flex', gap: 6 }}>
-    <button style={{ padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 7, background: '#fff', cursor: 'pointer' }} title="Visualizza"><Eye size={13} style={{ color: C.textSub }} /></button>
-    <button style={{ padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 7, background: '#fff', cursor: 'pointer' }} title="Modifica"><Edit2 size={13} style={{ color: C.accent }} /></button>
+const EmptyState = ({ message, icon: Icon = FileText, action, actionLabel }) => (
+  <div style={{ textAlign: 'center', padding: '40px 20px', color: C.muted }}>
+    <Icon size={40} style={{ opacity: 0.25, marginBottom: 12 }} />
+    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{message}</div>
+    {action && (
+      <button onClick={action} style={{ marginTop: 12, padding: '8px 16px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <Plus size={13} /> {actionLabel}
+      </button>
+    )}
+  </div>
+);
+
+const LoadingSpinner = () => (
+  <div style={{ textAlign: 'center', padding: 40 }}>
+    <Loader size={28} style={{ animation: 'spin 1s linear infinite', color: C.muted }} />
   </div>
 );
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SEZIONI
+// SEZIONE DASHBOARD — dati reali da reports.summary
 // ══════════════════════════════════════════════════════════════════════════════
 
-const SectionDashboard = () => (
-  <div>
-    <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
-      <KPICard label="Fatturato Mese"  value="€ 48.250" trend={+12}  color={C.success} icon={TrendingUp}    />
-      <KPICard label="Costi Mese"      value="€ 21.400" trend={-3}   color={C.danger}  icon={TrendingDown}  />
-      <KPICard label="Utile Lordo"     value="€ 26.550" trend={+8}   color={C.accent}  icon={Target}        />
-      <KPICard label="Saldo Banche"    value="€ 75.320"              color={C.gold}    icon={Landmark}      />
-    </div>
+const SectionDashboard = () => {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16, marginBottom: 16 }}>
-      {/* Grafici mock */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>Andamento Incassi e Uscite</div>
-          <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-            <span style={{ color: C.accent, fontWeight: 600 }}>■ Entrate</span>
-            <span style={{ color: C.gold, fontWeight: 600 }}>■ Uscite</span>
+  useEffect(() => {
+    reports.summary()
+      .then(r => setStats(r.data?.data || r.data))
+      .catch(() => {}) // silenzioso — dashboard mostra placeholder
+      .finally(() => setLoading(false));
+  }, []);
+
+  const fmt = (v) => v != null ? `€ ${Number(v).toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '—';
+  const num = (v) => v != null ? Number(v).toLocaleString('it-IT') : '—';
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
+        <KPICard label="Fatturato Mese"  value={fmt(stats?.revenue_current_month)} loading={loading} trend={stats?.revenue_trend}  color={C.success} icon={TrendingUp}    />
+        <KPICard label="Ordini Mese"     value={num(stats?.orders_current_month)}  loading={loading}                                color={C.accent}  icon={ShoppingBag}  />
+        <KPICard label="Clienti Totali"  value={num(stats?.total_customers)}       loading={loading}                                color={C.gold}    icon={Users}        />
+        <KPICard label="Scontrino Medio" value={fmt(stats?.avg_order_value)}       loading={loading}                                color={C.warning} icon={Receipt}      />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16, marginBottom: 16 }}>
+        {/* Grafico andamento — placeholder visivo */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Andamento Incassi</div>
+            <button onClick={() => navigate('/reports')} style={{ fontSize: 12, color: C.accent, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+              Vedi Report Completo <ExternalLink size={12} />
+            </button>
           </div>
-        </div>
-        {/* Grafico barre semplice */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 120 }}>
-          {[['Ott', 60, 40], ['Nov', 80, 50], ['Dic', 70, 55], ['Gen', 90, 60], ['Feb', 85, 45], ['Mar', 95, 50], ['Apr', 110, 65], ['Mag', 100, 70], ['Giu', 88, 48], ['Lug', 92, 52], ['Ago', 105, 60], ['Set', 115, 58]].map(([m, e, u]) => (
-            <div key={m} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-              <div style={{ width: '100%', display: 'flex', gap: 1, alignItems: 'flex-end', height: 100 }}>
-                <div style={{ flex: 1, height: `${e}%`, background: `${C.accent}88`, borderRadius: '3px 3px 0 0' }} />
-                <div style={{ flex: 1, height: `${u}%`, background: `${C.gold}88`, borderRadius: '3px 3px 0 0' }} />
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 120 }}>
+            {[60, 80, 70, 90, 85, 95, 110, 100, 88, 92, 105, 115].map((v, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <div style={{ width: '100%', height: `${v}%`, background: `linear-gradient(to top, ${C.accent}, ${C.accent}66)`, borderRadius: '3px 3px 0 0' }} />
+                <div style={{ fontSize: 9, color: C.muted }}>{['G','F','M','A','M','G','L','A','S','O','N','D'][i]}</div>
               </div>
-              <div style={{ fontSize: 9, color: C.muted }}>{m}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Pannello cliente example */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Petele Cliente</div>
-        <div style={{ padding: '12px 14px', background: '#F8FAFC', borderRadius: 10, marginBottom: 12 }}>
-          <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 2 }}>Rossi Srl</div>
-          <div style={{ fontSize: 12, color: C.textSub }}>P.IVA: 02764000730956</div>
-          <div style={{ fontSize: 12, color: C.textSub, marginTop: 4 }}>📍 Viterbo Recines So, 2326 – 2323 Vitalia...</div>
-          <div style={{ fontSize: 12, color: C.textSub }}>📞 Dta: 394-589 N222</div>
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-          {['Dati Generali', 'Documenti', 'Storico'].map(t => (
-            <button key={t} style={{ flex: 1, padding: '7px 8px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: t === 'Dati Generali' ? C.accent : '#fff', color: t === 'Dati Generali' ? '#fff' : C.textSub }}>{t}</button>
-          ))}
-        </div>
-        {[['Dati Generali', ChevronRight], ['Documenti', ChevronRight], ['Scadenze', ChevronRight]].map(([l, Icon]) => (
-          <div key={l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.accent }}>• {l}</div>
-            <Icon size={14} style={{ color: C.muted }} />
+            ))}
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
 
-    {/* Bottom row */}
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-      {[
-        { title: 'Incassi da Ricevere', items: [['T20', '€ 14.250'], ['2000', '€ 35.500'], ['B500', '€ 71.300']], color: C.success },
-        { title: 'Pagamenti in Scadenza', items: [['Inviata', '€ 10.400'], ['Dan-Dr-4000', '€ 31.000'], ['Dat 244 250', '€ 11.200']], color: C.warning },
-        { title: 'Fatture Scadute', items: [['Inviata', 'IVA Merce'], ['Scadute', 'Firme'], ['Scadute', 'BL.GOBS –']], color: C.danger },
-      ].map(({ title, items, color }) => (
-        <div key={title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, borderBottom: `2px solid ${color}`, paddingBottom: 8 }}>{title}</div>
-          {items.map(([a, b], i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
-              <span style={{ color: C.textSub }}>📄 {a}</span>
-              <span style={{ fontWeight: 700, color }}>{b}</span>
+        {/* Accesso rapido */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Accesso Rapido</div>
+          {[
+            { label: 'Gestione Clienti',   path: '/customers',      icon: Users,        color: C.accent  },
+            { label: 'Gestione Fornitori', path: '/suppliers',      icon: Truck,        color: C.gold    },
+            { label: 'Gestione Dipendenti',path: '/employees',      icon: UserCheck,    color: C.success },
+            { label: 'Ordini Clienti',     path: '/orders',         icon: ShoppingBag,  color: C.warning },
+            { label: 'Inventario',         path: '/inventory',      icon: Package,      color: C.danger  },
+            { label: 'Report',             path: '/reports',        icon: TrendingUp,   color: C.muted   },
+          ].map(({ label, path, icon: Icon, color }) => (
+            <div
+              key={path}
+              onClick={() => navigate(path)}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color }}>
+                <Icon size={14} /> {label}
+              </div>
+              <ChevronRight size={14} style={{ color: C.muted }} />
             </div>
           ))}
         </div>
-      ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SEZIONE ANAGRAFICHE — dati reali: Clienti, Dipendenti, Fornitori
+// ══════════════════════════════════════════════════════════════════════════════
 
 const SectionAnagrafiche = () => {
   const [subTab, setSubTab] = useState('clienti');
-  const TABS = [['clienti','Clienti'],['fornitori','Fornitori'],['pagamenti','Metodi Pagamento'],['banche','Banche/Casse'],['iva','Aliquote IVA'],['categorie','Categorie'],['listini','Listini']];
+  const [search, setSearch] = useState('');
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const TABS = [
+    ['clienti',    'Clienti'],
+    ['dipendenti', 'Dipendenti'],
+    ['fornitori',  'Fornitori'],
+    ['pagamenti',  'Metodi Pagamento'],
+    ['banche',     'Banche/Casse'],
+    ['iva',        'Aliquote IVA'],
+  ];
+
+  const fetchData = useCallback(async (tab) => {
+    setLoading(true);
+    try {
+      let res;
+      if (tab === 'clienti')    res = await customersApi.getCustomers({ per_page: 50 });
+      if (tab === 'dipendenti') res = await employeesApi.getEmployees({ per_page: 50 });
+      if (tab === 'fornitori')  res = await suppliersApi.getAll({ per_page: 50 });
+      setData(res?.data?.data || res?.data || []);
+    } catch {
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setSearch('');
+    if (['clienti', 'dipendenti', 'fornitori'].includes(subTab)) fetchData(subTab);
+    else setData([]);
+  }, [subTab, fetchData]);
+
+  const filtered = useMemo(() => {
+    if (!search) return data;
+    const q = search.toLowerCase();
+    return data.filter(r => {
+      const name = r.full_name || r.first_name || r.name || r.company_name || '';
+      const email = r.email || '';
+      return name.toLowerCase().includes(q) || email.toLowerCase().includes(q);
+    });
+  }, [data, search]);
+
+  const handleNew = () => {
+    if (subTab === 'clienti')    navigate('/customers');
+    if (subTab === 'dipendenti') navigate('/employees');
+    if (subTab === 'fornitori')  navigate('/suppliers');
+  };
+
+  const handleView = (item) => {
+    if (subTab === 'clienti')    navigate(`/customers/${item.id}`);
+    if (subTab === 'dipendenti') navigate(`/employees`);
+    if (subTab === 'fornitori')  navigate(`/suppliers`);
+  };
+
+  const renderClienteRow = (c) => (
+    <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/customers/${c.id}`)}>
+      <Td><span style={{ fontWeight: 700 }}>{c.full_name || c.name}</span></Td>
+      <Td mono>{c.phone || '—'}</Td>
+      <Td mono>{c.email || '—'}</Td>
+      <Td><span style={{ fontSize: 12, color: C.textSub }}>{c.loyalty_tier || '—'}</span></Td>
+      <Td><StatoBadge stato={c.status || 'attivo'} /></Td>
+      <Td>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={e => { e.stopPropagation(); navigate(`/customers/${c.id}`); }} style={{ padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 7, background: '#fff', cursor: 'pointer' }} title="Visualizza">
+            <Eye size={13} style={{ color: C.textSub }} />
+          </button>
+        </div>
+      </Td>
+    </tr>
+  );
+
+  const renderDipendenteRow = (e) => (
+    <tr key={e.id}>
+      <Td><span style={{ fontWeight: 700 }}>{`${e.first_name || ''} ${e.last_name || ''}`.trim()}</span></Td>
+      <Td>{e.role || e.position || '—'}</Td>
+      <Td mono>{e.email || '—'}</Td>
+      <Td mono>{e.phone || '—'}</Td>
+      <Td><StatoBadge stato={e.status || 'active'} /></Td>
+      <Td>
+        <button onClick={() => navigate('/employees')} style={{ padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 7, background: '#fff', cursor: 'pointer' }} title="Visualizza">
+          <ExternalLink size={13} style={{ color: C.accent }} />
+        </button>
+      </Td>
+    </tr>
+  );
+
+  const renderFornitoreRow = (f) => (
+    <tr key={f.id}>
+      <Td><span style={{ fontWeight: 700 }}>{f.name || f.company_name}</span></Td>
+      <Td mono>{f.vat_number || f.piva || '—'}</Td>
+      <Td mono>{f.phone || '—'}</Td>
+      <Td mono>{f.email || '—'}</Td>
+      <Td><StatoBadge stato={f.status || 'attivo'} /></Td>
+      <Td>
+        <button onClick={() => navigate('/suppliers')} style={{ padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 7, background: '#fff', cursor: 'pointer' }} title="Visualizza">
+          <Eye size={13} style={{ color: C.textSub }} />
+        </button>
+      </Td>
+    </tr>
+  );
+
+  const isRealTab = ['clienti', 'dipendenti', 'fornitori'].includes(subTab);
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -245,29 +340,84 @@ const SectionAnagrafiche = () => {
           </button>
         ))}
       </div>
-      <SearchBar placeholder="Cerca cliente per nome, P.IVA..." newLabel="Nuovo Cliente" />
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-        <Table
-          headers={['Nome', 'Partita IVA', 'Contatto', 'Scad. Pagamento', 'Stato', 'Azioni']}
-          rows={MOCK_CLIENTI.map(c => (
-            <tr key={c.id}>
-              <Td><span style={{ fontWeight: 700 }}>{c.nome}</span></Td>
-              <Td mono>{c.piva}</Td>
-              <Td>{c.contatto}</Td>
-              <Td mono>{c.scadenza}</Td>
-              <Td><StatoBadge stato={c.stato} /></Td>
-              <Td><RowActions /></Td>
-            </tr>
-          ))}
-        />
-      </div>
+
+      {isRealTab ? (
+        <>
+          <SearchBar
+            placeholder={`Cerca ${subTab}...`}
+            value={search}
+            onChange={setSearch}
+            onNew={handleNew}
+            newLabel={subTab === 'clienti' ? 'Nuovo Cliente' : subTab === 'dipendenti' ? 'Nuovo Dipendente' : 'Nuovo Fornitore'}
+          />
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+            {loading ? <LoadingSpinner /> : filtered.length === 0 ? (
+              <EmptyState
+                message={`Nessun ${subTab === 'dipendenti' ? 'dipendente' : subTab === 'fornitori' ? 'fornitore' : 'cliente'} trovato`}
+                icon={Users}
+                action={handleNew}
+                actionLabel="Crea nuovo"
+              />
+            ) : (
+              <Table
+                headers={
+                  subTab === 'clienti'    ? ['Nome', 'Telefono', 'Email', 'Tier', 'Stato', 'Azioni'] :
+                  subTab === 'dipendenti' ? ['Nome', 'Ruolo', 'Email', 'Telefono', 'Stato', 'Azioni'] :
+                  ['Nome / Azienda', 'P.IVA', 'Telefono', 'Email', 'Stato', 'Azioni']
+                }
+                rows={filtered.slice(0, 50).map(item =>
+                  subTab === 'clienti'    ? renderClienteRow(item) :
+                  subTab === 'dipendenti' ? renderDipendenteRow(item) :
+                  renderFornitoreRow(item)
+                )}
+              />
+            )}
+          </div>
+          <div style={{ marginTop: 10, fontSize: 12, color: C.muted }}>
+            {filtered.length} {subTab} mostrati
+            {filtered.length >= 50 && ' — vai alla pagina dedicata per vedere tutti'}
+          </div>
+        </>
+      ) : (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
+          <AlertCircle size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Sezione in costruzione</div>
+          <div style={{ fontSize: 13, color: C.textSub }}>La gestione di {subTab} sarà disponibile a breve.</div>
+        </div>
+      )}
     </div>
   );
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// SEZIONE VENDITE — ordini reali  
+// ══════════════════════════════════════════════════════════════════════════════
+
 const SectionVendite = () => {
-  const [subTab, setSubTab] = useState('fatture');
-  const TABS = [['preventivi','Preventivi'],['ordini','Ordini Clienti'],['ddt','DDT'],['fatture','Fatture Emesse'],['note','Note di Credito'],['corrispettivi','Corrispettivi']];
+  const [subTab, setSubTab] = useState('ordini');
+  const [ordersList, setOrdersList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const TABS = [
+    ['ordini',       'Ordini Clienti'],
+    ['fatture',      'Fatture Emesse'],
+    ['preventivi',   'Preventivi'],
+    ['note',         'Note di Credito'],
+    ['corrispettivi','Corrispettivi'],
+  ];
+
+  useEffect(() => {
+    if (subTab !== 'ordini') return;
+    setLoading(true);
+    ordersApi.getOrders({ per_page: 20, sort: 'desc' })
+      .then(r => setOrdersList(r?.data?.data || r?.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [subTab]);
+
+  const formatEur = (v) => `€ ${Number(v || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`;
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -275,44 +425,66 @@ const SectionVendite = () => {
           <button key={id} onClick={() => setSubTab(id)} style={{ padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: subTab === id ? C.accent : '#F1F5F9', color: subTab === id ? '#fff' : C.textSub }}>{l}</button>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['Periodo', 'Cliente', 'Stato', 'Importo', 'Punto Vendita'].map(f => (
-          <button key={f} style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: '#F8FAFC', fontSize: 12, color: C.textSub, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Filter size={11} /> {f}
+
+      {subTab === 'ordini' ? (
+        <>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button onClick={() => navigate('/orders')} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 8, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              <ExternalLink size={13} /> Gestisci Ordini
+            </button>
+          </div>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+            {loading ? <LoadingSpinner /> : ordersList.length === 0 ? (
+              <EmptyState message="Nessun ordine trovato" icon={ShoppingBag} action={() => navigate('/orders')} actionLabel="Vai agli Ordini" />
+            ) : (
+              <Table
+                headers={['Numero', 'Data', 'Cliente', 'Totale', 'Stato', 'Azioni']}
+                rows={ordersList.map(o => (
+                  <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => navigate('/orders')}>
+                    <Td mono>{o.order_number || `ORD-${o.id}`}</Td>
+                    <Td>{o.created_at ? new Date(o.created_at).toLocaleDateString('it-IT') : '—'}</Td>
+                    <Td><span style={{ fontWeight: 600 }}>{o.customer_name || o.customer?.full_name || '—'}</span></Td>
+                    <Td><span style={{ fontWeight: 700, color: C.success }}>{formatEur(o.grand_total)}</span></Td>
+                    <Td><StatoBadge stato={o.status} /></Td>
+                    <Td>
+                      <button onClick={e => { e.stopPropagation(); navigate('/orders'); }} style={{ padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 7, background: '#fff', cursor: 'pointer' }}>
+                        <Eye size={13} style={{ color: C.textSub }} />
+                      </button>
+                    </Td>
+                  </tr>
+                ))}
+              />
+            )}
+          </div>
+        </>
+      ) : subTab === 'fatture' ? (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
+          <Receipt size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Fatture Emesse</div>
+          <button onClick={() => navigate('/invoices')} style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <ExternalLink size={13} /> Vai alle Fatture
           </button>
-        ))}
-        <button style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', background: C.accent, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-          <Plus size={12} /> Nuova Fattura
-        </button>
-      </div>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-        <Table
-          headers={['Numero', 'Data', 'Cliente', 'Totale', 'Stato', 'Pagamento', 'Azioni']}
-          rows={MOCK_FATTURE.map(f => (
-            <tr key={f.id}>
-              <Td mono>{f.id}</Td>
-              <Td>{f.data}</Td>
-              <Td><span style={{ fontWeight: 600 }}>{f.cliente}</span></Td>
-              <Td><span style={{ fontWeight: 700, color: C.success }}>€ {f.totale.toLocaleString('it-IT')}</span></Td>
-              <Td><StatoBadge stato={f.stato} /></Td>
-              <Td>{f.pagamento}</Td>
-              <Td>
-                <div style={{ display: 'flex', gap: 5 }}>
-                  <button style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${C.border}`, background: '#fff', cursor: 'pointer', fontSize: 11 }} title="PDF">PDF</button>
-                  <RowActions />
-                </div>
-              </Td>
-            </tr>
-          ))}
-        />
-      </div>
+        </div>
+      ) : (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
+          <AlertCircle size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Sezione in costruzione</div>
+          <div style={{ fontSize: 13, color: C.textSub }}>La sezione {TABS.find(t => t[0] === subTab)?.[1]} sarà disponibile a breve.</div>
+        </div>
+      )}
     </div>
   );
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// SEZIONE ACQUISTI
+// ══════════════════════════════════════════════════════════════════════════════
+
 const SectionAcquisti = () => {
-  const [subTab, setSubTab] = useState('fatture');
+  const navigate = useNavigate();
+  const [subTab, setSubTab] = useState('ordini');
   const TABS = [['ordini','Ordini Fornitori'],['fatture','Fatture Ricevute'],['note','Note Credito Forn.'],['costi','Costi Ricorrenti']];
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
@@ -320,234 +492,113 @@ const SectionAcquisti = () => {
           <button key={id} onClick={() => setSubTab(id)} style={{ padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: subTab === id ? C.accent : '#F1F5F9', color: subTab === id ? '#fff' : C.textSub }}>{l}</button>
         ))}
       </div>
-      <SearchBar placeholder="Cerca per fornitore o numero..." newLabel="Nuova Fattura" />
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
-        <Table
-          headers={['Numero', 'Data', 'Fornitore', 'Importo', 'Scadenza', 'Categoria', 'Stato', 'Azioni']}
-          rows={[
-            ['10/11/2023', 'Maoco Plexit',  '€ 35.000', '10/12/2023', 'Forniture',   'DA Pagare'],
-            ['11/11/2023', 'Maoco Plexit',  '€ 35.500', '10/12/2023', 'Servizi',     'DA Pagare'],
-            ['02/11/2023', 'Maoco Plexit',  '€ 330.000','10/12/2023', 'Merce',       'Pagato'],
-            ['10/11/2023', 'Dreco-Cross',   '€ 335.000','10/12/2023', 'Attrezzature','DA Pagare'],
-          ].map((r, i) => (
-            <tr key={i}>
-              <Td mono>FAT-2023-{String(i+1).padStart(3,'0')}</Td>
-              <Td>{r[0]}</Td>
-              <Td><span style={{ fontWeight: 600 }}>{r[1]}</span></Td>
-              <Td><span style={{ fontWeight: 700, color: C.danger }}>{r[2]}</span></Td>
-              <Td>{r[3]}</Td>
-              <Td>{r[4]}</Td>
-              <Td><StatoBadge stato={r[5]} /></Td>
-              <Td><RowActions /></Td>
-            </tr>
-          ))}
-        />
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
+        {subTab === 'ordini' && (
+          <>
+            <Truck size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Ordini Fornitori</div>
+            <button onClick={() => navigate('/purchase-orders')} style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <ExternalLink size={13} /> Gestisci Ordini Fornitori
+            </button>
+          </>
+        )}
+        {subTab === 'fatture' && (
+          <>
+            <FileText size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Fatture Fornitori</div>
+            <button onClick={() => navigate('/supplier-invoices')} style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <ExternalLink size={13} /> Vai alle Fatture Fornitori
+            </button>
+          </>
+        )}
+        {!['ordini','fatture'].includes(subTab) && (
+          <>
+            <AlertCircle size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Sezione in costruzione</div>
+            <div style={{ fontSize: 13, color: C.textSub }}>Disponibile a breve.</div>
+          </>
+        )}
       </div>
     </div>
   );
 };
 
+// Mock sections — con bottoni "Crea" e link alle pagine dedicate
 const SectionTesoreria = () => {
-  const [subTab, setSubTab] = useState('movimenti');
+  const navigate = useNavigate();
   return (
     <div>
       <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
-        <KPICard label="Saldo Totale"      value="€ 82.450" color={C.success} icon={Wallet}      />
-        <KPICard label="Saldo Banca"       value="€ 58.300" color={C.accent}  icon={Landmark}    />
-        <KPICard label="Saldo Cassa"       value="€ 5.120"  color={C.gold}    icon={DollarSign}  />
-        <KPICard label="Flusso Previsto 7gg" value="€ 4.900" color={C.warning} icon={TrendingUp} />
+        <KPICard label="Saldo Totale"       value="—"  color={C.success} icon={Wallet}     />
+        <KPICard label="Saldo Banca"        value="—"  color={C.accent}  icon={Landmark}   />
+        <KPICard label="Saldo Cassa"        value="—"  color={C.gold}    icon={DollarSign} />
+        <KPICard label="Flusso Previsto 7gg" value="—" color={C.warning} icon={TrendingUp} />
       </div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        {[['movimenti','Prima Nota'],['bancari','Movimenti Bancari'],['cassa','Cassa'],['carte','Carte'],['riconciliazione','Riconciliazione'],['flussi','Flussi Previsionali']].map(([id, l]) => (
-          <button key={id} onClick={() => setSubTab(id)} style={{ padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: subTab === id ? C.accent : '#F1F5F9', color: subTab === id ? '#fff' : C.textSub }}>{l}</button>
-        ))}
-      </div>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-        <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>Movimenti</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}><Download size={12} /> Esporta</button>
-            <button style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: C.accent, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}><Plus size={12} /> Nuovo</button>
-          </div>
-        </div>
-        <Table
-          headers={['Data', 'Descrizione', 'Conto', 'Entrata', 'Uscita', 'Stato']}
-          rows={MOCK_MOVIMENTI.map((m, i) => (
-            <tr key={i}>
-              <Td mono>{m.data}</Td>
-              <Td><span style={{ fontWeight: 600 }}>{m.desc}</span></Td>
-              <Td>{m.conto}</Td>
-              <Td><span style={{ color: C.success, fontWeight: 700 }}>{m.entrata > 0 ? `€ ${m.entrata.toLocaleString('it-IT')}` : '—'}</span></Td>
-              <Td><span style={{ color: C.danger, fontWeight: 700 }}>{m.uscita > 0 ? `€ ${m.uscita.toLocaleString('it-IT')}` : '—'}</span></Td>
-              <Td><StatoBadge stato={m.stato} /></Td>
-            </tr>
-          ))}
-        />
-      </div>
-    </div>
-  );
-};
-
-const SectionScadenziario = () => {
-  const [subTab, setSubTab] = useState('incassi');
-  const [filter, setFilter] = useState('30giorni');
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        {[['incassi','Incassi'],['pagamenti','Pagamenti'],['insoluti','Insoluti'],['solleciti','Solleciti']].map(([id, l]) => (
-          <button key={id} onClick={() => setSubTab(id)} style={{ padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: subTab === id ? C.accent : '#F1F5F9', color: subTab === id ? '#fff' : C.textSub }}>{l}</button>
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        {[['oggi','Oggi'],['7giorni','7 Giorni'],['30giorni','30 Giorni'],['scaduti','Scaduti']].map(([v, l]) => (
-          <button key={v} onClick={() => setFilter(v)} style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${filter === v ? C.accent : C.border}`, background: filter === v ? `${C.accent}15` : '#F8FAFC', color: filter === v ? C.accent : C.textSub, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{l}</button>
-        ))}
-        <button style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', background: C.success, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-          <CheckCircle2 size={12} /> Registra Incasso
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
+        <Wallet size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Modulo Tesoreria</div>
+        <button onClick={() => navigate('/tesoreria')} style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <ExternalLink size={13} /> Vai alla Tesoreria
         </button>
       </div>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-        <Table
-          headers={['Scadenza', 'Soggetto', 'Documento', 'Totale', 'Pagato', 'Residuo', 'Stato', 'Azioni']}
-          rows={MOCK_SCADENZE.map((s, i) => (
-            <tr key={i}>
-              <Td mono>{s.scadenza}</Td>
-              <Td><span style={{ fontWeight: 600 }}>{s.soggetto}</span></Td>
-              <Td mono>{s.documento}</Td>
-              <Td><span style={{ fontWeight: 700 }}>€ {s.totale.toLocaleString('it-IT')}</span></Td>
-              <Td><span style={{ color: C.success }}>{s.pagato > 0 ? `€ ${s.pagato.toLocaleString('it-IT')}` : '€ 0'}</span></Td>
-              <Td><span style={{ color: C.danger, fontWeight: 700 }}>€ {s.residuo.toLocaleString('it-IT')}</span></Td>
-              <Td><StatoBadge stato={s.stato} /></Td>
-              <Td>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button style={{ padding: '4px 7px', borderRadius: 6, border: `1px solid ${C.border}`, background: '#fff', cursor: 'pointer', fontSize: 10, fontWeight: 600 }} title="Sollecito"><Send size={11} /></button>
-                  <RowActions />
-                </div>
-              </Td>
-            </tr>
-          ))}
-        />
-      </div>
     </div>
   );
 };
 
+const SectionScadenziario = () => (
+  <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
+    <Calendar size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Scadenziario</div>
+    <div style={{ fontSize: 13, color: C.textSub }}>Modulo in sviluppo.</div>
+  </div>
+);
+
 const SectionContabilita = () => (
-  <div>
-    <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-      <select style={{ padding: '8px 12px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, background: '#F8FAFC', cursor: 'pointer' }}>
-        <option>Ottobre 2024</option><option>Settembre 2024</option><option>Agosto 2024</option>
-      </select>
-      {['Causale', 'Conto', 'Filtro'].map(f => (
-        <button key={f} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: '#F8FAFC', fontSize: 12, color: C.textSub, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}><Filter size={11} /> {f}</button>
-      ))}
-    </div>
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-      <Table
-        headers={['Data', 'Protocollo', 'Causale', 'Conto Dare', 'Conto Avere', 'Importo', 'Rif. Documento']}
-        rows={[
-          ['01/10/2024', 'REG-001', 'Vendita merce',    'Clienti',       'Ricavi vendite',  '€ 12.500', 'FAT-001'],
-          ['02/10/2024', 'REG-002', 'Acquisto merce',   'Merci c/acquisti','Fornitori',     '€ 8.200',  'FAT-ACQ-001'],
-          ['05/10/2024', 'REG-003', 'Pagamento forn.',  'Fornitori',     'Banca c/c',       '€ 8.200',  'BNIM-001'],
-          ['10/10/2024', 'REG-004', 'Incasso cassa',    'Cassa',         'Clienti',         '€ 5.300',  'INC-001'],
-        ].map((r, i) => (
-          <tr key={i}>
-            {r.map((v, j) => <Td key={j} mono={j === 0 || j === 1}><span style={j === 5 ? { fontWeight: 700, color: C.accent } : {}}>{v}</span></Td>)}
-          </tr>
-        ))}
-      />
-    </div>
+  <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
+    <BookOpen size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Contabilità</div>
+    <div style={{ fontSize: 13, color: C.textSub }}>Modulo in sviluppo.</div>
   </div>
 );
 
 const SectionIva = () => (
-  <div>
-    <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
-      <KPICard label="IVA a Debito"    value="€ 9.680"  color={C.danger}   icon={ArrowUpRight}   />
-      <KPICard label="IVA a Credito"   value="€ 2.940"  color={C.success}  icon={ArrowDownRight} />
-      <KPICard label="Saldo Periodo"   value="€ 6.740"  color={C.accent}   icon={TrendingUp}     />
-      <KPICard label="Prossima Liquid." value="16/01"    color={C.warning}  icon={Calendar}       />
-    </div>
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', gap: 8 }}>
-        {['Registro Vendite','Registro Acquisti','Liquidazione'].map(t => (
-          <button key={t} style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: '#F8FAFC', fontSize: 12, cursor: 'pointer' }}>{t}</button>
-        ))}
-        <button style={{ marginLeft: 'auto', padding: '6px 12px', borderRadius: 8, border: 'none', background: C.accent, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-          <Download size={12} /> Esporta
-        </button>
-      </div>
-      <Table
-        headers={['Periodo', 'Imponibile', 'IVA', 'Totale', 'Stato Liquidazione']}
-        rows={[
-          ['Q3 2024', '€ 48.250', '€ 9.650', '€ 57.900', 'pagato'],
-          ['Q2 2024', '€ 42.100', '€ 8.420', '€ 50.520', 'pagato'],
-          ['Q1 2024', '€ 38.600', '€ 7.720', '€ 46.320', 'pagato'],
-        ].map((r, i) => (
-          <tr key={i}>
-            {r.map((v, j) => <Td key={j}><span style={j === 4 ? {} : j > 0 ? { fontWeight: 600 } : {}}>{j === 4 ? <StatoBadge stato={v} /> : v}</span></Td>)}
-          </tr>
-        ))}
-      />
-    </div>
+  <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
+    <PieChart size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>IVA e Fiscale</div>
+    <div style={{ fontSize: 13, color: C.textSub }}>Modulo in sviluppo.</div>
   </div>
 );
 
-const SectionDocumenti = () => (
-  <div>
-    <SearchBar placeholder="Cerca per nome, tipo, cliente..." newLabel="Carica Documento" />
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-      <Table
-        headers={['Nome File', 'Tipo', 'Soggetto', 'Documento Collegato', 'Data Caric.', 'Tag', 'Azioni']}
-        rows={[
-          ['Contratto_RossiSrl.pdf', 'PDF', 'Rossi Srl', 'FAT-2024-001', '10/11/2024', 'contratto'],
-          ['Fattura_001.xml', 'XML', 'Rey Gi', 'FAT-2024-002', '11/11/2024', 'fattura'],
-          ['Bolletta_Energia.pdf', 'PDF', 'Enel', 'COST-2024-045', '12/11/2024', 'costi'],
-          ['Preventivo_A.pdf', 'PDF', 'Senoni Srl', 'PREV-2024-003', '15/11/2024', 'preventivo'],
-        ].map((r, i) => (
-          <tr key={i}>
-            <Td><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><FileText size={14} style={{ color: C.accent }} /><span style={{ fontWeight: 600 }}>{r[0]}</span></div></Td>
-            <Td><span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>{r[1]}</span></Td>
-            <Td>{r[2]}</Td>
-            <Td mono>{r[3]}</Td>
-            <Td mono>{r[4]}</Td>
-            <Td><span style={{ background: '#F1F5F9', color: '#475569', padding: '2px 8px', borderRadius: 6, fontSize: 11 }}>{r[5]}</span></Td>
-            <Td><RowActions /></Td>
-          </tr>
-        ))}
-      />
-    </div>
-  </div>
-);
-
-const SectionReport = () => {
-  const [subReport, setSubReport] = useState('fatturato');
+const SectionDocumenti = () => {
+  const navigate = useNavigate();
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
-        {[['fatturato','Fatturato'],['costi','Costi'],['margini','Margini'],['cashflow','Cash Flow'],['clienti','Clienti'],['iva','IVA'],['performance','Performance Sede']].map(([id, l]) => (
-          <button key={id} onClick={() => setSubReport(id)} style={{ padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: subReport === id ? C.accent : '#F1F5F9', color: subReport === id ? '#fff' : C.textSub }}>{l}</button>
-        ))}
+      <SearchBar placeholder="Cerca per nome, tipo, cliente..." onNew={() => {}} newLabel="Carica Documento" />
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
+        <FolderOpen size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Gestione Documenti</div>
+        <div style={{ fontSize: 13, color: C.textSub }}>Modulo in sviluppo.</div>
       </div>
+    </div>
+  );
+};
+
+const SectionReport = () => {
+  const navigate = useNavigate();
+  return (
+    <div>
       <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
-        <KPICard label="Fatturato Totale" value="€ 145.200" trend={+15}  color={C.success}  icon={TrendingUp}  />
-        <KPICard label="Costi Totali"     value="€ 64.800"  trend={+4}   color={C.danger}   icon={TrendingDown}/>
-        <KPICard label="Margine"          value="55,4%"     trend={+6}   color={C.accent}   icon={Target}      />
-        <KPICard label="Clienti Attivi"   value="248"       trend={+22}  color={C.gold}     icon={Users}       />
+        <KPICard label="Fatturato Totale" value="—" color={C.success} icon={TrendingUp}   />
+        <KPICard label="Costi Totali"     value="—" color={C.danger}  icon={TrendingDown} />
+        <KPICard label="Margine"          value="—" color={C.accent}  icon={Target}       />
+        <KPICard label="Clienti Attivi"   value="—" color={C.gold}    icon={Users}        />
       </div>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{ fontWeight: 700 }}>Andamento Mensile</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}><Download size={12} /> CSV</button>
-            <button style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}><Download size={12} /> PDF</button>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 120 }}>
-          {[70, 85, 60, 95, 80, 100, 90, 110, 95, 120, 105, 130].map((v, i) => (
-            <div key={i} style={{ flex: 1, height: `${v}%`, background: `linear-gradient(to top, ${C.accent}, ${C.accent}55)`, borderRadius: '4px 4px 0 0' }} />
-          ))}
-        </div>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
+        <TrendingUp size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Report Avanzati</div>
+        <button onClick={() => navigate('/reports')} style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <ExternalLink size={13} /> Vai ai Report
+        </button>
       </div>
     </div>
   );
@@ -578,19 +629,16 @@ export default function AdminPanelPage() {
   }, [active]);
 
   const current = SECTIONS.find(s => s.id === active);
+  const navigate = useNavigate();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)', background: C.bg, margin: '-24px -32px -40px', overflow: 'hidden' }}>
 
       {/* ── Tab Bar orizzontale ── */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 2,
-        background: C.sidebar,
-        padding: '10px 16px',
-        overflowX: 'auto',
-        flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 2,
+        background: C.sidebar, padding: '10px 16px',
+        overflowX: 'auto', flexShrink: 0,
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         {SECTIONS.map(({ id, label, icon: Icon }) => {
@@ -603,23 +651,11 @@ export default function AdminPanelPage() {
               onMouseEnter={() => setHoveredTab(id)}
               onMouseLeave={() => setHoveredTab(null)}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                padding: '8px 14px',
-                borderRadius: 10,
-                border: 'none',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                fontSize: 13,
-                fontWeight: isAct ? 700 : 500,
-                transition: 'all 0.15s',
-                background: isAct
-                  ? C.accent
-                  : isHov
-                    ? 'rgba(255,255,255,0.09)'
-                    : 'transparent',
+                display: 'flex', alignItems: 'center', gap: 7,
+                padding: '8px 14px', borderRadius: 10, border: 'none',
+                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                fontSize: 13, fontWeight: isAct ? 700 : 500, transition: 'all 0.15s',
+                background: isAct ? C.accent : isHov ? 'rgba(255,255,255,0.09)' : 'transparent',
                 color: isAct ? '#fff' : isHov ? '#fff' : 'rgba(255,255,255,0.5)',
                 boxShadow: isAct ? `0 0 0 1px ${C.accent}` : 'none',
                 transform: isHov && !isAct ? 'translateY(-1px)' : 'translateY(0)',
@@ -645,17 +681,17 @@ export default function AdminPanelPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: `1px solid ${C.border}`, background: '#fff', fontSize: 13, cursor: 'pointer' }}>
+            <button onClick={() => window.location.reload()} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: `1px solid ${C.border}`, background: '#fff', fontSize: 13, cursor: 'pointer' }}>
               <RefreshCw size={13} /> Aggiorna
-            </button>
-            <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-              <Download size={13} /> Esporta
             </button>
           </div>
         </div>
 
         {content}
       </div>
+
+      {/* Spin CSS */}
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

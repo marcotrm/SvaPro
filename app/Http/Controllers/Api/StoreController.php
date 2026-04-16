@@ -175,6 +175,8 @@ class StoreController extends Controller
 
         $payload = array_filter([
             'name'                   => $request->input('name'),
+            'code'                   => $request->filled('code')
+                ? strtoupper(trim($request->input('code'))) : null,
             'address'                => $request->input('address'),
             'city'                   => $request->input('city'),
             'zip_code'               => $request->input('zip_code'),
