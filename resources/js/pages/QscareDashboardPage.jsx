@@ -33,7 +33,7 @@ function MiniBarChart({ data, valueKey, colorStart = '#10B981', colorEnd = '#636
           const g = Math.round(g1 + (g2-g1)*ratio);
           const b = Math.round(b1 + (b2-b1)*ratio);
           const color = `rgb(${r},${g},${b})`;
-          const colorStart = `rgba(${r},${g},${b},0.6)`;
+          const colorGradStart = `rgba(${r},${g},${b},0.6)`;
           const colorShadow = `rgba(${r},${g},${b},0.3)`;
           const valLabel = formatValue ? formatValue(d[valueKey]) : d[valueKey];
           return (
@@ -41,7 +41,7 @@ function MiniBarChart({ data, valueKey, colorStart = '#10B981', colorEnd = '#636
               <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end' }}>
                 <div style={{
                   width: '80%', height: barH,
-                  background: `linear-gradient(to top, ${colorStart}, ${color})`,
+                  background: `linear-gradient(to top, ${colorGradStart}, ${color})`,
                   borderRadius: '4px 4px 2px 2px',
                   transition: 'height 0.4s ease',
                   boxShadow: `0 2px 8px ${colorShadow}`,
