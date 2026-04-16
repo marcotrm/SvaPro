@@ -446,22 +446,35 @@ function StoreAccessTab({ store }) {
   const [loadingCreds, setLoadingCreds] = useState(false);
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
-  const [existingEmail, setExistingEmail] = useState(null); // email già configurata
+  const [existingEmail, setExistingEmail] = useState(null);
 
-  // Carica le credenziali esistenti all'apertura
+  const CACHE_KEY = store?.id ? `store_cred_email_${store.id}` : null;
+
+  // Carica email esistente: prima da localStorage (istantaneo), poi verifica dal backend
   useEffect(() => {
     if (!store?.id) return;
+
+    // 1. Carica subito da cache locale (se presente)
+    const cached = CACHE_KEY ? localStorage.getItem(CACHE_KEY) : null;
+    if (cached) {
+      setExistingEmail(cached);
+      setForm(p => ({ ...p, email: cached }));
+    }
+
+    // 2. Verifica/aggiorna dal backend
     setLoadingCreds(true);
     storesApi.getCredentials(store.id)
       .then(res => {
         if (res.data?.has_credentials && res.data?.email) {
           setExistingEmail(res.data.email);
           setForm(p => ({ ...p, email: res.data.email }));
+          if (CACHE_KEY) localStorage.setItem(CACHE_KEY, res.data.email);
         }
       })
-      .catch(() => {}) // Ignora errori — il campo resta vuoto
+      .catch(() => {}) // se l'API fallisce, va bene — usiamo la cache
       .finally(() => setLoadingCreds(false));
   }, [store?.id]);
+
 
   if (!store?.id) {
     return (
@@ -478,6 +491,7 @@ function StoreAccessTab({ store }) {
       setLoading(true); setErrors({});
       await storesApi.createCredentials(store.id, form);
       setExistingEmail(form.email);
+      if (CACHE_KEY) localStorage.setItem(CACHE_KEY, form.email); // persiste per riutilizzo
       toast.success('Credenziali salvate con successo!');
     } catch (err) {
       if (err.response?.data?.errors) setErrors(err.response.data.errors);

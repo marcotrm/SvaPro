@@ -172,6 +172,8 @@ export default function TesoreriaPage() {
   const [balances, setBalances] = useState([]);
   const [balancesLoading, setBalancesLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [filterAlerts, setFilterAlerts] = useState(false); // filtra solo negozi >= 1000
+  const CASH_ALERT_THRESHOLD = 1000;
 
   // ── Movimentazioni ──
   const [movements, setMovements] = useState([]);
@@ -302,6 +304,44 @@ export default function TesoreriaPage() {
             <div style={{ textAlign: 'center', padding: 60, color: 'var(--color-text-tertiary)' }}>Nessun negozio trovato.</div>
           ) : (
             <>
+              {/* ── PANNELLO ALLERTA CASSA ────────────────────────────── */}
+              {(() => {
+                const alertStores = balances.filter(b => b.balance >= CASH_ALERT_THRESHOLD);
+                if (alertStores.length === 0) return null;
+                return (
+                  <div style={{
+                    background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.3)',
+                    borderRadius: 14, padding: '14px 20px', marginBottom: 16,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <AlertCircle size={18} color="#ef4444" />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: '#ef4444' }}>
+                          {alertStores.length} {alertStores.length === 1 ? 'negozio' : 'negozi'} con cassa ≥ €{CASH_ALERT_THRESHOLD.toLocaleString('it-IT')}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                          {alertStores.map(s => s.store_name).join(' · ')}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setFilterAlerts(v => !v)}
+                      style={{
+                        padding: '8px 18px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                        fontWeight: 800, fontSize: 13, transition: 'all 0.2s',
+                        background: filterAlerts ? '#ef4444' : 'rgba(239,68,68,0.15)',
+                        color: filterAlerts ? '#fff' : '#ef4444',
+                      }}
+                    >
+                      {filterAlerts ? '🔴 Mostra tutti' : '🔴 Filtra negozi in allerta'}
+                    </button>
+                  </div>
+                );
+              })()}
+
               {/* Totale aggregato */}
               <div style={{ background: 'linear-gradient(135deg,#7B6FD0,#5B50B0)', borderRadius: 18, padding: '20px 24px', color: '#fff', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
@@ -314,7 +354,7 @@ export default function TesoreriaPage() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-                {balances.map(store => (
+                {(filterAlerts ? balances.filter(b => b.balance >= CASH_ALERT_THRESHOLD) : balances).map(store => (
                   <StoreCashCard key={store.store_id} store={store} onMove={(id, name) => openModal(id, name)} />
                 ))}
               </div>
