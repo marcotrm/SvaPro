@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { FileSpreadsheet, Download, Loader2, Calendar, AlertTriangle, CheckCircle, ChevronDown } from 'lucide-react';
+import { FileSpreadsheet, Download, Loader2, Calendar, CheckCircle, ChevronDown } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { adm } from '../api';
 
@@ -360,18 +360,19 @@ export default function AdmPage() {
       {/* ─── Note informative ─────────────────────────────────────── */}
       <div style={{
         marginTop: 28, padding: '16px 20px', borderRadius: 14,
-        background: '#fefce8', border: '1px solid #fde68a',
+        background: '#f0f9ff', border: '1px solid #bae6fd',
         display: 'flex', gap: 12,
       }}>
-        <AlertTriangle size={18} color="#d97706" style={{ flexShrink: 0, marginTop: 1 }} />
+        <div style={{ fontSize: 18, marginTop: 1 }}>💡</div>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 4 }}>
-            Configurazione excel-api richiesta
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0369a1', marginBottom: 4 }}>
+            Come funziona la generazione
           </div>
-          <div style={{ fontSize: 12, color: '#78350f', lineHeight: 1.6 }}>
-            Il report richiede il servizio <strong>excel-api</strong> attivo su Railway.<br />
-            Assicurati di aver configurato la variabile d'ambiente <code style={{ background: '#fde68a', padding: '0 4px', borderRadius: 4 }}>EXCEL_API_URL</code> nelle impostazioni del progetto SvaPro su Railway.<br />
-            Esempio: <code style={{ background: '#fde68a', padding: '0 4px', borderRadius: 4 }}>https://svapo-excel-api.up.railway.app</code>
+          <div style={{ fontSize: 12, color: '#0c4a6e', lineHeight: 1.7 }}>
+            Il sistema genera il file Excel in tre modalità (dalla più avanzata alla base):<br />
+            <strong>1. n8n Workflow</strong> — se <code style={{ background: '#e0f2fe', padding: '0 4px', borderRadius: 4 }}>N8N_WEBHOOK_URL</code> è configurato su Railway.<br />
+            <strong>2. excel-api</strong> — se <code style={{ background: '#e0f2fe', padding: '0 4px', borderRadius: 4 }}>EXCEL_API_URL</code> è configurato su Railway.<br />
+            <strong>3. Generazione nativa</strong> — sempre disponibile come fallback, senza dipendenze esterne.
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\NativeXlsx;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -241,28 +242,94 @@ class AdmController extends Controller
             $endpoint = '/genera-excel-quindicinale';
         }
 
-        // ── Chiama excel-api e restituisce il file con il nome corretto ──────
-        try {
-            $response = Http::timeout(90)->post($excelApiUrl . $endpoint, $payload);
+        // ── OPZIONE B — excel-api diretta (se configurata) ───────────────────
+        $excelApiUrl = rtrim(env('EXCEL_API_URL', ''), '/');
 
-            if ($response->failed()) {
-                return response()->json([
-                    'message' => 'Errore durante la generazione Excel.',
-                    'detail'  => $response->body(),
-                ], 502);
+        // Solo se EXCEL_API_URL è esplicitamente configurato (non localhost default)
+        if ($excelApiUrl && !str_contains($excelApiUrl, 'localhost')) {
+            try {
+                $response = Http::timeout(90)->post($excelApiUrl . $endpoint, $payload);
+
+                if ($response->successful()) {
+                    return response($response->body(), 200, [
+                        'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'Content-Disposition' => "attachment; filename=\"{$nomeFile}\"",
+                        'Cache-Control'       => 'no-cache, no-store, must-revalidate',
+                    ]);
+                }
+                // Se fallisce, continua con generazione nativa
+            } catch (\Throwable) {
+                // Continua con generazione nativa
+            }
+        }
+
+        // ── OPZIONE C — Generazione nativa PHP (fallback definitivo) ─────────
+        // Funziona sempre, senza dipendenze esterne.
+        try {
+            $xlsx = new NativeXlsx();
+
+            if ($type === 'mensile') {
+                // Foglio Vendite (Sheet3 ADM = DC Consumatori)
+                $headers3 = [
+                    'Ragione Sociale Depositario', 'Partita IVA', 'Codice Imposta',
+                    'Data Mese', 'Denominazione Prodotto', 'Codice Prodotto',
+                    'Capacità Confezione (ml)', 'Nicotina (mg/ml)',
+                    'N° Confezioni', 'Quantità Totale (ml)',
+                ];
+                $rows3 = array_map(fn($r) => array_values($r), $payload['sheet3']);
+                $xlsx->addSheet('DC Consumatori', $headers3, $rows3);
+
+                if (!empty($payload['sheet2'])) {
+                    $headers2 = [
+                        'Ragione Sociale Depositario', 'Partita IVA', 'Codice Imposta',
+                        'Data Mese', 'Denominazione Prodotto', 'Codice Prodotto',
+                        'Capacità Confezione (ml)', 'Nicotina (mg/ml)',
+                        'N° Confezioni', 'Quantità Totale (ml)',
+                    ];
+                    $rows2 = array_map(fn($r) => array_values($r), $payload['sheet2']);
+                    $xlsx->addSheet('Depositi Riforniti', $headers2, $rows2);
+                }
+            } else {
+                // Quindicinale: 3 fogli
+                $hPros = [
+                    'Ragione Sociale', 'Partita IVA', 'Codice Imposta', 'Data Fine Quindicina',
+                    'Tipo Consumatore', 'Denominazione Prodotto', 'Codice Prodotto',
+                    'Capacità (ml)', 'Nicotina (mg/ml)', 'Prezzo Confezione',
+                    'N° Confezioni', 'Quantità Totale (ml)', 'Imposta Unitaria', 'Imposta Totale',
+                ];
+                $xlsx->addSheet('Prospetto Vendite', $hPros,
+                    array_map(fn($r) => array_values($r), $payload['prospetto']));
+
+                $hGiac = [
+                    'Ragione Sociale', 'Partita IVA', 'Codice Imposta', 'Data Fine Quindicina',
+                    'Denominazione Prodotto', 'Codice Prodotto',
+                    'Capacità (ml)', 'Nicotina (mg/ml)', 'Giacenza Finale',
+                ];
+                $xlsx->addSheet('Giacenza Finale', $hGiac,
+                    array_map(fn($r) => array_values($r), $payload['giacenza']));
+
+                $hResi = [
+                    'Denominazione Prodotto', 'Codice Prodotto',
+                    'Quantità Resa', 'Motivo Reso', 'Data Reso',
+                ];
+                $xlsx->addSheet('Resi', $hResi,
+                    array_map(fn($r) => array_values($r), $payload['resi']));
             }
 
-            return response($response->body(), 200, [
+            $bytes = $xlsx->generate();
+
+            return response($bytes, 200, [
                 'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 'Content-Disposition' => "attachment; filename=\"{$nomeFile}\"",
                 'Cache-Control'       => 'no-cache, no-store, must-revalidate',
+                'Content-Length'      => strlen($bytes),
             ]);
 
         } catch (\Throwable $e) {
             return response()->json([
-                'message' => 'Impossibile contattare il servizio di generazione Excel.',
+                'message' => 'Errore nella generazione del file Excel.',
                 'detail'  => $e->getMessage(),
-            ], 503);
+            ], 500);
         }
     }
 
