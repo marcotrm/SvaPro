@@ -105,76 +105,80 @@ class AdmController extends Controller
             }
         }
 
-        // ── OPZIONE B — Query DB + excel-api diretta ─────────────────────────
-        $tenant   = DB::table('tenants')->where('id', $tenantId)->first(['name', 'vat_number', 'settings_json']);
-        $settings = json_decode($tenant?->settings_json ?? '{}', true);
+        // ── OPZIONE B — Query DB ─────────────────────────────────────────────
+        try {
+            $tenant   = DB::table('tenants')->where('id', $tenantId)->first(['name', 'vat_number', 'settings_json']);
+            $settings = json_decode($tenant?->settings_json ?? '{}', true);
 
-        $ragioneSociale = $tenant?->name       ?? null;
-        $partitaIva     = $tenant?->vat_number ?? null;
-        $codiceImposta  = $settings['depositary_pli_code'] ?? null;
+            $ragioneSociale = $tenant?->name       ?? null;
+            $partitaIva     = $tenant?->vat_number ?? null;
+            $codiceImposta  = $settings['depositary_pli_code'] ?? null;
 
-        // Vendite nel periodo — LEFT JOIN per gestire product_variant_id nullable
-        // Campi ADM null in DB → restano null nel payload → celle vuote in Excel
-        $venditeRows = DB::select("
-            SELECT
-                COALESCE(NULLIF(pv.flavor, ''), p.name, sol.product_name)       AS denominazione_prodotto,
-                NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku, sol.product_name), '') AS codice_prodotto,
-                COALESCE(pv.volume_ml, p.volume_ml)::numeric                    AS capacita_confezione_ml,
-                COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric)          AS nicotina_mg_ml,
-                SUM(sol.qty)::integer                                            AS numero_confezioni
-            FROM sales_order_lines sol
-            JOIN sales_orders so ON so.id = sol.sales_order_id
-                AND so.tenant_id = {$tenantId}
-                AND so.status = 'paid'
-                AND so.created_at >= '{$startDate}'
-                AND so.created_at <= '{$endDate}'
-            LEFT JOIN product_variants pv ON pv.id = sol.product_variant_id
-            LEFT JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
-            GROUP BY pv.flavor, p.name, sol.product_name, p.pli_code,
-                     pv.barcode, p.barcode, p.sku,
-                     pv.volume_ml, p.volume_ml, pv.nicotine_strength, p.nicotine_mg
-            HAVING SUM(sol.qty) > 0
-            ORDER BY denominazione_prodotto
-        ");
+            // Vendite nel periodo (LEFT JOIN per product_variant_id nullable)
+            $venditeRows = DB::select("
+                SELECT
+                    COALESCE(NULLIF(pv.flavor, ''), p.name, sol.product_name)       AS denominazione_prodotto,
+                    NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku, sol.product_name), '') AS codice_prodotto,
+                    COALESCE(pv.volume_ml, p.volume_ml)::numeric                    AS capacita_confezione_ml,
+                    COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric)          AS nicotina_mg_ml,
+                    SUM(sol.qty)::integer                                            AS numero_confezioni
+                FROM sales_order_lines sol
+                JOIN sales_orders so ON so.id = sol.sales_order_id
+                    AND so.tenant_id = {$tenantId}
+                    AND so.status = 'paid'
+                    AND so.created_at >= '{$startDate}'
+                    AND so.created_at <= '{$endDate}'
+                LEFT JOIN product_variants pv ON pv.id = sol.product_variant_id
+                LEFT JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
+                GROUP BY pv.flavor, p.name, sol.product_name, p.pli_code,
+                         pv.barcode, p.barcode, p.sku,
+                         pv.volume_ml, p.volume_ml, pv.nicotine_strength, p.nicotine_mg
+                HAVING SUM(sol.qty) > 0
+                ORDER BY denominazione_prodotto
+            ");
 
-        // Giacenza finale (tutti i prodotti in stock)
-        $giacenzaRows = DB::select("
-            SELECT
-                COALESCE(NULLIF(pv.flavor, ''), p.name)                         AS denominazione_prodotto,
-                NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku), '') AS codice_prodotto,
-                COALESCE(pv.volume_ml, p.volume_ml)::numeric                    AS capacita_confezione_ml,
-                COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric)          AS nicotina_mg_ml,
-                COALESCE(SUM(si.on_hand), 0)::integer                           AS giacenza_finale
-            FROM stock_items si
-            JOIN product_variants pv ON pv.id = si.product_variant_id
-            JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
-            WHERE si.tenant_id = {$tenantId}
-            GROUP BY pv.flavor, p.name, p.pli_code, pv.barcode, p.barcode, p.sku,
-                     pv.volume_ml, p.volume_ml, pv.nicotine_strength, p.nicotine_mg
-            ORDER BY denominazione_prodotto
-        ");
+            // Giacenza finale
+            $giacenzaRows = DB::select("
+                SELECT
+                    COALESCE(NULLIF(pv.flavor, ''), p.name)                         AS denominazione_prodotto,
+                    NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku), '') AS codice_prodotto,
+                    COALESCE(pv.volume_ml, p.volume_ml)::numeric                    AS capacita_confezione_ml,
+                    COALESCE(pv.nicotine_strength, p.nicotine_mg::numeric)          AS nicotina_mg_ml,
+                    COALESCE(SUM(si.on_hand), 0)::integer                           AS giacenza_finale
+                FROM stock_items si
+                JOIN product_variants pv ON pv.id = si.product_variant_id
+                JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
+                WHERE si.tenant_id = {$tenantId}
+                GROUP BY pv.flavor, p.name, p.pli_code, pv.barcode, p.barcode, p.sku,
+                         pv.volume_ml, p.volume_ml, pv.nicotine_strength, p.nicotine_mg
+                ORDER BY denominazione_prodotto
+            ");
 
-        // Resi nel periodo
-        $resiRows = DB::select("
-            SELECT
-                COALESCE(NULLIF(pv.flavor, ''), p.name)                         AS denominazione_prodotto,
-                NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku), '') AS codice_prodotto,
-                SUM(crl.quantity)::integer                                       AS quantita_resa,
-                cr.reason                                                        AS motivo_reso,
-                TO_CHAR(cr.created_at, 'DD/MM/YYYY')                            AS data_reso
-            FROM customer_returns cr
-            JOIN customer_return_lines crl ON crl.customer_return_id = cr.id
-            JOIN product_variants pv ON pv.id = crl.product_variant_id
-            JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
-            WHERE cr.tenant_id = {$tenantId}
-                AND cr.created_at >= '{$startDate}'
-                AND cr.created_at <= '{$endDate}'
-            GROUP BY pv.flavor, p.name, p.pli_code, pv.barcode, p.barcode, p.sku, cr.reason, cr.created_at
-            ORDER BY data_reso
-        ");
+            // Resi nel periodo
+            $resiRows = DB::select("
+                SELECT
+                    COALESCE(NULLIF(pv.flavor, ''), p.name)                         AS denominazione_prodotto,
+                    NULLIF(COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku), '') AS codice_prodotto,
+                    SUM(crl.quantity)::integer                                       AS quantita_resa,
+                    cr.reason                                                        AS motivo_reso,
+                    TO_CHAR(cr.created_at, 'DD/MM/YYYY')                            AS data_reso
+                FROM customer_returns cr
+                JOIN customer_return_lines crl ON crl.customer_return_id = cr.id
+                JOIN product_variants pv ON pv.id = crl.product_variant_id
+                JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
+                WHERE cr.tenant_id = {$tenantId}
+                    AND cr.created_at >= '{$startDate}'
+                    AND cr.created_at <= '{$endDate}'
+                GROUP BY pv.flavor, p.name, p.pli_code, pv.barcode, p.barcode, p.sku, cr.reason, cr.created_at
+                ORDER BY data_reso
+            ");
 
-        // ── Payload specifico per endpoint (struttura esatta di server.js) ──
-        $excelApiUrl = rtrim(env('EXCEL_API_URL', 'http://localhost:3001'), '/');
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Errore nel recupero dati dal database.',
+                'detail'  => $e->getMessage(),
+            ], 500);
+        }
 
         if ($type === 'mensile') {
             // /genera-excel → sheet3 (DC consumatori) + sheet2 (depositi riforniti, vuoto per retail)

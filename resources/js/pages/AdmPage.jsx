@@ -106,6 +106,7 @@ export default function AdmPage() {
   const [selectedMonth, setSelectedMonth] = useState(String(dm));
   const [generating, setGenerating]       = useState(false);
   const [lastGenerated, setLastGenerated] = useState(null);
+  const [lastError, setLastError]         = useState(null);
 
   const yearOptions  = getAvailableYears().map(y => ({ value: String(y), label: String(y) }));
   const monthOptions = MONTHS.map((m, i) => ({ value: String(i + 1), label: m }));
@@ -120,6 +121,7 @@ export default function AdmPage() {
 
   const handleGenerate = async () => {
     setGenerating(true);
+    setLastError(null);
     try {
       const response = await adm.generateReport({
         type: reportType,
@@ -134,32 +136,40 @@ export default function AdmPage() {
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = nomeFile;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      a.href = url; a.download = nomeFile;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
 
       setLastGenerated({ type: reportType, periodo: periodoLabel, nome: nomeFile, at: new Date() });
       toast.success(`✅ File "${nomeFile}" scaricato con successo!`);
     } catch (err) {
-      // Prova a leggere il messaggio di errore dal blob JSON
       let msg = 'Errore durante la generazione del report';
+      let detail = '';
+      // La risposta è sempre un Blob dato responseType:'blob'
       if (err.response?.data instanceof Blob) {
         try {
           const text = await err.response.data.text();
-          const parsed = JSON.parse(text);
-          msg = parsed.message || msg;
-        } catch {}
+          // Potrebbe essere JSON o HTML (Fatal error PHP)
+          if (text.trim().startsWith('{')) {
+            const parsed = JSON.parse(text);
+            msg    = parsed.message || msg;
+            detail = parsed.detail  || '';
+          } else {
+            // HTML / testo grezzo dal server
+            detail = text.replace(/<[^>]*>/g, '').substring(0, 400).trim();
+          }
+        } catch { detail = 'Impossibile leggere la risposta del server.'; }
       } else {
-        msg = err.userFriendlyMessage || err.response?.data?.message || err.message || msg;
+        msg    = err.response?.data?.message || err.message || msg;
+        detail = err.response?.data?.detail  || '';
       }
+      setLastError({ msg, detail, status: err.response?.status });
       toast.error(msg);
     } finally {
       setGenerating(false);
     }
   };
+
 
   return (
     <div className="sp-animate-in" style={{ maxWidth: 860, margin: '0 auto', padding: '0 4px' }}>
@@ -353,6 +363,26 @@ export default function AdmPage() {
             <div style={{ fontSize: 12, color: '#4ade80' }}>
               {lastGenerated.periodo} — {lastGenerated.at.toLocaleTimeString('it-IT')}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Errore dettagliato ────────────────────────────────────── */}
+      {lastError && (
+        <div style={{
+          marginTop: 16, padding: '16px 20px', borderRadius: 14,
+          background: '#fff1f2', border: '1px solid #fecdd3',
+          display: 'flex', gap: 12,
+        }}>
+          <div style={{ fontSize: 18, flexShrink: 0 }}>❌</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#be123c', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+              <span>Errore {lastError.status || ''} — {lastError.msg}</span>
+              <button onClick={() => setLastError(null)} style={{ background: 'none', border: 'none', color: '#be123c', cursor: 'pointer', fontWeight: 900 }}>×</button>
+            </div>
+            {lastError.detail && (
+              <pre style={{ fontSize: 11, color: '#9f1239', background: '#fff5f5', borderRadius: 8, padding: '10px 12px', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 200, overflowY: 'auto' }}>{lastError.detail}</pre>
+            )}
           </div>
         </div>
       )}
