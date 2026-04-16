@@ -178,11 +178,11 @@ class AdmController extends Controller
             SELECT
                 COALESCE(NULLIF(pv.flavor, ''), p.name) AS denominazione_prodotto,
                 COALESCE(NULLIF(p.pli_code, ''), pv.barcode, p.barcode, p.sku) AS codice_prodotto,
-                SUM(crl.qty)::integer AS quantita_resa,
+                SUM(crl.quantity)::integer AS quantita_resa,
                 cr.reason AS motivo_reso,
                 TO_CHAR(cr.created_at, 'DD/MM/YYYY') AS data_reso
             FROM customer_returns cr
-            JOIN customer_return_lines crl ON crl.return_id = cr.id
+            JOIN customer_return_lines crl ON crl.customer_return_id = cr.id
             JOIN product_variants pv ON pv.id = crl.product_variant_id
             JOIN products p ON p.id = pv.product_id AND p.tenant_id = {$tenantId}
             WHERE cr.tenant_id = {$tenantId}
