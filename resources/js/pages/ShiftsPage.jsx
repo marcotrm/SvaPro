@@ -613,6 +613,7 @@ export default function ShiftsPage() {
   const [globalShifts, setGlobalShifts]     = useState([]);
   const [showGlobalDrop, setShowGlobalDrop] = useState(false);
   const globalRef = useRef(null);
+  const [extraEmployees, setExtraEmployees] = useState([]); // dipendenti ospiti da altri negozi
 
   // ── Gap detection (ricalcola ogni volta che shifts cambia) ──────────────────
   const gapAlerts = useMemo(() => detectGaps(shifts, weekDays), [shifts, weekDays]);
@@ -721,6 +722,32 @@ export default function ShiftsPage() {
   useEffect(() => {
     if (globalEmp) loadGlobalEmpShifts(globalEmp);
   }, [weekStart]); // eslint-disable-line
+
+  // Aggiunge il dipendente trovato globalmente alla griglia come ospite
+  const addToGrid = () => {
+    if (!globalEmp) return;
+    const alreadyBase  = employees.some(e => e.id === globalEmp.id);
+    const alreadyExtra = extraEmployees.some(e => e.id === globalEmp.id);
+    if (alreadyBase || alreadyExtra) { toast.error('Dipendente gia\u2019 nella griglia'); return; }
+    const emp = {
+      id: globalEmp.id,
+      name: `${globalEmp.first_name ?? ''} ${globalEmp.last_name ?? ''}`.trim(),
+      first_name: globalEmp.first_name, last_name: globalEmp.last_name, role: globalEmp.role,
+      _extra: true, _from_store: globalEmp.store_name || '\u2014',
+    };
+    setExtraEmployees(prev => [...prev, emp]);
+    toast.success(`\u2705 ${emp.name} aggiunto alla griglia come ospite`);
+    setGlobalEmp(null); setGlobalSearch(''); setGlobalShifts([]);
+  };
+
+  const removeExtraEmployee = (empId) => {
+    setExtraEmployees(prev => prev.filter(e => e.id !== empId));
+    setShifts(prev => {
+      const next = { ...prev };
+      weekDays.forEach(d => { delete next[`${empId}_${d.dateStr}`]; });
+      return next;
+    });
+  };
 
   const handlePrevWeek = () => { const n = new Date(weekStart); n.setDate(n.getDate() - 7); setWeekStart(n); };
   const handleNextWeek = () => { const n = new Date(weekStart); n.setDate(n.getDate() + 7); setWeekStart(n); };
@@ -915,22 +942,28 @@ export default function ShiftsPage() {
           )}
         </div>
         {globalEmp && (
-          <div style={{ flex: 1, background: 'rgba(99,102,241,0.06)', border: '1.5px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '10px 16px' }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--color-accent)', marginBottom: 6 }}>
-              📅 Turni di {globalEmp.first_name} {globalEmp.last_name} — settimana corrente
-            </div>
-            {globalShifts.length > 0 ? (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {globalShifts.map(s => (
-                  <div key={s.id} style={{ fontSize: 12, padding: '4px 10px', background: 'rgba(99,102,241,0.1)', borderRadius: 8, color: 'var(--color-text)', fontWeight: 700 }}>
-                    {s.date} · {s.start_time}–{s.end_time}
-                    {s.store && <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)', marginLeft: 4 }}>({s.store.name})</span>}
-                  </div>
-                ))}
+          <div style={{ flex: 1, background: 'rgba(99,102,241,0.06)', border: '1.5px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--color-accent)', marginBottom: 4 }}>
+                Turni di {globalEmp.first_name} {globalEmp.last_name}
+                {globalEmp.store_name && <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)', marginLeft: 6 }}>({globalEmp.store_name})</span>}
               </div>
-            ) : (
-              <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Nessun turno questa settimana.</div>
-            )}
+              {globalShifts.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  {globalShifts.map(s => (
+                    <div key={s.id} style={{ fontSize: 11, padding: '3px 8px', background: 'rgba(99,102,241,0.1)', borderRadius: 7, color: 'var(--color-text)', fontWeight: 700 }}>
+                      {s.date} {s.start_time}&ndash;{s.end_time}
+                      {s.store && <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)', marginLeft: 3 }}>({s.store.name})</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Nessun turno questa settimana.</div>
+              )}
+            </div>
+            <button onClick={addToGrid} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 10, border: 'none', background: 'var(--color-accent)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              + Aggiungi alla griglia
+            </button>
           </div>
         )}
       </div>
@@ -1108,6 +1141,62 @@ export default function ShiftsPage() {
             })}
           </tbody>
         </table>
+
+        {/* Dipendenti ospiti cross-store */}
+        {extraEmployees.length > 0 && (
+          <div style={{ borderTop: '2px solid rgba(139,92,246,0.3)' }}>
+            <div style={{ padding: '8px 20px', background: 'rgba(139,92,246,0.06)', fontSize: 11, fontWeight: 800, color: '#8B5CF6', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Dipendenti Ospiti &mdash; coprono questo negozio
+            </div>
+            <table style={{ width: '100%', minWidth: 1000, borderCollapse: 'collapse', textAlign: 'left' }}>
+              <tbody>
+                {extraEmployees.map(emp => (
+                  <tr key={`extra_${emp.id}`} style={{ background: 'rgba(139,92,246,0.03)' }}>
+                    <td style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)', background: 'rgba(139,92,246,0.05)', width: 220 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(139,92,246,0.15)', border: '2px solid rgba(139,92,246,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, color: '#8B5CF6', flexShrink: 0 }}>
+                          {emp.name.charAt(0)}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            {emp.name}
+                            <button onClick={() => removeExtraEmployee(emp.id)} style={{ background: 'rgba(239,68,68,0.12)', border: 'none', borderRadius: 5, color: '#ef4444', cursor: 'pointer', padding: '1px 6px', fontSize: 11, fontWeight: 900, lineHeight: 1 }}>x</button>
+                          </div>
+                          <div style={{ fontSize: 10, color: '#8B5CF6', fontWeight: 700, marginTop: 2 }}>Ospite da: {emp._from_store}</div>
+                        </div>
+                      </div>
+                    </td>
+                    {weekDays.map(day => {
+                      const key = `${emp.id}_${day.dateStr}`;
+                      const shift = shifts[key];
+                      const hasShift = shift && shift.start_time;
+                      const shiftColor = shift?.color || '#8B5CF6';
+                      return (
+                        <td key={day.dateStr} style={{ padding: '8px', borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)', position: 'relative', verticalAlign: 'top' }} onClick={() => setActiveCell({ empId: emp.id, dateStr: day.dateStr })}>
+                          {hasShift ? (
+                            <div style={{ background: `${shiftColor}15`, border: `1px solid ${shiftColor}40`, borderLeft: `4px solid ${shiftColor}`, borderRadius: 8, padding: '6px 8px', cursor: 'pointer' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                                <input type="time" value={shift.start_time || ''} onChange={e => { e.stopPropagation(); onCellChange(emp.id, day.dateStr, { start_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '3px', fontSize: 11, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
+                                <span style={{ fontSize: 11 }}>-</span>
+                                <input type="time" value={shift.end_time || ''} onChange={e => { e.stopPropagation(); onCellChange(emp.id, day.dateStr, { end_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '3px', fontSize: 11, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
+                              </div>
+                              <div style={{ fontSize: 9, color: '#8B5CF6', textAlign: 'center', fontWeight: 800, textTransform: 'uppercase' }}>Ospite</div>
+                            </div>
+                          ) : (
+                            <div style={{ height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(139,92,246,0.3)', borderRadius: 8, color: 'rgba(139,92,246,0.5)', fontSize: 12, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.05)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                              + Assegna
+                            </div>
+                          )}
+                          {renderCellMenu(emp.id, day.dateStr)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Modal template */}

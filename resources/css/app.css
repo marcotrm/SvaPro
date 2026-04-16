@@ -3049,10 +3049,10 @@ a { text-decoration: none; color: inherit; }
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 20px 20px 0;
+  padding: 14px 14px 0;
 }
 .sp-pos-cart {
-  width: 380px;
+  width: 340px;
   flex-shrink: 0;
   background: #0f172a;
   display: flex;

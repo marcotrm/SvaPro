@@ -69,7 +69,7 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
       }}
     >
       {/* Immagine o gradient placeholder */}
-      <div style={{ height: 120, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ height: 88, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
         {imgUrl ? (
           <img
             src={imgUrl}

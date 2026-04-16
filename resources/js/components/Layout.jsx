@@ -836,14 +836,21 @@ export default function Layout({ user, setUser }) {
               </button>
             </>
           ) : (
-            /* ADMIN: Dashboard + Clienti + Ordini */
+            /* ADMIN: Negozi + Vendite */
             <>
               <button
-                className={`sp-mobile-nav-btn ${location.pathname === '/dashboard' ? 'active' : ''}`}
-                onClick={() => navigate('/dashboard')}
+                className={`sp-mobile-nav-btn ${location.pathname === '/stores' ? 'active' : ''}`}
+                onClick={() => navigate('/stores')}
+              >
+                <Store size={22} />
+                <span>Negozi</span>
+              </button>
+              <button
+                className={`sp-mobile-nav-btn ${showStoreStats ? 'active' : ''}`}
+                onClick={() => setShowStoreStats(v => !v)}
               >
                 <BarChart3 size={22} />
-                <span>Dashboard</span>
+                <span>Vendite</span>
               </button>
               <button
                 className={`sp-mobile-nav-btn ${location.pathname.startsWith('/customers') ? 'active' : ''}`}
@@ -852,15 +859,9 @@ export default function Layout({ user, setUser }) {
                 <Users size={22} />
                 <span>Clienti</span>
               </button>
-              <button
-                className={`sp-mobile-nav-btn ${location.pathname === '/orders' ? 'active' : ''}`}
-                onClick={() => navigate('/orders')}
-              >
-                <ShoppingCart size={22} />
-                <span>Ordini</span>
-              </button>
             </>
           )}
+
 
           {/* Menu â€” tutti */}
           <button
