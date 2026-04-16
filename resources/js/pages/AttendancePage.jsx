@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { attendance as attendanceApi } from '../api.jsx';
 import { CheckCircle, LogIn, LogOut, Clock, AlertTriangle, Loader, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import DipendentiTabs from '../components/DipendentiTabs.jsx';
 
 const STATUS_COLOR = {
   presente: { bg: '#ECFDF5', text: '#065F46', border: '#6EE7B7', label: 'Presente', avatarBg: 'linear-gradient(135deg, #10B981, #059669)' },
@@ -146,6 +147,9 @@ export default function AttendancePage() {
 
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1100, margin: '0 auto' }}>
+      {/* Sub-tabs Dipendenti */}
+      <DipendentiTabs />
+
       {/* Info banner: how to clock in */}
       <div style={{
         background: 'linear-gradient(135deg, #1e1b4b, #312e81)', borderRadius: 16, padding: '18px 24px',

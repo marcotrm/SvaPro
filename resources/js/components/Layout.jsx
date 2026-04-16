@@ -56,21 +56,22 @@ const allNavigation = [
   // 8. Dipendenti ───────────────────────────────────────────────────
   { section: 'Dipendenti', icon: Users, items: [
     { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente'] },
-    { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
-    { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin','admin_cliente'] },
+    { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin'] },
+    { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin'] },
     { label: 'Pianificazione Turni',   href: '/shifts',       icon: Calendar,    roles: ['superadmin','admin_cliente'] },
     { label: '🏆 Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
 
   // Amministrazione ──────────────────────────────────────────────
   { section: 'Amministrazione', icon: Shield, items: [
-    { label: 'Tesoreria & Cassa',      href: '/tesoreria',    icon: HandCoins,        roles: ['superadmin','admin_cliente','dipendente'] },
-    { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,        roles: ['superadmin','admin_cliente'] },
-    { label: 'Dashboard QScare',       href: '/qscare-dashboard', icon: Shield,       roles: ['superadmin','admin_cliente'] },
-    { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,            roles: ['superadmin','admin_cliente'] },
-    { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,            roles: ['superadmin','admin_cliente'] },
-    { label: 'Fatturazione',           href: '/invoices',     icon: FileText,         roles: ['superadmin','admin_cliente'] },
+    { label: 'Tesoreria & Cassa',      href: '/tesoreria',    icon: HandCoins,        roles: ['superadmin'] },
+    { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,        roles: ['superadmin'] },
+    { label: 'Dashboard QScare',       href: '/qscare-dashboard', icon: Shield,       roles: ['superadmin'] },
+    { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,            roles: ['superadmin'] },
+    { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,            roles: ['superadmin'] },
+    { label: 'Fatturazione',           href: '/invoices',     icon: FileText,         roles: ['superadmin'] },
   ]},
+
 
   // ADM — Sezione separata Reportistica Fiscale PLI ───────────────────
   { section: 'ADM', icon: FileSpreadsheet, items: [

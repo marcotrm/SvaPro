@@ -6,6 +6,7 @@ import ErrorAlert from '../components/ErrorAlert.jsx';
 import EmployeeModal from '../components/EmployeeModal.jsx';
 import EmployeeShiftsTab from '../components/EmployeeShiftsTab.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
+import DipendentiTabs from '../components/DipendentiTabs.jsx';
 import toast from 'react-hot-toast';
 
 // ── Sospensione ──────────────────────────────────────────────────────
@@ -160,6 +161,9 @@ export default function EmployeesPage() {
           Nuovo Dipendente
         </button>
       </div>
+
+      {/* Sub-tabs Dipendenti */}
+      <DipendentiTabs />
 
       {analytics && (
         <div className="kpi-grid">
