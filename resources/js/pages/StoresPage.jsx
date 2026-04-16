@@ -80,8 +80,13 @@ function OpeningHoursEditor({ value, onChange }) {
 
   const addSlot = (day) => {
     const slots = [...(hours[day].slots || [])];
-    // Propone un secondo slot pomeridiano di default
-    slots.push({ open: '15:00', close: '19:00' });
+    const originalClose = slots[0]?.close || '20:00';
+    // Smart default: chiudi mattina alle 13:30, apri pomeriggio alle 15:30
+    // e mantieni l'orario di chiusura originale per il pomeriggio
+    const morningClose = '13:30';
+    const afternoonOpen = '15:30';
+    slots[0] = { ...slots[0], close: morningClose };
+    slots.push({ open: afternoonOpen, close: originalClose });
     onChange({ ...hours, [day]: { ...hours[day], slots } });
   };
 
@@ -170,11 +175,27 @@ function OpeningHoursEditor({ value, onChange }) {
             </div>
 
             {/* Indicatore pausa visivo */}
-            {!day.closed && hasBreak && (
-              <div style={{ marginTop: 6, paddingLeft: 130, fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>
-                ☕ Pausa: {slots[0].close} – {slots[1].open}
-              </div>
-            )}
+            {!day.closed && hasBreak && (() => {
+              const s0close = slots[0].close;
+              const s1open  = slots[1].open;
+              const isValid = s0close <= s1open;
+              if (!isValid) {
+                return (
+                  <div style={{ marginTop: 6, paddingLeft: 130, fontSize: 11, color: '#ef4444', fontWeight: 700 }}>
+                    ⚠️ Orari sovrapposti — la pausa inizia prima della chiusura mattina
+                  </div>
+                );
+              }
+              // Calcola durata pausa in minuti
+              const toMin = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+              const dur = toMin(s1open) - toMin(s0close);
+              const durLabel = dur > 0 ? ` (${dur} min)` : '';
+              return (
+                <div style={{ marginTop: 6, paddingLeft: 130, fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>
+                  ☕ Pausa: {s0close} – {s1open}{durLabel}
+                </div>
+              );
+            })()}
           </div>
         );
       })}
