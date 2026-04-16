@@ -1,18 +1,216 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { orders as ordersApi, inventory, customers, reports, stores as storesApi, employees as employeesApi } from '../api.jsx';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, LineChart, Line, Cell, PieChart, Pie
 } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, Search, Bell, Download, Users, Trophy } from 'lucide-react';
-import DatePicker, { registerLocale } from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { it } from 'date-fns/locale/it';
-
-registerLocale('it', it);
+import { ArrowUpRight, ArrowDownRight, Search, Bell, Download, Users, Trophy, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 
 /* ─── palette ──────────────────────────────────────────────── */
+
+/* ─── CalendarPicker custom premium ─────────────────────────── */
+const IT_MONTHS = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const IT_DAYS_SHORT = ['Lu','Ma','Me','Gi','Ve','Sa','Do'];
+
+function CalendarPicker({ value, onChange }) {
+  // value: 'YYYY-MM-DD' string
+  const [open, setOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(() => value ? parseInt(value.slice(0,4)) : new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => value ? parseInt(value.slice(5,7)) - 1 : new Date().getMonth());
+  const ref = useRef();
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // When value changes from outside, sync view
+  useEffect(() => {
+    if (value) {
+      setViewYear(parseInt(value.slice(0,4)));
+      setViewMonth(parseInt(value.slice(5,7)) - 1);
+    }
+  }, [value]);
+
+  const today = new Date().toISOString().slice(0,10);
+
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+
+  // Build calendar grid (always 6 rows × 7 cols)
+  const cells = useMemo(() => {
+    const firstDay = new Date(viewYear, viewMonth, 1);
+    // Mon=0 ... Sun=6 (Italian week starts Monday)
+    let startDow = firstDay.getDay(); // 0=Sun
+    startDow = startDow === 0 ? 6 : startDow - 1; // convert to Mon-based
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const grid = [];
+    let offset = -startDow;
+    for (let row = 0; row < 6; row++) {
+      for (let col = 0; col < 7; col++) {
+        offset++;
+        if (offset < 1 || offset > daysInMonth) {
+          grid.push(null);
+        } else {
+          const mm = String(viewMonth + 1).padStart(2,'0');
+          const dd = String(offset).padStart(2,'0');
+          grid.push(`${viewYear}-${mm}-${dd}`);
+        }
+      }
+    }
+    return grid;
+  }, [viewYear, viewMonth]);
+
+  const displayLabel = value
+    ? (() => { const [y,m,d] = value.split('-'); return `${d}/${m}/${y}`; })()
+    : 'Seleziona data';
+
+  const isWeekend = (dateStr) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr).getDay();
+    return d === 0 || d === 6;
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      {/* Trigger button */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          padding: '6px 14px', borderRadius: 10, border: '1.5px solid rgba(123,111,208,0.35)',
+          background: open ? 'rgba(123,111,208,0.18)' : 'rgba(123,111,208,0.07)',
+          color: '#7B6FD0', cursor: 'pointer', fontSize: 13, fontWeight: 800,
+          transition: 'all 0.15s', whiteSpace: 'nowrap',
+          boxShadow: open ? '0 0 0 3px rgba(123,111,208,0.2)' : 'none',
+        }}
+      >
+        <CalendarDays size={14} strokeWidth={2.5} />
+        {displayLabel}
+      </button>
+
+      {/* Popup */}
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 8px)', left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 9999,
+          background: 'rgba(15,18,35,0.97)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(123,111,208,0.25)',
+          borderRadius: 18,
+          boxShadow: '0 24px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04)',
+          padding: '18px 16px 14px',
+          width: 280,
+          animation: 'calFadeIn 0.15s ease',
+        }}>
+          <style>{`
+            @keyframes calFadeIn {
+              from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+              to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+            }
+          `}</style>
+
+          {/* Header: mese/anno + nav */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <button onClick={prevMonth} style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', transition: 'background 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(123,111,208,0.3)'}
+              onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.07)'}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', letterSpacing: '-0.01em' }}>{IT_MONTHS[viewMonth]}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{viewYear}</div>
+            </div>
+            <button onClick={nextMonth} style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', transition: 'background 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(123,111,208,0.3)'}
+              onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.07)'}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          {/* Day names header */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginBottom: 6 }}>
+            {IT_DAYS_SHORT.map((d, i) => (
+              <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: i >= 5 ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.3)', letterSpacing: '0.04em', paddingBottom: 4 }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
+            {cells.map((dateStr, i) => {
+              if (!dateStr) return <div key={i} />;
+              const isSelected = dateStr === value;
+              const isToday = dateStr === today;
+              const weekend = isWeekend(dateStr);
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => { onChange(dateStr); setOpen(false); }}
+                  style={{
+                    aspectRatio: '1', border: 'none', borderRadius: 9,
+                    fontSize: 12, fontWeight: isSelected ? 900 : isToday ? 800 : 600,
+                    cursor: 'pointer', transition: 'all 0.12s',
+                    background: isSelected
+                      ? 'linear-gradient(135deg, #7B6FD0, #5B50B0)'
+                      : isToday
+                      ? 'rgba(123,111,208,0.18)'
+                      : 'transparent',
+                    color: isSelected
+                      ? '#fff'
+                      : isToday
+                      ? '#b3a9f0'
+                      : weekend
+                      ? 'rgba(251,191,36,0.65)'
+                      : 'rgba(255,255,255,0.75)',
+                    boxShadow: isSelected ? '0 4px 12px rgba(123,111,208,0.5)' : 'none',
+                    outline: isToday && !isSelected ? '1.5px solid rgba(123,111,208,0.4)' : 'none',
+                  }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(123,111,208,0.22)'; }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = isToday ? 'rgba(123,111,208,0.18)' : 'transparent'; }}
+                >
+                  {parseInt(dateStr.slice(8))}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Scorciatoie: Oggi / Ieri */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
+            {['Oggi', 'Ieri', '-7gg'].map(label => {
+              const d = new Date();
+              if (label === 'Ieri') d.setDate(d.getDate() - 1);
+              if (label === '-7gg') d.setDate(d.getDate() - 7);
+              const ds = d.toISOString().slice(0,10);
+              return (
+                <button key={label} onClick={() => { onChange(ds); setOpen(false); }}
+                  style={{
+                    flex: 1, padding: '5px 0', borderRadius: 8, border: 'none',
+                    background: value === ds ? 'rgba(123,111,208,0.4)' : 'rgba(255,255,255,0.06)',
+                    color: value === ds ? '#c4bbf9' : 'rgba(255,255,255,0.45)',
+                    fontSize: 11, fontWeight: 800, cursor: 'pointer', transition: 'all 0.12s',
+                  }}
+                  onMouseEnter={e => { if (value !== ds) e.currentTarget.style.background='rgba(255,255,255,0.12)'; }}
+                  onMouseLeave={e => { if (value !== ds) e.currentTarget.style.background='rgba(255,255,255,0.06)'; }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const PURPLE   = '#9B8FD4';
 const PURPLE_L = '#C5BEE8';
 const PURPLE_D = '#6C63AC';
@@ -188,14 +386,9 @@ export default function DashboardPage() {
   // NEW: period filter for main chart
   const [activePeriod, setActivePeriod] = useState('year');
   const [customDate, setCustomDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const customDateObj = new Date(customDate);
 
-  const handleCustomDateChange = (date) => {
-    if (date) {
-      const offset = date.getTimezoneOffset();
-      const localDate = new Date(date.getTime() - (offset*60*1000));
-      setCustomDate(localDate.toISOString().split('T')[0]);
-    }
+  const handleCustomDateChange = (dateStr) => {
+    if (dateStr) setCustomDate(dateStr);
   };
 
   // NEW: employee activity (ultime attività = dipendenti)
@@ -478,69 +671,7 @@ export default function DashboardPage() {
                 </button>
               ))}
               {activePeriod === 'custom' && (
-                <div style={{ position: 'relative', marginLeft: 6 }}>
-                  <DatePicker
-                    selected={customDateObj}
-                    onChange={handleCustomDateChange}
-                    locale="it"
-                    dateFormat="dd/MM/yyyy"
-                    className="sp-custom-datepicker"
-                  />
-                  <style>{`
-                    .sp-custom-datepicker {
-                      padding: 6px 12px;
-                      fontSize: 13px;
-                      border-radius: 8px;
-                      border: 1px solid var(--color-border-light);
-                      background: var(--color-bg);
-                      color: var(--color-text);
-                      outline: none;
-                      font-weight: 700;
-                      width: 110px;
-                      cursor: pointer;
-                      text-align: center;
-                      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-                      transition: all 0.2s ease;
-                    }
-                    .sp-custom-datepicker:hover {
-                      border-color: #9B8FD4;
-                    }
-                    .react-datepicker {
-                      font-family: inherit;
-                      border: 1px solid var(--color-border);
-                      border-radius: 12px;
-                      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-                      padding: 4px;
-                    }
-                    .react-datepicker__header {
-                      background-color: transparent;
-                      border-bottom: none;
-                      padding-top: 12px;
-                    }
-                    .react-datepicker__current-month, .react-datepicker-time__header {
-                      color: var(--color-text);
-                      font-weight: 800;
-                      font-size: 15px;
-                    }
-                    .react-datepicker__day-name {
-                      color: var(--color-text-tertiary);
-                      font-weight: 700;
-                    }
-                    .react-datepicker__day {
-                      color: var(--color-text);
-                      border-radius: 8px;
-                    }
-                    .react-datepicker__day:hover {
-                      background-color: var(--color-bg);
-                    }
-                    .react-datepicker__day--selected, .react-datepicker__day--keyboard-selected {
-                      background-color: #6C63AC !important;
-                      color: white !important;
-                      font-weight: 800;
-                      border-radius: 8px;
-                    }
-                  `}</style>
-                </div>
+                <CalendarPicker value={customDate} onChange={handleCustomDateChange} />
               )}
             </div>
           </div>
