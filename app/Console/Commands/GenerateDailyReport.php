@@ -134,14 +134,14 @@ class GenerateDailyReport extends Command
                 ]
             );
 
-            // Webhook a N8N
-            $n8nUrl = env('N8N_WEBHOOK_URL');
+            // CallMeBot WhatsApp
             $notifyPhone = env('NOTIFICATION_PHONE_NUMBER');
+            $callMeBotApiKey = env('CALLMEBOT_API_KEY');
 
-            if ($n8nUrl && $notifyPhone) {
+            if ($notifyPhone && $callMeBotApiKey) {
                 // Testo per WhatsApp o Telegram
                 $messageText = sprintf(
-                    "📊 *Report Serale %s*\n\n💰 Incasso Totale: €%s\n🧾 Scontrini emessi: %d\n🔄 Resi totali: %d\n\n_Accedi al gestionale sulla campanella in alto a destra per scaricare e analizzare il PDF completo di tutti i negozi._",
+                    "📊 *Report Serale %s*\n\n💰 Incasso Totale: €%s\n🧾 Scontrini emessi: %d\n🔄 Resi totali: %d\n\n_Accedi al gestionale sulla campanella in alto a destra per scaricare e analizzare il PDF._",
                     Carbon::now()->format('d/m/Y'),
                     number_format($totalIncasso, 2, ',', '.'),
                     $totalScontrini,
@@ -149,16 +149,14 @@ class GenerateDailyReport extends Command
                 );
 
                 try {
-                    Http::post($n8nUrl, [
-                        'type' => 'daily_closing',
-                        'tenant_id' => $tenantId,
-                        'phone_number' => $notifyPhone,
-                        'message' => $messageText,
-                        'reports_url' => url("/api/reports/daily/download?tenant_id={$tenantId}"),
-                        'raw_data' => $data
+                    $url = "https://api.callmebot.com/whatsapp.php";
+                    Http::get($url, [
+                        'phone' => str_replace('+', '', $notifyPhone), // Remove + if present just in case, or API handles it
+                        'text' => $messageText,
+                        'apikey' => $callMeBotApiKey
                     ]);
                 } catch (\Throwable $e) {
-                    $this->error("Errore webhook n8n: " . $e->getMessage());
+                    $this->error("Errore CallMeBot: " . $e->getMessage());
                 }
             }
         }
