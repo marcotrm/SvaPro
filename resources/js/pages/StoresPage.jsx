@@ -19,9 +19,31 @@ const DAYS = [
   { key: 'sun', label: 'Domenica' },
 ];
 
+// Ogni giorno: { closed: bool, slots: [{ open, close }] }
+// Supporta pausa pranzo con 2 slot: mattina + pomeriggio
 const DEFAULT_HOURS = Object.fromEntries(
-  DAYS.map(({ key }, i) => [key, { open: '09:00', close: '19:00', closed: i >= 5 }])
+  DAYS.map(({ key }, i) => [
+    key,
+    { closed: i >= 5, slots: [{ open: '09:00', close: '19:00' }] },
+  ])
 );
+
+// Converte il vecchio formato { open, close, closed } al nuovo con slots[]
+function normalizeHours(raw) {
+  if (!raw) return DEFAULT_HOURS;
+  const result = {};
+  for (const key of DAYS.map(d => d.key)) {
+    const day = raw[key];
+    if (!day) { result[key] = { closed: false, slots: [{ open: '09:00', close: '19:00' }] }; continue; }
+    if (Array.isArray(day.slots)) {
+      result[key] = day;
+    } else {
+      // Vecchio formato
+      result[key] = { closed: !!day.closed, slots: [{ open: day.open || '09:00', close: day.close || '19:00' }] };
+    }
+  }
+  return result;
+}
 
 const emptyStore = () => ({
   name: '',
@@ -41,48 +63,116 @@ const emptyStore = () => ({
   parent_store_id: '',
 });
 
-// ─── Griglia orari ─────────────────────────────────────────────────
+// ─── Griglia orari con supporto pausa pranzo ──────────────────────
 function OpeningHoursEditor({ value, onChange }) {
-  const hours = value || DEFAULT_HOURS;
+  const hours = normalizeHours(value);
 
-  const update = (day, field, val) => {
-    onChange({ ...hours, [day]: { ...hours[day], [field]: val } });
+  const updateClosed = (day, closed) => {
+    onChange({ ...hours, [day]: { ...hours[day], closed } });
+  };
+
+  const updateSlot = (day, idx, field, val) => {
+    const slots = [...(hours[day].slots || [{ open: '09:00', close: '19:00' }])];
+    slots[idx] = { ...slots[idx], [field]: val };
+    onChange({ ...hours, [day]: { ...hours[day], slots } });
+  };
+
+  const addSlot = (day) => {
+    const slots = [...(hours[day].slots || [])];
+    // Propone un secondo slot pomeridiano di default
+    slots.push({ open: '15:00', close: '19:00' });
+    onChange({ ...hours, [day]: { ...hours[day], slots } });
+  };
+
+  const removeSlot = (day, idx) => {
+    const slots = (hours[day].slots || []).filter((_, i) => i !== idx);
+    onChange({ ...hours, [day]: { ...hours[day], slots: slots.length ? slots : [{ open: '09:00', close: '19:00' }] } });
   };
 
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       {DAYS.map(({ key, label }) => {
-        const day = hours[key] || { open: '09:00', close: '19:00', closed: false };
+        const day = hours[key] || { closed: false, slots: [{ open: '09:00', close: '19:00' }] };
+        const slots = day.slots || [{ open: '09:00', close: '19:00' }];
+        const hasBreak = slots.length > 1;
+
         return (
           <div key={key} style={{
-            display: 'grid', gridTemplateColumns: '120px 1fr',
-            gap: 12, alignItems: 'center',
             padding: '10px 14px',
             background: day.closed ? 'var(--color-bg)' : 'rgba(155,143,212,0.05)',
-            borderRadius: 10, border: '1px solid var(--color-border)',
+            borderRadius: 12, border: '1px solid var(--color-border)',
             opacity: day.closed ? 0.6 : 1,
+            transition: 'all 0.15s',
           }}>
-            {/* Giorno + toggle chiuso */}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-              <input type="checkbox" checked={!day.closed}
-                onChange={e => update(key, 'closed', !e.target.checked)}
-                style={{ width: 15, height: 15, accentColor: 'var(--color-accent)', cursor: 'pointer' }} />
-              {label}
-            </label>
+            {/* Riga principale: toggle giorno + orari */}
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto', gap: 10, alignItems: 'center' }}>
+              {/* Toggle giorno */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                <input type="checkbox" checked={!day.closed}
+                  onChange={e => updateClosed(key, !e.target.checked)}
+                  style={{ width: 15, height: 15, accentColor: 'var(--color-accent)', cursor: 'pointer' }} />
+                {label}
+              </label>
 
-            {/* Orari aperto/chiuso */}
-            {!day.closed ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input type="time" value={day.open || '09:00'}
-                  onChange={e => update(key, 'open', e.target.value)}
-                  className="sp-input" style={{ width: 110, fontSize: 13 }} />
-                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 12 }}>→</span>
-                <input type="time" value={day.close || '19:00'}
-                  onChange={e => update(key, 'close', e.target.value)}
-                  className="sp-input" style={{ width: 110, fontSize: 13 }} />
+              {/* Slot(s) orari */}
+              {!day.closed ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {slots.map((slot, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {/* Badge slot */}
+                      {slots.length > 1 && (
+                        <span style={{ fontSize: 10, fontWeight: 800, color: idx === 0 ? '#6366f1' : '#f59e0b',
+                          background: idx === 0 ? 'rgba(99,102,241,0.1)' : 'rgba(245,158,11,0.1)',
+                          border: `1px solid ${idx === 0 ? 'rgba(99,102,241,0.2)' : 'rgba(245,158,11,0.2)'}`,
+                          borderRadius: 5, padding: '1px 6px', minWidth: 40, textAlign: 'center' }}>
+                          {idx === 0 ? 'Mattina' : 'Pomerig.'}
+                        </span>
+                      )}
+                      <input type="time" value={slot.open}
+                        onChange={e => updateSlot(key, idx, 'open', e.target.value)}
+                        className="sp-input" style={{ width: 100, fontSize: 13 }} />
+                      <span style={{ color: 'var(--color-text-tertiary)', fontSize: 12 }}>→</span>
+                      <input type="time" value={slot.close}
+                        onChange={e => updateSlot(key, idx, 'close', e.target.value)}
+                        className="sp-input" style={{ width: 100, fontSize: 13 }} />
+                      {/* Rimuovi slot secondario */}
+                      {idx > 0 && (
+                        <button onClick={() => removeSlot(key, idx)}
+                          title="Rimuovi slot"
+                          style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, flexShrink: 0 }}>
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>Chiuso</span>
+              )}
+
+              {/* Bottone aggiungi pausa pranzo */}
+              {!day.closed && (
+                <button
+                  onClick={() => hasBreak ? removeSlot(key, 1) : addSlot(key)}
+                  title={hasBreak ? 'Rimuovi pausa pranzo' : 'Aggiungi pausa pranzo'}
+                  style={{
+                    fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 8, border: 'none',
+                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                    background: hasBreak ? 'rgba(239,68,68,0.08)' : 'rgba(99,102,241,0.08)',
+                    color: hasBreak ? '#ef4444' : '#6366f1',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {hasBreak ? '✕ Pausa' : '+ Pausa'}
+                </button>
+              )}
+            </div>
+
+            {/* Indicatore pausa visivo */}
+            {!day.closed && hasBreak && (
+              <div style={{ marginTop: 6, paddingLeft: 130, fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>
+                ☕ Pausa: {slots[0].close} – {slots[1].open}
               </div>
-            ) : (
-              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontStyle: 'italic' }}>Chiuso</span>
             )}
           </div>
         );
