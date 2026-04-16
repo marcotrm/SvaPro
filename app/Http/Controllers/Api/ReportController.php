@@ -46,13 +46,26 @@ class ReportController extends Controller
         $dateFrom  = $request->input('date_from');
         $dateTo    = $request->input('date_to');
 
-        // Compatibile con SQLite e MariaDB/MySQL
-        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
-        $dateExpr = match ($period) {
-            'weekly'  => DB::raw($isSqlite ? "strftime('%Y-%W', created_at) as period" : "DATE_FORMAT(created_at, '%Y-%v') as period"),
-            'monthly' => DB::raw($isSqlite ? "strftime('%Y-%m', created_at) as period" : "DATE_FORMAT(created_at, '%Y-%m') as period"),
-            default   => DB::raw($isSqlite ? "strftime('%Y-%m-%d', created_at) as period" : "DATE(created_at) as period"),
-        };
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'sqlite') {
+            $dateExpr = match ($period) {
+                'weekly'  => DB::raw("strftime('%Y-%W', created_at) as period"),
+                'monthly' => DB::raw("strftime('%Y-%m', created_at) as period"),
+                default   => DB::raw("strftime('%Y-%m-%d', created_at) as period"),
+            };
+        } elseif ($driver === 'pgsql') {
+            $dateExpr = match ($period) {
+                'weekly'  => DB::raw("to_char(created_at, 'IYYY-IW') as period"),
+                'monthly' => DB::raw("to_char(created_at, 'YYYY-MM') as period"),
+                default   => DB::raw("to_char(created_at, 'YYYY-MM-DD') as period"),
+            };
+        } else {
+            $dateExpr = match ($period) {
+                'weekly'  => DB::raw("DATE_FORMAT(created_at, '%Y-%v') as period"),
+                'monthly' => DB::raw("DATE_FORMAT(created_at, '%Y-%m') as period"),
+                default   => DB::raw("DATE(created_at) as period"),
+            };
+        }
 
         $query = DB::table('sales_orders')
             ->where('sales_orders.tenant_id', $tenantId)
@@ -126,12 +139,26 @@ class ReportController extends Controller
         $period   = $request->input('period', 'monthly');
         $days     = min((int) ($request->input('days', 180) ?: 180), 365);
 
-        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
-        $dateExpr = match ($period) {
-            'weekly'  => DB::raw($isSqlite ? "strftime('%Y-%W', created_at) as period" : "DATE_FORMAT(created_at, '%Y-%v') as period"),
-            'monthly' => DB::raw($isSqlite ? "strftime('%Y-%m', created_at) as period" : "DATE_FORMAT(created_at, '%Y-%m') as period"),
-            default   => DB::raw($isSqlite ? "strftime('%Y-%m-%d', created_at) as period" : "DATE(created_at) as period"),
-        };
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'sqlite') {
+            $dateExpr = match ($period) {
+                'weekly'  => DB::raw("strftime('%Y-%W', created_at) as period"),
+                'monthly' => DB::raw("strftime('%Y-%m', created_at) as period"),
+                default   => DB::raw("strftime('%Y-%m-%d', created_at) as period"),
+            };
+        } elseif ($driver === 'pgsql') {
+            $dateExpr = match ($period) {
+                'weekly'  => DB::raw("to_char(created_at, 'IYYY-IW') as period"),
+                'monthly' => DB::raw("to_char(created_at, 'YYYY-MM') as period"),
+                default   => DB::raw("to_char(created_at, 'YYYY-MM-DD') as period"),
+            };
+        } else {
+            $dateExpr = match ($period) {
+                'weekly'  => DB::raw("DATE_FORMAT(created_at, '%Y-%v') as period"),
+                'monthly' => DB::raw("DATE_FORMAT(created_at, '%Y-%m') as period"),
+                default   => DB::raw("DATE(created_at) as period"),
+            };
+        }
 
         $rows = DB::table('customers')
             ->where('tenant_id', $tenantId)
