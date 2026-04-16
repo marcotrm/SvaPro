@@ -403,6 +403,7 @@ export default function CatalogPage() {
         />
       )}
     </div>
+    </>
   );
 }
 
@@ -739,6 +740,5 @@ function PrestashopImportModal({ onClose, onImported }) {
         </div>
       </div>
     </div>
-    </>
   );
 }
