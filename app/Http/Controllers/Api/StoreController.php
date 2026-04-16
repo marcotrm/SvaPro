@@ -327,6 +327,44 @@ class StoreController extends Controller
         return response()->json(['message' => 'Credenziali generate con successo!']);
     }
 
+    /**
+     * GET /stores/{id}/credentials
+     * Restituisce l'email dell'utente associato al negozio (senza password).
+     */
+    public function getCredentials(Request $request, int $storeId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $store = DB::table('stores')->where('tenant_id', $tenantId)->where('id', $storeId)->first();
+
+        if (!$store) {
+            return response()->json(['message' => 'Negozio non trovato.'], 404);
+        }
+
+        // Cerca il dipendente collegato al negozio con un user_id valido
+        $employee = DB::table('employees')
+            ->where('store_id', $storeId)
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('user_id')
+            ->orderBy('id', 'asc')
+            ->first();
+
+        if (!$employee || !$employee->user_id) {
+            return response()->json(['email' => null, 'has_credentials' => false]);
+        }
+
+        $user = DB::table('users')->where('id', $employee->user_id)->first();
+
+        if (!$user) {
+            return response()->json(['email' => null, 'has_credentials' => false]);
+        }
+
+        return response()->json([
+            'email'           => $user->email,
+            'has_credentials' => true,
+            'user_id'         => $user->id,
+        ]);
+    }
+
     // ─── Helpers ────────────────────────────────────────────────────
     private function formatStore(\stdClass $s): array
     {

@@ -68,6 +68,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::put('/stores/{storeId}', [StoreController::class, 'update']);
         Route::delete('/stores/{storeId}', [StoreController::class, 'destroy']);
         Route::post('/stores/{storeId}/credentials', [StoreController::class, 'createCredentials']);
+        Route::get('/stores/{storeId}/credentials', [StoreController::class, 'getCredentials']);
         Route::get('/loyalty/monitoring/push-stats', [LoyaltyController::class, 'pushMonitoringStats']);
 
         // Catalog WRITE - solo admin

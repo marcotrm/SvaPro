@@ -9,7 +9,7 @@ import {
   DollarSign, TrendingDown, Target, RefreshCw, Send, Copy,
   Loader, ExternalLink, UserCheck, Package,
 } from 'lucide-react';
-import { customers as customersApi, suppliers as suppliersApi, employees as employeesApi, reports, orders as ordersApi } from '../api.jsx';
+import { customers as customersApi, suppliers as suppliersApi, employees as employeesApi, reports, orders as ordersApi, cashMovements as cashMovementsApi, stores as storesApi } from '../api.jsx';
 import { toast } from 'react-hot-toast';
 
 // ── Palette colori ──────────────────────────────────────────────────────────
@@ -523,11 +523,109 @@ const SectionAcquisti = () => {
   );
 };
 
+// ─── Cash Alert Monitor (usato in Tesoreria) ────────────────────────────────
+function CashAlertMonitor() {
+  const [storeBalances, setStoreBalances] = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [alertOnly, setAlertOnly]         = useState(false);
+  const THRESHOLD = 1000;
+
+  const loadBalances = async () => {
+    try {
+      const [storesRes, movRes] = await Promise.all([
+        storesApi.getStores(),
+        cashMovementsApi.getAll({ per_page: 500 }),
+      ]);
+      const stores = storesRes.data?.data || storesRes.data || [];
+      const movements = movRes.data?.data || [];
+
+      const balances = stores.map(store => {
+        const storeMov = movements.filter(m => m.store_id === store.id);
+        const balance = storeMov.reduce((sum, m) => {
+          if (m.type === 'in' || m.type === 'sale') return sum + parseFloat(m.amount || 0);
+          if (m.type === 'out' || m.type === 'expense') return sum - parseFloat(m.amount || 0);
+          return sum;
+        }, 0);
+        return { ...store, balance };
+      });
+      setStoreBalances(balances);
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    loadBalances();
+    const t = setInterval(loadBalances, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  const alertStores = storeBalances.filter(s => s.balance >= THRESHOLD);
+  const displayed   = alertOnly ? alertStores : storeBalances;
+  const fmt = v => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v);
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <DollarSign size={18} color="#ef4444" />
+          </div>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 15, color: C.text }}>Monitoraggio Cassa Live</div>
+            <div style={{ fontSize: 12, color: C.textSub }}>Aggiornamento ogni 30s · Soglia allerta ≥ €1.000</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {alertStores.length > 0 && (
+            <button
+              onClick={() => setAlertOnly(v => !v)}
+              style={{ fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                background: alertOnly ? '#ef4444' : 'rgba(239,68,68,0.12)', color: alertOnly ? '#fff' : '#ef4444', transition: 'all 0.2s' }}
+            >
+              🔴 {alertStores.length} negoz{alertStores.length === 1 ? 'io' : 'i'} ≥ €1.000
+            </button>
+          )}
+          <button onClick={loadBalances} title="Aggiorna" style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textSub, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <RefreshCw size={13} />
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 24 }}><Loader size={20} style={{ animation: 'spin 1s linear infinite', opacity: 0.5 }} /></div>
+      ) : displayed.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 24, fontSize: 13, color: C.textSub }}>Nessun dato cassa disponibile.</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+          {displayed.map(store => {
+            const isAlert = store.balance >= THRESHOLD;
+            return (
+              <div key={store.id} style={{
+                padding: '12px 14px', borderRadius: 10,
+                background: isAlert ? 'rgba(239,68,68,0.07)' : C.bg,
+                border: `1px solid ${isAlert ? 'rgba(239,68,68,0.35)' : C.border}`,
+                transition: 'all 0.2s',
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.textSub, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{store.name}</span>
+                  {isAlert && <span style={{ fontSize: 10, fontWeight: 800, color: '#ef4444', background: 'rgba(239,68,68,0.15)', padding: '1px 6px', borderRadius: 10 }}>⚠ ALLERTA</span>}
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: isAlert ? '#ef4444' : C.text }}>{fmt(store.balance)}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Mock sections — con bottoni "Crea" e link alle pagine dedicate
 const SectionTesoreria = () => {
   const navigate = useNavigate();
   return (
     <div>
+      <CashAlertMonitor />
       <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
         <KPICard label="Saldo Totale"       value="—"  color={C.success} icon={Wallet}     />
         <KPICard label="Saldo Banca"        value="—"  color={C.accent}  icon={Landmark}   />
