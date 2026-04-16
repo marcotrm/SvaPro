@@ -4,7 +4,7 @@ import { catalog, suppliers, inventory, orders as ordersApi, clearApiCache } fro
 import { getImageUrl } from '../api.jsx';
 import api from '../api.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
-import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star } from 'lucide-react';
+import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function CatalogPage() {

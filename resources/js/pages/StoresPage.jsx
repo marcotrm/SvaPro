@@ -371,7 +371,7 @@ function StoreAccessTab({ store }) {
       setLoading(true); setErrors({});
       await storesApi.createCredentials(store.id, form);
       toast.success("Credenziali salvate! La password è aggiornata.");
-      setForm({ email: '', password: '' }); // Reset
+      setForm(p => ({ ...p, password: '' })); // Pulisce solo la password, l'email rimane
     } catch (err) {
       if (err.response?.data?.errors) setErrors(err.response.data.errors);
       else toast.error(err.response?.data?.message || 'Errore generazione credenziali');
