@@ -39,7 +39,7 @@ class AdmController extends Controller
         // Calcola range date e nome file
         if ($type === 'mensile') {
             $startDate    = sprintf('%04d-%02d-01 00:00:00', $year, $month);
-            $lastDay      = (int) date('t', mktime(0, 0, 0, $month, 1, $year));
+            $lastDay      = (int) \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth()->format('d');
             $endDate      = sprintf('%04d-%02d-%02d 23:59:59', $year, $month, $lastDay);
             $periodoLabel = sprintf('%02d%d', $month, $year);
             $nomeFile     = "SVAPOGROUPSRL{$periodoLabel}.xlsx";
@@ -49,7 +49,7 @@ class AdmController extends Controller
                 $endDate   = sprintf('%04d-%02d-15 23:59:59', $year, $month);
                 $halfKey   = '1Q';
             } else {
-                $lastDay   = (int) date('t', mktime(0, 0, 0, $month, 1, $year));
+                $lastDay   = (int) \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth()->format('d');
                 $startDate = sprintf('%04d-%02d-16 00:00:00', $year, $month);
                 $endDate   = sprintf('%04d-%02d-%02d 23:59:59', $year, $month, $lastDay);
                 $halfKey   = '2Q';
