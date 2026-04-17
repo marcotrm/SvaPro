@@ -200,32 +200,31 @@ function PeriodSelector({ period, setPeriod, offset, setOffset, customFrom, cust
           )}
         </div>
 
-        {/* Dropdown date picker — appare sotto la label */}
+        {/* Dropdown date picker — singolo giorno */}
         {(period === 'custom' || showCustom) && (
           <div style={{
             position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 200,
             background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.12)', padding: '16px 18px',
-            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)', padding: '14px 16px',
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dal</label>
-              <input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); setPeriod('custom'); }}
-                className="sp-input" style={{ width: 148 }} />
-            </div>
-            <span style={{ color: '#94a3b8', fontSize: 16, marginTop: 16 }}>→</span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Al</label>
-              <input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); setPeriod('custom'); }}
-                className="sp-input" style={{ width: 148 }} />
-            </div>
-            <button
-              onClick={() => setShowCustom(false)}
-              style={{ marginTop: 16, padding: '6px 14px', borderRadius: 8, background: '#10B981', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-              Applica
-            </button>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Scegli un giorno</div>
+            <input
+              type="date"
+              value={customFrom}
+              onChange={e => {
+                const d = e.target.value;
+                setCustomFrom(d);
+                setCustomTo(d);
+                setPeriod('custom');
+                setShowCustom(false); // chiude subito dopo la scelta
+              }}
+              className="sp-input"
+              style={{ width: 160 }}
+              autoFocus
+            />
           </div>
         )}
+
       </div>
     </div>
   );
