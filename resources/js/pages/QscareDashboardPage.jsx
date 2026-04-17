@@ -104,6 +104,116 @@ function getPeriodDates(period, offset = 0) {
   return { from, to };
 }
 
+
+// ─── Custom Calendar Picker ──────────────────────────────────────────────────
+const MONTHS_IT = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
+  'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const DAYS_IT = ['Lu','Ma','Me','Gi','Ve','Sa','Do'];
+
+function CalendarPicker({ value, onChange, onClose }) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const init = value ? new Date(value + 'T12:00:00') : new Date();
+  const [viewYear, setViewYear] = React.useState(init.getFullYear());
+  const [viewMonth, setViewMonth] = React.useState(init.getMonth());
+  const ref = React.useRef(null);
+
+  // Chiudi cliccando fuori
+  React.useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener('mousedown', handler, true);
+    return () => document.removeEventListener('mousedown', handler, true);
+  }, [onClose]);
+
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+
+  // Genera celle del mese (con padding per i giorni del mese precedente)
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=Dom
+  const startOffset = firstDay === 0 ? 6 : firstDay - 1; // converti a Lun=0
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const daysInPrev  = new Date(viewYear, viewMonth, 0).getDate();
+  const cells = [];
+  for (let i = startOffset - 1; i >= 0; i--) cells.push({ day: daysInPrev - i, thisMonth: false });
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, thisMonth: true });
+  const remaining = 42 - cells.length;
+  for (let d = 1; d <= remaining; d++) cells.push({ day: d, thisMonth: false });
+
+  const toDateStr = (d) => `${viewYear}-${String(viewMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+  return (
+    <div ref={ref} style={{
+      position: 'absolute', top: 'calc(100% + 10px)', left: 0, zIndex: 300,
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+      borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)',
+      boxShadow: '0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(16,185,129,0.15)',
+      padding: '20px 18px', width: 290, userSelect: 'none',
+    }}>
+      {/* Header mese/anno */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <button onClick={prevMonth} style={{ border: 'none', background: 'rgba(255,255,255,0.08)', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', transition: 'all 0.15s' }}
+          onMouseEnter={e => { e.currentTarget.style.background='rgba(16,185,129,0.2)'; e.currentTarget.style.color='#10B981'; }}
+          onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,0.08)'; e.currentTarget.style.color='#94a3b8'; }}>
+          <ChevronLeft size={16} />
+        </button>
+        <div style={{ fontWeight: 800, fontSize: 15, color: '#f1f5f9', letterSpacing: '0.02em' }}>
+          {MONTHS_IT[viewMonth]} <span style={{ color: '#10B981' }}>{viewYear}</span>
+        </div>
+        <button onClick={nextMonth} style={{ border: 'none', background: 'rgba(255,255,255,0.08)', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', transition: 'all 0.15s' }}
+          onMouseEnter={e => { e.currentTarget.style.background='rgba(16,185,129,0.2)'; e.currentTarget.style.color='#10B981'; }}
+          onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,0.08)'; e.currentTarget.style.color='#94a3b8'; }}>
+          <ChevronRight size={16} />
+        </button>
+      </div>
+
+      {/* Intestazione giorni settimana */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 6 }}>
+        {DAYS_IT.map(d => (
+          <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: '#475569', padding: '4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{d}</div>
+        ))}
+      </div>
+
+      {/* Griglia giorni */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+        {cells.map((cell, i) => {
+          const dateStr = cell.thisMonth ? toDateStr(cell.day) : null;
+          const isSelected = dateStr === value;
+          const isToday    = dateStr === todayStr;
+          return (
+            <button key={i}
+              onClick={() => { if (cell.thisMonth) { onChange(dateStr); onClose(); } }}
+              style={{
+                border: 'none', borderRadius: 10, padding: '7px 0', cursor: cell.thisMonth ? 'pointer' : 'default',
+                fontSize: 13, fontWeight: isSelected ? 800 : isToday ? 700 : 500,
+                background: isSelected ? '#10B981' : isToday ? 'rgba(16,185,129,0.15)' : 'transparent',
+                color: isSelected ? '#fff' : isToday ? '#10B981' : cell.thisMonth ? '#cbd5e1' : '#334155',
+                boxShadow: isSelected ? '0 2px 12px rgba(16,185,129,0.4)' : 'none',
+                transition: 'all 0.12s',
+                outline: 'none',
+              }}
+              onMouseEnter={e => { if (cell.thisMonth && !isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = isToday ? 'rgba(16,185,129,0.15)' : 'transparent'; }}
+            >
+              {cell.day}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Footer: Oggi */}
+      <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center' }}>
+        <button onClick={() => { onChange(todayStr); onClose(); }} style={{
+          border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.08)', borderRadius: 8,
+          padding: '6px 18px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#10B981', transition: 'all 0.15s',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.2)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.08)'; }}>
+          Oggi
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PeriodSelector({ period, setPeriod, offset, setOffset, customFrom, customTo, setCustomFrom, setCustomTo }) {
   const { from, to } = period !== 'custom' ? getPeriodDates(period, offset) : { from: customFrom, to: customTo };
   const canGoNext = period !== 'custom' && offset < 0;
@@ -113,20 +223,12 @@ function PeriodSelector({ period, setPeriod, offset, setOffset, customFrom, cust
     ? (from === to
         ? new Date(from + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
         : `${new Date(from + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })} – ${new Date(to + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}`)
-    : (customFrom && customTo
-        ? `${new Date(customFrom + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })} – ${new Date(customTo + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}`
-        : 'Seleziona date');
+    : (customFrom
+        ? new Date(customFrom + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+        : 'Seleziona data');
 
-  const handleLabelClick = () => {
-    setPeriod('custom');
-    setShowCustom(true);
-  };
-
-  const handlePillClick = (key) => {
-    setPeriod(key);
-    setOffset(0);
-    setShowCustom(false);
-  };
+  const handleLabelClick = () => { setPeriod('custom'); setShowCustom(s => !s); };
+  const handlePillClick  = (key) => { setPeriod(key); setOffset(0); setShowCustom(false); };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -149,32 +251,24 @@ function PeriodSelector({ period, setPeriod, offset, setOffset, customFrom, cust
       {/* nav arrows + date label cliccabile */}
       <div style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', borderRadius: 12, padding: '8px 14px', border: '1px solid #e2e8f0', width: 'fit-content' }}>
-          {/* freccia sinistra — solo per periodi non custom */}
           {period !== 'custom' && (
             <button onClick={() => setOffset(o => o - 1)} style={{ border: 'none', background: 'none', cursor: 'pointer', display: 'flex', color: '#64748b', padding: 2 }}>
               <ChevronLeft size={18} />
             </button>
           )}
-
-          {/* label cliccabile → apre il date picker */}
           <span
             onClick={handleLabelClick}
-            title="Clicca per scegliere un intervallo personalizzato"
             style={{
               fontWeight: 800, fontSize: 13, color: '#0f172a',
               minWidth: 180, textAlign: 'center',
-              cursor: 'pointer', borderRadius: 6,
-              padding: '2px 6px',
-              transition: 'background 0.15s',
-              userSelect: 'none',
+              cursor: 'pointer', borderRadius: 6, padding: '2px 6px',
+              transition: 'background 0.15s', userSelect: 'none',
             }}
             onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
-            {label}
+            📅 {label}
           </span>
-
-          {/* freccia destra — solo per periodi non custom */}
           {period !== 'custom' && (
             <button onClick={() => setOffset(o => o + 1)} disabled={!canGoNext}
               style={{ border: 'none', background: 'none', cursor: canGoNext ? 'pointer' : 'default', display: 'flex', color: canGoNext ? '#64748b' : '#cbd5e1', padding: 2 }}>
@@ -183,35 +277,18 @@ function PeriodSelector({ period, setPeriod, offset, setOffset, customFrom, cust
           )}
         </div>
 
-        {/* Dropdown date picker — singolo giorno */}
-        {(period === 'custom' || showCustom) && (
-          <div style={{
-            position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 200,
-            background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.12)', padding: '14px 16px',
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Scegli un giorno</div>
-            <input
-              type="date"
-              value={customFrom}
-              onChange={e => {
-                const d = e.target.value;
-                setCustomFrom(d);
-                setCustomTo(d);
-                setPeriod('custom');
-                setShowCustom(false); // chiude subito dopo la scelta
-              }}
-              className="sp-input"
-              style={{ width: 160 }}
-              autoFocus
-            />
-          </div>
+        {showCustom && (
+          <CalendarPicker
+            value={customFrom}
+            onChange={(d) => { setCustomFrom(d); setCustomTo(d); setPeriod('custom'); }}
+            onClose={() => setShowCustom(false)}
+          />
         )}
-
       </div>
     </div>
   );
 }
+
 
 export default function QscareDashboardPage() {
   const { selectedStoreId } = useOutletContext();
