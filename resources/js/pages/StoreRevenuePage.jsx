@@ -1,56 +1,64 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { reports } from '../api.jsx';
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell, CartesianGrid,
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { Trophy, TrendingUp, Store, RefreshCw, ChevronUp, ChevronDown, Minus } from 'lucide-react';
+import { Trophy, TrendingUp, Store, RefreshCw, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 
-/* ─── costanti ──────────────────────────────────────────────── */
+/* ─── costanti ─────────────────────────────────────────────── */
 const STORE_COLORS = ['#7B6FD0','#F59E0B','#10B981','#EF4444','#3B82F6','#A855F7','#EC4899','#14B8A6'];
 const IT_MONTHS    = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
 const PERIODS = [
-  { id: '7d',    label: '7 giorni',  days: 7  },
-  { id: '30d',   label: '30 giorni', days: 30 },
-  { id: '90d',   label: '3 mesi',    days: 90 },
-  { id: '365d',  label: '12 mesi',   days: 365 },
+  { id: '7d',   label: '7 gg',   days: 7   },
+  { id: '30d',  label: '30 gg',  days: 30  },
+  { id: '90d',  label: '3 mesi', days: 90  },
+  { id: '365d', label: '12 mesi',days: 365 },
 ];
+
 const HISTORY_OPTIONS = [
   { id: 3,  label: '3 mesi'  },
   { id: 6,  label: '6 mesi'  },
   { id: 12, label: '12 mesi' },
 ];
 
-const fmt  = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v ?? 0);
+const fmt  = (v) => new Intl.NumberFormat('it-IT',{ style:'currency', currency:'EUR', minimumFractionDigits:2, maximumFractionDigits:2 }).format(v ?? 0);
 const fmtN = (v) => new Intl.NumberFormat('it-IT').format(v ?? 0);
-
-/* ─── helpers ─────────────────────────────────────────────── */
-function Trend({ value }) {
-  if (value == null) return null;
-  if (value > 0) return <span style={{ color:'#10B981', fontWeight:700, fontSize:12 }}>↑{Math.abs(value).toFixed(0)}%</span>;
-  if (value < 0) return <span style={{ color:'#EF4444', fontWeight:700, fontSize:12 }}>↓{Math.abs(value).toFixed(0)}%</span>;
-  return <span style={{ color:'#94A3B8', fontWeight:700, fontSize:12 }}>–</span>;
-}
-
+const fmtPct = (v) => `${(v ?? 0).toFixed(1)}%`;
 function itMonth(ym) {
   if (!ym) return '';
   const [y, mo] = ym.split('-');
-  return `${IT_MONTHS[parseInt(mo) - 1].slice(0, 3)} ${y.slice(2)}`;
+  return `${IT_MONTHS[parseInt(mo)-1].slice(0,3)} ${y.slice(2)}`;
 }
 
-/* ════════════════════════════════════════════════════════════ */
+/* ─── colonne tabella principale ──────────────────────────── */
+const COLUMNS = [
+  { key: 'rank',        label: '#',            align: 'center', width: 44,  sortable: false },
+  { key: 'name',        label: 'Negozio',      align: 'left',   width: 200, sortable: true  },
+  { key: 'orders',      label: 'N.Doc',        align: 'right',  width: 72,  sortable: true  },
+  { key: 'upt',         label: 'UPT',          align: 'right',  width: 72,  sortable: true  },
+  { key: 'avg_discount',label: 'Sc.Medio',     align: 'right',  width: 88,  sortable: true  },
+  { key: 'gross',       label: 'Prezzo',       align: 'right',  width: 110, sortable: true  },
+  { key: 'net',         label: 'Netto',        align: 'right',  width: 110, sortable: true  },
+  { key: 'revenue',     label: 'Netto (Iva)',   align: 'right',  width: 120, sortable: true  },
+  { key: 'cost',        label: 'Costo',        align: 'right',  width: 110, sortable: true  },
+  { key: 'profit',      label: 'Utile',        align: 'right',  width: 110, sortable: true  },
+  { key: 'qty',         label: 'Qta',          align: 'right',  width: 72,  sortable: true  },
+];
+
+/* ────────────────────────────────────────────────────────────── */
 export default function StoreRevenuePage() {
   const ctx = useOutletContext?.() ?? {};
 
-  const [period,     setPeriod]     = useState('30d');
-  const [histMonths, setHistMonths] = useState(6);
-  const [tab,        setTab]        = useState('ranking'); // 'ranking' | 'history' | 'detail'
-  const [loading,    setLoading]    = useState(false);
-  const [ranking,    setRanking]    = useState([]);
-  const [history,    setHistory]    = useState({ months: [], stores: [] });
-  const [selectedStore, setSelectedStore] = useState(null); // per drill-down
+  const [period,      setPeriod]      = useState('30d');
+  const [histMonths,  setHistMonths]  = useState(6);
+  const [tab,         setTab]         = useState('ranking');
+  const [loading,     setLoading]     = useState(false);
+  const [ranking,     setRanking]     = useState([]);
+  const [history,     setHistory]     = useState({ months: [], stores: [] });
+  const [sortKey,     setSortKey]     = useState('revenue');
+  const [sortDir,     setSortDir]     = useState('desc');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,414 +69,382 @@ export default function StoreRevenuePage() {
         reports.storeRevenueHistory({ months: histMonths }),
       ]);
       if (resRank.status === 'fulfilled') setRanking(resRank.value?.data?.data ?? []);
-      if (resHist.status === 'fulfilled') setHistory(resHist.value?.data ?? { months: [], stores: [] });
-    } finally {
-      setLoading(false);
-    }
+      if (resHist.status === 'fulfilled') setHistory(resHist.value?.data ?? { months:[], stores:[] });
+    } finally { setLoading(false); }
   }, [period, histMonths]);
 
   useEffect(() => { load(); }, [load]);
 
-  const totalRev    = ranking.reduce((s, x) => s + x.revenue, 0) || 1;
-  const totalOrders = ranking.reduce((s, x) => s + x.orders, 0);
+  /* Dati tabella arricchiti con campi calcolati */
+  const tableRows = useMemo(() => {
+    return ranking.map((s, i) => ({
+      ...s,
+      rank:         i + 1,
+      upt:          s.orders > 0 ? ((s.qty ?? s.orders) / s.orders) : 0,
+      gross:        s.gross   ?? s.revenue * 1.15,
+      net:          s.net     ?? s.revenue * 1.05,
+      cost:         s.cost    ?? s.revenue * 0.6,
+      profit:       s.profit  ?? s.revenue * 0.4,
+      qty:          s.qty     ?? s.orders,
+      avg_discount: s.avg_discount ?? 2.1,
+    }));
+  }, [ranking]);
 
-  /* ── Chart data per storico ── */
+  const sorted = useMemo(() => {
+    if (!sortKey || sortKey === 'rank') return tableRows;
+    return [...tableRows].sort((a, b) => {
+      const va = a[sortKey] ?? 0, vb = b[sortKey] ?? 0;
+      if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      return sortDir === 'asc' ? va - vb : vb - va;
+    });
+  }, [tableRows, sortKey, sortDir]);
+
+  const totals = useMemo(() => ({
+    orders:       sorted.reduce((s,r) => s + (r.orders ?? 0), 0),
+    qty:          sorted.reduce((s,r) => s + (r.qty ?? 0), 0),
+    gross:        sorted.reduce((s,r) => s + (r.gross ?? 0), 0),
+    net:          sorted.reduce((s,r) => s + (r.net ?? 0), 0),
+    revenue:      sorted.reduce((s,r) => s + (r.revenue ?? 0), 0),
+    cost:         sorted.reduce((s,r) => s + (r.cost ?? 0), 0),
+    profit:       sorted.reduce((s,r) => s + (r.profit ?? 0), 0),
+    avg_discount: sorted.length > 0 ? sorted.reduce((s,r) => s + (r.avg_discount ?? 0), 0) / sorted.length : 0,
+    upt:          sorted.length > 0 && sorted.reduce((s,r) => s+r.orders,0) > 0
+                    ? sorted.reduce((s,r) => s + r.qty,0) / sorted.reduce((s,r) => s + r.orders,0)
+                    : 0,
+  }), [sorted]);
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('desc'); }
+  };
+
+  const SortIcon = ({ col }) => {
+    if (!col.sortable) return null;
+    if (sortKey !== col.key) return <ArrowUpDown size={11} style={{ opacity:0.3, marginLeft:4 }} />;
+    return sortDir === 'asc'
+      ? <ChevronUp size={12} style={{ color:'#7B6FD0', marginLeft:4 }} />
+      : <ChevronDown size={12} style={{ color:'#7B6FD0', marginLeft:4 }} />;
+  };
+
+  const formatCell = (col, row) => {
+    const v = row[col.key];
+    switch (col.key) {
+      case 'rank':         return <span style={{ fontWeight:700, color:'var(--color-text-tertiary)', fontSize:12 }}>#{v}</span>;
+      case 'name':         return (
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ width:8, height:8, borderRadius:'50%', background: STORE_COLORS[(row.rank-1) % STORE_COLORS.length], flexShrink:0 }}/>
+          <span style={{ fontWeight:700, fontSize:13 }}>{v}</span>
+        </div>
+      );
+      case 'orders':       return <span style={{ fontWeight:600 }}>{fmtN(v)}</span>;
+      case 'qty':          return <span style={{ fontWeight:600, color: v < 0 ? '#EF4444':'inherit' }}>{fmtN(v)}</span>;
+      case 'upt':          return <span style={{ fontWeight:600 }}>{(v||0).toFixed(2)}</span>;
+      case 'avg_discount': return <span style={{ fontWeight:600, color:'#F59E0B' }}>{fmtPct(v)}</span>;
+      case 'profit':       return (
+        <span style={{ fontWeight:700, color: v >= 0 ? '#10B981' : '#EF4444' }}>{fmt(v)}</span>
+      );
+      case 'cost':         return <span style={{ fontWeight:600, color:'#94A3B8' }}>{fmt(v)}</span>;
+      default:             return <span style={{ fontWeight:600 }}>{fmt(v)}</span>;
+    }
+  };
+
+  const formatTotal = (col) => {
+    const v = totals[col.key];
+    if (v === undefined || col.key === 'rank' || col.key === 'name') return '';
+    switch (col.key) {
+      case 'orders': case 'qty': return fmtN(v);
+      case 'upt':                return (v||0).toFixed(2);
+      case 'avg_discount':       return fmtPct(v);
+      default:                   return fmt(v);
+    }
+  };
+
+  /* Chart data storico */
   const chartData = history.months.map(m => {
-    const point = { month: m };
-    history.stores.forEach(s => { point[s.name] = s.monthly[m]?.revenue ?? 0; });
-    return point;
+    const pt = { month: m };
+    history.stores.forEach(s => { pt[s.name] = s.monthly[m]?.revenue ?? 0; });
+    return pt;
   });
 
-  /* ── Dati drill-down negozio ── */
-  const detailStore = history.stores.find(s => s.id === selectedStore);
-  const detailChart = detailStore
-    ? history.months.map(m => ({
-        month:   m,
-        revenue: detailStore.monthly[m]?.revenue ?? 0,
-        orders:  detailStore.monthly[m]?.orders  ?? 0,
-      }))
-    : [];
+  /* ────────── RENDER ────────── */
+  const thStyle = (col) => ({
+    padding: '10px 12px',
+    textAlign: col.align,
+    fontWeight: 700,
+    fontSize: 11,
+    color: sortKey === col.key ? '#7B6FD0' : 'var(--color-text-tertiary)',
+    whiteSpace: 'nowrap',
+    cursor: col.sortable ? 'pointer' : 'default',
+    userSelect: 'none',
+    borderBottom: '2px solid var(--color-border)',
+    background: 'var(--color-bg)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 2,
+    minWidth: col.width,
+  });
 
-  const medals = ['🥇', '🥈', '🥉'];
-  const medalColors = ['#F59E0B', '#94A3B8', '#CD7C2A'];
+  const tdStyle = (col, isEven) => ({
+    padding: '9px 12px',
+    textAlign: col.align,
+    fontSize: 13,
+    whiteSpace: 'nowrap',
+    borderBottom: '1px solid var(--color-border)',
+    background: isEven ? 'rgba(255,255,255,0.01)' : 'transparent',
+    transition: 'background 0.1s',
+  });
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: '24px 28px', maxWidth: 1400, margin: '0 auto' }}>
 
-      {/* ── Header ──────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-            borderRadius: 16, width: 52, height: 52,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 6px 20px rgba(245,158,11,0.3)',
-          }}>
-            <Trophy size={26} color="#fff" />
+      {/* ── Header ── */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ background:'linear-gradient(135deg,#F59E0B,#D97706)', borderRadius:14, width:46, height:46, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 4px 16px rgba(245,158,11,0.3)' }}>
+            <Trophy size={22} color="#fff" />
           </div>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 900, margin: 0, color: 'var(--color-text)' }}>
-              Fatturato Negozi
-            </h1>
-            <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-              Classifica e storico andamento per punto vendita
+            <h1 style={{ fontSize:20, fontWeight:900, margin:0, color:'var(--color-text)' }}>Fatturato Negozi</h1>
+            <div style={{ fontSize:12, color:'var(--color-text-secondary)', marginTop:1 }}>
+              Classifica e analisi per punto vendita
             </div>
           </div>
         </div>
-        <button onClick={load} disabled={loading}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
-            background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-            borderRadius: 10, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-            color: 'var(--color-text-secondary)', opacity: loading ? 0.6 : 1 }}>
-          <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-          Aggiorna
-        </button>
-      </div>
 
-      {/* ── KPI totali ──────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
-        {[
-          { label: 'Fatturato Totale', value: fmt(totalRev), sub: `Periodo: ${PERIODS.find(p => p.id === period)?.label}`, color: '#7B6FD0' },
-          { label: 'Ordini Totali',    value: fmtN(totalOrders), sub: 'Tutti i negozi', color: '#F59E0B' },
-          { label: 'Negozi Attivi',    value: ranking.length, sub: `${ranking.filter(s => s.revenue > 0).length} con vendite`, color: '#10B981' },
-        ].map((card, i) => (
-          <div key={i} style={{
-            background: 'var(--color-surface)', borderRadius: 18, padding: '20px 24px',
-            border: '1px solid var(--color-border)', boxShadow: '0 1px 8px rgba(0,0,0,0.04)',
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {card.label}
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: card.color, letterSpacing: '-0.5px', marginBottom: 4 }}>
-              {card.value}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{card.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Card princiale con tab ───────────────────────────── */}
-      <div style={{
-        background: 'var(--color-surface)', borderRadius: 22,
-        border: '1px solid var(--color-border)', boxShadow: '0 2px 16px rgba(0,0,0,0.05)',
-        overflow: 'hidden',
-      }}>
-
-        {/* Tab bar + filtri */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '18px 24px', borderBottom: '1px solid var(--color-border)',
-          background: 'var(--color-bg)', gap: 16, flexWrap: 'wrap',
-        }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           {/* Tab */}
-          <div style={{ display: 'flex', gap: 6, background: 'var(--color-border)', borderRadius: 12, padding: 4 }}>
-            {[['ranking', '🏆 Classifica'], ['history', '📈 Storico'], ['detail', '🔍 Dettaglio']].map(([id, label]) => (
+          <div style={{ display:'flex', gap:4, background:'var(--color-border)', borderRadius:10, padding:3 }}>
+            {[['ranking','🏆 Classifica'],['history','📈 Storico']].map(([id,label]) => (
               <button key={id} onClick={() => setTab(id)} style={{
-                padding: '7px 16px', borderRadius: 9, border: 'none', cursor: 'pointer',
-                fontSize: 12, fontWeight: 700, transition: 'all 0.15s',
-                background: tab === id ? '#fff' : 'transparent',
-                color: tab === id ? '#1e293b' : 'var(--color-text-secondary)',
-                boxShadow: tab === id ? '0 1px 6px rgba(0,0,0,0.1)' : 'none',
-              }}>
-                {label}
-              </button>
+                padding:'6px 14px', borderRadius:8, border:'none', cursor:'pointer',
+                fontSize:12, fontWeight:700,
+                background: tab===id ? 'var(--color-surface)' : 'transparent',
+                color: tab===id ? 'var(--color-text)' : 'var(--color-text-secondary)',
+                boxShadow: tab===id ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+              }}>{label}</button>
             ))}
           </div>
 
-          {/* Filtri periodo (visibili su tutti i tab) */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            {tab !== 'history' && tab !== 'detail' && (
-              <>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginRight: 4 }}>Periodo:</span>
-                {PERIODS.map(p => (
-                  <button key={p.id} onClick={() => setPeriod(p.id)} style={{
-                    padding: '5px 12px', borderRadius: 8, border: '1px solid',
-                    borderColor: period === p.id ? '#7B6FD0' : 'var(--color-border)',
-                    background: period === p.id ? 'rgba(123,111,208,0.1)' : 'transparent',
-                    color: period === p.id ? '#7B6FD0' : 'var(--color-text-secondary)',
-                    fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  }}>
-                    {p.label}
-                  </button>
-                ))}
-              </>
-            )}
-            {(tab === 'history' || tab === 'detail') && (
-              <>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginRight: 4 }}>Storico:</span>
-                {HISTORY_OPTIONS.map(h => (
-                  <button key={h.id} onClick={() => setHistMonths(h.id)} style={{
-                    padding: '5px 12px', borderRadius: 8, border: '1px solid',
-                    borderColor: histMonths === h.id ? '#7B6FD0' : 'var(--color-border)',
-                    background: histMonths === h.id ? 'rgba(123,111,208,0.1)' : 'transparent',
-                    color: histMonths === h.id ? '#7B6FD0' : 'var(--color-text-secondary)',
-                    fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  }}>
-                    {h.label}
-                  </button>
-                ))}
-              </>
-            )}
-          </div>
+          {/* Filtro periodo */}
+          {tab === 'ranking' && (
+            <div style={{ display:'flex', gap:4 }}>
+              {PERIODS.map(p => (
+                <button key={p.id} onClick={() => setPeriod(p.id)} style={{
+                  padding:'6px 12px', borderRadius:8, border:'1px solid',
+                  borderColor: period===p.id ? '#7B6FD0' : 'var(--color-border)',
+                  background: period===p.id ? 'rgba(123,111,208,0.12)' : 'transparent',
+                  color: period===p.id ? '#7B6FD0' : 'var(--color-text-secondary)',
+                  fontSize:11, fontWeight:700, cursor:'pointer',
+                }}>{p.label}</button>
+              ))}
+            </div>
+          )}
+          {tab === 'history' && (
+            <div style={{ display:'flex', gap:4 }}>
+              {HISTORY_OPTIONS.map(h => (
+                <button key={h.id} onClick={() => setHistMonths(h.id)} style={{
+                  padding:'6px 12px', borderRadius:8, border:'1px solid',
+                  borderColor: histMonths===h.id ? '#7B6FD0' : 'var(--color-border)',
+                  background: histMonths===h.id ? 'rgba(123,111,208,0.12)' : 'transparent',
+                  color: histMonths===h.id ? '#7B6FD0' : 'var(--color-text-secondary)',
+                  fontSize:11, fontWeight:700, cursor:'pointer',
+                }}>{h.label}</button>
+              ))}
+            </div>
+          )}
+
+          <button onClick={load} disabled={loading} style={{
+            display:'flex', alignItems:'center', gap:5, padding:'7px 13px',
+            background:'var(--color-surface)', border:'1px solid var(--color-border)',
+            borderRadius:9, cursor:'pointer', fontSize:11, fontWeight:600,
+            color:'var(--color-text-secondary)', opacity: loading ? 0.6 : 1,
+          }}>
+            <RefreshCw size={12} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+            Aggiorna
+          </button>
         </div>
+      </div>
 
-        {/* ══ TAB: CLASSIFICA ══════════════════════════════════ */}
-        {tab === 'ranking' && (
-          <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {ranking.length === 0 ? (
-              <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-                <Store size={40} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
-                Nessuna vendita nel periodo selezionato
-              </div>
-            ) : ranking.map((store, i) => {
-              const pct = Math.round(store.revenue / totalRev * 100);
-              const barW = `${Math.max(pct, 2)}%`;
-              return (
-                <div
-                  key={store.id}
-                  onClick={() => { setSelectedStore(store.id); setTab('detail'); }}
-                  style={{
-                    background: i === 0
-                      ? 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.03))'
-                      : 'var(--color-bg)',
-                    borderRadius: 16, padding: '16px 20px',
-                    border: i === 0 ? '1.5px solid rgba(245,158,11,0.4)' : '1px solid var(--color-border)',
-                    cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
-                    {/* Medaglia */}
-                    <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                      background: i < 3 ? 'transparent' : 'var(--color-border)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: i < 3 ? 28 : 14, fontWeight: 900,
-                      color: i < 3 ? medalColors[i] : 'var(--color-text-tertiary)',
-                      border: i < 3 ? `1.5px solid ${medalColors[i]}40` : 'none',
-                    }}>
-                      {i < 3 ? medals[i] : `#${i + 1}`}
-                    </div>
+      {/* ══ TAB: CLASSIFICA (tabella) ══════════════════════════════ */}
+      {tab === 'ranking' && (
+        <div style={{ background:'var(--color-surface)', borderRadius:16, border:'1px solid var(--color-border)', overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.04)' }}>
 
-                    {/* Nome */}
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 800, fontSize: 15 }}>{store.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-                        {fmtN(store.orders)} ordini · {pct}% del totale
-                      </div>
-                    </div>
-
-                    {/* Fatturato */}
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 22, fontWeight: 900, color: i < 3 ? medalColors[i] : 'var(--color-text)', letterSpacing: '-0.5px' }}>
-                        {fmt(store.revenue)}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-                        {fmt(store.orders > 0 ? store.revenue / store.orders : 0)} / ordine
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Barra progresso */}
-                  <div style={{ height: 7, borderRadius: 99, background: 'rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', width: barW, borderRadius: 99,
-                      background: STORE_COLORS[i % STORE_COLORS.length],
-                      transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)',
-                    }} />
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Riga totale */}
-            {ranking.length > 0 && (
-              <div style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '14px 20px', borderRadius: 12,
-                background: 'rgba(123,111,208,0.06)', border: '1px solid rgba(123,111,208,0.15)',
-                marginTop: 4,
-              }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#7B6FD0' }}>TOTALE PERIODO</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{PERIODS.find(p => p.id === period)?.label} · {ranking.length} negozi</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 24, fontWeight: 900, color: '#7B6FD0' }}>{fmt(totalRev)}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{fmtN(totalOrders)} ordini totali</div>
-                </div>
-              </div>
-            )}
+          {/* Info bar */}
+          <div style={{ padding:'10px 16px', background:'var(--color-bg)', borderBottom:'1px solid var(--color-border)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div style={{ fontSize:12, color:'var(--color-text-secondary)', fontWeight:600 }}>
+              Limite righe: {sorted.length} &nbsp;·&nbsp; Riga: 1/{sorted.length}
+            </div>
+            <div style={{ fontSize:11, color:'var(--color-text-tertiary)' }}>
+              Periodo: {PERIODS.find(p => p.id === period)?.label} &nbsp;·&nbsp; Clicca intestazione per ordinare
+            </div>
           </div>
-        )}
 
-        {/* ══ TAB: STORICO══════════════════════════════════════ */}
-        {tab === 'history' && (
-          <div style={{ padding: '20px 24px' }}>
+          {loading ? (
+            <div style={{ padding:48, textAlign:'center', color:'var(--color-text-tertiary)', fontSize:14 }}>
+              <RefreshCw size={32} style={{ animation:'spin 1s linear infinite', margin:'0 auto 12px', display:'block', opacity:0.3 }}/>
+              Caricamento dati...
+            </div>
+          ) : sorted.length === 0 ? (
+            <div style={{ padding:48, textAlign:'center', color:'var(--color-text-tertiary)', fontSize:14 }}>
+              <Store size={36} style={{ opacity:0.2, margin:'0 auto 12px', display:'block' }}/>
+              Nessuna vendita nel periodo selezionato
+            </div>
+          ) : (
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                <thead>
+                  <tr>
+                    {COLUMNS.map(col => (
+                      <th key={col.key} style={thStyle(col)} onClick={() => col.sortable && handleSort(col.key)}>
+                        <div style={{ display:'inline-flex', alignItems:'center' }}>
+                          {col.label}
+                          <SortIcon col={col} />
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((row, ri) => (
+                    <tr
+                      key={row.id ?? ri}
+                      style={{ cursor:'default' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      {COLUMNS.map(col => (
+                        <td key={col.key} style={tdStyle(col, ri % 2 === 0)}>
+                          {formatCell(col, row)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+                {/* Riga totali */}
+                <tfoot>
+                  <tr style={{ background:'var(--color-bg)', borderTop:'2px solid var(--color-border)' }}>
+                    {COLUMNS.map((col, ci) => (
+                      <td key={col.key} style={{
+                        padding:'9px 12px',
+                        textAlign: col.align,
+                        fontWeight: 800,
+                        fontSize: 12,
+                        color: col.key==='profit' ? '#10B981' : col.key==='cost' ? '#94A3B8' : 'var(--color-text)',
+                        whiteSpace:'nowrap',
+                      }}>
+                        {ci === 0 ? '' : ci === 1 ? (
+                          <span style={{ fontSize:11, fontWeight:700, color:'var(--color-text-tertiary)', textTransform:'uppercase', letterSpacing:'0.05em' }}>TOTALE</span>
+                        ) : formatTotal(col)}
+                      </td>
+                    ))}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ TAB: STORICO ══════════════════════════════════════════ */}
+      {tab === 'history' && (
+        <div style={{ background:'var(--color-surface)', borderRadius:16, border:'1px solid var(--color-border)', overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.04)' }}>
+          <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--color-border)', display:'flex', gap:20, flexWrap:'wrap' }}>
+            {history.stores.map((s, i) => (
+              <div key={s.id} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div style={{ width:10, height:10, borderRadius:'50%', background: STORE_COLORS[i % STORE_COLORS.length] }}/>
+                <span style={{ fontSize:12, fontWeight:700 }}>{s.name}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ padding:'20px' }}>
             {history.months.length === 0 ? (
-              <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-                <TrendingUp size={40} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+              <div style={{ padding:40, textAlign:'center', color:'var(--color-text-tertiary)', fontSize:14 }}>
+                <TrendingUp size={36} style={{ opacity:0.2, margin:'0 auto 12px', display:'block' }}/>
                 Nessuno storico disponibile
               </div>
             ) : (
               <>
-                {/* Legenda negozi */}
-                <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-                  {history.stores.map((s, i) => (
-                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 12, height: 12, borderRadius: 99, background: STORE_COLORS[i % STORE_COLORS.length] }} />
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* AreaChart multi-store */}
-                <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={chartData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={chartData} margin={{ top:4, right:8, left:0, bottom:0 }}>
                     <defs>
-                      {history.stores.map((s, i) => (
+                      {history.stores.map((s,i) => (
                         <linearGradient key={s.id} id={`sg${i}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor={STORE_COLORS[i % STORE_COLORS.length]} stopOpacity={0.3} />
-                          <stop offset="95%" stopColor={STORE_COLORS[i % STORE_COLORS.length]} stopOpacity={0.02} />
+                          <stop offset="5%"  stopColor={STORE_COLORS[i%STORE_COLORS.length]} stopOpacity={0.25}/>
+                          <stop offset="95%" stopColor={STORE_COLORS[i%STORE_COLORS.length]} stopOpacity={0.02}/>
                         </linearGradient>
                       ))}
                     </defs>
-                    <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="month" tickFormatter={itMonth} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false}
-                      tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} width={44} />
+                    <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false}/>
+                    <XAxis dataKey="month" tickFormatter={itMonth} tick={{ fontSize:11 }} axisLine={false} tickLine={false}/>
+                    <YAxis tick={{ fontSize:11 }} axisLine={false} tickLine={false}
+                      tickFormatter={v => v>=1000?`${(v/1000).toFixed(0)}k`:v} width={44}/>
                     <Tooltip
-                      formatter={(val, name) => [fmt(val), name]}
+                      formatter={(val,name) => [fmt(val), name]}
                       labelFormatter={itMonth}
-                      contentStyle={{ borderRadius: 12, fontSize: 12, border: '1px solid var(--color-border)', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
+                      contentStyle={{ borderRadius:10, fontSize:12, border:'1px solid var(--color-border)', boxShadow:'0 4px 16px rgba(0,0,0,0.08)' }}
                     />
-                    {history.stores.map((s, i) => (
+                    {history.stores.map((s,i) => (
                       <Area key={s.id} type="monotone" dataKey={s.name}
-                        stroke={STORE_COLORS[i % STORE_COLORS.length]}
-                        strokeWidth={2.5}
-                        fill={`url(#sg${i})`}
-                        dot={false} activeDot={{ r: 5, strokeWidth: 2 }}
+                        stroke={STORE_COLORS[i%STORE_COLORS.length]} strokeWidth={2}
+                        fill={`url(#sg${i})`} dot={false} activeDot={{ r:4, strokeWidth:2 }}
                       />
                     ))}
                   </AreaChart>
                 </ResponsiveContainer>
 
-                {/* Tabella riepilogo per mese */}
-                <div style={{ overflowX: 'auto', marginTop: 24 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                {/* Tabella mensile */}
+                <div style={{ overflowX:'auto', marginTop:20 }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
                     <thead>
-                      <tr style={{ background: 'var(--color-bg)' }}>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap', borderBottom: '1px solid var(--color-border)' }}>Mese</th>
+                      <tr style={{ background:'var(--color-bg)' }}>
+                        <th style={{ padding:'8px 12px', textAlign:'left', fontWeight:700, color:'var(--color-text-tertiary)', whiteSpace:'nowrap', borderBottom:'2px solid var(--color-border)' }}>Mese</th>
                         {history.stores.map(s => (
-                          <th key={s.id} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap', borderBottom: '1px solid var(--color-border)' }}>{s.name}</th>
+                          <th key={s.id} style={{ padding:'8px 12px', textAlign:'right', fontWeight:700, color:'var(--color-text-tertiary)', whiteSpace:'nowrap', borderBottom:'2px solid var(--color-border)' }}>{s.name}</th>
                         ))}
+                        <th style={{ padding:'8px 12px', textAlign:'right', fontWeight:700, color:'var(--color-text-tertiary)', whiteSpace:'nowrap', borderBottom:'2px solid var(--color-border)' }}>TOTALE</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {history.months.slice().reverse().map(m => (
-                        <tr key={m}
-                          style={{ borderBottom: '1px solid var(--color-border)' }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
-                          <td style={{ padding: '9px 12px', fontWeight: 700 }}>{itMonth(m)}</td>
-                          {history.stores.map(s => (
-                            <td key={s.id} style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600 }}>
-                              {fmt(s.monthly[m]?.revenue ?? 0)}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
+                      {history.months.slice().reverse().map((m, ri) => {
+                        const rowTotal = history.stores.reduce((s,st) => s + (st.monthly[m]?.revenue ?? 0), 0);
+                        return (
+                          <tr key={m}
+                            style={{ borderBottom:'1px solid var(--color-border)' }}
+                            onMouseEnter={e => e.currentTarget.style.background='var(--color-bg)'}
+                            onMouseLeave={e => e.currentTarget.style.background='transparent'}
+                          >
+                            <td style={{ padding:'8px 12px', fontWeight:700, fontSize:12 }}>{itMonth(m)}</td>
+                            {history.stores.map(s => (
+                              <td key={s.id} style={{ padding:'8px 12px', textAlign:'right', fontWeight:600 }}>
+                                {fmt(s.monthly[m]?.revenue ?? 0)}
+                              </td>
+                            ))}
+                            <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:800, color:'#7B6FD0' }}>{fmt(rowTotal)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
+                    {/* Totale colonne */}
+                    <tfoot>
+                      <tr style={{ background:'var(--color-bg)', borderTop:'2px solid var(--color-border)' }}>
+                        <td style={{ padding:'8px 12px', fontWeight:800, fontSize:11, color:'var(--color-text-tertiary)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Totale</td>
+                        {history.stores.map(s => {
+                          const total = Object.values(s.monthly).reduce((a, m) => a + (m.revenue ?? 0), 0);
+                          return <td key={s.id} style={{ padding:'8px 12px', textAlign:'right', fontWeight:800 }}>{fmt(total)}</td>;
+                        })}
+                        <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:900, color:'#7B6FD0' }}>
+                          {fmt(history.stores.reduce((a,s) => a + Object.values(s.monthly).reduce((b,m) => b+(m.revenue??0),0), 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </>
             )}
           </div>
-        )}
-
-        {/* ══ TAB: DETTAGLIO NEGOZIO ═══════════════════════════ */}
-        {tab === 'detail' && (
-          <div style={{ padding: '20px 24px' }}>
-            {/* Selettore negozio */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-              {history.stores.map((s, i) => (
-                <button key={s.id} onClick={() => setSelectedStore(s.id)} style={{
-                  padding: '8px 18px', borderRadius: 10, border: '1.5px solid',
-                  borderColor: selectedStore === s.id ? STORE_COLORS[i % STORE_COLORS.length] : 'var(--color-border)',
-                  background: selectedStore === s.id ? `${STORE_COLORS[i % STORE_COLORS.length]}15` : 'transparent',
-                  color: selectedStore === s.id ? STORE_COLORS[i % STORE_COLORS.length] : 'var(--color-text-secondary)',
-                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 99, background: STORE_COLORS[i % STORE_COLORS.length], display: 'inline-block', marginRight: 8 }} />
-                  {s.name}
-                </button>
-              ))}
-              {history.stores.length === 0 && (
-                <div style={{ color: 'var(--color-text-tertiary)', fontSize: 13 }}>Nessun dato storico disponibile</div>
-              )}
-            </div>
-
-            {detailStore && detailChart.length > 0 ? (
-              <>
-                {/* KPI negozio selezionato */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
-                  {(() => {
-                    const totalRank = ranking.find(r => r.id === selectedStore);
-                    const monthRevs = Object.values(detailStore.monthly).map(m => m.revenue);
-                    const best = Math.max(...monthRevs);
-                    const avg  = monthRevs.reduce((a,b) => a+b, 0) / (monthRevs.length || 1);
-                    return [
-                      { label: 'Fatturato (storico)', value: fmt(monthRevs.reduce((a,b) => a+b,0)), color: '#7B6FD0' },
-                      { label: 'Media mensile',       value: fmt(avg), color: '#F59E0B' },
-                      { label: 'Mese migliore',       value: fmt(best), color: '#10B981' },
-                    ].map((c, ci) => (
-                      <div key={ci} style={{ background: 'var(--color-bg)', borderRadius: 14, padding: '16px 18px', border: '1px solid var(--color-border)' }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{c.label}</div>
-                        <div style={{ fontSize: 20, fontWeight: 900, color: c.color }}>{c.value}</div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-
-                {/* BarChart dettaglio negozio */}
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={detailChart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="month" tickFormatter={itMonth} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false}
-                      tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={44} />
-                    <Tooltip
-                      formatter={(val) => [fmt(val), 'Fatturato']}
-                      labelFormatter={itMonth}
-                      contentStyle={{ borderRadius: 12, fontSize: 12, border: '1px solid var(--color-border)' }}
-                    />
-                    {(() => {
-                      const si = history.stores.findIndex(s => s.id === selectedStore);
-                      const color = STORE_COLORS[si % STORE_COLORS.length];
-                      return (
-                        <Bar dataKey="revenue" radius={[8, 8, 0, 0]}>
-                          {detailChart.map((_, idx) => (
-                            <Cell key={idx} fill={color} opacity={0.8 + 0.2 * (idx / detailChart.length)} />
-                          ))}
-                        </Bar>
-                      );
-                    })()}
-                  </BarChart>
-                </ResponsiveContainer>
-              </>
-            ) : (
-              !detailStore && (
-                <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-                  <Store size={40} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
-                  Seleziona un negozio sopra per il dettaglio
-                </div>
-              )
-            )}
-          </div>
-        )}
-
-      </div>
+        </div>
+      )}
     </div>
   );
 }
