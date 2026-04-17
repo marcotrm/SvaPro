@@ -664,95 +664,195 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
     if (!f) return;
     setFile(f); setParsing(true); setPreview(null); setManualMap({});
     try {
-      const buf     = await f.arrayBuffer();
-      const wb      = XLSX.read(buf, { type:'array', cellDates:false, raw:false });
-      const ws      = wb.Sheets[wb.SheetNames[0]];
-      const allRows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:false });
-      const cellStr = (v) => String(v ?? '').trim();
+      const buf = await f.arrayBuffer();
+      // raw:true → legge i numeri Excel reali (date seriali, frazioni per orari)
+      const wb  = XLSX.read(buf, { type:'array', cellDates:false, raw:true });
+      const ws  = wb.Sheets[wb.SheetNames[0]];
 
-      // Anno dal file
+      // Gestisce celle unite (merged): propaga il valore della cella superiore-sinistra
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+      if (ws['!merges']) {
+        for (const merge of ws['!merges']) {
+          const topLeft = XLSX.utils.encode_cell({ r: merge.s.r, c: merge.s.c });
+          const topVal  = ws[topLeft];
+          for (let r = merge.s.r; r <= merge.e.r; r++) {
+            for (let c = merge.s.c; c <= merge.e.c; c++) {
+              const addr = XLSX.utils.encode_cell({ r, c });
+              if (!ws[addr] && topVal) ws[addr] = { ...topVal };
+            }
+          }
+        }
+      }
+
+      const allRows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:true });
+      const debugInfo = { totalRows: allRows.length, rawSample: [], colDateMap: {}, names: [] };
+
+      // Mostra prime 8 righe come debug
+      debugInfo.rawSample = allRows.slice(0,8).map((row, i) =>
+        `R${i}: [${row.slice(0,9).map(v => String(v??'').substring(0,12)).join(' | ')}]`
+      );
+
+      const cellStr = (v) => {
+        if (v === null || v === undefined || v === '') return '';
+        // Numero seriale Excel per data (>= 40000 = dopo il 2009)
+        if (typeof v === 'number' && v >= 40000 && v < 100000 && !String(v).includes('.')) {
+          const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+          const dd = String(d.getUTCDate()).padStart(2,'0');
+          const mm = String(d.getUTCMonth()+1).padStart(2,'0');
+          return `${dd}/${mm}`;
+        }
+        return String(v).trim();
+      };
+
+      // Converti orario: supporta "9:00 - 14:00", "09:00-14:00", frazioni Excel (0.375 = 09:00)
+      const parseTimeRange = (val) => {
+        if (val === '' || val === null || val === undefined) return null;
+        // Frazione Excel (orario singolo, non range)
+        if (typeof val === 'number' && val > 0 && val < 1) {
+          const totalMin = Math.round(val * 24 * 60);
+          const h = Math.floor(totalMin/60), m = totalMin%60;
+          return null; // orario singolo senza fine — ignora
+        }
+        const s = String(val).trim().replace(/\s+/g,' ');
+        if (!s) return null;
+        // Pattern: "9:00 - 14:00", "9.00-14.00", "9 - 14", ecc.
+        const m = s.match(/(\d{1,2})[:\.]?(\d{0,2})\s*[-–—]\s*(\d{1,2})[:\.]?(\d{0,2})/);
+        if (!m) return null;
+        const startH = m[1].padStart(2,'0'), startM = (m[2]||'00').padStart(2,'0');
+        const endH   = m[3].padStart(2,'0'), endM   = (m[4]||'00').padStart(2,'0');
+        return { start_time: `${startH}:${startM}`, end_time: `${endH}:${endM}` };
+      };
+
+      // Converti valore cella → data ISO
+      const toISO = (val, year) => {
+        const s = cellStr(val);
+        if (!s) return null;
+        // Già ISO
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        // dd/mm/yyyy
+        const full = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if (full) { const y = full[3].length===2?'20'+full[3]:full[3]; return `${y}-${full[2].padStart(2,'0')}-${full[1].padStart(2,'0')}`; }
+        // dd/mm (formato italiano)
+        const short = s.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+        if (short && year) return `${year}-${short[2].padStart(2,'0')}-${short[1].padStart(2,'0')}`;
+        // Numero seriale Excel (come numero grezzo)
+        if (typeof val === 'number' && val > 40000 && val < 100000) {
+          const d = new Date(Math.round((val-25569)*86400*1000));
+          return d.toISOString().split('T')[0];
+        }
+        return null;
+      };
+
+      // Anno dal file (cerca nelle prime 6 righe)
       let fileYear = new Date().getFullYear();
       for (const row of allRows.slice(0,6)) {
         for (const cell of row) {
-          const m = cellStr(cell).match(/(\d{4})/);
-          if (m && parseInt(m[1]) >= 2024) { fileYear = parseInt(m[1]); break; }
+          const m = String(cell??'').match(/(\d{4})/);
+          if (m && parseInt(m[1]) >= 2024 && parseInt(m[1]) <= 2030) { fileYear=parseInt(m[1]); break; }
         }
+        if (fileYear !== new Date().getFullYear()) break;
       }
 
-      // Trova header row (riga con giorni o date)
-      const DAY_KW = ['lun','mar','mer','gio','ven','sab','dom'];
+      // Trova riga header: ha ≥3 celle con date dd/mm oppure parole giorno
+      const DAY_KW = ['lunedì','lunedi','martedì','martedi','mercoledì','mercoledi','giovedì','giovedi','venerdì','venerdi','sabato','domenica','lun','mar','mer','gio','ven','sab','dom'];
       let headerRowIdx = -1, dateRowIdx = -1;
-      for (let i = 0; i < allRows.length; i++) {
-        const rText = allRows[i].map(c => cellStr(c).toLowerCase()).join(' ');
-        const shortDates = allRows[i].filter(c => /^\d{1,2}[\/\-]\d{2}$/.test(cellStr(c))).length;
-        const hasDays    = DAY_KW.filter(d => rText.includes(d)).length >= 2;
-        if (shortDates >= 3 || hasDays) {
+      for (let i=0; i<allRows.length; i++) {
+        const row = allRows[i];
+        const rowLow = row.map(v => String(v??'').toLowerCase());
+        const nShortDates = row.filter(v => {
+          const s = cellStr(v);
+          return /^\d{1,2}[\/\-]\d{2}$/.test(s) || (typeof v==='number' && v>40000 && v<100000);
+        }).length;
+        const nDayKw = DAY_KW.filter(d => rowLow.some(c => c.includes(d))).length;
+        if (nShortDates >= 3 || nDayKw >= 3) {
           headerRowIdx = i;
-          dateRowIdx   = shortDates >= 3 ? i : i;
-          if (!hasDays || shortDates === 0) {
+          dateRowIdx = nShortDates >= 3 ? i : -1;
+          // Cerca date nella riga precedente se header ha solo giorni
+          if (dateRowIdx === -1) {
             for (let j=i-1; j>=Math.max(0,i-3); j--) {
-              if (allRows[j].filter(c => /^\d{1,2}[\/\-]\d{2}$/.test(cellStr(c))).length >= 3) { dateRowIdx=j; break; }
+              const pr = allRows[j];
+              const n = pr.filter(v => {
+                const s = cellStr(v);
+                return /^\d{1,2}[\/\-]\d{2}$/.test(s) || (typeof v==='number' && v>40000 && v<100000);
+              }).length;
+              if (n >= 3) { dateRowIdx=j; break; }
             }
           }
+          if (dateRowIdx === -1) dateRowIdx = i;
           break;
         }
       }
-      if (headerRowIdx === -1) throw new Error('Struttura non riconosciuta: aggiungi una riga con le date tipo 20/04, 21/04...');
 
-      // Mappa colonna → data ISO
+      if (headerRowIdx===-1) {
+        // Ultimo tentativo: usa row 3 o 4 (indice 3/4) come ipotesi
+        headerRowIdx = Math.min(4, allRows.length-1);
+        dateRowIdx   = Math.max(3, allRows.length-2);
+        debugInfo.warning = `Header non trovato automaticamente, uso riga ${dateRowIdx} come date`;
+      }
+
+      // Costruisci colDateMap
       const colDateMap = {};
-      const dateRow = allRows[dateRowIdx];
-      for (let col=1; col<dateRow.length; col++) {
-        const iso = shortDateToISO(cellStr(dateRow[col]), fileYear);
-        if (iso) colDateMap[col] = iso;
+      [dateRowIdx, headerRowIdx].forEach(rowIdx => {
+        if (rowIdx < 0) return;
+        allRows[rowIdx].forEach((val, col) => {
+          if (col === 0) return;
+          const iso = toISO(val, fileYear);
+          if (iso && !colDateMap[col]) colDateMap[col] = iso;
+        });
+      });
+
+      debugInfo.colDateMap = colDateMap;
+      debugInfo.headerRow  = headerRowIdx;
+      debugInfo.dateRow    = dateRowIdx;
+      debugInfo.fileYear   = fileYear;
+
+      if (Object.keys(colDateMap).length === 0) {
+        throw new Error(`Nessuna data trovata. Header riga ${headerRowIdx}, date riga ${dateRowIdx}. Controlla il formato del file.`);
       }
-      // Fallback: prova riga header se dateRow non ha date
-      if (Object.keys(colDateMap).length < 2) {
-        const hr = allRows[headerRowIdx];
-        for (let col=1; col<hr.length; col++) {
-          const iso = shortDateToISO(cellStr(hr[col]), fileYear);
-          if (iso) colDateMap[col] = iso;
-        }
-      }
-      if (Object.keys(colDateMap).length === 0) throw new Error('Nessuna data trovata nelle colonne. Usa il formato 20/04 o 20/04/2026.');
 
       // Leggi righe dipendenti
-      const SKIP_KW = ['settimana','store','negozio','dipendente','nome','lunedì','martedì','mercoledì','giovedì','venerdì','sabato','domenica',...DAY_KW,'qui svapo','turni',''];
-      const rawEntries = []; // { name, shifts: [{date, start_time, end_time}] }
+      const SKIP_KW = new Set(['settimana','store','negozio','dipendente','nome','qui svapo','turni settimanali','turni']);
+      const rawEntries = [];
 
       for (let i=headerRowIdx+1; i<allRows.length; i++) {
         const row = allRows[i];
-        const rawName = cellStr(row[0]);
+        const rawVal = row[0];
+        const rawName = String(rawVal??'').trim();
         if (!rawName || rawName.length < 2) continue;
-        const low = rawName.toLowerCase();
-        if (SKIP_KW.some(k => k && low === k)) continue;
+        const lc = rawName.toLowerCase().replace(/[^a-z\s]/g,'').trim();
+        if (!lc || SKIP_KW.has(lc)) continue;
         if (/^\d/.test(rawName)) continue;
+        // Salta righe che sembrano intestazioni di giorno
+        if (DAY_KW.some(d => lc === d)) continue;
 
         const shifts = [];
         for (const [colStr, dateISO] of Object.entries(colDateMap)) {
-          const tr = parseTimeRange(row[parseInt(colStr)]);
+          const cellVal = row[parseInt(colStr)];
+          const tr = parseTimeRange(cellVal);
           if (tr) shifts.push({ date: dateISO, ...tr });
         }
-        if (shifts.length > 0) rawEntries.push({ name: rawName, shifts });
+        if (shifts.length > 0 || rawName.length > 1) {
+          rawEntries.push({ name: rawName, shifts });
+          debugInfo.names.push(`${rawName} → ${shifts.length} turni`);
+        }
       }
 
-      // Match con dipendenti caricati
-      const matched   = [];
-      const unmatched = []; // { name, shifts } — nomi non trovati
+      debugInfo.rawEntries = rawEntries.length;
 
+      const matched   = [];
+      const unmatched = [];
       rawEntries.forEach(entry => {
+        if (entry.shifts.length === 0) return; // nessun orario = salta
         const emp = matchEmployee(entry.name, allEmployees);
-        if (emp) {
-          entry.shifts.forEach(s => matched.push({ name: entry.name, emp, ...s }));
-        } else {
-          unmatched.push(entry);
-        }
+        if (emp) entry.shifts.forEach(s => matched.push({ name: entry.name, emp, ...s }));
+        else     unmatched.push(entry);
       });
 
-      setPreview({ matched, unmatched, colDateMap, rawEntries });
+      setPreview({ matched, unmatched, colDateMap, rawEntries, debug: debugInfo });
     } catch(err) {
-      toast.error('Errore: ' + err.message);
+      toast.error('Errore parsing: ' + err.message);
       console.error(err);
+      setPreview({ matched:[], unmatched:[], colDateMap:{}, rawEntries:[], debug:{ error: err.message } });
     } finally { setParsing(false); }
   };
 
@@ -902,8 +1002,29 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
                 <CheckCircle size={16}/> Importa {finalMatched.length} turni
               </button>
             </div>
+
+            {/* Diagnostica visibile */}
+            {preview.debug && (
+              <details style={{marginTop:16}}>
+                <summary style={{fontSize:11,color:'#475569',cursor:'pointer',userSelect:'none'}}>🔍 Diagnostica parsing ({preview.debug.totalRows} righe totali)</summary>
+                <div style={{background:'#0a0f1a',borderRadius:10,padding:12,marginTop:8,fontSize:10,color:'#64748b',fontFamily:'monospace',maxHeight:200,overflowY:'auto'}}>
+                  <div style={{color:'#94a3b8',marginBottom:6}}>
+                    Header riga: {preview.debug.headerRow} | Date riga: {preview.debug.dateRow} | Anno: {preview.debug.fileYear}
+                  </div>
+                  <div style={{color:'#10B981',marginBottom:6}}>
+                    Date trovate: {JSON.stringify(preview.debug.colDateMap)}
+                  </div>
+                  <div style={{color:'#fbbf24',marginBottom:6}}>
+                    Nomi trovati: {(preview.debug.names||[]).join(', ') || 'nessuno'}
+                  </div>
+                  {preview.debug.warning && <div style={{color:'#F59E0B'}}>⚠️ {preview.debug.warning}</div>}
+                  {(preview.debug.rawSample||[]).map((line,i) => <div key={i} style={{color:'#475569'}}>{line}</div>)}
+                </div>
+              </details>
+            )}
           </div>
         )}
+
 
         {confirmed && (
           <div style={{textAlign:'center',padding:'24px 0'}}>
