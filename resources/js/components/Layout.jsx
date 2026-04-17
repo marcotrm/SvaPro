@@ -59,15 +59,15 @@ const allNavigation = [
     { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin'] },
     { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin'] },
     { label: 'Timbra Entrata/Uscita',  href: '/clock-in',     icon: Fingerprint, roles: ['dipendente'] },
-    { label: 'Pianificazione Turni',   href: '/shifts',       icon: Calendar,    roles: ['superadmin','admin_cliente'] },
+    { label: 'Pianificazione Turni',   href: '/shifts',       icon: Calendar,    roles: ['superadmin','admin_cliente','dipendente'] },
     { label: 'Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','dipendente'] },
   ]},
 
   // Amministrazione â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { section: 'Amministrazione', icon: Shield, items: [
-    { label: 'Tesoreria & Cassa',      href: '/tesoreria',    icon: HandCoins,        roles: ['superadmin'] },
+    { label: 'Tesoreria & Cassa',      href: '/tesoreria',    icon: HandCoins,        roles: ['superadmin','admin_cliente'] },
     { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,        roles: ['superadmin'] },
-    { label: 'Dashboard QScare',       href: '/qscare-dashboard', icon: Shield,       roles: ['superadmin'] },
+    { label: 'Dashboard QScare',       href: '/qscare-dashboard', icon: Shield,       roles: ['superadmin','admin_cliente'] },
     { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,            roles: ['superadmin'] },
     { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,            roles: ['superadmin'] },
     { label: 'Fatturazione',           href: '/invoices',     icon: FileText,         roles: ['superadmin'] },
