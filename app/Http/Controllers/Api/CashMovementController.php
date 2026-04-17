@@ -9,16 +9,41 @@ use Illuminate\Support\Facades\DB;
 
 class CashMovementController extends Controller
 {
+    /**
+     * Recupera lo store_id dell'utente se è un dipendente.
+     * I dipendenti possono vedere/operare SOLO sul proprio store.
+     */
+    private function getSecureStoreId(Request $request): ?int
+    {
+        $user = $request->user();
+        if (!$user) return $request->input('store_id') ? (int) $request->input('store_id') : null;
+
+        $isDipendente = DB::table('user_roles')
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->where('user_roles.user_id', $user->id)
+            ->where('roles.code', 'dipendente')
+            ->exists();
+
+        if ($isDipendente) {
+            $employeeStoreId = DB::table('employees')
+                ->where('user_id', $user->id)
+                ->value('store_id');
+            if ($employeeStoreId) {
+                return (int) $employeeStoreId;
+            }
+        }
+
+        // Admin/superadmin: usa il filtro passato dal frontend
+        return $request->input('store_id') ? (int) $request->input('store_id') : null;
+    }
+
     public function index(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
-        $storeId  = $request->input('store_id');
+        $storeId  = $this->getSecureStoreId($request);  // ← forzato per dipendente
         $dateFrom = $request->input('date_from');
         $dateTo   = $request->input('date_to');
 
-        // Solo i manager o superadmin possono vedere tutti gli store
-        // Ma lasciamo che il filtro sia applicato dalla route (dipendente id/store).
-        
         $query = DB::table('cash_movements')
             ->leftJoin('users', 'cash_movements.employee_id', '=', 'users.id')
             ->leftJoin('stores', 'cash_movements.store_id', '=', 'stores.id')
@@ -52,11 +77,15 @@ class CashMovementController extends Controller
 
     public function balances(Request $request): JsonResponse
     {
-        $tenantId = (int) $request->attributes->get('tenant_id');
+        $tenantId       = (int) $request->attributes->get('tenant_id');
+        $forcedStoreId  = $this->getSecureStoreId($request);  // ← null = admin vede tutto
 
-        $stores = DB::table('stores')
-            ->where('tenant_id', $tenantId)
-            ->get(['id', 'name']);
+        $storesQuery = DB::table('stores')->where('tenant_id', $tenantId);
+        if ($forcedStoreId) {
+            // Dipendente: vede solo il proprio store
+            $storesQuery->where('id', $forcedStoreId);
+        }
+        $stores = $storesQuery->get(['id', 'name']);
 
         $results = [];
         foreach ($stores as $store) {
@@ -87,12 +116,12 @@ class CashMovementController extends Controller
                 ->first(['created_at', 'type', 'amount']);
 
             $results[] = [
-                'store_id'       => $store->id,
-                'store_name'     => $store->name,
-                'balance'        => round($salesCash + $deposits - $withdrawals, 2),
-                'total_deposits' => round($salesCash + $deposits, 2),
+                'store_id'          => $store->id,
+                'store_name'        => $store->name,
+                'balance'           => round($salesCash + $deposits - $withdrawals, 2),
+                'total_deposits'    => round($salesCash + $deposits, 2),
                 'total_withdrawals' => round($withdrawals, 2),
-                'last_movement'  => $lastMov,
+                'last_movement'     => $lastMov,
             ];
         }
 
@@ -101,8 +130,9 @@ class CashMovementController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $tenantId = (int) $request->attributes->get('tenant_id');
-        $user = $request->user();
+        $tenantId       = (int) $request->attributes->get('tenant_id');
+        $user           = $request->user();
+        $forcedStoreId  = $this->getSecureStoreId($request);
 
         $request->validate([
             'store_id' => ['required', 'integer'],
@@ -111,7 +141,8 @@ class CashMovementController extends Controller
             'note'     => ['nullable', 'string', 'max:255'],
         ]);
 
-        $storeId = (int) $request->input('store_id');
+        // Se il dipendente prova a usare uno store diverso dal suo → forza il suo
+        $storeId = $forcedStoreId ?? (int) $request->input('store_id');
 
         // Risolvi dipendente da barcode se passato
         $employeeId = $user->id;
@@ -144,8 +175,8 @@ class CashMovementController extends Controller
         return response()->json([
             'message' => 'Movimento registrato con successo',
             'data' => [
-                'id' => $id,
-                'type' => $request->input('type'),
+                'id'     => $id,
+                'type'   => $request->input('type'),
                 'amount' => $request->input('amount'),
             ]
         ], 201);
