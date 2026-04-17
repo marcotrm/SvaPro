@@ -478,12 +478,12 @@ function ExportModal({ employees, onClose }) {
         const extra = Math.max(0, totAct[emp.id] - totSched[emp.id]);
         const totStyle = 'background:#0F766E;color:#fff;font-weight:700;font-size:11pt;padding:8px 10px;font-family:Calibri,Arial,sans-serif;border:1px solid #0D9488;';
         html += '<tr>'
-          + `<td colspan="2" style="${totStyle}">📊 TOTALE ${emp.first_name} ${emp.last_name}</td>`
+          + `<td colspan="2" style="${totStyle}">TOTALE ${emp.first_name} ${emp.last_name}</td>`
           + `<td style="${totStyle}text-align:center;">Prog: ${formatHours(totSched[emp.id])}</td>`
           + `<td colspan="2" style="${totStyle}text-align:center;">Effettive: ${formatHours(totAct[emp.id])}</td>`
-          + `<td style="${totStyle}text-align:center;color:${extra > 0 ? '#FDE68A' : '#99F6E4'};">` + (extra > 0 ? `⭐ +${formatHours(extra)}` : '—') + '</td>'
-          + `<td style="${totStyle}text-align:center;">✅ ${totPresente[emp.id]}gg</td>`
-          + `<td style="${totStyle}text-align:center;">🌴 ${totFerie[emp.id]}  🤒 ${totMalatt[emp.id]}  🕐 ${totPerm[emp.id]}  ❌ ${totAssente[emp.id]}</td>`
+          + `<td style="${totStyle}text-align:center;color:${extra > 0 ? '#FDE68A' : '#99F6E4'};">` + (extra > 0 ? `+${formatHours(extra)}` : '-') + '</td>'
+          + `<td style="${totStyle}text-align:center;">${totPresente[emp.id]}gg presenti</td>`
+          + `<td style="${totStyle}text-align:center;">F:${totFerie[emp.id]} M:${totMalatt[emp.id]} P:${totPerm[emp.id]} A:${totAssente[emp.id]}</td>`
           + `<td colspan="2" style="${totStyle}"></td>`
           + '</tr>';
 
@@ -492,19 +492,19 @@ function ExportModal({ employees, onClose }) {
       });
 
       // ── SEZIONE RIEPILOGO FINALE ─────────────────────────────────────────────
-      html += `<tr><td colspan="${COL_COUNT}" style="background:#1E1B4B;color:#C7D2FE;font-weight:900;font-size:13pt;padding:12px 14px;font-family:Calibri,Arial,sans-serif;border:1px solid #1E1B4B;letter-spacing:0.05em;">📋 RIEPILOGO TOTALI — ${dateFrom} → ${dateTo}</td></tr>`;
+      html += `<tr><td colspan="${COL_COUNT}" style="background:#1E1B4B;color:#C7D2FE;font-weight:900;font-size:13pt;padding:12px 14px;font-family:Calibri,Arial,sans-serif;border:1px solid #1E1B4B;letter-spacing:0.05em;">RIEPILOGO TOTALI - ${dateFrom} al ${dateTo}</td></tr>`;
 
       const rhStyle = 'background:#3730A3;color:#fff;font-weight:700;font-size:10pt;padding:7px 10px;font-family:Calibri,Arial,sans-serif;border:1px solid #312E81;text-align:center;';
       html += '<tr>'
-        + `<td colspan="2" style="${rhStyle}">👤 Dipendente</td>`
+        + `<td colspan="2" style="${rhStyle}">Dipendente</td>`
         + `<td style="${rhStyle}">Ore Prog.</td>`
         + `<td style="${rhStyle}">Ore Effect.</td>`
-        + `<td style="${rhStyle}">⭐ ORE EXTRA</td>`
-        + `<td style="${rhStyle}">✅ Presenti</td>`
-        + `<td style="${rhStyle}">🌴 Ferie</td>`
-        + `<td style="${rhStyle}">🤒 Malattia</td>`
-        + `<td style="${rhStyle}">🕐 Permessi</td>`
-        + `<td style="${rhStyle}">❌ Assenti</td>`
+        + `<td style="${rhStyle}">Ore Extra</td>`
+        + `<td style="${rhStyle}">Presenti</td>`
+        + `<td style="${rhStyle}">Ferie</td>`
+        + `<td style="${rhStyle}">Malattia</td>`
+        + `<td style="${rhStyle}">Permessi</td>`
+        + `<td style="${rhStyle}">Assenti</td>`
         + '</tr>';
 
       employees.filter(e => selected.has(e.id)).forEach((emp, idx) => {
@@ -754,7 +754,7 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
       }
 
       // Trova riga header: ha ≥3 celle con date dd/mm oppure parole giorno
-      const DAY_KW = ['lunedì','lunedi','martedì','martedi','mercoledì','mercoledi','giovedì','giovedi','venerdì','venerdi','sabato','domenica','lun','mar','mer','gio','ven','sab','dom'];
+      const DAY_KW = ['lunedi','lunedi','martedi','martedi','mercoledi','mercoledi','giovedi','giovedi','venerdi','venerdi','sabato','domenica','lun','mar','mer','gio','ven','sab','dom'];
       let headerRowIdx = -1, dateRowIdx = -1;
       for (let i=0; i<allRows.length; i++) {
         const row = allRows[i];
@@ -837,10 +837,10 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
         const row     = allRows[i];
         const rawName = String(row[nameCol] ?? '').trim();
         if (!rawName || rawName.length < 2) continue;
-        const lc = rawName.toLowerCase().replace(/[^a-zàèéìòù\s]/g,'').trim();
+        const lc = rawName.toLowerCase().replace(/[^a-z\s]/g,'').trim();
         if (!lc || SKIP_KW.has(lc)) continue;
         if (/^\d/.test(rawName)) continue;
-        if (DAY_KW.some(d => lc === d || lc === d.replace('ì','i').replace('è','e').replace('é','e').replace('à','a'))) continue;
+        if (DAY_KW.some(d => lc === d)) continue;
 
         const shifts = [];
         for (const [colStr, dateISO] of Object.entries(colDateMap)) {
@@ -853,7 +853,7 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
         if (shifts.length > 0 && !seenNames.has(rawName)) {
           seenNames.add(rawName);
           rawEntries.push({ name: rawName, shifts });
-          debugInfo.names.push(`${rawName} → ${shifts.length} turni`);
+          debugInfo.names.push(`${rawName} -> ${shifts.length} turni`);
         } else if (shifts.length > 0 && seenNames.has(rawName)) {
           // Aggiungi turni alla entry esistente (potrebbero essere su righe separate)
           const existing = rawEntries.find(e => e.name === rawName);
@@ -914,7 +914,7 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
   const downloadTemplate = () => {
     const d0 = weekDays[0]?.dateStr || new Date().toISOString().split('T')[0];
     const dayHeaders = weekDays.map(d => { const [,m,day] = d.dateStr.split('-'); return `${day}/${m}`; });
-    const dayNames   = ['LUNEDÌ','MARTEDÌ','MERCOLEDÌ','GIOVEDÌ','VENERDÌ','SABATO','DOMENICA'];
+    const dayNames   = ['lunedi','martedi','mercoledi','giovedi','venerdi','SABATO','DOMENICA'];
     const rows = [
       ['TURNI SETTIMANALI','','','','','QUI SVAPO','','',''],
       ['','','','','','STORE','','',''],
@@ -1266,7 +1266,7 @@ export default function ShiftsPage() {
   // Auto-salva se ci sono modifiche pendenti, poi cambia settimana
   const changeWeek = async (deltaDays) => {
     if (hasUnsavedChanges && Object.keys(shifts).length > 0) {
-      const savingToast = toast.loading('💾 Salvataggio turni in corso...');
+      const savingToast = toast.loading('Salvataggio turni in corso...');
       try {
         const payload = { store_id: storeId, shifts: [], deletions: [] };
         Object.keys(shifts).forEach(key => {
@@ -1280,10 +1280,10 @@ export default function ShiftsPage() {
           }
         });
         await shiftsApi.bulkSave(payload);
-        toast.success('✅ Turni salvati automaticamente', { id: savingToast });
+        toast.success('Turni salvati automaticamente', { id: savingToast });
         setOriginalShifts(JSON.parse(JSON.stringify(shifts)));
       } catch {
-        toast.error('❌ Errore salvataggio automatico — i turni potrebbero andare persi', { id: savingToast });
+        toast.error('Errore salvataggio automatico - i turni potrebbero andare persi', { id: savingToast });
       }
     }
     const n = new Date(weekStart);
