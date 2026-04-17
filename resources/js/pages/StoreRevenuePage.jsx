@@ -10,13 +10,6 @@ import { Trophy, TrendingUp, Store, RefreshCw, ChevronUp, ChevronDown, ArrowUpDo
 const STORE_COLORS = ['#7B6FD0','#F59E0B','#10B981','#EF4444','#3B82F6','#A855F7','#EC4899','#14B8A6'];
 const IT_MONTHS    = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
-const PERIODS = [
-  { id: '7d',   label: '7 gg',   days: 7   },
-  { id: '30d',  label: '30 gg',  days: 30  },
-  { id: '90d',  label: '3 mesi', days: 90  },
-  { id: '365d', label: '12 mesi',days: 365 },
-];
-
 const HISTORY_OPTIONS = [
   { id: 3,  label: '3 mesi'  },
   { id: 6,  label: '6 mesi'  },
@@ -64,21 +57,17 @@ export default function StoreRevenuePage() {
   const [sortDir,     setSortDir]     = useState('desc');
   const [activeKeys,  setActiveKeys]  = useState(DEFAULT_ACTIVE);
   const [showPicker,  setShowPicker]  = useState(false);
-  const [customRange, setCustomRange] = useState({ from: null, to: null }); // { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
-  const [rangeSelecting, setRangeSelecting] = useState('from'); // 'from' | 'to'
+  // Default: ultimi 30 giorni
+  const defaultFrom = () => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0,10); };
+  const defaultTo   = () => new Date().toISOString().slice(0,10);
+  const [dateFrom,  setDateFrom]  = useState(defaultFrom);
+  const [dateTo,    setDateTo]    = useState(defaultTo);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      let rankParams, histParams = { months: histMonths };
-      if (period === 'custom' && customRange.from && customRange.to) {
-        rankParams = { date_from: customRange.from, date_to: customRange.to };
-      } else {
-        const p = PERIODS.find(x => x.id === period) || PERIODS[1];
-        rankParams = { days: p.days };
-      }
+      const rankParams = { date_from: dateFrom, date_to: dateTo };
+      const histParams = { months: histMonths };
       const [resRank, resHist] = await Promise.allSettled([
         reports.storeRevenue(rankParams),
         reports.storeRevenueHistory(histParams),
@@ -86,7 +75,7 @@ export default function StoreRevenuePage() {
       if (resRank.status === 'fulfilled') setRanking(resRank.value?.data?.data ?? []);
       if (resHist.status === 'fulfilled') setHistory(resHist.value?.data ?? { months:[], stores:[] });
     } finally { setLoading(false); }
-  }, [period, histMonths, customRange]);
+  }, [dateFrom, dateTo, histMonths]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -185,56 +174,6 @@ export default function StoreRevenuePage() {
     );
   };
 
-  /* ── Mini calendario ── */
-  const buildCalendar = (y, m) => {
-    const firstDay = new Date(y, m, 1).getDay(); // 0=sun
-    const daysInMonth = new Date(y, m + 1, 0).getDate();
-    const startOffset = (firstDay + 6) % 7; // monday-based
-    const cells = [];
-    for (let i = 0; i < startOffset; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-    while (cells.length % 7 !== 0) cells.push(null);
-    return cells;
-  };
-
-  const toDateStr = (y, m, d) => `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-
-  const handleCalendarDay = (d) => {
-    if (!d) return;
-    const ds = toDateStr(calendarMonth.y, calendarMonth.m, d);
-    if (rangeSelecting === 'from') {
-      setCustomRange({ from: ds, to: null });
-      setRangeSelecting('to');
-    } else {
-      if (ds < customRange.from) {
-        setCustomRange({ from: ds, to: customRange.from });
-      } else {
-        setCustomRange(prev => ({ ...prev, to: ds }));
-      }
-      setRangeSelecting('from');
-      setShowCalendar(false);
-      setPeriod('custom');
-    }
-  };
-
-  const isDayInRange = (d) => {
-    if (!d) return false;
-    const ds = toDateStr(calendarMonth.y, calendarMonth.m, d);
-    if (customRange.from && customRange.to) return ds >= customRange.from && ds <= customRange.to;
-    if (customRange.from && rangeSelecting === 'to') return ds === customRange.from;
-    return false;
-  };
-
-  const isDayFrom = (d) => d && toDateStr(calendarMonth.y, calendarMonth.m, d) === customRange.from;
-  const isDayTo   = (d) => d && toDateStr(calendarMonth.y, calendarMonth.m, d) === customRange.to;
-
-  const prevMonth = () => setCalendarMonth(prev => prev.m === 0 ? { y: prev.y - 1, m: 11 } : { ...prev, m: prev.m - 1 });
-  const nextMonth = () => setCalendarMonth(prev => prev.m === 11 ? { y: prev.y + 1, m: 0 } : { ...prev, m: prev.m + 1 });
-
-  const customLabel = customRange.from && customRange.to
-    ? `${customRange.from.slice(5).replace('-','/')} → ${customRange.to.slice(5).replace('-','/')}`
-    : 'Seleziona date';
-
   /* Chart data storico */
   const chartData = history.months.map(m => {
     const pt = { month: m };
@@ -301,91 +240,30 @@ export default function StoreRevenuePage() {
             ))}
           </div>
 
-          {/* Filtro periodo */}
+          {/* Filtro periodo — Dal / Al */}
           {tab === 'ranking' && (
-            <div style={{ display:'flex', gap:4, alignItems:'center' }}>
-              {PERIODS.map(p => (
-                <button key={p.id} onClick={() => { setPeriod(p.id); setShowCalendar(false); }} style={{
-                  padding:'6px 12px', borderRadius:8, border:'1px solid',
-                  borderColor: period===p.id ? '#7B6FD0' : 'var(--color-border)',
-                  background: period===p.id ? 'rgba(123,111,208,0.12)' : 'transparent',
-                  color: period===p.id ? '#7B6FD0' : 'var(--color-text-secondary)',
-                  fontSize:11, fontWeight:700, cursor:'pointer',
-                }}>{p.label}</button>
-              ))}
-              {/* Pulsante calendario custom */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  onClick={() => { setShowCalendar(p => !p); setRangeSelecting('from'); }}
-                  style={{
-                    display:'flex', alignItems:'center', gap:5, padding:'6px 12px',
-                    borderRadius:8, border:'1px solid',
-                    borderColor: period === 'custom' || showCalendar ? '#7B6FD0' : 'var(--color-border)',
-                    background: period === 'custom' || showCalendar ? 'rgba(123,111,208,0.12)' : 'transparent',
-                    color: period === 'custom' || showCalendar ? '#7B6FD0' : 'var(--color-text-secondary)',
-                    fontSize:11, fontWeight:700, cursor:'pointer',
-                  }}
-                >
-                  <Calendar size={12} />
-                  {period === 'custom' ? customLabel : 'Personalizzato'}
-                </button>
-
-                {showCalendar && (
-                  <div style={{
-                    position:'absolute', right:0, top:'calc(100% + 6px)', zIndex:500,
-                    background:'var(--color-surface)', border:'1.5px solid var(--color-border)',
-                    borderRadius:14, boxShadow:'0 12px 32px rgba(0,0,0,0.15)', padding:16, width:260,
-                  }}>
-                    {/* Navigazione mese */}
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-                      <button onClick={prevMonth} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--color-text-secondary)', padding:4, display:'flex' }}><ChevronLeft size={16}/></button>
-                      <span style={{ fontSize:13, fontWeight:800, color:'var(--color-text)' }}>
-                        {IT_MONTHS[calendarMonth.m]} {calendarMonth.y}
-                      </span>
-                      <button onClick={nextMonth} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--color-text-secondary)', padding:4, display:'flex', transform:'rotate(180deg)' }}><ChevronLeft size={16}/></button>
-                    </div>
-
-                    {/* Istruzione */}
-                    <div style={{ fontSize:10, color:'var(--color-text-tertiary)', textAlign:'center', marginBottom:8, fontWeight:600 }}>
-                      {rangeSelecting === 'from' ? '📅 Clicca il giorno di inizio' : '📅 Clicca il giorno di fine'}
-                    </div>
-
-                    {/* Giorni header */}
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:2, marginBottom:4 }}>
-                      {['L','M','M','G','V','S','D'].map((d,i) => (
-                        <div key={i} style={{ textAlign:'center', fontSize:10, fontWeight:800, color:'var(--color-text-tertiary)', padding:'2px 0' }}>{d}</div>
-                      ))}
-                    </div>
-
-                    {/* Giorni griglia */}
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:2 }}>
-                      {buildCalendar(calendarMonth.y, calendarMonth.m).map((d, i) => {
-                        const inRange = isDayInRange(d);
-                        const isFrom  = isDayFrom(d);
-                        const isTo    = isDayTo(d);
-                        const isEdge  = isFrom || isTo;
-                        return (
-                          <button key={i} onClick={() => handleCalendarDay(d)} disabled={!d}
-                            style={{
-                              textAlign:'center', fontSize:12, fontWeight: isEdge ? 900 : 500,
-                              padding:'6px 2px', border:'none', cursor: d ? 'pointer' : 'default',
-                              borderRadius:8, transition:'all 0.1s',
-                              background: isEdge ? '#7B6FD0' : inRange ? 'rgba(123,111,208,0.15)' : 'transparent',
-                              color: isEdge ? '#fff' : inRange ? '#7B6FD0' : d ? 'var(--color-text)' : 'transparent',
-                            }}
-                          >{d || ''}</button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Reset */}
-                    {(customRange.from || customRange.to) && (
-                      <button onClick={() => { setCustomRange({from:null,to:null}); setRangeSelecting('from'); setPeriod('30d'); setShowCalendar(false); }}
-                        style={{ marginTop:10, width:'100%', padding:'6px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:8, fontSize:11, fontWeight:700, color:'#EF4444', cursor:'pointer' }}
-                      >✕ Azzera date</button>
-                    )}
-                  </div>
-                )}
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--color-surface)', border:'1.5px solid var(--color-border)', borderRadius:10, padding:'5px 12px' }}>
+                <Calendar size={13} color="#7B6FD0" />
+                <span style={{ fontSize:11, fontWeight:700, color:'var(--color-text-tertiary)' }}>Dal</span>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  max={dateTo}
+                  onChange={e => setDateFrom(e.target.value)}
+                  style={{ border:'none', background:'transparent', fontSize:12, fontWeight:700, color:'var(--color-text)', outline:'none', cursor:'pointer' }}
+                />
+              </div>
+              <span style={{ fontSize:13, color:'var(--color-text-tertiary)' }}>→</span>
+              <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--color-surface)', border:'1.5px solid var(--color-border)', borderRadius:10, padding:'5px 12px' }}>
+                <span style={{ fontSize:11, fontWeight:700, color:'var(--color-text-tertiary)' }}>Al</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom}
+                  onChange={e => setDateTo(e.target.value)}
+                  style={{ border:'none', background:'transparent', fontSize:12, fontWeight:700, color:'var(--color-text)', outline:'none', cursor:'pointer' }}
+                />
               </div>
             </div>
           )}
