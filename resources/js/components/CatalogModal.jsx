@@ -108,6 +108,7 @@ const createEmptyVariant = () => ({
   volume_ml: '',
   color: '',
   barcode: '',
+  extra_barcodes: [],
   location: '',
   tax_class_id: '',
   excise_profile_code: '',
@@ -131,6 +132,7 @@ const normalizeVariant = (v = {}) => ({
   volume_ml: v.volume_ml ?? '',
   color: v.color ?? '',
   barcode: v.barcode ?? '',
+  extra_barcodes: Array.isArray(v.extra_barcodes) ? v.extra_barcodes : [],
   location: v.location ?? '',
   tax_class_id: v.tax_class_id ?? '',
   excise_profile_code: v.excise_profile_code ?? '',
@@ -314,11 +316,19 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
     setFormData(prev => ({ ...prev, subcategory_id: subId }));
   };
 
+  // Rilevazione hardware: product_type device oppure nome categoria
+  const isHardware = useMemo(() => {
+    if (formData.product_type === 'device') return true;
+    const cat = categories.find(c => String(c.id) === String(formData.subcategory_id || formData.category_id));
+    const n = cat?.name?.toLowerCase() || '';
+    return n.includes('hardware') || n.includes('device') || n.includes('disposit') || n.includes('mod');
+  }, [formData.product_type, formData.category_id, formData.subcategory_id, categories]);
+
   const TABS = [
-    { id: 'info', label: 'Informazioni', icon: <Package size={14} /> },
-    { id: 'variants', label: 'Varianti & Prezzi', icon: <Tag size={14} /> },
-    { id: 'fiscal', label: 'Fiscale & Accise', icon: <DollarSign size={14} /> },
-    { id: 'inventory', label: 'Inventario', icon: <Settings2 size={14} /> },
+    { id: 'info',      label: 'Informazioni',                              icon: <Package size={14} /> },
+    { id: 'variants',  label: isHardware ? 'Varianti Colore' : 'Varianti & Prezzi', icon: <Tag size={14} /> },
+    ...(!isHardware ? [{ id: 'fiscal', label: 'Fiscale & Accise', icon: <DollarSign size={14} /> }] : []),
+    { id: 'inventory', label: 'Inventario',                               icon: <Settings2 size={14} /> },
   ];
 
   return (
@@ -516,124 +526,108 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <div>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Varianti Prodotto</h3>
-                  <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>Ogni variante ha prezzi, barcode e ubicazione propri</p>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{isHardware ? 'Varianti per Colore' : 'Varianti Prodotto'}</h3>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{isHardware ? 'Ogni variante rappresenta un colore — piu barcodes per colore' : 'Ogni variante ha prezzi, barcode e ubicazione propri'}</p>
                 </div>
                 <button type="button" className="sp-btn sp-btn-secondary sp-btn-sm" onClick={addVariant}>
-                  <Plus size={14} /> Aggiungi Variante
+                  <Plus size={14} /> {isHardware ? 'Aggiungi Colore' : 'Aggiungi Variante'}
                 </button>
               </div>
 
               {formData.variants.map((v, idx) => (
-                <div key={idx} style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 20, marginBottom: 16, border: '1px solid var(--color-border)' }}>
+                <div key={idx} style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 20, marginBottom: 16, border: isHardware ? '1.5px solid rgba(99,102,241,0.25)' : '1px solid var(--color-border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)' }}>Variante #{idx + 1}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {isHardware && v.color && v.color.match(/^#/) && (<span style={{ width: 12, height: 12, borderRadius: '50%', background: v.color, border: '1px solid var(--color-border)', display: 'inline-block', flexShrink: 0 }} />)}
+                      {isHardware ? (v.color || `Colore #${idx + 1}`) : `Variante #${idx + 1}`}
+                    </span>
                     {formData.variants.length > 1 && (
                       <button type="button" onClick={() => removeVariant(idx)} style={{ color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', gap: 4, alignItems: 'center', fontSize: 12 }}>
                         <Trash2 size={12} /> Rimuovi
                       </button>
                     )}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                    <div>
-                      <label className="sp-label">SKU Variante</label>
-                      <input className="sp-input" value={v.sku} onChange={e => handleVariantChange(idx, 'sku', e.target.value)} placeholder="Es: KWI-BLU" style={{ fontFamily: 'monospace' }} />
-                    </div>
-                    <div>
-                      <label className="sp-label">Gusto / Flavor</label>
-                      <input className="sp-input" value={v.flavor} onChange={e => handleVariantChange(idx, 'flavor', e.target.value)} placeholder="Es: Menta Ghiaccio" />
-                    </div>
-                    <div>
-                      <label className="sp-label">Colore</label>
-                      <input className="sp-input" value={v.color} onChange={e => handleVariantChange(idx, 'color', e.target.value)} placeholder="Es: Nero" />
-                    </div>
-                    <div>
-                      <label className="sp-label">Nicotina (mg/ml)</label>
-                      <input className="sp-input" type="number" step="0.1" value={v.nicotine_strength} onChange={e => handleVariantChange(idx, 'nicotine_strength', e.target.value)} placeholder="Es: 3" />
-                    </div>
-                    <div>
-                      <label className="sp-label">Volume (ml)</label>
-                      <input className="sp-input" type="number" step="1" value={v.volume_ml} onChange={e => handleVariantChange(idx, 'volume_ml', e.target.value)} placeholder="Es: 10" />
-                    </div>
-                    <div>
-                      <label className="sp-label">Resistenza (Ohm)</label>
-                      <input className="sp-input" type="number" step="0.01" value={v.resistance_ohm} onChange={e => handleVariantChange(idx, 'resistance_ohm', e.target.value)} placeholder="Es: 0.8" />
-                    </div>
-                    <div>
-                      <label className="sp-label">Pezzi per Pacco</label>
-                      <input className="sp-input" type="number" min="1" value={v.pack_size} onChange={e => handleVariantChange(idx, 'pack_size', e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="sp-label">💰 Listino 1 — Prezzo Vendita IVA incl. (€) *</label>
-                      <div style={{ position: 'relative' }}>
-                        <input className="sp-input" type="number" step="0.01"
-                          value={(() => {
-                            const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id));
-                            return tc?.rate ? withVat(v.sale_price, tc.rate) : v.sale_price;
-                          })()}
-                          onChange={e => {
-                            const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id));
-                            // Salvo sempre il netto nel form
-                            const net = tc?.rate ? withoutVat(e.target.value, tc.rate) : e.target.value;
-                            handleVariantChange(idx, 'sale_price', net);
-                          }}
-                          placeholder="0.00" style={{ fontWeight: 700, paddingRight: 90, ...inputStyleV(idx, 'sale_price') }} />
-                        <span style={{
-                          position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                          fontSize: 10, fontWeight: 700, color: '#10b981',
-                          background: 'rgba(16,185,129,0.1)', borderRadius: 5, padding: '2px 6px',
-                        }}>IVA incl.</span>
+                  {isHardware ? (
+                    /* HARDWARE: colore + multi-barcode + prezzi + specs */
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                      <div>
+                        <label className="sp-label">Colore *</label>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input type="color" value={v.color.match(/^#[0-9A-Fa-f]{6}$/) ? v.color : '#888888'} onChange={e => handleVariantChange(idx, 'color', e.target.value)} style={{ width: 36, height: 36, padding: 2, border: '1px solid var(--color-border)', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }} />
+                          <input className="sp-input" value={v.color} onChange={e => handleVariantChange(idx, 'color', e.target.value)} placeholder="Es: Nero, Space Grey" style={{ flex: 1 }} />
+                        </div>
                       </div>
-                      {v.sale_price && (() => {
-                        const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id));
-                        return tc?.rate ? (
-                          <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 3 }}>
-                            Imponibile (netto): €{parseFloat(v.sale_price).toFixed(2)} · IVA {tc.rate}%: €{(parseFloat(v.sale_price) * tc.rate / 100).toFixed(2)}
-                          </p>
-                        ) : (
-                          <p style={{ fontSize: 11, color: '#F59E0B', marginTop: 3 }}>⚠ Seleziona la Classe IVA per calcolare il prezzo ivato</p>
-                        );
-                      })()}
-                      {fv(idx, 'sale_price') && <p style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{fv(idx, 'sale_price')}</p>}
-                    </div>
-                    <div>
-                      <label className="sp-label">💰 Listino 2 (es. Ingrosso) (€)</label>
-                      <input className="sp-input" type="number" step="0.01" value={v.price_list_2}
-                        onChange={e => handleVariantChange(idx, 'price_list_2', e.target.value)}
-                        placeholder="0.00" />
-                    </div>
-                    <div>
-                      <label className="sp-label">💰 Listino 3 (es. Promo/Staff) (€)</label>
-                      <input className="sp-input" type="number" step="0.01" value={v.price_list_3}
-                        onChange={e => handleVariantChange(idx, 'price_list_3', e.target.value)}
-                        placeholder="0.00" />
-                    </div>
-                    <div>
-                      <label className="sp-label">Costo (€)</label>
-                      <input className="sp-input" type="number" step="0.01" value={v.cost_price} onChange={e => handleVariantChange(idx, 'cost_price', e.target.value)} placeholder="0.00" />
-                    </div>
-                    <div>
-                      <label className="sp-label">Barcode Variante (EAN)</label>
-                      <div style={{ position: 'relative' }}>
-                        <Barcode size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
-                        <input className="sp-input" value={v.barcode} onChange={e => handleVariantChange(idx, 'barcode', e.target.value)} placeholder="Scansiona o inserisci..." style={{ paddingLeft: 34 }} />
+                      <div><label className="sp-label">SKU Variante</label><input className="sp-input" value={v.sku} onChange={e => handleVariantChange(idx, 'sku', e.target.value)} placeholder="Es: HW-NERO" style={{ fontFamily: 'monospace' }} /></div>
+                      <div><label className="sp-label">Classe IVA</label><select className="sp-select" value={v.tax_class_id} onChange={e => handleVariantChange(idx, 'tax_class_id', e.target.value)}>{TAX_CLASSES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
+                      <div>
+                        <label className="sp-label">Prezzo Vendita IVA incl. (EUR) *</label>
+                        <div style={{ position: 'relative' }}>
+                          <input className="sp-input" type="number" step="0.01" value={(() => { const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id)); return tc?.rate ? withVat(v.sale_price, tc.rate) : v.sale_price; })()} onChange={e => { const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id)); handleVariantChange(idx, 'sale_price', tc?.rate ? withoutVat(e.target.value, tc.rate) : e.target.value); }} placeholder="0.00" style={{ fontWeight: 700, paddingRight: 80, ...inputStyleV(idx, 'sale_price') }} />
+                          <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 10, fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.1)', borderRadius: 5, padding: '2px 6px' }}>IVA incl.</span>
+                        </div>
+                        {fv(idx, 'sale_price') && <p style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{fv(idx, 'sale_price')}</p>}
+                      </div>
+                      <div><label className="sp-label">Costo (EUR)</label><input className="sp-input" type="number" step="0.01" value={v.cost_price} onChange={e => handleVariantChange(idx, 'cost_price', e.target.value)} placeholder="0.00" /></div>
+                      <div><label className="sp-label">Ubicazione</label><div style={{ position: 'relative' }}><MapPin size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} /><input className="sp-input" value={v.location} onChange={e => handleVariantChange(idx, 'location', e.target.value)} placeholder="Es: Scaffale A3" style={{ paddingLeft: 34 }} /></div></div>
+                      {/* Multi-barcode */}
+                      <div style={{ gridColumn: '1/-1' }}>
+                        <label className="sp-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>Barcodes (EAN/GTIN) — Multipli per colore</span>
+                          <button type="button" onClick={() => handleVariantChange(idx, 'extra_barcodes', [...(v.extra_barcodes ?? []), ''])} style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-accent)', background: 'none', border: '1px solid var(--color-accent)', borderRadius: 6, padding: '2px 10px', cursor: 'pointer' }}>+ Aggiungi Barcode</button>
+                        </label>
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                          <div style={{ position: 'relative', flex: 1 }}><Barcode size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} /><input className="sp-input" value={v.barcode} onChange={e => handleVariantChange(idx, 'barcode', e.target.value)} placeholder="Barcode principale (EAN-13)" style={{ paddingLeft: 34, fontFamily: 'monospace' }} /></div>
+                          <span style={{ padding: '3px 8px', fontSize: 10, fontWeight: 700, background: 'rgba(99,102,241,0.1)', color: '#6366F1', borderRadius: 6, whiteSpace: 'nowrap' }}>MAIN</span>
+                        </div>
+                        {(v.extra_barcodes ?? []).map((bc, bi) => (
+                          <div key={bi} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                            <div style={{ position: 'relative', flex: 1 }}><Barcode size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)', opacity: 0.5 }} /><input className="sp-input" value={bc} onChange={e => { const u = [...(v.extra_barcodes ?? [])]; u[bi] = e.target.value; handleVariantChange(idx, 'extra_barcodes', u); }} placeholder={`Barcode alternativo ${bi + 1}`} style={{ paddingLeft: 34, fontFamily: 'monospace' }} /></div>
+                            <button type="button" onClick={() => handleVariantChange(idx, 'extra_barcodes', (v.extra_barcodes ?? []).filter((_, i) => i !== bi))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)', padding: '0 4px', flexShrink: 0 }}><Trash2 size={13} /></button>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Specifiche tecniche */}
+                      <div style={{ gridColumn: '1/-1', borderTop: '1px solid var(--color-border)', paddingTop: 14, marginTop: 4 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Specifiche Tecniche</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                          <div><label className="sp-label">Batteria (mAh)</label><input className="sp-input" type="number" value={v.battery_mah ?? ''} onChange={e => handleVariantChange(idx, 'battery_mah', e.target.value)} placeholder="Es: 3000" /></div>
+                          <div><label className="sp-label">Resist. Compatibile (Ohm)</label><input className="sp-input" type="number" step="0.01" value={v.resistance_ohm} onChange={e => handleVariantChange(idx, 'resistance_ohm', e.target.value)} placeholder="Es: 0.2-3.0" /></div>
+                          <div><label className="sp-label">Pezzi per Pacco</label><input className="sp-input" type="number" min="1" value={v.pack_size} onChange={e => handleVariantChange(idx, 'pack_size', e.target.value)} /></div>
+                        </div>
                       </div>
                     </div>
-                    <div style={{ gridColumn: '1/-1' }}>
-                      <label className="sp-label">Ubicazione in Magazzino</label>
-                      <div style={{ position: 'relative' }}>
-                        <MapPin size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
-                        <input className="sp-input" value={v.location} onChange={e => handleVariantChange(idx, 'location', e.target.value)} placeholder="Es: Scaffale A3 - Ripiano 2" style={{ paddingLeft: 34 }} />
+                  ) : (
+                    /* STANDARD: flavor/nicotina/volume */
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                      <div><label className="sp-label">SKU Variante</label><input className="sp-input" value={v.sku} onChange={e => handleVariantChange(idx, 'sku', e.target.value)} placeholder="Es: KWI-BLU" style={{ fontFamily: 'monospace' }} /></div>
+                      <div><label className="sp-label">Gusto / Flavor</label><input className="sp-input" value={v.flavor} onChange={e => handleVariantChange(idx, 'flavor', e.target.value)} placeholder="Es: Menta Ghiaccio" /></div>
+                      <div><label className="sp-label">Colore</label><input className="sp-input" value={v.color} onChange={e => handleVariantChange(idx, 'color', e.target.value)} placeholder="Es: Nero" /></div>
+                      <div><label className="sp-label">Nicotina (mg/ml)</label><input className="sp-input" type="number" step="0.1" value={v.nicotine_strength} onChange={e => handleVariantChange(idx, 'nicotine_strength', e.target.value)} placeholder="Es: 3" /></div>
+                      <div><label className="sp-label">Volume (ml)</label><input className="sp-input" type="number" step="1" value={v.volume_ml} onChange={e => handleVariantChange(idx, 'volume_ml', e.target.value)} placeholder="Es: 10" /></div>
+                      <div><label className="sp-label">Resistenza (Ohm)</label><input className="sp-input" type="number" step="0.01" value={v.resistance_ohm} onChange={e => handleVariantChange(idx, 'resistance_ohm', e.target.value)} placeholder="Es: 0.8" /></div>
+                      <div><label className="sp-label">Pezzi per Pacco</label><input className="sp-input" type="number" min="1" value={v.pack_size} onChange={e => handleVariantChange(idx, 'pack_size', e.target.value)} /></div>
+                      <div>
+                        <label className="sp-label">Prezzo Vendita IVA incl. (EUR) *</label>
+                        <div style={{ position: 'relative' }}>
+                          <input className="sp-input" type="number" step="0.01" value={(() => { const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id)); return tc?.rate ? withVat(v.sale_price, tc.rate) : v.sale_price; })()} onChange={e => { const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id)); handleVariantChange(idx, 'sale_price', tc?.rate ? withoutVat(e.target.value, tc.rate) : e.target.value); }} placeholder="0.00" style={{ fontWeight: 700, paddingRight: 90, ...inputStyleV(idx, 'sale_price') }} />
+                          <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.1)', borderRadius: 5, padding: '2px 6px' }}>IVA incl.</span>
+                        </div>
+                        {fv(idx, 'sale_price') && <p style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{fv(idx, 'sale_price')}</p>}
                       </div>
+                      <div><label className="sp-label">Listino 2 (Ingrosso) (EUR)</label><input className="sp-input" type="number" step="0.01" value={v.price_list_2} onChange={e => handleVariantChange(idx, 'price_list_2', e.target.value)} placeholder="0.00" /></div>
+                      <div><label className="sp-label">Listino 3 (Promo) (EUR)</label><input className="sp-input" type="number" step="0.01" value={v.price_list_3} onChange={e => handleVariantChange(idx, 'price_list_3', e.target.value)} placeholder="0.00" /></div>
+                      <div><label className="sp-label">Costo (EUR)</label><input className="sp-input" type="number" step="0.01" value={v.cost_price} onChange={e => handleVariantChange(idx, 'cost_price', e.target.value)} placeholder="0.00" /></div>
+                      <div><label className="sp-label">Barcode Variante (EAN)</label><div style={{ position: 'relative' }}><Barcode size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} /><input className="sp-input" value={v.barcode} onChange={e => handleVariantChange(idx, 'barcode', e.target.value)} placeholder="Scansiona o inserisci..." style={{ paddingLeft: 34 }} /></div></div>
+                      <div style={{ gridColumn: '1/-1' }}><label className="sp-label">Ubicazione in Magazzino</label><div style={{ position: 'relative' }}><MapPin size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} /><input className="sp-input" value={v.location} onChange={e => handleVariantChange(idx, 'location', e.target.value)} placeholder="Es: Scaffale A3 - Ripiano 2" style={{ paddingLeft: 34 }} /></div></div>
                     </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
 
-          {/* TAB: FISCALE */}
-          {activeTab === 'fiscal' && (
+          {/* TAB: FISCALE — solo per prodotti NON hardware */}
+          {activeTab === 'fiscal' && !isHardware && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               <div>
                 <label className="sp-label">Codice PLI (Accise)</label>
@@ -679,7 +673,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                         <input className="sp-input" type="number" step="0.001" value={v.excise_unit_amount_override} onChange={e => handleVariantChange(idx, 'excise_unit_amount_override', e.target.value)} placeholder="Auto da regole" />
                       </div>
                       <div>
-                        <label className="sp-label">ðŸ”‘ Codice CLI (Accise Doganali)</label>
+                        <label className="sp-label">Codice CLI (Accise Doganali)</label>
                         <input
                           className="sp-input"
                           value={v.cli_code}
