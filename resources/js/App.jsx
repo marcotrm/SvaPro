@@ -51,6 +51,7 @@ const RestockOrdersPage    = lazy(() => import('./pages/RestockOrdersPage.jsx'))
 const DeliveryNotesPage    = lazy(() => import('./pages/DeliveryNotesPage.jsx'));
 const AdmPage              = lazy(() => import('./pages/AdmPage.jsx'));
 const AutomazioniPage      = lazy(() => import('./pages/AutomazioniPage.jsx'));
+const StoreRevenuePage     = lazy(() => import('./pages/StoreRevenuePage.jsx'));
 
 
 // Components
@@ -155,6 +156,7 @@ export default function App() {
               <Route path="/roles-permissions" element={<RolesPermissionsPage />} />
               <Route path="/invoices" element={<InvoicesPage />} />
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/store-revenue" element={<StoreRevenuePage />} />
               <Route path="/qscare-dashboard" element={<QscareDashboardPage />} />
               <Route path="/suppliers" element={<SuppliersPage />} />
               <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
