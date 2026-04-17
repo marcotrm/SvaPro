@@ -417,7 +417,22 @@ class OrderController extends Controller
                 ->where('tenant_id', $tenantId)
                 ->value('personal_discount') ?? 0);
         }
-        $quote = $this->buildQuote($tenantId, (array) $request->input('lines'), $orderDiscount, $customerDiscountPct);
+        // Sicurezza prezzi: i dipendenti non possono modificare i prezzi di listino
+        // Rimuoviamo unit_price dalle righe se il ruolo è dipendente
+        $requestLines = (array) $request->input('lines');
+        $isDipendente = DB::table('user_roles')
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->where('user_roles.user_id', $request->user()->id)
+            ->where('roles.code', 'dipendente')
+            ->exists();
+        if ($isDipendente) {
+            $requestLines = array_map(function ($line) {
+                unset($line['unit_price'], $line['discount']);
+                return $line;
+            }, $requestLines);
+        }
+
+        $quote = $this->buildQuote($tenantId, $requestLines, $orderDiscount, $customerDiscountPct);
         $status = (string) ($request->input('status') ?: 'paid');
         $now = now();
         $stockAlerts = [];
