@@ -28,24 +28,31 @@ class ShiftController extends Controller
         $startDate = $request->input('start_date');
         $endDate   = $request->input('end_date');
 
-        $query = Shift::with('store:id,name')
-            ->where('tenant_id', $tenantId);
+        $query = DB::table('employee_shifts as es')
+            ->leftJoin('stores as st', 'st.id', '=', 'es.store_id')
+            ->where('es.tenant_id', $tenantId)
+            ->select(
+                'es.id', 'es.tenant_id', 'es.store_id', 'es.employee_id',
+                'es.date', 'es.start_time', 'es.end_time', 'es.color',
+                'es.created_at', 'es.updated_at',
+                'st.name as store_name'
+            );
 
         // Filtro per negozio (opzionale se usiamo la ricerca globale per dipendente)
         if ($storeId) {
-            $query->where('store_id', $storeId);
+            $query->where('es.store_id', $storeId);
         }
 
         // Filtro per dipendente (cross-store, nessun filtro su store_id)
         if ($empId) {
-            $query->where('employee_id', $empId);
+            $query->where('es.employee_id', $empId);
         }
 
         if ($startDate && $endDate) {
-            $query->whereBetween('date', [$startDate, $endDate]);
+            $query->whereBetween('es.date', [$startDate, $endDate]);
         }
 
-        $shifts = $query->orderBy('date')->get();
+        $shifts = $query->orderBy('es.date')->get();
 
         return response()->json(['data' => $shifts]);
     }
@@ -151,11 +158,18 @@ class ShiftController extends Controller
         // Identificare employee (dal token API in futuro, per ora mock via employee_id)
         $employeeId = $request->input('employee_id');
 
-        $shifts = Shift::with('store:id,name')
-            ->where('tenant_id', $tenantId)
-            ->where('employee_id', $employeeId)
-            ->where('date', '>=', now()->subDays(7)->toDateString())
-            ->orderBy('date', 'asc')
+        $shifts = DB::table('employee_shifts as es')
+            ->leftJoin('stores as st', 'st.id', '=', 'es.store_id')
+            ->where('es.tenant_id', $tenantId)
+            ->where('es.employee_id', $employeeId)
+            ->where('es.date', '>=', now()->subDays(7)->toDateString())
+            ->select(
+                'es.id', 'es.tenant_id', 'es.store_id', 'es.employee_id',
+                'es.date', 'es.start_time', 'es.end_time', 'es.color',
+                'es.created_at', 'es.updated_at',
+                'st.name as store_name'
+            )
+            ->orderBy('es.date', 'asc')
             ->get();
 
         return response()->json(['data' => $shifts]);

@@ -11,11 +11,6 @@ class Shift extends Model
 
     public function employee()
     {
-        return $this->belongsTo(Employee::class);
-    }
-
-    public function store()
-    {
-        return $this->belongsTo(Store::class);
+        return $this->belongsTo(User::class, 'employee_id');
     }
 }
