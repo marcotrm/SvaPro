@@ -1101,6 +1101,16 @@ export default function ShiftsPage() {
   const [extraEmployees, setExtraEmployees] = useState([]);
   const [showJollyPicker, setShowJollyPicker] = useState(false);
   const [jollySearch, setJollySearch]         = useState('');
+  const [allEmployeesGlobal, setAllEmployeesGlobal] = useState([]);
+
+  // Carica tutti i dipendenti (tutti i negozi) per il Jolly picker
+  useEffect(() => {
+    employeesApi.getEmployees()
+      .then(res => setAllEmployeesGlobal(res.data?.data || []))
+      .catch(() => {
+        attendance.getEmployeesKiosk({}).then(res => setAllEmployeesGlobal(res.data?.data || [])).catch(() => {});
+      });
+  }, []);
 
   // ── Gap detection (ricalcola ogni volta che shifts cambia) ──────────────────
   const gapAlerts = useMemo(() => detectGaps(shifts, weekDays), [shifts, weekDays]);
@@ -1778,7 +1788,7 @@ export default function ShiftsPage() {
                   {(() => {
                     const q = jollySearch.toLowerCase().trim();
                     const already = new Set([...employees.map(e => e.id), ...extraEmployees.map(e => e.id)]);
-                    const list = allEmployees.filter(e => {
+                    const list = allEmployeesGlobal.filter(e => {
                       const name = `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim().toLowerCase();
                       return !already.has(e.id) && (!q || name.includes(q));
                     });
