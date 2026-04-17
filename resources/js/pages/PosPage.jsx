@@ -1119,7 +1119,7 @@ export default function PosPage() {
           </div>
         </div>
 
-        {/* Cart Items — scrollable */}
+        {/* Cart Summary compatta — lista completa nel modal checkout */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '4px 22px' }}>
           {cartLines.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, opacity: 0.3 }}>
@@ -1129,17 +1129,38 @@ export default function PosPage() {
             </div>
           ) : (
             <div style={{ paddingTop: 4 }}>
-              {cartLines.map(line => (
-                <CartItem
-                  key={line.product_variant_id}
-                  line={line}
-                  onUpdateQty={delta => updateQty(line.product_variant_id, delta)}
-                  onRemove={() => removeFromCart(line.product_variant_id)}
-                />
-              ))}
+              {/* Riepilogo compatto — ogni articolo come riga slim */}
+              <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden', marginBottom: 10 }}>
+                {cartLines.map((line, idx) => (
+                  <div key={line.product_variant_id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 12px', gap: 8,
+                    borderBottom: idx < cartLines.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {line.name}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>x{line.qty}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd' }}>
+                        {(line.price * line.qty).toLocaleString('it-IT', { minimumFractionDigits: 2 })} €
+                      </span>
+                      <button
+                        onClick={() => removeFromCart(line.product_variant_id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', display: 'flex', padding: 0 }}
+                        title="Rimuovi"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-              {/* Note */}
-              <div style={{ marginTop: 14 }}>
+              {/* Nota ordine */}
+              <div style={{ marginTop: 8 }}>
                 <input
                   value={note}
                   onChange={e => setNote(e.target.value)}

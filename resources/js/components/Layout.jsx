@@ -549,19 +549,17 @@ export default function Layout({ user, setUser }) {
               title="Panoramica Generale"
               className="sp-desktop-only"
               style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 14px', borderRadius: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                 background: location.pathname === '/dashboard' ? 'linear-gradient(135deg, #5B50B0, #3d3490)' : 'rgba(123,111,208,0.12)',
                 color: location.pathname === '/dashboard' ? '#fff' : '#7B6FD0',
                 border: '1px solid rgba(123,111,208,0.25)',
-                cursor: 'pointer', fontSize: 12, fontWeight: 700,
-                transition: 'all 0.15s', whiteSpace: 'nowrap',
+                cursor: 'pointer', transition: 'all 0.15s',
               }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.background = 'linear-gradient(135deg, #7B6FD0, #5B50B0)'; e.currentTarget.style.color = '#fff'; }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.background = location.pathname === '/dashboard' ? 'linear-gradient(135deg, #5B50B0, #3d3490)' : 'rgba(123,111,208,0.12)'; e.currentTarget.style.color = location.pathname === '/dashboard' ? '#fff' : '#7B6FD0'; }}
             >
-              <LayoutDashboard size={14} />
-              Panoramica
+              <LayoutDashboard size={16} />
             </button>
             {/* Bottone Scheda (VapeCalc) */}
             <button
@@ -569,18 +567,17 @@ export default function Layout({ user, setUser }) {
               title="Scheda â€” Tabelle Nicotina"
               className="sp-desktop-only"
               style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 14px', borderRadius: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 36, height: 36, borderRadius: 10, flexShrink: 0, fontSize: 17,
                 background: showMichelePanel ? 'linear-gradient(135deg, #d97706, #f59e0b)' : 'rgba(245,158,11,0.12)',
                 color: showMichelePanel ? '#fff' : '#f59e0b',
                 border: '1px solid rgba(245,158,11,0.3)',
-                cursor: 'pointer', fontSize: 12, fontWeight: 700,
-                transition: 'all 0.15s', whiteSpace: 'nowrap',
+                cursor: 'pointer', transition: 'all 0.15s',
               }}
               onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #d97706, #f59e0b)'; e.currentTarget.style.color = '#fff'; }}
               onMouseLeave={e => { e.currentTarget.style.background = showMichelePanel ? 'linear-gradient(135deg, #d97706, #f59e0b)' : 'rgba(245,158,11,0.12)'; e.currentTarget.style.color = showMichelePanel ? '#fff' : '#f59e0b'; }}
             >
-              📋 Scheda
+              📋
             </button>
 
             {/* Bottone riepilogo vendite */}
@@ -589,20 +586,17 @@ export default function Layout({ user, setUser }) {
               title={selectedStore ? `Vendite: ${selectedStore.name}` : 'Riepilogo vendite'}
               className="sp-desktop-only"
               style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 14px', borderRadius: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                 background: 'linear-gradient(135deg, #7B6FD0, #5B50B0)',
                 color: '#fff', border: 'none', cursor: 'pointer',
-                fontSize: 12, fontWeight: 700,
                 boxShadow: '0 2px 8px rgba(123,111,208,0.35)',
                 transition: 'all 0.15s',
-                whiteSpace: 'nowrap',
               }}
               onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
               onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
             >
-              <BarChart3 size={14} />
-              Vendite
+              <BarChart3 size={16} />
             </button>
             {/* â”€â”€ CAMPANELLA NOTIFICHE â”€â”€ */}
             <div ref={notifPanelRef} style={{ position: 'relative' }}>
