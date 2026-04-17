@@ -1,286 +1,402 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Truck, Plus, Check, Clock, MapPin, Package, Store, ChevronDown,
-  ChevronUp, X, AlertCircle, CheckCircle2, Circle, Edit3, Trash2,
-  RefreshCw, ExternalLink, Copy
+  Truck, Plus, Check, ChevronLeft, ChevronRight, X, AlertCircle,
+  CheckCircle2, Circle, Edit3, Trash2, ExternalLink, Copy, Package, MapPin
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { stores } from '../api.jsx';
 
-/* ── helpers localStorage ─────────────────────────────────── */
+/* ── storage ─────────────────────────────────────────────── */
 const STORAGE_KEY = 'svapro_store_deliveries';
+const loadAll  = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; } };
+const saveAll  = (l) => localStorage.setItem(STORAGE_KEY, JSON.stringify(l));
+const newId    = () => `del_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
 
-const loadDeliveries = () => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
-};
-const saveDeliveries = (list) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-};
+/* ── helpers date ────────────────────────────────────────── */
+const DAYS_IT  = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
+const DAYS_SH  = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
 
+function getMonday(d) {
+  const dt = new Date(d);
+  const day = dt.getDay(); // 0=sun
+  const diff = (day === 0 ? -6 : 1 - day);
+  dt.setDate(dt.getDate() + diff);
+  dt.setHours(0,0,0,0);
+  return dt;
+}
+function addDays(d, n) {
+  const dt = new Date(d);
+  dt.setDate(dt.getDate() + n);
+  return dt;
+}
+function toISO(d) {
+  return d.toISOString().slice(0,10);
+}
+function fmtDay(d) {
+  return d.toLocaleDateString('it-IT', { day:'2-digit', month:'short' });
+}
+function fmtFull(d) {
+  return new Date(d).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'2-digit' });
+}
+function fmtTime(iso) {
+  return iso ? new Date(iso).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' }) : '';
+}
+
+/* ── status config ───────────────────────────────────────── */
 const STATUS = {
-  pending:     { label: 'Da fare',      color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',  Icon: Circle },
-  in_progress: { label: 'In corso',     color: '#3B82F6', bg: 'rgba(59,130,246,0.1)',  Icon: Truck },
-  done:        { label: 'Consegnato',   color: '#10B981', bg: 'rgba(16,185,129,0.1)',  Icon: CheckCircle2 },
-  issue:       { label: 'Problema',     color: '#EF4444', bg: 'rgba(239,68,68,0.1)',   Icon: AlertCircle },
+  pending:     { label: 'Da fare',    color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  Icon: Circle },
+  in_progress: { label: 'In corso',  color: '#3B82F6', bg: 'rgba(59,130,246,0.12)',  Icon: Truck },
+  done:        { label: 'Consegnato',color: '#10B981', bg: 'rgba(16,185,129,0.12)',  Icon: CheckCircle2 },
+  issue:       { label: 'Problema',  color: '#EF4444', bg: 'rgba(239,68,68,0.12)',   Icon: AlertCircle },
 };
-
-const newId = () => `del_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
-const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
-const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '—';
+const PRI = { high: { label:'🔴 Urgente', color:'#EF4444' }, normal: { label:'🟡 Normale', color:'#F59E0B' }, low: { label:'🟢 Bassa', color:'#10B981' } };
 
 /* ────────────────────────────────────────────────────────── */
 export default function StoreDeliveriesPage() {
-  const [deliveries, setDeliveries] = useState(loadDeliveries);
+  const [deliveries, setDeliveries] = useState(loadAll);
   const [storeList,  setStoreList]  = useState([]);
-  const [showForm,   setShowForm]   = useState(false);
-  const [editId,     setEditId]     = useState(null);
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [driverLink, setDriverLink]    = useState('');
+  const [weekStart,  setWeekStart]  = useState(() => getMonday(new Date()));
 
-  /* form state */
-  const emptyForm = { store_id: '', store_name: '', notes: '', items: '', scheduled_date: '', priority: 'normal' };
-  const [form, setForm] = useState(emptyForm);
+  /* Modale form */
+  const emptyForm = { store_id:'', store_name:'', items:'', notes:'', priority:'normal', scheduled_date:'' };
+  const [showModal, setShowModal]   = useState(false);
+  const [editId,    setEditId]      = useState(null);
+  const [form,      setForm]        = useState(emptyForm);
+
+  /* Modale dettaglio cella */
+  const [cellModal, setCellModal]   = useState(null); // { storeId, storeName, dateStr }
 
   useEffect(() => {
     stores.getAll?.().then(r => setStoreList(r.data?.data || r.data || [])).catch(() => {});
-    // Genera link driver
-    const base = window.location.origin;
-    setDriverLink(`${base}/deliveries/driver`);
   }, []);
 
-  const persist = useCallback((list) => {
-    setDeliveries(list);
-    saveDeliveries(list);
-  }, []);
-
-  const handleFormChange = (k, v) => {
-    setForm(f => ({ ...f, [k]: v }));
-    if (k === 'store_id') {
-      const s = storeList.find(s => String(s.id) === String(v));
-      if (s) setForm(f => ({ ...f, store_id: v, store_name: s.name || s.store_name || '' }));
-    }
+  /* ── settimana corrente ── */
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = addDays(weekStart, i);
+    return { dateStr: toISO(d), label: DAYS_IT[i], short: DAYS_SH[i], display: fmtDay(d), date: d };
+  });
+  const fmtWeekRange = () => {
+    const from = weekDays[0].date.toLocaleDateString('it-IT', { day:'2-digit', month:'long' });
+    const to   = weekDays[6].date.toLocaleDateString('it-IT', { day:'2-digit', month:'long', year:'numeric' });
+    return `${from} — ${to}`;
   };
 
+  /* ── persist ── */
+  const persist = (list) => { setDeliveries(list); saveAll(list); };
+
+  /* ── form handlers ── */
+  const openCreate = (storeId, storeName, dateStr) => {
+    setForm({ ...emptyForm, store_id: String(storeId || ''), store_name: storeName || '', scheduled_date: dateStr || '' });
+    setEditId(null);
+    setShowModal(true);
+  };
+  const openEdit = (d) => {
+    setForm({ store_id: String(d.store_id||''), store_name: d.store_name||'', items: d.items||'', notes: d.notes||'', priority: d.priority||'normal', scheduled_date: d.scheduled_date||'' });
+    setEditId(d.id);
+    setShowModal(true);
+  };
   const handleSave = () => {
-    if (!form.store_name && !form.store_id) return toast.error('Seleziona un negozio');
-    const storeName = form.store_name || storeList.find(s => String(s.id) === String(form.store_id))?.name || form.store_id;
+    const storeName = form.store_name || storeList.find(s => String(s.id) === form.store_id)?.name || form.store_id;
+    if (!storeName) return toast.error('Seleziona un negozio');
+    if (!form.scheduled_date) return toast.error('Seleziona una data');
     if (editId) {
       persist(deliveries.map(d => d.id === editId ? { ...d, ...form, store_name: storeName, updated_at: new Date().toISOString() } : d));
       toast.success('Consegna aggiornata');
     } else {
-      const nd = {
-        id: newId(),
-        ...form,
-        store_name: storeName,
-        status: 'pending',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        completed_at: null,
-        driver_note: '',
-      };
-      persist([nd, ...deliveries]);
-      toast.success(`✅ Consegna creata per ${storeName}`);
+      persist([{ id: newId(), ...form, store_name: storeName, status:'pending', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), completed_at: null, driver_note:'' }, ...deliveries]);
+      toast.success(`✅ Consegna aggiunta per ${storeName}`);
     }
-    setForm(emptyForm);
-    setShowForm(false);
+    setShowModal(false);
     setEditId(null);
   };
-
   const handleDelete = (id) => {
     if (!confirm('Eliminare questa consegna?')) return;
     persist(deliveries.filter(d => d.id !== id));
     toast.success('Eliminata');
   };
-
-  const handleEdit = (d) => {
-    setForm({ store_id: d.store_id || '', store_name: d.store_name || '', notes: d.notes || '', items: d.items || '', scheduled_date: d.scheduled_date || '', priority: d.priority || 'normal' });
-    setEditId(d.id);
-    setShowForm(true);
+  const toggleStatus = (id) => {
+    const d = deliveries.find(x => x.id === id);
+    if (!d) return;
+    const order = ['pending','in_progress','done','issue'];
+    const next  = order[(order.indexOf(d.status) + 1) % order.length];
+    persist(deliveries.map(x => x.id === id ? { ...x, status: next, completed_at: next === 'done' ? new Date().toISOString() : x.completed_at, updated_at: new Date().toISOString() } : x));
   };
 
-  const filtered = filterStatus === 'all' ? deliveries : deliveries.filter(d => d.status === filterStatus);
-  const counts   = Object.fromEntries(Object.keys(STATUS).map(k => [k, deliveries.filter(d => d.status === k).length]));
+  /* ── griglia: righe = stores, colonne = weekDays ── */
+  // Tutti gli store: quelli dall'API + quelli già nelle consegne di questa settimana
+  const deliveriesThisWeek = deliveries.filter(d => weekDays.some(w => w.dateStr === d.scheduled_date));
+  const storesInGrid = (() => {
+    const map = new Map();
+    storeList.forEach(s => map.set(String(s.id), { id: String(s.id), name: s.name || s.store_name || '' }));
+    deliveriesThisWeek.forEach(d => { if (d.store_id && !map.has(String(d.store_id))) map.set(String(d.store_id), { id: String(d.store_id), name: d.store_name }); });
+    // Se non c'è nessuno dall'API, usa i negozi delle consegne storiche
+    if (map.size === 0) {
+      const names = new Map();
+      deliveries.forEach(d => { if (d.store_name && !names.has(d.store_name)) names.set(d.store_name, { id: d.store_name, name: d.store_name }); });
+      names.forEach((v, k) => map.set(k, v));
+    }
+    return Array.from(map.values());
+  })();
+
+  const cellDeliveries = (storeId, dateStr) => deliveries.filter(d =>
+    d.scheduled_date === dateStr && (String(d.store_id) === String(storeId) || d.store_name === storeId)
+  );
+
+  /* ── KPI ── */
+  const counts = Object.fromEntries(Object.keys(STATUS).map(k => [k, deliveries.filter(d => d.status === k).length]));
+
+  /* ── colori colonna giorno ── */
+  const todayStr = toISO(new Date());
 
   return (
-    <div style={{ padding: '24px 28px', maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20, height: '100%', boxSizing: 'border-box' }}>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ background: 'linear-gradient(135deg,#7B6FD0,#5B50B0)', borderRadius: 14, width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(123,111,208,0.35)', flexShrink: 0 }}>
-            <Truck size={22} color="#fff" />
+          <div style={{ background: 'linear-gradient(135deg,#7B6FD0,#5B50B0)', borderRadius: 14, width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(123,111,208,0.3)', flexShrink: 0 }}>
+            <Truck size={21} color="#fff" />
           </div>
           <div>
-            <h1 style={{ fontSize: 21, fontWeight: 900, margin: 0 }}>Consegne Negozi</h1>
-            <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '2px 0 0' }}>
-              Gestisci le missioni di consegna — il corriere vede cosa fare in tempo reale
-            </p>
+            <h1 style={{ fontSize: 20, fontWeight: 900, margin: 0 }}>Consegne Negozi</h1>
+            <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: 0 }}>Pianifica le missioni di consegna settimana per settimana</p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* Link corriere */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 10 }}>
             <ExternalLink size={12} color="#10B981" />
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#10B981' }}>Accesso Corriere</span>
-            <button
-              onClick={() => { navigator.clipboard?.writeText(driverLink); toast.success('Link copiato!'); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#10B981', display: 'flex', padding: 0 }}
-              title="Copia link"
-            ><Copy size={12} /></button>
-            <button
-              onClick={() => window.open('/deliveries/driver', '_blank')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#10B981', display: 'flex', padding: 0 }}
-              title="Apri vista corriere"
-            ><ExternalLink size={12} /></button>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#10B981' }}>Vista Corriere</span>
+            <button onClick={() => { navigator.clipboard?.writeText(window.location.origin + '/deliveries/driver'); toast.success('Link copiato!'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#10B981', display: 'flex', padding: 0 }} title="Copia link"><Copy size={12} /></button>
+            <button onClick={() => window.open('/deliveries/driver', '_blank')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#10B981', display: 'flex', padding: 0 }} title="Apri"><ExternalLink size={12} /></button>
           </div>
-          <button
-            onClick={() => { setShowForm(true); setEditId(null); setForm(emptyForm); }}
-            className="sp-btn sp-btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <Plus size={15} /> Nuova Consegna
+          <button onClick={() => openCreate('','','')} className="sp-btn sp-btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Plus size={14} /> Nuova Consegna
           </button>
         </div>
       </div>
 
       {/* ── KPI strip ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 10 }}>
         {Object.entries(STATUS).map(([k, s]) => {
           const { Icon } = s;
           return (
-            <button key={k}
-              onClick={() => setFilterStatus(f => f === k ? 'all' : k)}
-              style={{
-                background: filterStatus === k ? s.bg : 'var(--color-surface)',
-                border: `1.5px solid ${filterStatus === k ? s.color : 'var(--color-border)'}`,
-                borderRadius: 12, padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
-                transition: 'all 0.15s',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Icon size={16} color={s.color} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: s.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</span>
+            <div key={k} style={{ flex: 1, background: 'var(--color-surface)', border: `1.5px solid ${s.color}30`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon size={17} color={s.color} />
               </div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--color-text)' }}>{counts[k] || 0}</div>
-            </button>
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--color-text)', lineHeight: 1 }}>{counts[k] || 0}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: s.color, textTransform: 'uppercase', marginTop: 2 }}>{s.label}</div>
+              </div>
+            </div>
           );
         })}
       </div>
 
-      {/* ── Form nuova consegna ── */}
-      {showForm && (
-        <div style={{ background: 'var(--color-surface)', border: '1.5px solid var(--color-accent)', borderRadius: 16, padding: 24, marginBottom: 24, boxShadow: '0 4px 24px rgba(123,111,208,0.15)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0 }}>{editId ? 'Modifica Consegna' : 'Nuova Missione di Consegna'}</h3>
-            <button onClick={() => { setShowForm(false); setEditId(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}><X size={18} /></button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-            <div style={{ gridColumn: '1/2' }}>
-              <label className="sp-label">Negozio *</label>
-              {storeList.length > 0 ? (
-                <select className="sp-select" value={form.store_id} onChange={e => handleFormChange('store_id', e.target.value)}>
-                  <option value="">— Seleziona negozio —</option>
-                  {storeList.map(s => <option key={s.id} value={s.id}>{s.name || s.store_name}</option>)}
-                </select>
-              ) : (
-                <input className="sp-input" value={form.store_name} onChange={e => handleFormChange('store_name', e.target.value)} placeholder="Nome negozio / store" />
-              )}
-            </div>
-            <div>
-              <label className="sp-label">Data prevista</label>
-              <input className="sp-input" type="date" value={form.scheduled_date} onChange={e => handleFormChange('scheduled_date', e.target.value)} />
-            </div>
-            <div>
-              <label className="sp-label">Priorità</label>
-              <select className="sp-select" value={form.priority} onChange={e => handleFormChange('priority', e.target.value)}>
-                <option value="low">🟢 Bassa</option>
-                <option value="normal">🟡 Normale</option>
-                <option value="high">🔴 Urgente</option>
-              </select>
-            </div>
-            <div style={{ gridColumn: '1/-1' }}>
-              <label className="sp-label">Articoli / Descrizione spedizione</label>
-              <input className="sp-input" value={form.items} onChange={e => handleFormChange('items', e.target.value)} placeholder="Es: 3 scatole Kiwi Spark, 2 kit hardware..." />
-            </div>
-            <div style={{ gridColumn: '1/-1' }}>
-              <label className="sp-label">Note per il corriere</label>
-              <textarea className="sp-input" value={form.notes} onChange={e => handleFormChange('notes', e.target.value)} rows={2} placeholder="Es: Consegnare al responsabile, orari di apertura 9-19..." style={{ resize: 'vertical' }} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
-            <button className="sp-btn sp-btn-ghost" onClick={() => { setShowForm(false); setEditId(null); }}>Annulla</button>
-            <button className="sp-btn sp-btn-primary" onClick={handleSave}>
-              <Check size={14} /> {editId ? 'Salva Modifiche' : 'Crea Consegna'}
-            </button>
-          </div>
+      {/* ── Navigazione settimana ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <button onClick={() => setWeekStart(d => addDays(d, -7))} style={{ width: 34, height: 34, borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ChevronLeft size={18} />
+        </button>
+        <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-text)', minWidth: 280, textAlign: 'center' }}>
+          {fmtWeekRange()}
         </div>
-      )}
+        <button onClick={() => setWeekStart(d => addDays(d, 7))} style={{ width: 34, height: 34, borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ChevronRight size={18} />
+        </button>
+        <button onClick={() => setWeekStart(getMonday(new Date()))} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)' }}>
+          Oggi
+        </button>
+      </div>
 
-      {/* ── Lista consegne ── */}
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--color-text-tertiary)' }}>
-          <Truck size={48} style={{ opacity: 0.2, marginBottom: 16 }} />
-          <p style={{ fontSize: 15, fontWeight: 600 }}>
-            {filterStatus === 'all' ? 'Nessuna consegna creata' : `Nessuna consegna con stato "${STATUS[filterStatus]?.label}"`}
-          </p>
-          <p style={{ fontSize: 13 }}>Clicca "+ Nuova Consegna" per aggiungerne una</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.map(d => {
-            const st = STATUS[d.status] || STATUS.pending;
-            const { Icon } = st;
-            const priColor = d.priority === 'high' ? '#EF4444' : d.priority === 'low' ? '#10B981' : '#F59E0B';
-            const priLabel = d.priority === 'high' ? '🔴 Urgente' : d.priority === 'low' ? '🟢 Bassa' : '🟡 Normale';
-            return (
-              <div key={d.id} style={{
-                background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-                borderLeft: `4px solid ${st.color}`, borderRadius: 12, padding: '16px 20px',
-                display: 'flex', alignItems: 'center', gap: 16, transition: 'box-shadow 0.15s',
-              }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-              >
-                {/* Status icon */}
-                <div style={{ width: 42, height: 42, borderRadius: 12, background: st.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon size={20} color={st.color} />
-                </div>
-
-                {/* Info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-text)' }}>{d.store_name}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: st.bg, color: st.color }}>{st.label}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: priColor }}>{priLabel}</span>
-                    {d.scheduled_date && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 3 }}><Clock size={11} />{fmtDate(d.scheduled_date + 'T00:00:00')}</span>}
+      {/* ── Griglia settimanale ── */}
+      <div style={{ overflowX: 'auto', flex: 1, borderRadius: 14, border: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
+          <thead>
+            <tr>
+              {/* Intestazione negozio */}
+              <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 800, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left', background: 'var(--color-bg)', borderBottom: '2px solid var(--color-border)', borderRight: '1px solid var(--color-border)', position: 'sticky', left: 0, zIndex: 3, minWidth: 160, whiteSpace: 'nowrap' }}>
+                Store / Negozio
+              </th>
+              {weekDays.map(day => {
+                const isToday = day.dateStr === todayStr;
+                return (
+                  <th key={day.dateStr} style={{
+                    padding: '10px 8px', fontSize: 12, fontWeight: 700, textAlign: 'center',
+                    background: isToday ? 'rgba(123,111,208,0.08)' : 'var(--color-bg)',
+                    borderBottom: `2px solid ${isToday ? '#7B6FD0' : 'var(--color-border)'}`,
+                    borderRight: '1px solid var(--color-border)',
+                    color: isToday ? '#7B6FD0' : 'var(--color-text)',
+                    minWidth: 128, position: 'sticky', top: 0, zIndex: 2,
+                  }}>
+                    <div style={{ fontWeight: 800 }}>{day.short}</div>
+                    <div style={{ fontSize: 11, fontWeight: 500, color: isToday ? '#7B6FD0' : 'var(--color-text-tertiary)', marginTop: 2 }}>{day.display}</div>
+                    {isToday && <div style={{ width: 6, height: 6, borderRadius: 3, background: '#7B6FD0', margin: '4px auto 0' }} />}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {storesInGrid.length === 0 ? (
+              <tr>
+                <td colSpan={8} style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
+                  <Truck size={40} style={{ opacity: 0.2, marginBottom: 12 }} />
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>Nessun negozio trovato</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Aggiungi una consegna o attendi il caricamento degli store</div>
+                </td>
+              </tr>
+            ) : storesInGrid.map((store, si) => (
+              <tr key={store.id} style={{ background: si % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)' }}>
+                {/* Nome negozio (sticky) */}
+                <td style={{
+                  padding: '10px 14px', fontWeight: 800, fontSize: 13,
+                  color: 'var(--color-text)', background: si % 2 === 0 ? 'var(--color-surface)' : 'var(--color-bg)',
+                  borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)',
+                  position: 'sticky', left: 0, zIndex: 1, whiteSpace: 'nowrap',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: `hsl(${(si * 47 + 220) % 360},60%,55%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
+                      {store.name.charAt(0).toUpperCase()}
+                    </div>
+                    {store.name}
                   </div>
-                  {d.items && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 5 }}><Package size={11} />{d.items}</div>}
-                  {d.notes && <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 5 }}><MapPin size={11} />{d.notes}</div>}
-                  {d.driver_note && (
-                    <div style={{ marginTop: 6, padding: '6px 10px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, fontSize: 11, color: '#10B981', fontWeight: 600 }}>
-                      💬 Corriere: {d.driver_note}
-                    </div>
-                  )}
-                  {d.completed_at && (
-                    <div style={{ fontSize: 11, color: '#10B981', marginTop: 4, fontWeight: 600 }}>
-                      ✅ Consegnato il {fmtDate(d.completed_at)} alle {fmtTime(d.completed_at)}
-                    </div>
-                  )}
-                </div>
+                </td>
+                {/* Cella per ogni giorno */}
+                {weekDays.map(day => {
+                  const isToday = day.dateStr === todayStr;
+                  const cell = cellDeliveries(store.id, day.dateStr);
+                  return (
+                    <td key={day.dateStr}
+                      style={{
+                        padding: 6, verticalAlign: 'top', height: 80,
+                        borderBottom: '1px solid var(--color-border)',
+                        borderRight: '1px solid var(--color-border)',
+                        background: isToday ? 'rgba(123,111,208,0.04)' : 'transparent',
+                        position: 'relative', cursor: 'default',
+                      }}
+                    >
+                      {/* Consegne nella cella */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minHeight: 0 }}>
+                        {cell.map(d => {
+                          const st = STATUS[d.status] || STATUS.pending;
+                          return (
+                            <div key={d.id}
+                              style={{
+                                background: st.bg, border: `1px solid ${st.color}40`,
+                                borderLeft: `3px solid ${st.color}`,
+                                borderRadius: 6, padding: '4px 7px', fontSize: 11, fontWeight: 700,
+                                color: 'var(--color-text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4,
+                                transition: 'opacity 0.1s',
+                              }}
+                              onClick={() => openEdit(d)}
+                              onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
+                              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                            >
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                {d.items || d.notes || '—'}
+                              </span>
+                              <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                                <button
+                                  title={`Stato: ${st.label} — clicca per cambiare`}
+                                  onClick={e => { e.stopPropagation(); toggleStatus(d.id); }}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 1, display: 'flex', borderRadius: 4, color: st.color }}
+                                >
+                                  <st.Icon size={11} />
+                                </button>
+                                <button
+                                  onClick={e => { e.stopPropagation(); handleDelete(d.id); }}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 1, display: 'flex', borderRadius: 4, color: '#EF4444', opacity: 0.6 }}
+                                >
+                                  <X size={10} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* Pulsante + aggiungi */}
+                      <button
+                        onClick={() => openCreate(store.id, store.name, day.dateStr)}
+                        style={{
+                          position: 'absolute', bottom: 4, right: 4,
+                          width: 20, height: 20, borderRadius: 5, border: '1px dashed var(--color-border)',
+                          background: 'transparent', cursor: 'pointer', color: 'var(--color-text-tertiary)',
+                          fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 0.1s', lineHeight: 1, padding: 0,
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(123,111,208,0.12)'; e.currentTarget.style.color = '#7B6FD0'; e.currentTarget.style.borderColor = '#7B6FD0'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-tertiary)'; e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                        title={`Aggiungi consegna per ${store.name} il ${day.display}`}
+                      >+</button>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => handleEdit(d)} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center' }}>
-                    <Edit3 size={13} />
-                  </button>
-                  <button onClick={() => handleDelete(d.id)} style={{ background: 'none', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#EF4444', display: 'flex', alignItems: 'center' }}>
-                    <Trash2 size={13} />
-                  </button>
-                </div>
+      {/* ── Modal crea / modifica ── */}
+      {showModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowModal(false)}>
+          <div style={{ background: 'var(--color-surface)', borderRadius: 18, padding: 28, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 900, margin: 0 }}>{editId ? 'Modifica Consegna' : 'Nuova Consegna'}</h2>
+              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}><X size={18} /></button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label className="sp-label">Negozio *</label>
+                {storeList.length > 0 ? (
+                  <select className="sp-select" value={form.store_id} onChange={e => {
+                    const s = storeList.find(x => String(x.id) === e.target.value);
+                    setForm(f => ({ ...f, store_id: e.target.value, store_name: s ? (s.name || s.store_name) : '' }));
+                  }}>
+                    <option value="">— Seleziona negozio —</option>
+                    {storeList.map(s => <option key={s.id} value={s.id}>{s.name || s.store_name}</option>)}
+                  </select>
+                ) : (
+                  <input className="sp-input" value={form.store_name} onChange={e => setForm(f => ({ ...f, store_name: e.target.value }))} placeholder="Nome negozio" />
+                )}
               </div>
-            );
-          })}
+              <div>
+                <label className="sp-label">Data *</label>
+                <input className="sp-input" type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} />
+              </div>
+              <div>
+                <label className="sp-label">Priorità</label>
+                <select className="sp-select" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+                  <option value="low">🟢 Bassa</option>
+                  <option value="normal">🟡 Normale</option>
+                  <option value="high">🔴 Urgente</option>
+                </select>
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label className="sp-label">Articoli / Contenuto</label>
+                <input className="sp-input" value={form.items} onChange={e => setForm(f => ({ ...f, items: e.target.value }))} placeholder="Es: 3 scatole Kiwi Spark, 2 kit hardware..." />
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label className="sp-label">Note per il corriere</label>
+                <textarea className="sp-input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Es: Consegnare al responsabile, orario 9-19..." style={{ resize: 'vertical' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
+              {editId && (
+                <button className="sp-btn" onClick={() => { handleDelete(editId); setShowModal(false); }} style={{ color: '#EF4444', borderColor: 'rgba(239,68,68,0.3)', marginRight: 'auto' }}>
+                  <Trash2 size={13} /> Elimina
+                </button>
+              )}
+              <button className="sp-btn sp-btn-ghost" onClick={() => setShowModal(false)}>Annulla</button>
+              <button className="sp-btn sp-btn-primary" onClick={handleSave}>
+                <Check size={14} /> {editId ? 'Salva' : 'Crea Consegna'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
