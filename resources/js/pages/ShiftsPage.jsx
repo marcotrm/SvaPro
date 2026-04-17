@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Loader, Clock, Trash, X, Download, AlertTriangle, Search, User, Users } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Loader, Clock, Trash, X, Download, AlertTriangle, Search, User, Users, Upload, FileSpreadsheet, CheckCircle, AlertCircle } from 'lucide-react';
 import { attendance, shifts as shiftsApi, stores, employees as employeesApi, clearApiCache } from '../api.jsx';
 import api from '../api.jsx';
-
+import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import ShiftTemplateModal from '../components/ShiftTemplateModal.jsx';
 
@@ -588,6 +588,229 @@ function ExportModal({ employees, onClose }) {
     </div>
   );
 }
+// ─── Excel Import Modal ───────────────────────────────────────────────────────
+function ExcelImportModal({ employees, weekDays, templates, onImport, onClose }) {
+  const [file, setFile]         = useState(null);
+  const [preview, setPreview]   = useState(null); // { matched, unmatched, rows }
+  const [parsing, setParsing]   = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+
+  // Fuzzy name match: normalizza e confronta
+  const normName = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const matchEmployee = (name) => {
+    const n = normName(name);
+    return employees.find(e => {
+      const full = normName(`${e.first_name} ${e.last_name}`);
+      const rev  = normName(`${e.last_name} ${e.first_name}`);
+      const first = normName(e.first_name);
+      const last  = normName(e.last_name);
+      return full === n || rev === n || n.includes(first) || n.includes(last) || full.includes(n);
+    });
+  };
+
+  // Converte numero seriale Excel → stringa YYYY-MM-DD
+  const excelDateToStr = (val) => {
+    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+    if (typeof val === 'string') {
+      // formato dd/mm/yyyy
+      const m = val.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+      if (m) {
+        const y = m[3].length === 2 ? '20' + m[3] : m[3];
+        return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+      }
+    }
+    if (typeof val === 'number') {
+      const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+      return d.toISOString().split('T')[0];
+    }
+    return null;
+  };
+
+  const parseTime = (val) => {
+    if (!val) return '';
+    const s = String(val).trim();
+    if (/^\d{1,2}:\d{2}$/.test(s)) return s;
+    if (/^\d{1,2}$/.test(s)) return `${s.padStart(2,'0')}:00`;
+    // numero frazionario Excel (es. 0.375 = 09:00)
+    if (typeof val === 'number' && val < 1) {
+      const total = Math.round(val * 24 * 60);
+      const h = Math.floor(total / 60); const m = total % 60;
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    }
+    return s;
+  };
+
+  const handleFile = async (f) => {
+    if (!f) return;
+    setFile(f); setParsing(true); setPreview(null);
+    try {
+      const buf  = await f.arrayBuffer();
+      const wb   = XLSX.read(buf, { type: 'array', cellDates: false });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      // Normalizza colonne (case insensitive)
+      const normKey = (k) => k.toLowerCase().replace(/[^a-z]/g, '');
+      const getRaw = (row, ...keys) => {
+        for (const k of keys) {
+          const found = Object.keys(row).find(rk => normKey(rk) === normKey(k));
+          if (found !== undefined) return row[found];
+        }
+        return '';
+      };
+
+      const parsed = rows.map(row => ({
+        name:       String(getRaw(row,'nome','dipendente','name','cognome nome') || '').trim(),
+        date:       excelDateToStr(getRaw(row,'data','giorno','date','Data')),
+        start_time: parseTime(getRaw(row,'inizio','entrata','start','orario inizio','OraInizio','ora inizio')),
+        end_time:   parseTime(getRaw(row,'fine','uscita','end','orario fine','OraFine','ora fine')),
+      })).filter(r => r.name && r.date);
+
+      const weekDateStrs = new Set(weekDays.map(d => d.dateStr));
+      const matched   = [];
+      const unmatched = [];
+
+      parsed.forEach(r => {
+        const inWeek = weekDateStrs.has(r.date);
+        const emp    = matchEmployee(r.name);
+        if (emp && inWeek) matched.push({ ...r, emp });
+        else unmatched.push({ ...r, reason: !emp ? 'Dipendente non trovato' : 'Data fuori settimana' });
+      });
+
+      setPreview({ matched, unmatched, total: parsed.length });
+    } catch (err) {
+      toast.error('Errore nel parsing del file: ' + err.message);
+    } finally { setParsing(false); }
+  };
+
+  const handleConfirm = () => {
+    if (!preview?.matched?.length) return;
+    const newShifts = {};
+    const defaultColor = templates?.[0]?.color || '#10B981';
+    preview.matched.forEach(r => {
+      const key = `${r.emp.id}_${r.date}`;
+      newShifts[key] = { start_time: r.start_time || '09:00', end_time: r.end_time || '18:00', color: defaultColor };
+    });
+    onImport(newShifts);
+    setConfirmed(true);
+    setTimeout(onClose, 1200);
+  };
+
+  // Download template Excel
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Nome Dipendente', 'Data', 'Ora Inizio', 'Ora Fine'],
+      ['Mario Rossi', weekDays[0]?.dateStr || '2026-04-21', '09:00', '18:00'],
+      ['Giulia Bianchi', weekDays[1]?.dateStr || '2026-04-22', '10:00', '19:00'],
+    ]);
+    ws['!cols'] = [{wch:22},{wch:14},{wch:12},{wch:12}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Turni');
+    XLSX.writeFile(wb, 'template_turni.xlsx');
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }} onClick={onClose}>
+      <div style={{ background:'#0f172a', borderRadius:24, padding:32, width:560, maxWidth:'95vw', maxHeight:'90vh', overflow:'auto', boxShadow:'0 32px 80px rgba(0,0,0,0.5)', border:'1px solid rgba(255,255,255,0.08)' }} onClick={e=>e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <div style={{ width:44, height:44, borderRadius:14, background:'linear-gradient(135deg,#10B981,#059669)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <FileSpreadsheet size={22} color="#fff" />
+            </div>
+            <div>
+              <div style={{ fontSize:18, fontWeight:900, color:'#f1f5f9' }}>Importa da Excel</div>
+              <div style={{ fontSize:12, color:'#64748b', marginTop:2 }}>Carica un file .xlsx con i turni della settimana</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background:'rgba(255,255,255,0.06)', border:'none', borderRadius:10, width:34, height:34, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8' }}><X size={16}/></button>
+        </div>
+
+        {/* Download template */}
+        <div style={{ background:'rgba(99,102,241,0.1)', border:'1px solid rgba(99,102,241,0.2)', borderRadius:14, padding:'12px 16px', marginBottom:20, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+          <div style={{ fontSize:13, color:'#a5b4fc', fontWeight:600 }}>📋 Scarica il template Excel per compilare i turni</div>
+          <button onClick={downloadTemplate} style={{ background:'#6366F1', border:'none', borderRadius:10, padding:'8px 16px', cursor:'pointer', fontSize:12, fontWeight:700, color:'#fff', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
+            <Download size={14}/> Template
+          </button>
+        </div>
+
+        {/* Drop zone */}
+        <label style={{ display:'block', border:`2px dashed ${file ? '#10B981' : 'rgba(255,255,255,0.12)'}`, borderRadius:16, padding:'28px 20px', textAlign:'center', cursor:'pointer', background: file ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)', transition:'all 0.2s', marginBottom:20 }}>
+          <input type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={e => handleFile(e.target.files[0])} />
+          {parsing ? (
+            <div style={{ color:'#10B981', fontSize:14, fontWeight:700 }}><Loader size={24} style={{display:'block',margin:'0 auto 8px',animation:'spin 1s linear infinite'}}/> Analisi in corso...</div>
+          ) : file ? (
+            <div style={{ color:'#10B981', fontSize:14, fontWeight:700 }}><CheckCircle size={24} style={{display:'block',margin:'0 auto 8px'}}/>{file.name}</div>
+          ) : (
+            <div style={{ color:'#475569' }}>
+              <Upload size={32} style={{display:'block',margin:'0 auto 10px',opacity:0.5}}/>
+              <div style={{fontSize:14,fontWeight:700,color:'#94a3b8'}}>Trascina il file qui o clicca per caricare</div>
+              <div style={{fontSize:11,color:'#475569',marginTop:4}}>.xlsx · .xls · .csv</div>
+            </div>
+          )}
+        </label>
+
+        {/* Preview risultati */}
+        {preview && !confirmed && (
+          <div>
+            {/* Riquadro Matchati */}
+            <div style={{ marginBottom:12 }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#10B981', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+                <CheckCircle size={14}/> {preview.matched.length} turni pronti all&apos;importazione
+              </div>
+              {preview.matched.length > 0 && (
+                <div style={{ background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.15)', borderRadius:12, overflow:'hidden', maxHeight:180, overflowY:'auto' }}>
+                  {preview.matched.map((r,i) => (
+                    <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 14px', borderBottom:'1px solid rgba(255,255,255,0.04)', fontSize:12 }}>
+                      <span style={{width:140,fontWeight:700,color:'#cbd5e1',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.emp.first_name} {r.emp.last_name}</span>
+                      <span style={{color:'#64748b'}}>{r.date}</span>
+                      <span style={{color:'#10B981',fontWeight:700,marginLeft:'auto'}}>{r.start_time} → {r.end_time}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Riquadro Non matchati */}
+            {preview.unmatched.length > 0 && (
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'#F59E0B', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+                  <AlertCircle size={14}/> {preview.unmatched.length} righe ignorati
+                </div>
+                <div style={{ background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)', borderRadius:12, overflow:'hidden', maxHeight:120, overflowY:'auto' }}>
+                  {preview.unmatched.map((r,i) => (
+                    <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 14px', borderBottom:'1px solid rgba(255,255,255,0.04)', fontSize:11 }}>
+                      <span style={{width:140,color:'#94a3b8'}}>{r.name}</span>
+                      <span style={{color:'#64748b'}}>{r.date}</span>
+                      <span style={{color:'#F59E0B',marginLeft:'auto'}}>{r.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Azioni */}
+            <div style={{display:'flex',gap:10,marginTop:4}}>
+              <button onClick={onClose} style={{flex:1,padding:'12px',borderRadius:12,border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#64748b',fontWeight:700,fontSize:13,cursor:'pointer'}}>Annulla</button>
+              <button onClick={handleConfirm} disabled={!preview.matched.length} style={{flex:2,padding:'12px',borderRadius:12,border:'none',background: preview.matched.length ? '#10B981' : '#334155',color:'#fff',fontWeight:800,fontSize:14,cursor:preview.matched.length?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                <CheckCircle size={16}/> Importa {preview.matched.length} turni
+              </button>
+            </div>
+          </div>
+        )}
+
+        {confirmed && (
+          <div style={{textAlign:'center',padding:'24px 0'}}>
+            <CheckCircle size={48} color="#10B981" style={{margin:'0 auto 12px',display:'block'}}/>
+            <div style={{fontSize:18,fontWeight:800,color:'#f1f5f9'}}>Turni importati!</div>
+            <div style={{fontSize:13,color:'#64748b',marginTop:4}}>Ricorda di cliccare «Salva Configurazioni» per persistere i dati.</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ShiftsPage() {
@@ -609,7 +832,8 @@ export default function ShiftsPage() {
   const [templates, setTemplates]   = useState([]);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [activeCell, setActiveCell] = useState(null);
-  const [showExport, setShowExport] = useState(false);
+  const [showExport, setShowExport]   = useState(false);
+  const [showImport, setShowImport]   = useState(false);
 
   // ── Ricerca globale dipendente (cross-store) ──────────────────────────
 
@@ -942,6 +1166,11 @@ export default function ShiftsPage() {
               <Clock size={16} /> Modelli Orari
             </button>
           ) : null}
+          {canEditShifts && (
+            <button onClick={() => setShowImport(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'linear-gradient(135deg,#10B981,#059669)', color:'#fff', border:'none', padding:'10px 16px', borderRadius:12, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 12px rgba(16,185,129,0.3)' }}>
+              <Upload size={16} /> Importa Excel
+            </button>
+          )}
           <button onClick={() => setShowExport(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'#6366F1', color:'#fff', border:'none', padding:'10px 16px', borderRadius:12, fontWeight:700, cursor:'pointer' }}>
             <Download size={16} /> Esporta Excel
           </button>
@@ -1275,6 +1504,21 @@ export default function ShiftsPage() {
       {showExport && (
         <ExportModal employees={employees} onClose={() => setShowExport(false)} />
       )}
+
+      {/* Modal import Excel */}
+      {showImport && (
+        <ExcelImportModal
+          employees={[...employees, ...extraEmployees]}
+          weekDays={weekDays}
+          templates={templates}
+          onImport={(importedShifts) => {
+            setShifts(prev => ({ ...prev, ...importedShifts }));
+            toast.success(`✅ ${Object.keys(importedShifts).length} turni importati! Salva per confermare.`);
+          }}
+          onClose={() => setShowImport(false)}
+        />
+      )}
     </div>
   );
 }
+
