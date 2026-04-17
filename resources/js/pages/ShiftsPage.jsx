@@ -933,9 +933,10 @@ export default function ShiftsPage() {
             <CalendarIcon size={24} color="var(--color-accent)" /> Pianificazione Turni
           </h1>
           <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>
-            Clicca sull'avatar di un dipendente per impostare ferie/malattia. Clicca su una cella giorno per assegnare il turno.
+            Clicca sull&apos;avatar di un dipendente per impostare ferie/malattia. Clicca su una cella giorno per assegnare il turno.
           </div>
         </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {canEditShifts ? (
             <button onClick={() => setShowTemplatesModal(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'var(--color-surface)', color:'var(--color-text)', border:'1px solid var(--color-border)', padding:'10px 16px', borderRadius:12, fontWeight:600, cursor:'pointer' }}>
               <Clock size={16} /> Modelli Orari
