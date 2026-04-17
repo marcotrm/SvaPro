@@ -17,18 +17,25 @@ function MiniBarChart({ data, valueKey, colorStart = '#10B981', colorEnd = '#636
     </div>
   );
 
-  const max = Math.max(...data.map(d => d[valueKey] || 0), 1);
+  // Assicura che tutti i valori siano numerici validi
+  const safeData = data.map(d => ({ ...d, [valueKey]: parseFloat(d[valueKey]) || 0 }));
+  const max = Math.max(...safeData.map(d => d[valueKey]), 1);
+
+  // Parsing sicuro dei colori esadecimali
+  const parseHex = (hex, pos) => {
+    try { return parseInt((hex || '#888888').slice(pos, pos + 2), 16) || 128; } catch { return 128; }
+  };
+  const r1 = parseHex(colorStart, 1), g1 = parseHex(colorStart, 3), b1 = parseHex(colorStart, 5);
+  const r2 = parseHex(colorEnd, 1),   g2 = parseHex(colorEnd, 3),   b2 = parseHex(colorEnd, 5);
 
   return (
     <div style={{ width: '100%', height: height + 28, position: 'relative' }}>
       <div style={{ position: 'absolute', bottom: 28, left: 0, right: 0, height: 1, background: '#f1f5f9' }} />
       <div style={{ display: 'flex', alignItems: 'flex-end', height, gap: 3, paddingBottom: 0 }}>
-        {data.map((d, i) => {
-          const pct = (d[valueKey] || 0) / max;
+        {safeData.map((d, i) => {
+          const pct = d[valueKey] / max;
           const barH = Math.max(pct * (height - 20), 4);
-          const ratio = data.length > 1 ? i / (data.length - 1) : 0;
-          const r1 = parseInt(colorStart.slice(1,3), 16), g1 = parseInt(colorStart.slice(3,5), 16), b1 = parseInt(colorStart.slice(5,7), 16);
-          const r2 = parseInt(colorEnd.slice(1,3), 16), g2 = parseInt(colorEnd.slice(3,5), 16), b2 = parseInt(colorEnd.slice(5,7), 16);
+          const ratio = safeData.length > 1 ? i / (safeData.length - 1) : 0;
           const r = Math.round(r1 + (r2-r1)*ratio);
           const g = Math.round(g1 + (g2-g1)*ratio);
           const b = Math.round(b1 + (b2-b1)*ratio);

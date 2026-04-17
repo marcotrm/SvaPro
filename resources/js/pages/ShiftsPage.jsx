@@ -664,24 +664,20 @@ export default function ShiftsPage() {
 
   useEffect(() => { if (selectedStoreId) setStoreId(selectedStoreId); }, [selectedStoreId]);
 
-  useEffect(() => {
-    // Reset tutto immediatamente quando lo store cambia
-    setEmployees([]);
-    setShifts({});
-    setOriginalShifts({});
-    setExtraEmployees([]);
-    if (storeId) loadData();
-  }, [storeId, weekStart]);
-
-
-  const loadData = async () => {
+  // loadData deve essere definita con useCallback PRIMA dell'effect che la chiama,
+  // in modo che quando storeId o weekDays cambiano, la nuova versione venga usata.
+  const loadData = useCallback(async () => {
+    if (!storeId) return;
     setLoading(true);
     try {
-      const empRes = await attendance.getEmployeesKiosk({ store_id: storeId });
-      setEmployees(empRes.data?.data || []);
       const startDateStr = weekDays[0].dateStr;
       const endDateStr   = weekDays[6].dateStr;
-      const shRes = await shiftsApi.getAll({ store_id: storeId, start_date: startDateStr, end_date: endDateStr });
+      const [empRes, shRes, tplRes] = await Promise.all([
+        attendance.getEmployeesKiosk({ store_id: storeId }),
+        shiftsApi.getAll({ store_id: storeId, start_date: startDateStr, end_date: endDateStr }),
+        shiftsApi.getTemplates(),
+      ]);
+      setEmployees(empRes.data?.data || []);
       const shiftsMap = {};
       (shRes.data?.data || []).forEach(s => {
         const key = `${s.employee_id}_${s.date}`;
@@ -689,12 +685,20 @@ export default function ShiftsPage() {
       });
       setShifts(shiftsMap);
       setOriginalShifts(JSON.parse(JSON.stringify(shiftsMap)));
-      const tplRes = await shiftsApi.getTemplates();
       setTemplates(tplRes.data?.data || []);
     } catch {
       toast.error('Errore caricamento dati');
     } finally { setLoading(false); }
-  };
+  }, [storeId, weekDays]); // ← dipendenze corrette: si ricrea quando store o settimana cambiano
+
+  useEffect(() => {
+    // Reset + ricarica quando lo store o la settimana cambiano
+    setEmployees([]);
+    setShifts({});
+    setOriginalShifts({});
+    setExtraEmployees([]);
+    loadData();
+  }, [loadData]); // ← usa loadData come dipendenza: si triggera solo quando essa cambia
 
   // Ricerca globale dipendenti — server-side con debounce (usa LIKE su first_name/last_name)
   useEffect(() => {
