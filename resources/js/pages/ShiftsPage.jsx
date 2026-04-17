@@ -791,17 +791,25 @@ export default function ShiftsPage() {
     setActiveCell(null);
   };
 
+  // Helper: split key "123_2026-04-17" → ['123', '2026-04-17']
+  // Non possiamo usare split('_') perché la data contiene underscore nelle versioni precedenti
+  // ma la chiave è sempre `${empId}_${YYYY-MM-DD}`, quindi usiamo la prima occorrenza di '_'
+  const splitShiftKey = (key) => {
+    const idx = key.indexOf('_');
+    return [key.slice(0, idx), key.slice(idx + 1)];
+  };
+
   const saveChanges = async () => {
     setSaving(true);
     try {
       const payload = { store_id: storeId, shifts: [], deletions: [] };
       Object.keys(shifts).forEach(key => {
-        const [empId, dateStr] = key.split('_');
+        const [empId, dateStr] = splitShiftKey(key);
         payload.shifts.push({ employee_id: empId, date: dateStr, start_time: shifts[key].start_time, end_time: shifts[key].end_time, color: shifts[key].color });
       });
       Object.keys(originalShifts).forEach(key => {
         if (!shifts[key]) {
-          const [empId, dateStr] = key.split('_');
+          const [empId, dateStr] = splitShiftKey(key);
           payload.deletions.push({ employee_id: empId, date: dateStr });
         }
       });

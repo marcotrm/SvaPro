@@ -326,20 +326,14 @@ class ReportController extends Controller
 
         $driver = DB::connection()->getDriverName(); // pgsql | mysql | sqlite
 
-        // JSON path expressions differ by driver
+        // JSON path expression per il service_name (driver-safe)
         if ($driver === 'pgsql') {
-            $serviceNameExpr    = "COALESCE(sales_order_lines.tax_snapshot_json::json->>'service_name', 'QScare')";
-            $productTypeFilter  = "sales_order_lines.tax_snapshot_json::json->>'product_type' = 'service'";
-            $serviceNameFilter  = "LOWER(sales_order_lines.tax_snapshot_json::json->>'service_name') LIKE '%qscare%'";
+            $serviceNameExpr = "COALESCE(sales_order_lines.tax_snapshot_json::json->>'service_name', 'QScare')";
         } elseif ($driver === 'sqlite') {
-            $serviceNameExpr    = "COALESCE(json_extract(sales_order_lines.tax_snapshot_json, '$.service_name'), 'QScare')";
-            $productTypeFilter  = "json_extract(sales_order_lines.tax_snapshot_json, '$.product_type') = 'service'";
-            $serviceNameFilter  = "LOWER(json_extract(sales_order_lines.tax_snapshot_json, '$.service_name')) LIKE '%qscare%'";
+            $serviceNameExpr = "COALESCE(json_extract(sales_order_lines.tax_snapshot_json, '$.service_name'), 'QScare')";
         } else {
             // MySQL / MariaDB
-            $serviceNameExpr    = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.service_name')), 'QScare')";
-            $productTypeFilter  = "JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.product_type')) = 'service'";
-            $serviceNameFilter  = "LOWER(JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.service_name'))) LIKE '%qscare%'";
+            $serviceNameExpr = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.service_name')), 'QScare')";
         }
 
         // Build the employee full name concat (driver-safe)
@@ -353,14 +347,9 @@ class ReportController extends Controller
             ->leftJoin('stores', 'sales_orders.store_id', '=', 'stores.id')
             ->where('sales_orders.tenant_id', $tenantId)
             ->where('sales_orders.status', 'paid')
-            // QScare lines: no product_variant_id + snapshot present
-            // Accept either strict product_type='service' OR service_name contains 'qscare'
+            // Righe QScare: product_variant_id nullo (è un servizio, non un prodotto fisico)
             ->whereNull('sales_order_lines.product_variant_id')
             ->whereNotNull('sales_order_lines.tax_snapshot_json')
-            ->where(function ($q) use ($productTypeFilter, $serviceNameFilter) {
-                $q->whereRaw($productTypeFilter)
-                  ->orWhereRaw($serviceNameFilter);
-            })
             ->select(
                 'sales_orders.id as order_id',
                 'sales_orders.created_at',

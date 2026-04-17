@@ -407,8 +407,11 @@ class OrderController extends Controller
 
         $orderDiscount = (float) $request->input('order_discount_amount', 0);
         // Applica sconto personale cliente (se presente)
+        // IMPORTANTE: se il frontend ha già fornito order_discount_amount > 0, significa che
+        // ha già calcolato e incluso lo sconto cliente nel totale. Non riapplicare customerDiscountPct
+        // per evitare il doppio sconto (es. 58€ → 69€ invece di rimanere 58€).
         $customerDiscountPct = 0.0;
-        if ($request->filled('customer_id')) {
+        if ($request->filled('customer_id') && $orderDiscount <= 0) {
             $customerDiscountPct = (float) (DB::table('customers')
                 ->where('id', (int) $request->input('customer_id'))
                 ->where('tenant_id', $tenantId)
