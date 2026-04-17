@@ -644,44 +644,162 @@ function ExcelImportModal({ employees, weekDays, templates, onImport, onClose })
     if (!f) return;
     setFile(f); setParsing(true); setPreview(null);
     try {
-      const buf  = await f.arrayBuffer();
-      const wb   = XLSX.read(buf, { type: 'array', cellDates: false });
-      const ws   = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      const buf = await f.arrayBuffer();
+      const wb  = XLSX.read(buf, { type: 'array', cellDates: false, raw: false });
+      const ws  = wb.Sheets[wb.SheetNames[0]];
 
-      // Normalizza colonne (case insensitive)
-      const normKey = (k) => k.toLowerCase().replace(/[^a-z]/g, '');
-      const getRaw = (row, ...keys) => {
-        for (const k of keys) {
-          const found = Object.keys(row).find(rk => normKey(rk) === normKey(k));
-          if (found !== undefined) return row[found];
+      // Legge tutto come array di righe (array of arrays)
+      const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+
+      // ─── Utility ────────────────────────────────────────
+      const cellStr = (v) => String(v ?? '').trim();
+
+      // Normalizza orario: "9:00 - 14:00" → { start_time: '09:00', end_time: '14:00' }
+      const parseTimeRange = (val) => {
+        const s = cellStr(val);
+        if (!s) return null;
+        // Prova formato "HH:MM - HH:MM" o "HH:MM-HH:MM"
+        const m = s.match(/(\d{1,2}[:\.]\d{2})\s*[-–]\s*(\d{1,2}[:\.]\d{2})/);
+        if (m) {
+          const normalize = (t) => t.replace('.', ':').replace(/^(\d):/, '0$1:');
+          return { start_time: normalize(m[1]), end_time: normalize(m[2]) };
         }
-        return '';
+        return null;
       };
 
-      const parsed = rows.map(row => ({
-        name:       String(getRaw(row,'nome','dipendente','name','cognome nome') || '').trim(),
-        date:       excelDateToStr(getRaw(row,'data','giorno','date','Data')),
-        start_time: parseTime(getRaw(row,'inizio','entrata','start','orario inizio','OraInizio','ora inizio')),
-        end_time:   parseTime(getRaw(row,'fine','uscita','end','orario fine','OraFine','ora fine')),
-      })).filter(r => r.name && r.date);
+      // Converte "20/04" + anno → "2026-04-20"
+      const shortDateToISO = (val, year) => {
+        const s = cellStr(val);
+        // Già ISO
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        // dd/mm/yyyy completo
+        const full = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if (full) {
+          const y = full[3].length === 2 ? '20' + full[3] : full[3];
+          return `${y}-${full[2].padStart(2,'0')}-${full[1].padStart(2,'0')}`;
+        }
+        // Formato "20/04" o "20-04"
+        const short = s.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+        if (short && year) {
+          return `${year}-${short[2].padStart(2,'0')}-${short[1].padStart(2,'0')}`;
+        }
+        // Numero seriale Excel
+        if (/^\d+(\.\d+)?$/.test(s) && !s.includes(':')) {
+          const serial = parseFloat(s);
+          if (serial > 40000) {
+            const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
+            return d.toISOString().split('T')[0];
+          }
+        }
+        return null;
+      };
 
-      const weekDateStrs = new Set(weekDays.map(d => d.dateStr));
+      // ─── Cerca l'anno nella riga "Settimana" ────────────
+      let fileYear = new Date().getFullYear();
+      for (const row of allRows.slice(0, 6)) {
+        for (const cell of row) {
+          const s = cellStr(cell);
+          const m = s.match(/(\d{4})/);
+          if (m && parseInt(m[1]) >= 2024) { fileYear = parseInt(m[1]); break; }
+        }
+      }
+
+      // ─── Trova la riga con i giorni della settimana (header data) ────────────
+      // Cerco la riga che ha almeno 3 valori che sembrano date (dd/mm, numeri di colonna ≥ 2024, o nomi giorno)
+      const DAY_KEYWORDS = ['lun','mar','mer','gio','ven','sab','dom','monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+      let headerRowIdx = -1;
+      let dateRowIdx   = -1;
+
+      for (let i = 0; i < allRows.length; i++) {
+        const row = allRows[i];
+        const rowText = row.map(c => cellStr(c).toLowerCase()).join(' ');
+        const hasDayKeyword = DAY_KEYWORDS.some(d => rowText.includes(d));
+        const shortDates = row.filter(c => /^\d{1,2}[\/\-]\d{2}$/.test(cellStr(c))).length;
+        if (hasDayKeyword || shortDates >= 3) {
+          headerRowIdx = i;
+          // La riga delle date potrebbe essere questa stessa o quella precedente
+          if (shortDates >= 3) {
+            dateRowIdx = i;
+          } else {
+            // Cerca la riga precedente con le date
+            for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
+              const pShort = allRows[j].filter(c => /^\d{1,2}[\/\-]\d{2}$/.test(cellStr(c))).length;
+              if (pShort >= 3) { dateRowIdx = j; break; }
+            }
+            if (dateRowIdx === -1) dateRowIdx = i;
+          }
+          break;
+        }
+      }
+
+      if (headerRowIdx === -1) throw new Error('Struttura non riconosciuta: non trovata riga con i giorni della settimana.');
+
+      // ─── Mappa colonna → data ISO ────────────────────────
+      const dateRow = allRows[dateRowIdx];
+      const colDateMap = {}; // colIdx → 'YYYY-MM-DD'
+
+      for (let col = 1; col < dateRow.length; col++) {
+        const iso = shortDateToISO(dateRow[col], fileYear);
+        if (iso) colDateMap[col] = iso;
+      }
+
+      // Se la riga dei giorni e quella delle date sono separate, prova a unire
+      // (es: riga 4 = "20/04 21/04 ..." e riga 5 = "LUNEDÌ MARTEDÌ...")
+      if (Object.keys(colDateMap).length < 2) {
+        const altRow = allRows[headerRowIdx];
+        for (let col = 1; col < altRow.length; col++) {
+          const iso = shortDateToISO(altRow[col], fileYear);
+          if (iso) colDateMap[col] = iso;
+        }
+      }
+
+      if (Object.keys(colDateMap).length === 0) throw new Error('Non riesco a leggere le date delle colonne. Controlla che le date siano nel formato dd/mm o dd/mm/yyyy.');
+
+      // ─── Leggo le righe dipendenti (dopo il headerRow) ──────────────────────
+      const skipKeywords = ['settimana','store','negozio','dipendente','nome','lunedì','martedì','mercoledì','giovedì','venerdì','sabato','domenica','lun','mar','mer','gio','ven','sab','dom','qui svapo','turni'];
       const matched   = [];
       const unmatched = [];
 
-      parsed.forEach(r => {
-        const inWeek = weekDateStrs.has(r.date);
-        const emp    = matchEmployee(r.name);
-        if (emp && inWeek) matched.push({ ...r, emp });
-        else unmatched.push({ ...r, reason: !emp ? 'Dipendente non trovato' : 'Data fuori settimana' });
-      });
+      for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+        const row = allRows[i];
+        const rawName = cellStr(row[0]);
+        if (!rawName) continue;
+        // Salta righe che non sono dipendenti
+        const lowerName = rawName.toLowerCase();
+        if (skipKeywords.some(k => lowerName.includes(k))) continue;
+        if (/^\d/.test(rawName)) continue; // salta righe che iniziano con numero
 
-      setPreview({ matched, unmatched, total: parsed.length });
+        const emp = matchEmployee(rawName);
+
+        // Leggi le celle per ogni colonna-data
+        let empHasAny = false;
+        for (const [colStr, dateISO] of Object.entries(colDateMap)) {
+          const col = parseInt(colStr);
+          const cellVal = row[col];
+          const timeRange = parseTimeRange(cellVal);
+          if (!timeRange) continue; // cella vuota o non un orario = giorno libero
+
+          empHasAny = true;
+          if (emp) {
+            matched.push({ name: rawName, date: dateISO, ...timeRange, emp });
+          } else {
+            unmatched.push({ name: rawName, date: dateISO, reason: 'Dipendente non trovato in questo store' });
+          }
+        }
+
+        // Se il dipendente esiste ma non aveva orari in nessuna colonna, ignora silenziosamente
+        if (!empHasAny && rawName.length > 1) {
+          // non aggiungere ai non matchati - potrebbe essere una riga di spaziatura
+        }
+      }
+
+      setPreview({ matched, unmatched, colDateMap });
     } catch (err) {
-      toast.error('Errore nel parsing del file: ' + err.message);
+      toast.error('Errore parsing: ' + err.message);
+      console.error(err);
     } finally { setParsing(false); }
   };
+
 
   const handleConfirm = () => {
     if (!preview?.matched?.length) return;
@@ -696,17 +814,37 @@ function ExcelImportModal({ employees, weekDays, templates, onImport, onClose })
     setTimeout(onClose, 1200);
   };
 
-  // Download template Excel
+  // Download template Excel — formato QSi Svapo
   const downloadTemplate = () => {
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['Nome Dipendente', 'Data', 'Ora Inizio', 'Ora Fine'],
-      ['Mario Rossi', weekDays[0]?.dateStr || '2026-04-21', '09:00', '18:00'],
-      ['Giulia Bianchi', weekDays[1]?.dateStr || '2026-04-22', '10:00', '19:00'],
-    ]);
-    ws['!cols'] = [{wch:22},{wch:14},{wch:12},{wch:12}];
+    const d0 = weekDays[0]?.dateStr || new Date().toISOString().split('T')[0];
+    const year = d0.slice(0, 4);
+    // Genera date nel formato dd/mm
+    const dayHeaders = weekDays.map(d => {
+      const [y, m, day] = d.dateStr.split('-');
+      return `${day}/${m}`;
+    });
+    const dayNames = ['LUNEDÌ', 'MARTEDÌ', 'MERCOLEDÌ', 'GIOVEDÌ', 'VENERDÌ', 'SABATO', 'DOMENICA'];
+
+    const rows = [
+      ['TURNI SETTIMANALI', '', '', '', '', 'QUI SVAPO', '', '', ''],
+      ['', '', '', '', '', 'STORE', '', '', ''],
+      ['Settimana', d0, weekDays[6]?.dateStr || '', '', '', '', '', '', ''],
+      [],
+      ['', ...dayHeaders],
+      ['', ...dayNames.slice(0, weekDays.length)],
+      [],
+      ['NOME DIPENDENTE', '9:00 - 18:00', '9:00 - 18:00', '9:00 - 18:00', '9:00 - 18:00', '9:00 - 18:00', '', '', ''],
+      ['Mario Rossi',     '9:00 - 14:00', '9:00 - 14:00', '9:00 - 14:00', '15:00 - 21:00', '15:00 - 21:00', '15:00 - 21:00', '', ''],
+      [],
+      [],
+      ['Giulia Bianchi',  '15:00 - 21:00', '15:00 - 21:00', '15:00 - 21:00', '9:00 - 14:00', '9:00 - 14:00', '9:00 - 14:00', '', ''],
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 18 }, ...Array(8).fill({ wch: 14 })];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Turni');
-    XLSX.writeFile(wb, 'template_turni.xlsx');
+    XLSX.writeFile(wb, `template_turni_${d0}.xlsx`);
   };
 
   return (
