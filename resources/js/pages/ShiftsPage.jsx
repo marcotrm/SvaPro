@@ -589,267 +589,229 @@ function ExportModal({ employees, onClose }) {
   );
 }
 // ─── Excel Import Modal ───────────────────────────────────────────────────────
-function ExcelImportModal({ employees, weekDays, templates, onImport, onClose }) {
-  const [file, setFile]         = useState(null);
-  const [preview, setPreview]   = useState(null); // { matched, unmatched, rows }
-  const [parsing, setParsing]   = useState(false);
+function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
+  const [file, setFile]           = useState(null);
+  const [preview, setPreview]     = useState(null);
+  const [parsing, setParsing]     = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
-  // Fuzzy name match: normalizza e confronta
+  // Carica dipendenti direttamente dall'API (autonomo, non dipende dallo stato pagina)
+  const [allEmployees, setAllEmployees]     = useState([]);
+  const [loadingEmps, setLoadingEmps]       = useState(false);
+  // Mappa manuale: excelName → employee_id (per i non matchati)
+  const [manualMap, setManualMap]           = useState({}); // { 'CLAUDIA': empId }
+
+  useEffect(() => {
+    if (!storeId) return;
+    setLoadingEmps(true);
+    attendance.getEmployeesKiosk({ store_id: storeId })
+      .then(res => setAllEmployees(res.data?.data || []))
+      .catch(() => {})
+      .finally(() => setLoadingEmps(false));
+  }, [storeId]);
+
+  // Fuzzy name match
   const normName = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const matchEmployee = (name) => {
+  const matchEmployee = (name, empList) => {
     const n = normName(name);
-    return employees.find(e => {
-      const full = normName(`${e.first_name} ${e.last_name}`);
-      const rev  = normName(`${e.last_name} ${e.first_name}`);
-      const first = normName(e.first_name);
-      const last  = normName(e.last_name);
-      return full === n || rev === n || n.includes(first) || n.includes(last) || full.includes(n);
+    if (!n) return null;
+    return empList.find(e => {
+      const full  = normName(`${e.first_name ?? ''} ${e.last_name ?? ''}`);
+      const rev   = normName(`${e.last_name ?? ''} ${e.first_name ?? ''}`);
+      const first = normName(e.first_name ?? '');
+      const last  = normName(e.last_name  ?? '');
+      const nm    = normName(e.name ?? '');
+      // Match esatto (full name o invertito)
+      if (full === n || rev === n || nm === n) return true;
+      // Match solo nome o solo cognome (utile per "CLAUDIA" → "Claudia Rossi")
+      if (first && (n === first || first === n)) return true;
+      if (last  && (n === last  || last  === n)) return true;
+      // Match parziale (il nome del file è contenuto nel nome completo)
+      if (n.length >= 3 && (full.includes(n) || nm.includes(n))) return true;
+      return false;
     });
   };
 
-  // Converte numero seriale Excel → stringa YYYY-MM-DD
-  const excelDateToStr = (val) => {
-    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
-    if (typeof val === 'string') {
-      // formato dd/mm/yyyy
-      const m = val.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
-      if (m) {
-        const y = m[3].length === 2 ? '20' + m[3] : m[3];
-        return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-      }
-    }
-    if (typeof val === 'number') {
-      const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+  // Converte "20/04" + anno → "YYYY-MM-DD"
+  const shortDateToISO = (val, year) => {
+    const s = String(val ?? '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const full = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (full) { const y = full[3].length===2?'20'+full[3]:full[3]; return `${y}-${full[2].padStart(2,'0')}-${full[1].padStart(2,'0')}`; }
+    const short = s.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+    if (short && year) return `${year}-${short[2].padStart(2,'0')}-${short[1].padStart(2,'0')}`;
+    if (/^\d+$/.test(s) && parseFloat(s) > 40000) {
+      const d = new Date(Math.round((parseFloat(s)-25569)*86400*1000));
       return d.toISOString().split('T')[0];
     }
     return null;
   };
 
-  const parseTime = (val) => {
-    if (!val) return '';
-    const s = String(val).trim();
-    if (/^\d{1,2}:\d{2}$/.test(s)) return s;
-    if (/^\d{1,2}$/.test(s)) return `${s.padStart(2,'0')}:00`;
-    // numero frazionario Excel (es. 0.375 = 09:00)
-    if (typeof val === 'number' && val < 1) {
-      const total = Math.round(val * 24 * 60);
-      const h = Math.floor(total / 60); const m = total % 60;
-      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-    }
-    return s;
+  const parseTimeRange = (val) => {
+    const s = String(val ?? '').trim();
+    if (!s) return null;
+    const m = s.match(/(\d{1,2}[:\.]?\d{0,2})\s*[-–]\s*(\d{1,2}[:\.]?\d{0,2})/);
+    if (!m) return null;
+    const norm = (t) => {
+      t = t.replace('.', ':');
+      if (!t.includes(':')) t = t + ':00';
+      return t.replace(/^(\d):/, '0$1:');
+    };
+    return { start_time: norm(m[1]), end_time: norm(m[2]) };
   };
 
   const handleFile = async (f) => {
     if (!f) return;
-    setFile(f); setParsing(true); setPreview(null);
+    setFile(f); setParsing(true); setPreview(null); setManualMap({});
     try {
-      const buf = await f.arrayBuffer();
-      const wb  = XLSX.read(buf, { type: 'array', cellDates: false, raw: false });
-      const ws  = wb.Sheets[wb.SheetNames[0]];
-
-      // Legge tutto come array di righe (array of arrays)
-      const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
-
-      // ─── Utility ────────────────────────────────────────
+      const buf     = await f.arrayBuffer();
+      const wb      = XLSX.read(buf, { type:'array', cellDates:false, raw:false });
+      const ws      = wb.Sheets[wb.SheetNames[0]];
+      const allRows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:false });
       const cellStr = (v) => String(v ?? '').trim();
 
-      // Normalizza orario: "9:00 - 14:00" → { start_time: '09:00', end_time: '14:00' }
-      const parseTimeRange = (val) => {
-        const s = cellStr(val);
-        if (!s) return null;
-        // Prova formato "HH:MM - HH:MM" o "HH:MM-HH:MM"
-        const m = s.match(/(\d{1,2}[:\.]\d{2})\s*[-–]\s*(\d{1,2}[:\.]\d{2})/);
-        if (m) {
-          const normalize = (t) => t.replace('.', ':').replace(/^(\d):/, '0$1:');
-          return { start_time: normalize(m[1]), end_time: normalize(m[2]) };
-        }
-        return null;
-      };
-
-      // Converte "20/04" + anno → "2026-04-20"
-      const shortDateToISO = (val, year) => {
-        const s = cellStr(val);
-        // Già ISO
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-        // dd/mm/yyyy completo
-        const full = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-        if (full) {
-          const y = full[3].length === 2 ? '20' + full[3] : full[3];
-          return `${y}-${full[2].padStart(2,'0')}-${full[1].padStart(2,'0')}`;
-        }
-        // Formato "20/04" o "20-04"
-        const short = s.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
-        if (short && year) {
-          return `${year}-${short[2].padStart(2,'0')}-${short[1].padStart(2,'0')}`;
-        }
-        // Numero seriale Excel
-        if (/^\d+(\.\d+)?$/.test(s) && !s.includes(':')) {
-          const serial = parseFloat(s);
-          if (serial > 40000) {
-            const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
-            return d.toISOString().split('T')[0];
-          }
-        }
-        return null;
-      };
-
-      // ─── Cerca l'anno nella riga "Settimana" ────────────
+      // Anno dal file
       let fileYear = new Date().getFullYear();
-      for (const row of allRows.slice(0, 6)) {
+      for (const row of allRows.slice(0,6)) {
         for (const cell of row) {
-          const s = cellStr(cell);
-          const m = s.match(/(\d{4})/);
+          const m = cellStr(cell).match(/(\d{4})/);
           if (m && parseInt(m[1]) >= 2024) { fileYear = parseInt(m[1]); break; }
         }
       }
 
-      // ─── Trova la riga con i giorni della settimana (header data) ────────────
-      // Cerco la riga che ha almeno 3 valori che sembrano date (dd/mm, numeri di colonna ≥ 2024, o nomi giorno)
-      const DAY_KEYWORDS = ['lun','mar','mer','gio','ven','sab','dom','monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
-      let headerRowIdx = -1;
-      let dateRowIdx   = -1;
-
+      // Trova header row (riga con giorni o date)
+      const DAY_KW = ['lun','mar','mer','gio','ven','sab','dom'];
+      let headerRowIdx = -1, dateRowIdx = -1;
       for (let i = 0; i < allRows.length; i++) {
-        const row = allRows[i];
-        const rowText = row.map(c => cellStr(c).toLowerCase()).join(' ');
-        const hasDayKeyword = DAY_KEYWORDS.some(d => rowText.includes(d));
-        const shortDates = row.filter(c => /^\d{1,2}[\/\-]\d{2}$/.test(cellStr(c))).length;
-        if (hasDayKeyword || shortDates >= 3) {
+        const rText = allRows[i].map(c => cellStr(c).toLowerCase()).join(' ');
+        const shortDates = allRows[i].filter(c => /^\d{1,2}[\/\-]\d{2}$/.test(cellStr(c))).length;
+        const hasDays    = DAY_KW.filter(d => rText.includes(d)).length >= 2;
+        if (shortDates >= 3 || hasDays) {
           headerRowIdx = i;
-          // La riga delle date potrebbe essere questa stessa o quella precedente
-          if (shortDates >= 3) {
-            dateRowIdx = i;
-          } else {
-            // Cerca la riga precedente con le date
-            for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
-              const pShort = allRows[j].filter(c => /^\d{1,2}[\/\-]\d{2}$/.test(cellStr(c))).length;
-              if (pShort >= 3) { dateRowIdx = j; break; }
+          dateRowIdx   = shortDates >= 3 ? i : i;
+          if (!hasDays || shortDates === 0) {
+            for (let j=i-1; j>=Math.max(0,i-3); j--) {
+              if (allRows[j].filter(c => /^\d{1,2}[\/\-]\d{2}$/.test(cellStr(c))).length >= 3) { dateRowIdx=j; break; }
             }
-            if (dateRowIdx === -1) dateRowIdx = i;
           }
           break;
         }
       }
+      if (headerRowIdx === -1) throw new Error('Struttura non riconosciuta: aggiungi una riga con le date tipo 20/04, 21/04...');
 
-      if (headerRowIdx === -1) throw new Error('Struttura non riconosciuta: non trovata riga con i giorni della settimana.');
-
-      // ─── Mappa colonna → data ISO ────────────────────────
+      // Mappa colonna → data ISO
+      const colDateMap = {};
       const dateRow = allRows[dateRowIdx];
-      const colDateMap = {}; // colIdx → 'YYYY-MM-DD'
-
-      for (let col = 1; col < dateRow.length; col++) {
-        const iso = shortDateToISO(dateRow[col], fileYear);
+      for (let col=1; col<dateRow.length; col++) {
+        const iso = shortDateToISO(cellStr(dateRow[col]), fileYear);
         if (iso) colDateMap[col] = iso;
       }
-
-      // Se la riga dei giorni e quella delle date sono separate, prova a unire
-      // (es: riga 4 = "20/04 21/04 ..." e riga 5 = "LUNEDÌ MARTEDÌ...")
+      // Fallback: prova riga header se dateRow non ha date
       if (Object.keys(colDateMap).length < 2) {
-        const altRow = allRows[headerRowIdx];
-        for (let col = 1; col < altRow.length; col++) {
-          const iso = shortDateToISO(altRow[col], fileYear);
+        const hr = allRows[headerRowIdx];
+        for (let col=1; col<hr.length; col++) {
+          const iso = shortDateToISO(cellStr(hr[col]), fileYear);
           if (iso) colDateMap[col] = iso;
         }
       }
+      if (Object.keys(colDateMap).length === 0) throw new Error('Nessuna data trovata nelle colonne. Usa il formato 20/04 o 20/04/2026.');
 
-      if (Object.keys(colDateMap).length === 0) throw new Error('Non riesco a leggere le date delle colonne. Controlla che le date siano nel formato dd/mm o dd/mm/yyyy.');
+      // Leggi righe dipendenti
+      const SKIP_KW = ['settimana','store','negozio','dipendente','nome','lunedì','martedì','mercoledì','giovedì','venerdì','sabato','domenica',...DAY_KW,'qui svapo','turni',''];
+      const rawEntries = []; // { name, shifts: [{date, start_time, end_time}] }
 
-      // ─── Leggo le righe dipendenti (dopo il headerRow) ──────────────────────
-      const skipKeywords = ['settimana','store','negozio','dipendente','nome','lunedì','martedì','mercoledì','giovedì','venerdì','sabato','domenica','lun','mar','mer','gio','ven','sab','dom','qui svapo','turni'];
-      const matched   = [];
-      const unmatched = [];
-
-      for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+      for (let i=headerRowIdx+1; i<allRows.length; i++) {
         const row = allRows[i];
         const rawName = cellStr(row[0]);
-        if (!rawName) continue;
-        // Salta righe che non sono dipendenti
-        const lowerName = rawName.toLowerCase();
-        if (skipKeywords.some(k => lowerName.includes(k))) continue;
-        if (/^\d/.test(rawName)) continue; // salta righe che iniziano con numero
+        if (!rawName || rawName.length < 2) continue;
+        const low = rawName.toLowerCase();
+        if (SKIP_KW.some(k => k && low === k)) continue;
+        if (/^\d/.test(rawName)) continue;
 
-        const emp = matchEmployee(rawName);
-
-        // Leggi le celle per ogni colonna-data
-        let empHasAny = false;
+        const shifts = [];
         for (const [colStr, dateISO] of Object.entries(colDateMap)) {
-          const col = parseInt(colStr);
-          const cellVal = row[col];
-          const timeRange = parseTimeRange(cellVal);
-          if (!timeRange) continue; // cella vuota o non un orario = giorno libero
-
-          empHasAny = true;
-          if (emp) {
-            matched.push({ name: rawName, date: dateISO, ...timeRange, emp });
-          } else {
-            unmatched.push({ name: rawName, date: dateISO, reason: 'Dipendente non trovato in questo store' });
-          }
+          const tr = parseTimeRange(row[parseInt(colStr)]);
+          if (tr) shifts.push({ date: dateISO, ...tr });
         }
-
-        // Se il dipendente esiste ma non aveva orari in nessuna colonna, ignora silenziosamente
-        if (!empHasAny && rawName.length > 1) {
-          // non aggiungere ai non matchati - potrebbe essere una riga di spaziatura
-        }
+        if (shifts.length > 0) rawEntries.push({ name: rawName, shifts });
       }
 
-      setPreview({ matched, unmatched, colDateMap });
-    } catch (err) {
-      toast.error('Errore parsing: ' + err.message);
+      // Match con dipendenti caricati
+      const matched   = [];
+      const unmatched = []; // { name, shifts } — nomi non trovati
+
+      rawEntries.forEach(entry => {
+        const emp = matchEmployee(entry.name, allEmployees);
+        if (emp) {
+          entry.shifts.forEach(s => matched.push({ name: entry.name, emp, ...s }));
+        } else {
+          unmatched.push(entry);
+        }
+      });
+
+      setPreview({ matched, unmatched, colDateMap, rawEntries });
+    } catch(err) {
+      toast.error('Errore: ' + err.message);
       console.error(err);
     } finally { setParsing(false); }
   };
 
+  // Aggiorna match quando l'utente fa una mappatura manuale
+  const computeFinalMatched = () => {
+    const result = [...(preview?.matched || [])];
+    (preview?.unmatched || []).forEach(entry => {
+      const empId = manualMap[entry.name];
+      if (!empId) return;
+      const emp = allEmployees.find(e => e.id == empId);
+      if (!emp) return;
+      entry.shifts.forEach(s => result.push({ name: entry.name, emp, ...s }));
+    });
+    return result;
+  };
 
   const handleConfirm = () => {
-    if (!preview?.matched?.length) return;
-    const newShifts = {};
+    const finalMatched = computeFinalMatched();
+    if (!finalMatched.length) return;
     const defaultColor = templates?.[0]?.color || '#10B981';
-    preview.matched.forEach(r => {
+    const newShifts = {};
+    finalMatched.forEach(r => {
       const key = `${r.emp.id}_${r.date}`;
       newShifts[key] = { start_time: r.start_time || '09:00', end_time: r.end_time || '18:00', color: defaultColor };
     });
     onImport(newShifts);
     setConfirmed(true);
-    setTimeout(onClose, 1200);
+    setTimeout(onClose, 1400);
   };
 
   // Download template Excel — formato QSi Svapo
   const downloadTemplate = () => {
     const d0 = weekDays[0]?.dateStr || new Date().toISOString().split('T')[0];
-    const year = d0.slice(0, 4);
-    // Genera date nel formato dd/mm
-    const dayHeaders = weekDays.map(d => {
-      const [y, m, day] = d.dateStr.split('-');
-      return `${day}/${m}`;
-    });
-    const dayNames = ['LUNEDÌ', 'MARTEDÌ', 'MERCOLEDÌ', 'GIOVEDÌ', 'VENERDÌ', 'SABATO', 'DOMENICA'];
-
+    const dayHeaders = weekDays.map(d => { const [,m,day] = d.dateStr.split('-'); return `${day}/${m}`; });
+    const dayNames   = ['LUNEDÌ','MARTEDÌ','MERCOLEDÌ','GIOVEDÌ','VENERDÌ','SABATO','DOMENICA'];
     const rows = [
-      ['TURNI SETTIMANALI', '', '', '', '', 'QUI SVAPO', '', '', ''],
-      ['', '', '', '', '', 'STORE', '', '', ''],
-      ['Settimana', d0, weekDays[6]?.dateStr || '', '', '', '', '', '', ''],
+      ['TURNI SETTIMANALI','','','','','QUI SVAPO','','',''],
+      ['','','','','','STORE','','',''],
+      ['Settimana', d0, weekDays[6]?.dateStr||'','','','','','',''],
       [],
       ['', ...dayHeaders],
       ['', ...dayNames.slice(0, weekDays.length)],
       [],
-      ['NOME DIPENDENTE', '9:00 - 18:00', '9:00 - 18:00', '9:00 - 18:00', '9:00 - 18:00', '9:00 - 18:00', '', '', ''],
-      ['Mario Rossi',     '9:00 - 14:00', '9:00 - 14:00', '9:00 - 14:00', '15:00 - 21:00', '15:00 - 21:00', '15:00 - 21:00', '', ''],
+      ['Mario Rossi',   '9:00 - 14:00','9:00 - 14:00','9:00 - 14:00','15:00 - 21:00','15:00 - 21:00','15:00 - 21:00','',''],
       [],
-      [],
-      ['Giulia Bianchi',  '15:00 - 21:00', '15:00 - 21:00', '15:00 - 21:00', '9:00 - 14:00', '9:00 - 14:00', '9:00 - 14:00', '', ''],
+      ['Giulia Bianchi','15:00 - 21:00','15:00 - 21:00','15:00 - 21:00','9:00 - 14:00','9:00 - 14:00','9:00 - 14:00','',''],
     ];
-
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 18 }, ...Array(8).fill({ wch: 14 })];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Turni');
-    XLSX.writeFile(wb, `template_turni_${d0}.xlsx`);
+    ws['!cols'] = [{ wch:18 }, ...Array(8).fill({ wch:14 })];
+    const wbk = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wbk, ws, 'Turni');
+    XLSX.writeFile(wbk, `template_turni_${d0}.xlsx`);
   };
+
+  const finalMatched = computeFinalMatched();
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }} onClick={onClose}>
-      <div style={{ background:'#0f172a', borderRadius:24, padding:32, width:560, maxWidth:'95vw', maxHeight:'90vh', overflow:'auto', boxShadow:'0 32px 80px rgba(0,0,0,0.5)', border:'1px solid rgba(255,255,255,0.08)' }} onClick={e=>e.stopPropagation()}>
+      <div style={{ background:'#0f172a', borderRadius:24, padding:32, width:600, maxWidth:'95vw', maxHeight:'92vh', overflow:'auto', boxShadow:'0 32px 80px rgba(0,0,0,0.5)', border:'1px solid rgba(255,255,255,0.08)' }} onClick={e=>e.stopPropagation()}>
 
         {/* Header */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
@@ -859,80 +821,85 @@ function ExcelImportModal({ employees, weekDays, templates, onImport, onClose })
             </div>
             <div>
               <div style={{ fontSize:18, fontWeight:900, color:'#f1f5f9' }}>Importa da Excel</div>
-              <div style={{ fontSize:12, color:'#64748b', marginTop:2 }}>Carica un file .xlsx con i turni della settimana</div>
+              <div style={{ fontSize:12, color:'#64748b', marginTop:2 }}>
+                {loadingEmps ? '⏳ Caricamento dipendenti...' : `${allEmployees.length} dipendenti caricati`}
+              </div>
             </div>
           </div>
           <button onClick={onClose} style={{ background:'rgba(255,255,255,0.06)', border:'none', borderRadius:10, width:34, height:34, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8' }}><X size={16}/></button>
         </div>
 
-        {/* Download template */}
+        {/* Template */}
         <div style={{ background:'rgba(99,102,241,0.1)', border:'1px solid rgba(99,102,241,0.2)', borderRadius:14, padding:'12px 16px', marginBottom:20, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
-          <div style={{ fontSize:13, color:'#a5b4fc', fontWeight:600 }}>📋 Scarica il template Excel per compilare i turni</div>
+          <div style={{ fontSize:13, color:'#a5b4fc', fontWeight:600 }}>📋 Scarica il template nel formato corretto</div>
           <button onClick={downloadTemplate} style={{ background:'#6366F1', border:'none', borderRadius:10, padding:'8px 16px', cursor:'pointer', fontSize:12, fontWeight:700, color:'#fff', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
             <Download size={14}/> Template
           </button>
         </div>
 
         {/* Drop zone */}
-        <label style={{ display:'block', border:`2px dashed ${file ? '#10B981' : 'rgba(255,255,255,0.12)'}`, borderRadius:16, padding:'28px 20px', textAlign:'center', cursor:'pointer', background: file ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)', transition:'all 0.2s', marginBottom:20 }}>
-          <input type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={e => handleFile(e.target.files[0])} />
-          {parsing ? (
-            <div style={{ color:'#10B981', fontSize:14, fontWeight:700 }}><Loader size={24} style={{display:'block',margin:'0 auto 8px',animation:'spin 1s linear infinite'}}/> Analisi in corso...</div>
-          ) : file ? (
-            <div style={{ color:'#10B981', fontSize:14, fontWeight:700 }}><CheckCircle size={24} style={{display:'block',margin:'0 auto 8px'}}/>{file.name}</div>
-          ) : (
-            <div style={{ color:'#475569' }}>
-              <Upload size={32} style={{display:'block',margin:'0 auto 10px',opacity:0.5}}/>
-              <div style={{fontSize:14,fontWeight:700,color:'#94a3b8'}}>Trascina il file qui o clicca per caricare</div>
-              <div style={{fontSize:11,color:'#475569',marginTop:4}}>.xlsx · .xls · .csv</div>
-            </div>
-          )}
+        <label style={{ display:'block', border:`2px dashed ${file?'#10B981':'rgba(255,255,255,0.12)'}`, borderRadius:16, padding:'24px 20px', textAlign:'center', cursor:'pointer', background:file?'rgba(16,185,129,0.05)':'rgba(255,255,255,0.02)', transition:'all 0.2s', marginBottom:20 }}>
+          <input type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={e=>handleFile(e.target.files[0])} />
+          {parsing
+            ? <div style={{color:'#10B981',fontSize:14,fontWeight:700}}><Loader size={24} style={{display:'block',margin:'0 auto 8px',animation:'spin 1s linear infinite'}}/> Analisi in corso...</div>
+            : file
+              ? <div style={{color:'#10B981',fontSize:14,fontWeight:700}}><CheckCircle size={24} style={{display:'block',margin:'0 auto 8px'}}/>{file.name}</div>
+              : <div style={{color:'#475569'}}><Upload size={32} style={{display:'block',margin:'0 auto 10px',opacity:0.5}}/><div style={{fontSize:14,fontWeight:700,color:'#94a3b8'}}>Trascina o clicca per caricare</div><div style={{fontSize:11,color:'#475569',marginTop:4}}>.xlsx · .xls · .csv</div></div>
+          }
         </label>
 
-        {/* Preview risultati */}
+        {/* Preview */}
         {preview && !confirmed && (
           <div>
-            {/* Riquadro Matchati */}
-            <div style={{ marginBottom:12 }}>
-              <div style={{ fontSize:12, fontWeight:800, color:'#10B981', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
-                <CheckCircle size={14}/> {preview.matched.length} turni pronti all&apos;importazione
-              </div>
-              {preview.matched.length > 0 && (
-                <div style={{ background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.15)', borderRadius:12, overflow:'hidden', maxHeight:180, overflowY:'auto' }}>
-                  {preview.matched.map((r,i) => (
-                    <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 14px', borderBottom:'1px solid rgba(255,255,255,0.04)', fontSize:12 }}>
-                      <span style={{width:140,fontWeight:700,color:'#cbd5e1',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.emp.first_name} {r.emp.last_name}</span>
-                      <span style={{color:'#64748b'}}>{r.date}</span>
-                      <span style={{color:'#10B981',fontWeight:700,marginLeft:'auto'}}>{r.start_time} → {r.end_time}</span>
-                    </div>
-                  ))}
+            {/* Turni pronti */}
+            {finalMatched.length > 0 && (
+              <div style={{ marginBottom:14 }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'#10B981', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+                  <CheckCircle size={13}/> {finalMatched.length} turni pronti
                 </div>
-              )}
-            </div>
-
-            {/* Riquadro Non matchati */}
-            {preview.unmatched.length > 0 && (
-              <div style={{ marginBottom:16 }}>
-                <div style={{ fontSize:12, fontWeight:800, color:'#F59E0B', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
-                  <AlertCircle size={14}/> {preview.unmatched.length} righe ignorati
-                </div>
-                <div style={{ background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)', borderRadius:12, overflow:'hidden', maxHeight:120, overflowY:'auto' }}>
-                  {preview.unmatched.map((r,i) => (
-                    <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 14px', borderBottom:'1px solid rgba(255,255,255,0.04)', fontSize:11 }}>
-                      <span style={{width:140,color:'#94a3b8'}}>{r.name}</span>
-                      <span style={{color:'#64748b'}}>{r.date}</span>
-                      <span style={{color:'#F59E0B',marginLeft:'auto'}}>{r.reason}</span>
+                <div style={{ background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.15)', borderRadius:12, overflow:'hidden', maxHeight:160, overflowY:'auto' }}>
+                  {finalMatched.map((r,i) => (
+                    <div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 14px', borderBottom:'1px solid rgba(255,255,255,0.04)', fontSize:12 }}>
+                      <span style={{ fontWeight:700, color:'#cbd5e1', flex:1 }}>{r.emp.first_name ?? r.emp.name} {r.emp.last_name ?? ''}</span>
+                      <span style={{ color:'#64748b', fontSize:11 }}>{r.date}</span>
+                      <span style={{ color:'#10B981', fontWeight:700 }}>{r.start_time} → {r.end_time}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
+            {/* Nomi non trovati → mappatura manuale */}
+            {preview.unmatched.length > 0 && (
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'#F59E0B', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+                  <AlertCircle size={13}/> {preview.unmatched.length} nome/i non riconosciuto — assegna manualmente:
+                </div>
+                {preview.unmatched.map((entry, i) => (
+                  <div key={i} style={{ background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.18)', borderRadius:12, padding:'12px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:12 }}>
+                    <div style={{ flex:'0 0 120px', fontSize:13, fontWeight:800, color:'#fbbf24' }}>{entry.name}</div>
+                    <span style={{ color:'#475569', fontSize:11 }}>({entry.shifts.length} giorni)</span>
+                    <select
+                      value={manualMap[entry.name] || ''}
+                      onChange={e => setManualMap(prev => ({ ...prev, [entry.name]: e.target.value }))}
+                      style={{ flex:1, background:'#1e293b', border:'1px solid #334155', borderRadius:8, padding:'6px 10px', color:'#f1f5f9', fontSize:12, cursor:'pointer' }}
+                    >
+                      <option value="">— Seleziona dipendente —</option>
+                      {allEmployees.map(e => (
+                        <option key={e.id} value={e.id}>{e.first_name ?? ''} {e.last_name ?? e.name ?? ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Azioni */}
             <div style={{display:'flex',gap:10,marginTop:4}}>
               <button onClick={onClose} style={{flex:1,padding:'12px',borderRadius:12,border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#64748b',fontWeight:700,fontSize:13,cursor:'pointer'}}>Annulla</button>
-              <button onClick={handleConfirm} disabled={!preview.matched.length} style={{flex:2,padding:'12px',borderRadius:12,border:'none',background: preview.matched.length ? '#10B981' : '#334155',color:'#fff',fontWeight:800,fontSize:14,cursor:preview.matched.length?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-                <CheckCircle size={16}/> Importa {preview.matched.length} turni
+              <button onClick={handleConfirm} disabled={!finalMatched.length}
+                style={{flex:2,padding:'12px',borderRadius:12,border:'none',background:finalMatched.length?'#10B981':'#334155',color:'#fff',fontWeight:800,fontSize:14,cursor:finalMatched.length?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                <CheckCircle size={16}/> Importa {finalMatched.length} turni
               </button>
             </div>
           </div>
@@ -942,7 +909,7 @@ function ExcelImportModal({ employees, weekDays, templates, onImport, onClose })
           <div style={{textAlign:'center',padding:'24px 0'}}>
             <CheckCircle size={48} color="#10B981" style={{margin:'0 auto 12px',display:'block'}}/>
             <div style={{fontSize:18,fontWeight:800,color:'#f1f5f9'}}>Turni importati!</div>
-            <div style={{fontSize:13,color:'#64748b',marginTop:4}}>Ricorda di cliccare «Salva Configurazioni» per persistere i dati.</div>
+            <div style={{fontSize:13,color:'#64748b',marginTop:4}}>Clicca «Salva Configurazioni» per salvare.</div>
           </div>
         )}
       </div>
@@ -1646,7 +1613,7 @@ export default function ShiftsPage() {
       {/* Modal import Excel */}
       {showImport && (
         <ExcelImportModal
-          employees={[...employees, ...extraEmployees]}
+          storeId={storeId}
           weekDays={weekDays}
           templates={templates}
           onImport={(importedShifts) => {
