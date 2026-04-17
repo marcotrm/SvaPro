@@ -388,7 +388,7 @@ class ReportController extends Controller
      */
     public function qscareDashboard(Request $request)
     {
-        $tenantId   = $request->attributes->get('tenant_id');
+        $tenantId   = (int) $request->attributes->get('tenant_id');
         $storeId    = $this->getSecureStoreId($request);
         $employeeId = $request->input('employee_id');
         $dateFrom   = $request->input('date_from');
@@ -396,30 +396,40 @@ class ReportController extends Controller
 
         $driver = DB::connection()->getDriverName(); // pgsql | mysql | sqlite
 
-        // JSON path expression per il service_name (driver-safe)
+        // Employee full name concat — driver-safe, no special chars in literals
+        $empNameExpr = ($driver === 'pgsql')
+            ? "COALESCE(employees.first_name || ' ' || employees.last_name, 'N/A')"
+            : "COALESCE(CONCAT(employees.first_name, ' ', employees.last_name), 'N/A')";
+
+        // service_name dal JSON snapshot — driver-safe
         if ($driver === 'pgsql') {
             $serviceNameExpr = "COALESCE(sales_order_lines.tax_snapshot_json::json->>'service_name', 'QScare')";
         } elseif ($driver === 'sqlite') {
             $serviceNameExpr = "COALESCE(json_extract(sales_order_lines.tax_snapshot_json, '$.service_name'), 'QScare')";
         } else {
-            // MySQL / MariaDB
             $serviceNameExpr = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(sales_order_lines.tax_snapshot_json, '$.service_name')), 'QScare')";
         }
-
-        // Build the employee full name concat (driver-safe)
-        $empNameExpr = $driver === 'pgsql'
-            ? "COALESCE(employees.first_name || ' ' || employees.last_name, 'â€”')"
-            : "COALESCE(CONCAT(employees.first_name, ' ', employees.last_name), 'â€”')";
 
         $query = DB::table('sales_order_lines')
             ->join('sales_orders', 'sales_order_lines.sales_order_id', '=', 'sales_orders.id')
             ->leftJoin('employees', 'sales_orders.sold_by_employee_id', '=', 'employees.id')
             ->leftJoin('stores', 'sales_orders.store_id', '=', 'stores.id')
+            ->leftJoin('product_variants as pv', 'sales_order_lines.product_variant_id', '=', 'pv.id')
+            ->leftJoin('products as p', 'pv.product_id', '=', 'p.id')
             ->where('sales_orders.tenant_id', $tenantId)
             ->where('sales_orders.status', 'paid')
-            // Righe QScare: product_variant_id nullo (Ã¨ un servizio, non un prodotto fisico)
-            ->whereNull('sales_order_lines.product_variant_id')
-            ->whereNotNull('sales_order_lines.tax_snapshot_json')
+            // Righe QScare: o sono servizi (product_variant_id NULL + snapshot) o prodotti di tipo qscare
+            ->where(function ($q) {
+                $q->where(function ($inner) {
+                    // Caso 1: riga di servizio QScare (aggiunta dal POS)
+                    $inner->whereNull('sales_order_lines.product_variant_id')
+                          ->whereNotNull('sales_order_lines.tax_snapshot_json');
+                })->orWhere(function ($inner) {
+                    // Caso 2: prodotto con product_type qscare/service_qscare
+                    $inner->whereNotNull('sales_order_lines.product_variant_id')
+                          ->whereIn('p.product_type', ['qscare', 'service_qscare', 'qscare_kit']);
+                });
+            })
             ->select(
                 'sales_orders.id as order_id',
                 'sales_orders.created_at',
@@ -428,7 +438,8 @@ class ReportController extends Controller
                 DB::raw($serviceNameExpr . ' as service_name'),
                 DB::raw('COALESCE(sales_order_lines.line_total, sales_order_lines.qty * sales_order_lines.unit_price) as line_total'),
                 'stores.name as store_name',
-                DB::raw($empNameExpr . ' as employee_name')
+                DB::raw($empNameExpr . ' as employee_name'),
+                'sales_orders.sold_by_employee_id'
             );
 
         if ($storeId) {
@@ -452,11 +463,12 @@ class ReportController extends Controller
         return response()->json([
             'data'    => $lines,
             'summary' => [
-                'total_revenue' => $totalRevenue,
-                'total_qty'     => $totalQty,
+                'total_revenue' => (float) $totalRevenue,
+                'total_qty'     => (int)   $totalQty,
             ],
         ]);
     }
+
     /**
      * GET /reports/store-revenue
      * Fatturato e ordini per negozio (classifica dashboard).
