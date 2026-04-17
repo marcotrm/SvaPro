@@ -1110,13 +1110,21 @@ export default function ShiftsPage() {
 
   useEffect(() => {
     setAllEmpLoading(true);
-    employeesApi.getEmployees({ per_page: 500, page: 1 })
+    employeesApi.getAllEmployees()
       .then(res => {
         const list = res.data?.data || res.data || [];
         setAllEmployeesGlobal(Array.isArray(list) ? list : []);
       })
       .catch(() => {
-        attendance.getEmployeesKiosk({}).then(res => setAllEmployeesGlobal(res.data?.data || [])).catch(() => {});
+        // Fallback: prova con getEmployees e per_page massimo
+        employeesApi.getEmployees({ per_page: 500, page: 1 })
+          .then(res => {
+            const list = res.data?.data || res.data || [];
+            setAllEmployeesGlobal(Array.isArray(list) ? list : []);
+          })
+          .catch(() => {
+            attendance.getEmployeesKiosk({}).then(res => setAllEmployeesGlobal(res.data?.data || [])).catch(() => {});
+          });
       })
       .finally(() => setAllEmpLoading(false));
   }, []);

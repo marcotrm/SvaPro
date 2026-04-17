@@ -698,16 +698,30 @@ function StoreCard({ store, onEdit, onDelete }) {
 
   const today = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
   const todayHours = store.opening_hours?.[today];
+
+  // Calcolo aperto/chiuso in tempo reale dagli slot orari (formato nuovo: slots[])
+  const isStoreOpenNow = (() => {
+    if (todayHours?.closed) return false;
+    const slots = todayHours?.slots || (todayHours?.open ? [{ open: todayHours.open, close: todayHours.close }] : null);
+    if (!slots?.length) return store.is_open_now ?? false; // fallback API
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const toMins = (t) => { const [h,m] = (t||'').split(':').map(Number); return h*60 + (m||0); };
+    return slots.some(s => nowMins >= toMins(s.open) && nowMins < toMins(s.close));
+  })();
+
   const hoursDisplay = todayHours?.closed
     ? 'Chiuso oggi'
-    : todayHours
-    ? `${todayHours.open} – ${todayHours.close}`
+    : todayHours?.slots?.length
+    ? todayHours.slots.map(s => `${s.open}–${s.close}`).join(', ')
+    : todayHours?.open
+    ? `${todayHours.open}–${todayHours.close}`
     : '—';
 
   return (
     <div style={{
       background: 'var(--color-surface)', borderRadius: 16, padding: 0,
-      border: store.is_open_now ? '2px solid #6EE7B7' : '1px solid var(--color-border)',
+    border: isStoreOpenNow ? '2px solid #6EE7B7' : '1px solid var(--color-border)',
       overflow: 'hidden', transition: 'box-shadow 0.15s',
     }}
       onMouseEnter={e => e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)'}
@@ -732,10 +746,10 @@ function StoreCard({ store, onEdit, onDelete }) {
             )}
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
-              background: store.is_open_now ? '#D1FAE5' : '#F3F4F6',
-              color: store.is_open_now ? '#065F46' : '#6B7280',
+              background: isStoreOpenNow ? '#D1FAE5' : '#F3F4F6',
+              color: isStoreOpenNow ? '#065F46' : '#6B7280',
             }}>
-              {store.is_open_now ? '🟢 APERTO' : '🔴 CHIUSO'}
+              {isStoreOpenNow ? '🟢 APERTO' : '🔴 CHIUSO'}
             </span>
           </div>
           <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--color-text-secondary)' }}>
@@ -867,8 +881,26 @@ export default function StoresPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
           { label: 'Totale negozi', value: storesList.length, icon: Store, color: 'var(--color-accent)' },
-          { label: 'Aperti ora', value: storesList.filter(s => s.is_open_now).length, icon: CheckCircle, color: '#10B981' },
-          { label: 'Chiusi ora', value: storesList.filter(s => !s.is_open_now).length, icon: XCircle, color: '#6B7280' },
+          { label: 'Aperti ora', value: storesList.filter(s => {
+            const today = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
+            const th = s.opening_hours?.[today];
+            if (th?.closed) return false;
+            const slots = th?.slots || (th?.open ? [{ open: th.open, close: th.close }] : null);
+            if (!slots?.length) return s.is_open_now ?? false;
+            const nowMins = new Date().getHours()*60 + new Date().getMinutes();
+            const toMins = (t) => { const [h,m]=(t||'').split(':').map(Number); return h*60+(m||0); };
+            return slots.some(sl => nowMins >= toMins(sl.open) && nowMins < toMins(sl.close));
+          }).length, icon: CheckCircle, color: '#10B981' },
+          { label: 'Chiusi ora', value: storesList.filter(s => {
+            const today = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
+            const th = s.opening_hours?.[today];
+            if (th?.closed) return true;
+            const slots = th?.slots || (th?.open ? [{ open: th.open, close: th.close }] : null);
+            if (!slots?.length) return !(s.is_open_now ?? false);
+            const nowMins = new Date().getHours()*60 + new Date().getMinutes();
+            const toMins = (t) => { const [h,m]=(t||'').split(':').map(Number); return h*60+(m||0); };
+            return !slots.some(sl => nowMins >= toMins(sl.open) && nowMins < toMins(sl.close));
+          }).length, icon: XCircle, color: '#6B7280' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} style={{ background: 'var(--color-surface)', borderRadius: 14, padding: '16px 20px', border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

@@ -484,6 +484,7 @@ export const stores = {
   getTenants: () => cachedGet('/tenants', {}, 60000, 600000),
   getTenantHealth: () => cachedGet('/tenants/health', {}, 20000, 120000),
   getStores: () => api.get('/stores'),  // no cache — sempre aggiornato
+  getAll: () => api.get('/stores'),     // alias per compatibilità (StoreDeliveriesPage)
   getStore: (id) => api.get(`/stores/${id}`),
   createStore: (data) => api.post('/stores', data),
   updateStore: (id, data) => api.put(`/stores/${id}`, data),
@@ -550,6 +551,8 @@ export const customers = {
 // Employee APIs
 export const employees = {
   getEmployees: (params = {}) => cachedGet('/employees', params, 30000, 300000),
+  // Ritorna TUTTI i dipendenti di TUTTI gli store (bypassa il filtro store_id automatico)
+  getAllEmployees: () => api.get('/employees', { params: { per_page: 500, page: 1, all_stores: 1 }, headers: { 'X-Ignore-Store': '1' } }),
   getEmployee: (id) => api.get(`/employees/${id}`),
   createEmployee: (data) => api.post('/employees', data),
   updateEmployee: (id, data) => api.put(`/employees/${id}`, data),

@@ -323,7 +323,7 @@ export default function StoreRevenuePage() {
               Limite righe: {sorted.length} &nbsp;·&nbsp; Riga: 1/{sorted.length}
             </div>
             <div style={{ fontSize:11, color:'var(--color-text-tertiary)' }}>
-              Periodo: {PERIODS.find(p => p.id === period)?.label} &nbsp;·&nbsp; Clicca colonna per ordinare
+              Dal {dateFrom} al {dateTo} &nbsp;·&nbsp; Clicca colonna per ordinare
             </div>
           </div>
 
