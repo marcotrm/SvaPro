@@ -36,8 +36,9 @@ const allNavigation = [
     { label: 'Trasferimenti',          href: '/stock-transfers',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
 
 
-    { label: 'Ordini Riassortimento', href: '/warehouse/restock',         icon: ClipboardList,  roles: ['superadmin','admin_cliente'] },
-    { label: 'Bolle di Scarico',      href: '/warehouse/delivery-notes',  icon: Truck,          roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Ordini Riassortimento', href: '/warehouse/restock',          icon: ClipboardList,  roles: ['superadmin','admin_cliente'] },
+    { label: 'Bolle di Scarico',      href: '/warehouse/delivery-notes',   icon: Truck,          roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Consegne Negozi',       href: '/warehouse/store-deliveries', icon: MapPin,         roles: ['superadmin','admin_cliente'] },
   ]},
 
   // 5. Acquisti / Fornitori â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

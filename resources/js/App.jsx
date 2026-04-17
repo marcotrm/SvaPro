@@ -52,6 +52,8 @@ const DeliveryNotesPage    = lazy(() => import('./pages/DeliveryNotesPage.jsx'))
 const AdmPage              = lazy(() => import('./pages/AdmPage.jsx'));
 const AutomazioniPage      = lazy(() => import('./pages/AutomazioniPage.jsx'));
 const StoreRevenuePage     = lazy(() => import('./pages/StoreRevenuePage.jsx'));
+const StoreDeliveriesPage  = lazy(() => import('./pages/StoreDeliveriesPage.jsx'));
+const DriverDeliveriesPage = lazy(() => import('./pages/DriverDeliveriesPage.jsx'));
 
 
 // Components
@@ -183,9 +185,13 @@ export default function App() {
               <Route path="/warehouse/delivery-notes" element={<DeliveryNotesPage />} />
               <Route path="/adm" element={<AdmPage />} />
               <Route path="/automazioni" element={<AutomazioniPage />} />
+              <Route path="/warehouse/store-deliveries" element={<StoreDeliveriesPage />} />
 
             </Route>
           </Route>
+
+          {/* Vista corriere — standalone, no layout protetto */}
+          <Route path="/deliveries/driver" element={<Suspense fallback={null}><DriverDeliveriesPage /></Suspense>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
