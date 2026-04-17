@@ -1,9 +1,7 @@
 name: Deploy to Railway
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:   # Solo manuale — Railway usa già GitHub integration nativa per auto-deploy
 
 jobs:
   deploy:
