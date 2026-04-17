@@ -988,126 +988,125 @@ export default function PosPage() {
             </button>
           </div>
 
-          {/* Operatore — via barcode scanner */}
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <ScanBarcode size={11} /> Operatore (scansiona badge)
-            </div>
-            {soldByEmployeeId ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 10, padding: '9px 12px' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#86efac' }}>✓ {operatorName}</span>
-                <button onClick={() => { setSoldByEmployeeId(''); setOperatorBarcode(''); setOperatorName(''); setOperatorError(''); setTimeout(() => operatorBarcodeRef.current?.focus(), 50); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', display: 'flex' }}>
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <div>
-                <input
-                  ref={operatorBarcodeRef}
-                  value={operatorBarcode}
-                  onChange={e => { setOperatorBarcode(e.target.value); setOperatorError(''); }}
-                  onKeyDown={async e => {
-                    // Invio come fallback manuale (per barcode scanner lenti)
-                    if (e.key === 'Enter' && operatorBarcode.trim()) {
-                      const val = operatorBarcode.trim();
-                      const valLow = val.toLowerCase();
-                      const em = employees.find(em => 
-                        (em.barcode && em.barcode.toLowerCase() === valLow) ||
-                        (em.id.toString() === valLow)
-                      );
-                      let found = em;
-                      if (!found) {
-                        try {
-                          const { employees: empApi } = await import('../api.jsx');
-                          const res = await empApi.getEmployees({ search: val, limit: 10 });
-                          const list = res.data?.data || [];
-                          const chkEm = list.find(em => 
-                            (em.barcode && em.barcode.toLowerCase() === valLow) ||
-                            (em.id.toString() === valLow)
-                          );
-                          found = chkEm || (/^\d+$/.test(val) && (list.find(em => String(em.id) === val) || employees.find(em => String(em.id) === val)));
-                        } catch {}
-                      }
-                      if (found) {
-                        setSoldByEmployeeId(String(found.id));
-                        setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || `Operatore #${found.id}`);
-                        setOperatorError('');
-                        setOperatorBarcode('');
-                      } else {
-                        setOperatorError(`Codice "${val}" non riconosciuto`);
-                        setOperatorBarcode('');
-                      }
-                    }
-                  }}
-                  placeholder="Scansiona badge o digita ID operatore..."
-                  autoFocus
-                  style={{
-                    width: '100%', background: operatorError ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.06)',
-                    border: `1px solid ${operatorError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                    borderRadius: 10, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: '#fff',
-                    outline: 'none', fontFamily: 'monospace', letterSpacing: '0.1em', boxSizing: 'border-box',
-                  }}
-                />
-                {operatorError && <div style={{ fontSize: 11, color: '#fc8181', marginTop: 6 }}>⚠ {operatorError}</div>}
-              </div>
-            )}
-          </div>
+          {/* ─── Operatore + Cliente in 2 colonne ─── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
 
-          {/* Cliente */}
-          <div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-              Cliente
+            {/* Operatore */}
+            <div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <ScanBarcode size={9} /> Operatore
+              </div>
+              {soldByEmployeeId ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 8, padding: '7px 10px', minHeight: 36 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#86efac', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>✓ {operatorName}</span>
+                  <button onClick={() => { setSoldByEmployeeId(''); setOperatorBarcode(''); setOperatorName(''); setOperatorError(''); setTimeout(() => operatorBarcodeRef.current?.focus(), 50); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', display: 'flex', flexShrink: 0 }}>
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <input
+                    ref={operatorBarcodeRef}
+                    value={operatorBarcode}
+                    onChange={e => { setOperatorBarcode(e.target.value); setOperatorError(''); }}
+                    onKeyDown={async e => {
+                      if (e.key === 'Enter' && operatorBarcode.trim()) {
+                        const val = operatorBarcode.trim();
+                        const valLow = val.toLowerCase();
+                        const em = employees.find(em =>
+                          (em.barcode && em.barcode.toLowerCase() === valLow) ||
+                          (em.id.toString() === valLow)
+                        );
+                        let found = em;
+                        if (!found) {
+                          try {
+                            const { employees: empApi } = await import('../api.jsx');
+                            const res = await empApi.getEmployees({ search: val, limit: 10 });
+                            const list = res.data?.data || [];
+                            const chkEm = list.find(em =>
+                              (em.barcode && em.barcode.toLowerCase() === valLow) ||
+                              (em.id.toString() === valLow)
+                            );
+                            found = chkEm || (/^\d+$/.test(val) && (list.find(em => String(em.id) === val) || employees.find(em => String(em.id) === val)));
+                          } catch {}
+                        }
+                        if (found) {
+                          setSoldByEmployeeId(String(found.id));
+                          setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || `Operatore #${found.id}`);
+                          setOperatorError('');
+                          setOperatorBarcode('');
+                        } else {
+                          setOperatorError(`"${val}" non trovato`);
+                          setOperatorBarcode('');
+                        }
+                      }
+                    }}
+                    placeholder="Badge / ID..."
+                    autoFocus
+                    style={{
+                      width: '100%', background: operatorError ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${operatorError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: 8, padding: '7px 10px', fontSize: 11, fontWeight: 600, color: '#fff',
+                      outline: 'none', fontFamily: 'monospace', letterSpacing: '0.08em', boxSizing: 'border-box',
+                    }}
+                  />
+                  {operatorError && <div style={{ fontSize: 10, color: '#fc8181', marginTop: 4 }}>⚠ {operatorError}</div>}
+                </div>
+              )}
             </div>
-            {selectedCustomer ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(123,111,208,0.15)', border: '1px solid rgba(123,111,208,0.3)', borderRadius: 10, padding: '9px 12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <UserCircle size={16} color="#8b7fcc" />
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{selectedCustomer.name}</div>
-                    {selectedCustomer.email && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{selectedCustomer.email}</div>}
+
+            {/* Cliente */}
+            <div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <User size={9} /> Cliente
+              </div>
+              {selectedCustomer ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(123,111,208,0.15)', border: '1px solid rgba(123,111,208,0.3)', borderRadius: 8, padding: '7px 10px', minHeight: 36 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCustomer.name}</div>
                     {customerDiscountPct > 0 && (
-                      <div style={{ fontSize: 10, fontWeight: 800, color: '#86efac', marginTop: 2 }}>🎟️ Sconto personale: {customerDiscountPct}%</div>
+                      <div style={{ fontSize: 9, fontWeight: 800, color: '#86efac' }}>🎟️ -{customerDiscountPct}%</div>
                     )}
                   </div>
+                  <button onClick={() => setSelectedCustomer(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', flexShrink: 0 }}>
+                    <X size={12} />
+                  </button>
                 </div>
-                <button onClick={() => setSelectedCustomer(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex' }}>
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <div style={{ position: 'relative' }}>
-                <User size={13} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }} />
-                <input
-                  value={customerSearch}
-                  onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDrop(true); }}
-                  onFocus={() => setShowCustomerDrop(true)}
-                  onKeyDown={handleCustomerBarcode}
-                  placeholder="Nome, email, fidelity card..."
-                  style={{
-                    width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 10, padding: '9px 12px 9px 34px', fontSize: 12, color: '#fff', outline: 'none', boxSizing: 'border-box',
-                  }}
-                />
-                {showCustomerDrop && customerSearch && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, marginTop: 4, background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
-                    {filteredCustomers.map(c => (
-                      <button key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(''); setShowCustomerDrop(false); }}
-              style={{ display: 'block', width: '100%', padding: '10px 14px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#fff' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(123,111,208,0.15)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                      >
-                        <div style={{ fontSize: 12, fontWeight: 700 }}>{c.first_name || c.name} {c.last_name || ''}</div>
-                        {/* Per i dipendenti: mostra solo codice tessera, no dati sensibili */}
-                        {!isDipendente && c.email && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{c.email}</div>}
-                        {c.code && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Tessera: {c.code}</div>}
-                      </button>
-                    ))}
-                    {filteredCustomers.length === 0 && <div style={{ padding: 14, fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>Nessun cliente</div>}
-                  </div>
-                )}
-              </div>
-            )}
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  <User size={11} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }} />
+                  <input
+                    value={customerSearch}
+                    onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDrop(true); }}
+                    onFocus={() => setShowCustomerDrop(true)}
+                    onKeyDown={handleCustomerBarcode}
+                    placeholder="Nome, tessera..."
+                    style={{
+                      width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 8, padding: '7px 10px 7px 28px', fontSize: 11, color: '#fff', outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                  {showCustomerDrop && customerSearch && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, marginTop: 4, background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
+                      {filteredCustomers.map(c => (
+                        <button key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(''); setShowCustomerDrop(false); }}
+                          style={{ display: 'block', width: '100%', padding: '9px 12px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#fff' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(123,111,208,0.15)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                        >
+                          <div style={{ fontSize: 12, fontWeight: 700 }}>{c.first_name || c.name} {c.last_name || ''}</div>
+                          {!isDipendente && c.email && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{c.email}</div>}
+                          {c.code && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Tessera: {c.code}</div>}
+                        </button>
+                      ))}
+                      {filteredCustomers.length === 0 && <div style={{ padding: 12, fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>Nessun cliente</div>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
 
