@@ -13,4 +13,9 @@ class Shift extends Model
     {
         return $this->belongsTo(Employee::class);
     }
+
+    public function store()
+    {
+        return $this->belongsTo(Store::class);
+    }
 }
