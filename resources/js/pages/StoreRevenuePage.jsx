@@ -4,7 +4,7 @@ import { reports } from '../api.jsx';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { Trophy, TrendingUp, Store, RefreshCw, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
+import { Trophy, TrendingUp, Store, RefreshCw, ChevronUp, ChevronDown, ArrowUpDown, Settings2, X, GripVertical, Trash2 } from 'lucide-react';
 
 /* ─── costanti ─────────────────────────────────────────────── */
 const STORE_COLORS = ['#7B6FD0','#F59E0B','#10B981','#EF4444','#3B82F6','#A855F7','#EC4899','#14B8A6'];
@@ -33,19 +33,22 @@ function itMonth(ym) {
 }
 
 /* ─── colonne tabella principale ──────────────────────────── */
-const COLUMNS = [
-  { key: 'rank',        label: '#',            align: 'center', width: 44,  sortable: false },
-  { key: 'name',        label: 'Negozio',      align: 'left',   width: 200, sortable: true  },
-  { key: 'orders',      label: 'N.Doc',        align: 'right',  width: 72,  sortable: true  },
-  { key: 'upt',         label: 'UPT',          align: 'right',  width: 72,  sortable: true  },
-  { key: 'avg_discount',label: 'Sc.Medio',     align: 'right',  width: 88,  sortable: true  },
-  { key: 'gross',       label: 'Prezzo',       align: 'right',  width: 110, sortable: true  },
-  { key: 'net',         label: 'Netto',        align: 'right',  width: 110, sortable: true  },
-  { key: 'revenue',     label: 'Netto (Iva)',   align: 'right',  width: 120, sortable: true  },
-  { key: 'cost',        label: 'Costo',        align: 'right',  width: 110, sortable: true  },
-  { key: 'profit',      label: 'Utile',        align: 'right',  width: 110, sortable: true  },
-  { key: 'qty',         label: 'Qta',          align: 'right',  width: 72,  sortable: true  },
+const ALL_COLUMNS = [
+  { key: 'rank',        label: '#',               align: 'center', width: 44,  sortable: false, always: true  },
+  { key: 'name',        label: 'Azienda (Negozio)',align: 'left',   width: 200, sortable: true,  always: true  },
+  { key: 'orders',      label: 'N.Doc',           align: 'right',  width: 72,  sortable: true,  always: false },
+  { key: 'upt',         label: 'UPT',             align: 'right',  width: 72,  sortable: true,  always: false },
+  { key: 'avg_discount',label: 'Sc. Medio',       align: 'right',  width: 88,  sortable: true,  always: false },
+  { key: 'gross',       label: 'Prezzo',          align: 'right',  width: 110, sortable: true,  always: false },
+  { key: 'net',         label: 'Netto',           align: 'right',  width: 110, sortable: true,  always: false },
+  { key: 'revenue',     label: 'Netto (Iva Incl.)',align: 'right',  width: 130, sortable: true,  always: false },
+  { key: 'cost',        label: 'Costo',           align: 'right',  width: 110, sortable: true,  always: false },
+  { key: 'profit',      label: 'Utile',           align: 'right',  width: 110, sortable: true,  always: false },
+  { key: 'qty',         label: 'Qta',             align: 'right',  width: 72,  sortable: true,  always: false },
 ];
+
+// Default: tutte le colonne attive
+const DEFAULT_ACTIVE = ALL_COLUMNS.map(c => c.key);
 
 /* ────────────────────────────────────────────────────────────── */
 export default function StoreRevenuePage() {
@@ -59,6 +62,8 @@ export default function StoreRevenuePage() {
   const [history,     setHistory]     = useState({ months: [], stores: [] });
   const [sortKey,     setSortKey]     = useState('revenue');
   const [sortDir,     setSortDir]     = useState('desc');
+  const [activeKeys,  setActiveKeys]  = useState(DEFAULT_ACTIVE); // colonne visibili
+  const [showPicker,  setShowPicker]  = useState(false);           // pannello colonne
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -159,6 +164,17 @@ export default function StoreRevenuePage() {
     }
   };
 
+  /* Colonne visibili: filtrate da activeKeys, mantenendo l'ordine di ALL_COLUMNS */
+  const COLUMNS = ALL_COLUMNS.filter(c => activeKeys.includes(c.key));
+
+  const toggleColumn = (key) => {
+    setActiveKeys(prev =>
+      prev.includes(key)
+        ? prev.filter(k => k !== key)
+        : [...prev, key]
+    );
+  };
+
   /* Chart data storico */
   const chartData = history.months.map(m => {
     const pt = { month: m };
@@ -253,6 +269,23 @@ export default function StoreRevenuePage() {
             </div>
           )}
 
+          {/* Pulsante configura colonne */}
+          {tab === 'ranking' && (
+            <button
+              onClick={() => setShowPicker(p => !p)}
+              style={{
+                display:'flex', alignItems:'center', gap:5, padding:'7px 13px',
+                background: showPicker ? 'rgba(123,111,208,0.15)' : 'var(--color-surface)',
+                border: `1px solid ${showPicker ? '#7B6FD0' : 'var(--color-border)'}`,
+                borderRadius:9, cursor:'pointer', fontSize:11, fontWeight:700,
+                color: showPicker ? '#7B6FD0' : 'var(--color-text-secondary)',
+              }}
+            >
+              <Settings2 size={12}/>
+              Variabili ({activeKeys.length - 2} / {ALL_COLUMNS.length - 2})
+            </button>
+          )}
+
           <button onClick={load} disabled={loading} style={{
             display:'flex', alignItems:'center', gap:5, padding:'7px 13px',
             background:'var(--color-surface)', border:'1px solid var(--color-border)',
@@ -265,9 +298,12 @@ export default function StoreRevenuePage() {
         </div>
       </div>
 
+      {/* ══ LAYOUT con pannello laterale colonne ══ */}
+      <div style={{ display:'flex', gap:16, alignItems:'flex-start' }}>
+
       {/* ══ TAB: CLASSIFICA (tabella) ══════════════════════════════ */}
       {tab === 'ranking' && (
-        <div style={{ background:'var(--color-surface)', borderRadius:16, border:'1px solid var(--color-border)', overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.04)' }}>
+        <div style={{ flex: 1, minWidth: 0, background:'var(--color-surface)', borderRadius:16, border:'1px solid var(--color-border)', overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.04)' }}>
 
           {/* Info bar */}
           <div style={{ padding:'10px 16px', background:'var(--color-bg)', borderBottom:'1px solid var(--color-border)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
@@ -275,7 +311,7 @@ export default function StoreRevenuePage() {
               Limite righe: {sorted.length} &nbsp;·&nbsp; Riga: 1/{sorted.length}
             </div>
             <div style={{ fontSize:11, color:'var(--color-text-tertiary)' }}>
-              Periodo: {PERIODS.find(p => p.id === period)?.label} &nbsp;·&nbsp; Clicca intestazione per ordinare
+              Periodo: {PERIODS.find(p => p.id === period)?.label} &nbsp;·&nbsp; Clicca colonna per ordinare
             </div>
           </div>
 
@@ -345,9 +381,101 @@ export default function StoreRevenuePage() {
         </div>
       )}
 
+      {/* ══ PANNELLO LATERALE: Variabili in Analisi ══ */}
+      {showPicker && tab === 'ranking' && (
+        <div style={{
+          width: 240, flexShrink: 0,
+          background: 'var(--color-surface)',
+          borderRadius: 16, border: '1px solid var(--color-border)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          overflow: 'hidden',
+          alignSelf: 'flex-start',
+        }}>
+          {/* Header pannello */}
+          <div style={{
+            padding: '12px 14px', background: 'var(--color-bg)',
+            borderBottom: '1px solid var(--color-border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Variabili/Valori in Analisi
+            </div>
+            <button onClick={() => setShowPicker(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--color-text-tertiary)', padding:2 }}>
+              <X size={14}/>
+            </button>
+          </div>
+
+          {/* Colonne attive (rimuovibili) */}
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+              Inserite in Analisi
+            </div>
+            {ALL_COLUMNS.filter(c => !c.always && activeKeys.includes(c.key)).map(col => (
+              <div key={col.key} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '6px 8px', borderRadius: 8, marginBottom: 2,
+                background: 'rgba(123,111,208,0.06)',
+                border: '1px solid rgba(123,111,208,0.15)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <GripVertical size={12} style={{ color: 'var(--color-text-tertiary)', opacity: 0.4 }}/>
+                  <span style={{ fontSize: 12, fontWeight: 600 }}>{col.label}</span>
+                </div>
+                <button
+                  onClick={() => toggleColumn(col.key)}
+                  title="Rimuovi"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: 2, opacity: 0.7, flexShrink: 0 }}
+                >
+                  <Trash2 size={12}/>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Colonne disattive (aggiungibili) */}
+          <div style={{ padding: '10px 12px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+              Disponibili
+            </div>
+            {ALL_COLUMNS.filter(c => !c.always && !activeKeys.includes(c.key)).map(col => (
+              <div
+                key={col.key}
+                onClick={() => toggleColumn(col.key)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 8px', borderRadius: 8, marginBottom: 2,
+                  cursor: 'pointer', transition: 'background 0.1s',
+                  color: 'var(--color-text-secondary)',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <span style={{ fontSize: 16, color: '#10B981', fontWeight: 700, lineHeight: 1 }}>+</span>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{col.label}</span>
+              </div>
+            ))}
+            {ALL_COLUMNS.filter(c => !c.always && !activeKeys.includes(c.key)).length === 0 && (
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '8px 0' }}>
+                Tutte le colonne sono attive
+              </div>
+            )}
+          </div>
+
+          {/* Reset */}
+          <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-border)', textAlign: 'center' }}>
+            <button
+              onClick={() => setActiveKeys(DEFAULT_ACTIVE)}
+              style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Ripristina tutte
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ══ TAB: STORICO ══════════════════════════════════════════ */}
       {tab === 'history' && (
-        <div style={{ background:'var(--color-surface)', borderRadius:16, border:'1px solid var(--color-border)', overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.04)' }}>
+        <div style={{ flex:1, background:'var(--color-surface)', borderRadius:16, border:'1px solid var(--color-border)', overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.04)' }}>
           <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--color-border)', display:'flex', gap:20, flexWrap:'wrap' }}>
             {history.stores.map((s, i) => (
               <div key={s.id} style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -445,6 +573,8 @@ export default function StoreRevenuePage() {
           </div>
         </div>
       )}
+
+      </div>{/* fine layout flex */}
     </div>
   );
 }
