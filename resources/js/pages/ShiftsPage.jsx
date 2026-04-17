@@ -1099,6 +1099,8 @@ export default function ShiftsPage() {
   const [globalSearchLoading, setGlobalSearchLoading] = useState(false);
   const globalRef = useRef(null);
   const [extraEmployees, setExtraEmployees] = useState([]);
+  const [showJollyPicker, setShowJollyPicker] = useState(false);
+  const [jollySearch, setJollySearch]         = useState('');
 
   // ── Gap detection (ricalcola ogni volta che shifts cambia) ──────────────────
   const gapAlerts = useMemo(() => detectGaps(shifts, weekDays), [shifts, weekDays]);
@@ -1250,6 +1252,23 @@ export default function ShiftsPage() {
       weekDays.forEach(d => { delete next[`${empId}_${d.dateStr}`]; });
       return next;
     });
+  };
+
+  // Aggiunge un dipendente come Jolly direttamente da allEmployees
+  const addJolly = (emp) => {
+    const alreadyBase  = employees.some(e => e.id === emp.id);
+    const alreadyExtra = extraEmployees.some(e => e.id === emp.id);
+    if (alreadyBase || alreadyExtra) { toast.error('Dipendente gia nella griglia'); return; }
+    const entry = {
+      id: emp.id,
+      name: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || emp.name || '?',
+      first_name: emp.first_name, last_name: emp.last_name, role: emp.role,
+      _extra: true, _from_store: emp.store_name || emp.store?.name || '—',
+    };
+    setExtraEmployees(prev => [...prev, entry]);
+    toast.success(`${entry.name} aggiunto come Jolly`);
+    setShowJollyPicker(false);
+    setJollySearch('');
   };
 
   // Controlla se ci sono modifiche non salvate
@@ -1719,7 +1738,93 @@ export default function ShiftsPage() {
           </tbody>
         </table>
 
-        {/* Dipendenti ospiti cross-store */}
+        {/* ── Bottone Jolly ── */}
+        {canEditShifts && (
+          <div style={{ position: 'relative', borderTop: '1px solid var(--color-border)' }}>
+            <button
+              onClick={() => { setShowJollyPicker(p => !p); setJollySearch(''); }}
+              style={{
+                width: '100%', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 8,
+                background: showJollyPicker ? 'rgba(139,92,246,0.08)' : 'transparent',
+                border: 'none', cursor: 'pointer', color: '#8B5CF6', fontSize: 13, fontWeight: 700,
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.06)'}
+              onMouseLeave={e => e.currentTarget.style.background = showJollyPicker ? 'rgba(139,92,246,0.08)' : 'transparent'}
+            >
+              <span style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(139,92,246,0.15)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900, flexShrink: 0 }}>+</span>
+              Aggiungi Jolly
+            </button>
+
+            {showJollyPicker && (
+              <div style={{
+                position: 'absolute', left: 0, right: 0, zIndex: 200,
+                background: 'var(--color-surface)', border: '1.5px solid rgba(139,92,246,0.35)',
+                borderTop: 'none', borderRadius: '0 0 12px 12px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 280, display: 'flex', flexDirection: 'column',
+              }}>
+                {/* Search */}
+                <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-border)' }}>
+                  <input
+                    autoFocus
+                    value={jollySearch}
+                    onChange={e => setJollySearch(e.target.value)}
+                    placeholder="Cerca dipendente..."
+                    style={{ width: '100%', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '7px 12px', fontSize: 13, fontWeight: 600, outline: 'none', boxSizing: 'border-box', color: 'var(--color-text)' }}
+                  />
+                </div>
+                {/* List */}
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  {(() => {
+                    const q = jollySearch.toLowerCase().trim();
+                    const already = new Set([...employees.map(e => e.id), ...extraEmployees.map(e => e.id)]);
+                    const list = allEmployees.filter(e => {
+                      const name = `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim().toLowerCase();
+                      return !already.has(e.id) && (!q || name.includes(q));
+                    });
+                    if (list.length === 0) return (
+                      <div style={{ padding: '20px', textAlign: 'center', fontSize: 13, color: 'var(--color-text-tertiary)' }}>
+                        {q ? 'Nessun dipendente trovato' : 'Tutti i dipendenti sono gia nella griglia'}
+                      </div>
+                    );
+                    return list.map(emp => {
+                      const name = `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || '?';
+                      const store = emp.store_name || emp.store?.name || '—';
+                      return (
+                        <div
+                          key={emp.id}
+                          onClick={() => addJolly(emp)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            padding: '10px 14px', cursor: 'pointer',
+                            borderBottom: '1px solid var(--color-border)',
+                            transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.07)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(139,92,246,0.15)', border: '2px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#8B5CF6', flexShrink: 0 }}>
+                            {name.charAt(0)}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{emp.role || 'Operatore'} — {store}</div>
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#8B5CF6', background: 'rgba(139,92,246,0.1)', borderRadius: 6, padding: '2px 8px', flexShrink: 0 }}>Jolly</span>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+                {/* Footer */}
+                <div style={{ padding: '8px 14px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setShowJollyPicker(false)} style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}>Chiudi</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {extraEmployees.length > 0 && (
           <div style={{ borderTop: '2px solid rgba(139,92,246,0.3)' }}>
             <div style={{ padding: '8px 20px', background: 'rgba(139,92,246,0.06)', fontSize: 11, fontWeight: 800, color: '#8B5CF6', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
