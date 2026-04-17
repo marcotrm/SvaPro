@@ -810,20 +810,37 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
         throw new Error(`Nessuna data trovata. Header riga ${headerRowIdx}, date riga ${dateRowIdx}. Controlla il formato del file.`);
       }
 
+      // ─── Auto-rileva la colonna dei nomi ─────────────────────────────────────
+      // I nomi possono essere in col A (0) o col B (1) — contiamo occorrenze di testo
+      const dateColSet = new Set(Object.keys(colDateMap).map(Number));
+      const nameColCounts = {};
+      for (let i = headerRowIdx + 1; i < Math.min(allRows.length, headerRowIdx + 20); i++) {
+        for (let c = 0; c <= 3; c++) {
+          if (dateColSet.has(c)) continue;
+          const v = String(allRows[i][c] ?? '').trim();
+          if (v.length >= 2 && !/^\d+(\.\d+)?$/.test(v) && !DAY_KW.some(d => v.toLowerCase().startsWith(d))) {
+            nameColCounts[c] = (nameColCounts[c] || 0) + 1;
+          }
+        }
+      }
+      const nameCol = Object.keys(nameColCounts).length > 0
+        ? parseInt(Object.entries(nameColCounts).sort((a,b) => b[1]-a[1])[0][0])
+        : 0;
+      debugInfo.nameCol = nameCol;
+
       // Leggi righe dipendenti
       const SKIP_KW = new Set(['settimana','store','negozio','dipendente','nome','qui svapo','turni settimanali','turni']);
       const rawEntries = [];
+      const seenNames  = new Set(); // deduplicazione (celle unite ripetono il nome)
 
-      for (let i=headerRowIdx+1; i<allRows.length; i++) {
-        const row = allRows[i];
-        const rawVal = row[0];
-        const rawName = String(rawVal??'').trim();
+      for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+        const row     = allRows[i];
+        const rawName = String(row[nameCol] ?? '').trim();
         if (!rawName || rawName.length < 2) continue;
-        const lc = rawName.toLowerCase().replace(/[^a-z\s]/g,'').trim();
+        const lc = rawName.toLowerCase().replace(/[^a-zàèéìòù\s]/g,'').trim();
         if (!lc || SKIP_KW.has(lc)) continue;
         if (/^\d/.test(rawName)) continue;
-        // Salta righe che sembrano intestazioni di giorno
-        if (DAY_KW.some(d => lc === d)) continue;
+        if (DAY_KW.some(d => lc === d || lc === d.replace('ì','i').replace('è','e').replace('é','e').replace('à','a'))) continue;
 
         const shifts = [];
         for (const [colStr, dateISO] of Object.entries(colDateMap)) {
@@ -831,9 +848,18 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
           const tr = parseTimeRange(cellVal);
           if (tr) shifts.push({ date: dateISO, ...tr });
         }
-        if (shifts.length > 0 || rawName.length > 1) {
+
+        // Aggiungi solo se ha turni E non è già nella lista (deduplicazione merged cells)
+        if (shifts.length > 0 && !seenNames.has(rawName)) {
+          seenNames.add(rawName);
           rawEntries.push({ name: rawName, shifts });
           debugInfo.names.push(`${rawName} → ${shifts.length} turni`);
+        } else if (shifts.length > 0 && seenNames.has(rawName)) {
+          // Aggiungi turni alla entry esistente (potrebbero essere su righe separate)
+          const existing = rawEntries.find(e => e.name === rawName);
+          if (existing) existing.shifts.push(...shifts.filter(s =>
+            !existing.shifts.some(es => es.date === s.date)
+          ));
         }
       }
 
@@ -842,13 +868,14 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
       const matched   = [];
       const unmatched = [];
       rawEntries.forEach(entry => {
-        if (entry.shifts.length === 0) return; // nessun orario = salta
+        if (entry.shifts.length === 0) return;
         const emp = matchEmployee(entry.name, allEmployees);
         if (emp) entry.shifts.forEach(s => matched.push({ name: entry.name, emp, ...s }));
         else     unmatched.push(entry);
       });
 
       setPreview({ matched, unmatched, colDateMap, rawEntries, debug: debugInfo });
+
     } catch(err) {
       toast.error('Errore parsing: ' + err.message);
       console.error(err);
