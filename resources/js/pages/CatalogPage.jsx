@@ -78,11 +78,11 @@ export default function CatalogPage() {
     const newVal = !product.is_online;
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_online: newVal } : p));
     try {
-      await catalog.updateProduct(product.id, { is_online: newVal });
+      await catalog.toggleOnline(product.id, newVal);
       toast.success(newVal ? `🌐 "${product.name}" attivo online` : `🚫 "${product.name}" nascosto online`, { duration: 2000 });
     } catch (err) {
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_online: !newVal } : p));
-      toast.error('Errore nell\'aggiornamento');
+      toast.error(err.response?.data?.message || 'Errore nell\'aggiornamento');
     }
   };
 

@@ -58,7 +58,7 @@ export default function StoreDeliveriesPage() {
   const [weekStart,  setWeekStart]  = useState(() => getMonday(new Date()));
 
   /* Modale form */
-  const emptyForm = { store_id:'', store_name:'', items:'', notes:'', priority:'normal', scheduled_date:'' };
+  const emptyForm = { store_id:'', store_name:'', priority:'normal', scheduled_date:'' };
   const [showModal, setShowModal]   = useState(false);
   const [editId,    setEditId]      = useState(null);
   const [form,      setForm]        = useState(emptyForm);
@@ -91,7 +91,7 @@ export default function StoreDeliveriesPage() {
     setShowModal(true);
   };
   const openEdit = (d) => {
-    setForm({ store_id: String(d.store_id||''), store_name: d.store_name||'', items: d.items||'', notes: d.notes||'', priority: d.priority||'normal', scheduled_date: d.scheduled_date||'' });
+    setForm({ store_id: String(d.store_id||''), store_name: d.store_name||'', priority: d.priority||'normal', scheduled_date: d.scheduled_date||'' });
     setEditId(d.id);
     setShowModal(true);
   };
@@ -351,17 +351,13 @@ export default function StoreDeliveriesPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div style={{ gridColumn: '1/-1' }}>
                 <label className="sp-label">Negozio *</label>
-                {storeList.length > 0 ? (
-                  <select className="sp-select" value={form.store_id} onChange={e => {
-                    const s = storeList.find(x => String(x.id) === e.target.value);
-                    setForm(f => ({ ...f, store_id: e.target.value, store_name: s ? (s.name || s.store_name) : '' }));
-                  }}>
-                    <option value="">— Seleziona negozio —</option>
-                    {storeList.map(s => <option key={s.id} value={s.id}>{s.name || s.store_name}</option>)}
-                  </select>
-                ) : (
-                  <input className="sp-input" value={form.store_name} onChange={e => setForm(f => ({ ...f, store_name: e.target.value }))} placeholder="Nome negozio" />
-                )}
+                <select className="sp-select" value={form.store_id} onChange={e => {
+                  const s = storeList.find(x => String(x.id) === e.target.value);
+                  setForm(f => ({ ...f, store_id: e.target.value, store_name: s ? (s.name || s.store_name) : '' }));
+                }}>
+                  <option value="">— Seleziona negozio —</option>
+                  {storeList.map(s => <option key={s.id} value={s.id}>{s.name || s.store_name}</option>)}
+                </select>
               </div>
               <div>
                 <label className="sp-label">Data *</label>
@@ -374,14 +370,6 @@ export default function StoreDeliveriesPage() {
                   <option value="normal">🟡 Normale</option>
                   <option value="high">🔴 Urgente</option>
                 </select>
-              </div>
-              <div style={{ gridColumn: '1/-1' }}>
-                <label className="sp-label">Articoli / Contenuto</label>
-                <input className="sp-input" value={form.items} onChange={e => setForm(f => ({ ...f, items: e.target.value }))} placeholder="Es: 3 scatole Kiwi Spark, 2 kit hardware..." />
-              </div>
-              <div style={{ gridColumn: '1/-1' }}>
-                <label className="sp-label">Note per il corriere</label>
-                <textarea className="sp-input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Es: Consegnare al responsabile, orario 9-19..." style={{ resize: 'vertical' }} />
               </div>
             </div>
 

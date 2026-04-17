@@ -81,6 +81,8 @@ export default function GamificationPage() {
   const [loading, setLoading]         = useState(true);
   const [activeTab, setActiveTab]     = useState('leaderboard');
   const [period, setPeriod]           = useState('month');
+  const [customFrom, setCustomFrom]   = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0,10); });
+  const [customTo,   setCustomTo]     = useState(() => new Date().toISOString().slice(0,10));
 
   const [rules, setRules]           = useState(DEFAULT_RULES);
   const [editRules, setEditRules]   = useState(DEFAULT_RULES);
@@ -167,6 +169,10 @@ export default function GamificationPage() {
     try {
       setLoading(true);
       const params = { period };
+      if (period === 'custom') {
+        params.date_from = customFrom;
+        params.date_to   = customTo;
+      }
       if (selectedStoreId) params.store_id = selectedStoreId;
 
       const res = await gamApi.getLeaderboard(params);
@@ -183,7 +189,7 @@ export default function GamificationPage() {
     } catch (err) {
       console.error('Gamification load error:', err);
     } finally { setLoading(false); }
-  }, [selectedStoreId, period]);
+  }, [selectedStoreId, period, customFrom, customTo]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -221,14 +227,24 @@ export default function GamificationPage() {
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-          {[['month','30gg'],['quarter','Trimestre'],['year','Anno'],['all','Tutto']].map(([v,l]) => (
+        <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+          {[['month','30gg'],['quarter','Trimestre'],['year','Anno'],['all','Tutto'],['custom','📅 Personalizzato']].map(([v,l]) => (
             <button key={v} onClick={() => setPeriod(v)} style={{
               background: period === v ? '#c9a227' : 'rgba(255,255,255,0.1)',
               color: period === v ? '#0e1726' : 'rgba(255,255,255,0.7)',
               border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
             }}>{l}</button>
           ))}
+          {period === 'custom' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '4px 12px' }}>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Dal</span>
+              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, outline: 'none', cursor: 'pointer' }} />
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Al</span>
+              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, outline: 'none', cursor: 'pointer' }} />
+            </div>
+          )}
         </div>
         {leaderboard.length >= 3 && (
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 24, alignItems: 'flex-end' }}>
