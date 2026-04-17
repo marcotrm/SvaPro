@@ -1370,6 +1370,7 @@ export default function PosPage() {
       {showCheckoutModal && (
         <PosCheckoutModal
           cartTotal={cartTotalFinal}
+          cartLines={cartLines}
           onComplete={handleCheckout}
           onCancel={() => setShowCheckoutModal(false)}
           lockDiscount={isDipendente}
