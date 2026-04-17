@@ -591,7 +591,11 @@ function ExportModal({ employees, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ShiftsPage() {
-  const { selectedStoreId } = useOutletContext?.() || {};
+  const { selectedStoreId, userRoles = [] } = useOutletContext?.() || {};
+
+  // Solo Store Manager / Admin possono modificare i turni
+  const canEditShifts = !userRoles.includes('dipendente');
+
   const [storeId, setStoreId] = useState(selectedStoreId || '');
 
   const [weekStart, setWeekStart] = useState(() => getStartOfWeek());
@@ -932,18 +936,28 @@ export default function ShiftsPage() {
             Clicca sull'avatar di un dipendente per impostare ferie/malattia. Clicca su una cella giorno per assegnare il turno.
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button onClick={() => setShowTemplatesModal(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'var(--color-surface)', color:'var(--color-text)', border:'1px solid var(--color-border)', padding:'10px 16px', borderRadius:12, fontWeight:600, cursor:'pointer' }}>
-            <Clock size={16} /> Modelli Orari (Template)
-          </button>
+          {canEditShifts ? (
+            <button onClick={() => setShowTemplatesModal(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'var(--color-surface)', color:'var(--color-text)', border:'1px solid var(--color-border)', padding:'10px 16px', borderRadius:12, fontWeight:600, cursor:'pointer' }}>
+              <Clock size={16} /> Modelli Orari
+            </button>
+          ) : null}
           <button onClick={() => setShowExport(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'#6366F1', color:'#fff', border:'none', padding:'10px 16px', borderRadius:12, fontWeight:700, cursor:'pointer' }}>
             <Download size={16} /> Esporta Excel
           </button>
-          <button onClick={saveChanges} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-accent)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.8 : 1 }}>
-            {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} Salva Configurazioni
-          </button>
+          {canEditShifts && (
+            <button onClick={saveChanges} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-accent)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.8 : 1 }}>
+              {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} Salva Configurazioni
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Banner sola lettura per dipendenti */}
+      {!canEditShifts && (
+        <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#6366F1', fontWeight: 600 }}>
+          <User size={16} /> Visualizzazione sola lettura — solo i responsabili di negozio possono modificare i turni.
+        </div>
+      )}
 
       {/* ── Ricerca globale dipendente (cross-store) ── */}
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -1156,7 +1170,7 @@ export default function ShiftsPage() {
                       <td
                         key={day.dateStr}
                         style={{ padding: '8px', borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)', position: 'relative', background: day.isToday ? 'rgba(16,185,129,0.02)' : 'transparent', verticalAlign: 'top' }}
-                        onClick={() => setActiveCell({ empId: emp.id, dateStr: day.dateStr })}
+                        onClick={() => canEditShifts && setActiveCell({ empId: emp.id, dateStr: day.dateStr })}
                       >
                         {hasShift ? (
                           <div style={{ background: `${shift.color}15`, border: `1px solid ${shift.color}40`, borderLeft: `4px solid ${shift.color}`, borderRadius: 8, padding: '8px', cursor: 'pointer', transition: 'all 0.1s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>

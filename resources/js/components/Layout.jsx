@@ -728,6 +728,7 @@ export default function Layout({ user, setUser }) {
             user, setUser, 
             storesList, selectedStoreId, selectedStore,
             handleStoreChange, displayMode, toggleDisplayMode,
+            userRoles,
             setLowStockCount: () => {} 
           }} />
         </section>

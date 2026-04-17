@@ -4,7 +4,8 @@ import { orders as ordersApi, catalog, customers as customersApi, inventory, sto
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, X, User,
   MapPin, Zap, Package, ChevronRight, ReceiptText, Loader2,
-  ScanBarcode, Cherry, RotateCcw, UserCircle, Tag, Star
+  ScanBarcode, Cherry, RotateCcw, UserCircle, Tag, Star,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import PosCheckoutModal from '../components/PosCheckoutModal.jsx';
@@ -273,6 +274,7 @@ export default function PosPage() {
   const operatorDebounceRef = useRef(null);
   const [note, setNote]                   = useState('');
   const [showResoModal, setShowResoModal] = useState(false);
+  const [showMyShifts, setShowMyShifts]   = useState(false);
 
   const [allCustomers, setAllCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -981,6 +983,13 @@ export default function PosPage() {
                 <Trash2 size={12} /> Svuota
               </button>
             )}
+            {soldByEmployeeId && (
+              <button
+                onClick={() => setShowMyShifts(true)}
+                style={{ background: 'rgba(99,102,241,0.15)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#a5b4fc', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <CalendarIcon size={12} /> Turni
+              </button>
+            )}
             <button
               onClick={() => setShowResoModal(true)}
               style={{ background: 'rgba(251,191,36,0.12)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#fbbf24', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -1418,6 +1427,13 @@ export default function PosPage() {
           </div>
         </div>
       )}
+      {showMyShifts && (
+        <MyShiftsModal
+          employeeId={soldByEmployeeId}
+          employeeName={operatorName}
+          onClose={() => setShowMyShifts(false)}
+        />
+      )}
       {/* Reso Modal */}
       {showResoModal && <PosResoModal
         storeId={selectedStoreId}
@@ -1570,3 +1586,86 @@ function PosResoModal({ storeId, onClose, onDone }) {
   );
 }
 
+/* ─── Modal "I Miei Turni" POS ────────────────────────────────────── */
+function MyShiftsModal({ employeeId, employeeName, onClose }) {
+  const [myShifts, setMyShifts] = React.useState([]);
+  const [loading, setLoading]   = React.useState(true);
+
+  React.useEffect(() => {
+    if (!employeeId) return;
+    const now = new Date();
+    const start = new Date(now); start.setDate(start.getDate() - 3);
+    const end   = new Date(now); end.setDate(end.getDate() + 14);
+    const fmtD = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    import('../api.jsx').then(({ shifts: shiftsAPI }) => {
+      shiftsAPI.getAll({ employee_id: employeeId, start_date: fmtD(start), end_date: fmtD(end) })
+        .then(res => setMyShifts(res.data?.data || []))
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    });
+  }, [employeeId]);
+
+  const DAY_IT = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+  const today = new Date().toISOString().split('T')[0];
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}
+      onClick={onClose}>
+      <div style={{ background:'#0f172a', borderRadius:20, width:'100%', maxWidth:400, boxShadow:'0 32px 80px rgba(0,0,0,0.5)', border:'1px solid rgba(255,255,255,0.08)', overflow:'hidden' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ padding:'18px 22px', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:36, height:36, borderRadius:10, background:'rgba(99,102,241,0.2)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <CalendarIcon size={18} color="#a5b4fc" />
+            </div>
+            <div>
+              <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>I Miei Turni</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>{employeeName}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.4)' }}>
+            <X size={18} />
+          </button>
+        </div>
+        <div style={{ padding:'16px 22px 22px', maxHeight:420, overflowY:'auto' }}>
+          {loading ? (
+            <div style={{ textAlign:'center', padding:'32px 0', color:'rgba(255,255,255,0.3)' }}>
+              <Loader2 size={24} style={{ margin:'0 auto 8px', display:'block' }} />
+              <div style={{ fontSize:12 }}>Caricamento turni...</div>
+            </div>
+          ) : myShifts.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'32px 0', color:'rgba(255,255,255,0.3)', fontSize:13 }}>
+              📅 Nessun turno assegnato nei prossimi giorni
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {myShifts.map(s => {
+                const d = new Date(s.date + 'T12:00:00');
+                const isToday = s.date === today;
+                const isPast  = s.date < today;
+                return (
+                  <div key={s.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:12, background: isToday ? 'rgba(16,185,129,0.12)' : isPast ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)', border: isToday ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.07)', opacity: isPast ? 0.6 : 1 }}>
+                    <div style={{ width:10, height:10, borderRadius:'50%', background: s.color || '#7B6FD0', flexShrink:0 }} />
+                    <div style={{ minWidth:90 }}>
+                      <div style={{ fontSize:12, fontWeight:800, color: isToday ? '#86efac' : '#fff' }}>
+                        {isToday ? '📍 OGGI' : DAY_IT[d.getDay()]} {d.getDate()}/{d.getMonth()+1}
+                      </div>
+                      {s.store?.name && <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginTop:1 }}>{s.store.name}</div>}
+                    </div>
+                    <div style={{ marginLeft:'auto', textAlign:'right' }}>
+                      {s.start_time && s.end_time ? (
+                        <div style={{ fontSize:13, fontWeight:700, color:'rgba(255,255,255,0.85)', fontFamily:'monospace' }}>{s.start_time.slice(0,5)} – {s.end_time.slice(0,5)}</div>
+                      ) : (
+                        <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)' }}>Orario non impostato</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
