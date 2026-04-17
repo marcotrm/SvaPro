@@ -1292,17 +1292,7 @@ export default function PosPage() {
 
         {/* Cart Footer — Total + CTA */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '16px 22px 24px' }}>
-          {/* Subtotale riga per riga */}
-          {cartLines.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              {cartLines.map(l => (
-                <div key={l.product_variant_id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 3 }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{l.name} ×{l.qty}</span>
-                  <span>{fmt(l.price * l.qty)}</span>
-                </div>
-              ))}
-            </div>
-          )}
+
 
           {/* Totale */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: effectiveQscarePrice > 0 ? 4 : 0 }}>
