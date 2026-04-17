@@ -4,12 +4,15 @@ import { reports, stores, orders } from '../api.jsx';
 import { Shield, Loader2, Euro, Activity, TrendingUp, Package, BarChart2, Users, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import OrderDetailModal from '../components/OrderDetailModal.jsx';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid
+} from 'recharts';
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 const fmtDate = (d) => new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-// ─── Barchart SVG puro ──────────────────────────────────────────────────────
-function MiniBarChart({ data, valueKey, colorStart = '#10B981', colorEnd = '#6366f1', labelKey = 'label', height = 180, formatValue }) {
+// ─── MiniBarChart con Recharts ──────────────────────────────────────────────
+function MiniBarChart({ data, valueKey, color = '#10B981', labelKey = 'label', height = 180, formatValue }) {
   if (!data?.length) return (
     <div style={{ height, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 13, gap: 8 }}>
       <BarChart2 size={32} style={{ opacity: 0.2 }} />
@@ -17,54 +20,34 @@ function MiniBarChart({ data, valueKey, colorStart = '#10B981', colorEnd = '#636
     </div>
   );
 
-  // Assicura che tutti i valori siano numerici validi
   const safeData = data.map(d => ({ ...d, [valueKey]: parseFloat(d[valueKey]) || 0 }));
-  const max = Math.max(...safeData.map(d => d[valueKey]), 1);
-
-  // Parsing sicuro dei colori esadecimali
-  const parseHex = (hex, pos) => {
-    try { return parseInt((hex || '#888888').slice(pos, pos + 2), 16) || 128; } catch { return 128; }
-  };
-  const r1 = parseHex(colorStart, 1), g1 = parseHex(colorStart, 3), b1 = parseHex(colorStart, 5);
-  const r2 = parseHex(colorEnd, 1),   g2 = parseHex(colorEnd, 3),   b2 = parseHex(colorEnd, 5);
 
   return (
-    <div style={{ width: '100%', height: height + 28, position: 'relative' }}>
-      <div style={{ position: 'absolute', bottom: 28, left: 0, right: 0, height: 1, background: '#f1f5f9' }} />
-      <div style={{ display: 'flex', alignItems: 'flex-end', height, gap: 3, paddingBottom: 0 }}>
-        {safeData.map((d, i) => {
-          const pct = d[valueKey] / max;
-          const barH = Math.max(pct * (height - 20), 4);
-          const ratio = safeData.length > 1 ? i / (safeData.length - 1) : 0;
-          const r = Math.round(r1 + (r2-r1)*ratio);
-          const g = Math.round(g1 + (g2-g1)*ratio);
-          const b = Math.round(b1 + (b2-b1)*ratio);
-          const color = `rgb(${r},${g},${b})`;
-          const colorGradStart = `rgba(${r},${g},${b},0.6)`;
-          const colorShadow = `rgba(${r},${g},${b},0.3)`;
-          const valLabel = formatValue ? formatValue(d[valueKey]) : d[valueKey];
-          return (
-            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, height: '100%', position: 'relative' }} title={`${d[labelKey]}: ${valLabel}`}>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end' }}>
-                <div style={{
-                  width: '80%', height: barH,
-                  background: `linear-gradient(to top, ${colorGradStart}, ${color})`,
-                  borderRadius: '4px 4px 2px 2px',
-                  transition: 'height 0.4s ease',
-                  boxShadow: `0 2px 8px ${colorShadow}`,
-                  minHeight: 4,
-                }} />
-              </div>
-              <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700, marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', textAlign: 'center' }}>
-                {d[labelKey]}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={safeData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barCategoryGap="20%">
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+        <XAxis
+          dataKey={labelKey}
+          tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
+          axisLine={false} tickLine={false}
+        />
+        <YAxis
+          tick={{ fontSize: 10, fill: '#94a3b8' }}
+          axisLine={false} tickLine={false}
+          tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}
+          width={36}
+        />
+        <Tooltip
+          formatter={(val) => [formatValue ? formatValue(val) : val, '']}
+          contentStyle={{ borderRadius: 10, fontSize: 12, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+          cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+        />
+        <Bar dataKey={valueKey} radius={[6, 6, 2, 2]} maxBarSize={48} fill={color} />
+      </BarChart>
+    </ResponsiveContainer>
   );
 }
+
 
 // ─── KPI Card ───────────────────────────────────────────────────────────────
 function KpiCard({ icon: Icon, label, value, sub, color = '#10B981' }) {
@@ -388,7 +371,7 @@ export default function QscareDashboardPage() {
           </div>
           {loading
             ? <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={24} className="sp-spin" style={{ color: '#10B981' }} /></div>
-            : <MiniBarChart data={chartByDay} valueKey="revenue" labelKey="label" height={160} colorStart="#10B981" colorEnd="#059669" formatValue={v => fmt(v)} />}
+            : <MiniBarChart data={chartByDay} valueKey="revenue" labelKey="label" height={160} color="#10B981" formatValue={v => fmt(v)} />}
         </div>
 
         {/* Attivazioni per periodo */}
@@ -402,7 +385,7 @@ export default function QscareDashboardPage() {
           </div>
           {loading
             ? <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={24} className="sp-spin" style={{ color: '#6366f1' }} /></div>
-            : <MiniBarChart data={chartByDay} valueKey="qty" labelKey="label" height={160} colorStart="#818cf8" colorEnd="#6366f1" />}
+            : <MiniBarChart data={chartByDay} valueKey="qty" labelKey="label" height={160} color="#6366f1" />}
         </div>
 
         {/* Top operatori */}
@@ -414,12 +397,11 @@ export default function QscareDashboardPage() {
           </div>
           {loading
             ? <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={24} className="sp-spin" style={{ color: '#8b5cf6' }} /></div>
-            : <MiniBarChart data={chartByEmployee} valueKey="revenue" labelKey="label" height={160} colorStart="#a78bfa" colorEnd="#7c3aed" formatValue={v => fmt(v)} />}
+            : <MiniBarChart data={chartByEmployee} valueKey="revenue" labelKey="label" height={160} color="#8b5cf6" formatValue={v => fmt(v)} />}
         </div>
 
         {/* Per negozio */}
-        {(chartByStore.length > 1 || !loading) && (
-          <div style={chartCardStyle}>
+        <div style={chartCardStyle}>
             <div style={chartHeaderStyle}>
               <Package size={18} color="#f59e0b" />
               <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Per Negozio</div>
@@ -427,9 +409,8 @@ export default function QscareDashboardPage() {
             </div>
             {loading
               ? <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={24} className="sp-spin" style={{ color: '#f59e0b' }} /></div>
-              : <MiniBarChart data={chartByStore} valueKey="revenue" labelKey="label" height={160} colorStart="#fbbf24" colorEnd="#d97706" formatValue={v => fmt(v)} />}
+              : <MiniBarChart data={chartByStore} valueKey="revenue" labelKey="label" height={160} color="#f59e0b" formatValue={v => fmt(v)} />}
           </div>
-        )}
       </div>
 
       {/* ── Tabella dettaglio ── */}
