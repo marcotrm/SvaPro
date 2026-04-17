@@ -407,7 +407,7 @@ export default function DashboardPage() {
       const { date_from, date_to, days } = getPeriodDates(activePeriod, customDate);
 
       // Fetch each independently so one failure doesn't break everything
-      const [resSummary, resTrend, resOrders, resStock, resCust, resStores, resEmployees] = await Promise.allSettled([
+      const [resSummary, resTrend, resOrders, resStock, resCust, resStores, resEmployees, resStoreRev] = await Promise.allSettled([
         reports.summary({ ...sp, date_from, date_to, days }),
         reports.revenueTrend({ ...sp, period: period.chartPeriod, days, date_from, date_to }),
         ordersApi.getOrders({ ...sp, limit: 200, status: 'paid', date_from, date_to }),
@@ -415,6 +415,7 @@ export default function DashboardPage() {
         customers.getCustomers({ limit: 1 }),
         storesApi.getStores(),
         employeesApi.getEmployees({ limit: 200 }),
+        reports.storeRevenue({ date_from, date_to, days }), // ← classifiche negozi — NO store_id filter per avere tutti
       ]);
 
       // ── KPI Summary ───────────────────────────────────────────
@@ -496,19 +497,7 @@ export default function DashboardPage() {
         });
         setEmployeeActivity(Object.values(empMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
 
-        // Store ranking — usa store_id + store_name dal backend
-        const storeMap = {};
-        ordersList.forEach(o => {
-          const sId = o.store_id;
-          const sName = o.store_name || o.warehouse?.name || `Negozio #${sId}`;
-          if (!sId) return;
-          if (!storeMap[sId]) storeMap[sId] = { id: sId, name: sName, revenue: 0, orders: 0 };
-          storeMap[sId].revenue += parseFloat(o.total || o.grand_total || 0);
-          storeMap[sId].orders++;
-        });
-        setStoreRanking(Object.values(storeMap).sort((a, b) => b.revenue - a.revenue));
-
-        // Top products
+        // Top products — lavora sugli ordini già fetchati
         const topProd = [...ordersList]
           .flatMap(o => o.lines || [])
           .reduce((acc, line) => {
@@ -519,6 +508,11 @@ export default function DashboardPage() {
             return acc;
           }, {});
         setTopProducts(Object.values(topProd).sort((a, b) => b.revenue - a.revenue).slice(0, 5));
+      }
+
+      // Store ranking — endpoint dedicato (dati completi, non troncati a 200 ordini)
+      if (resStoreRev?.status === 'fulfilled') {
+        setStoreRanking(resStoreRev.value?.data?.data || []);
       }
 
       // ── Customer Count ─────────────────────────────────────────

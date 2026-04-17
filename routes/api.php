@@ -197,6 +197,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/reports/customer-acquisition', [ReportController::class, 'customerAcquisition']);
         Route::get('/reports/summary', [ReportController::class, 'summary']);
         Route::get('/reports/qscare-dashboard', [ReportController::class, 'qscareDashboard']);
+        Route::get('/reports/store-revenue', [ReportController::class, 'storeRevenue']);
 
         // Promotions & Bundles
         Route::get('/promotions', [PromotionController::class, 'index']);
@@ -356,6 +357,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/reports/top-products', [ReportController::class, 'topProducts']);
         Route::get('/reports/customer-acquisition', [ReportController::class, 'customerAcquisition']);
         Route::get('/reports/qscare-dashboard', [ReportController::class, 'qscareDashboard']);
+        Route::get('/reports/store-revenue', [ReportController::class, 'storeRevenue']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente,cliente_finale')->group(function () {

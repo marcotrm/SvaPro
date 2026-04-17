@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers\Api;
 
@@ -338,8 +338,8 @@ class ReportController extends Controller
 
         // Build the employee full name concat (driver-safe)
         $empNameExpr = $driver === 'pgsql'
-            ? "COALESCE(employees.first_name || ' ' || employees.last_name, '—')"
-            : "COALESCE(CONCAT(employees.first_name, ' ', employees.last_name), '—')";
+            ? "COALESCE(employees.first_name || ' ' || employees.last_name, 'â€”')"
+            : "COALESCE(CONCAT(employees.first_name, ' ', employees.last_name), 'â€”')";
 
         $query = DB::table('sales_order_lines')
             ->join('sales_orders', 'sales_order_lines.sales_order_id', '=', 'sales_orders.id')
@@ -347,7 +347,7 @@ class ReportController extends Controller
             ->leftJoin('stores', 'sales_orders.store_id', '=', 'stores.id')
             ->where('sales_orders.tenant_id', $tenantId)
             ->where('sales_orders.status', 'paid')
-            // Righe QScare: product_variant_id nullo (è un servizio, non un prodotto fisico)
+            // Righe QScare: product_variant_id nullo (Ã¨ un servizio, non un prodotto fisico)
             ->whereNull('sales_order_lines.product_variant_id')
             ->whereNotNull('sales_order_lines.tax_snapshot_json')
             ->select(
@@ -387,7 +387,39 @@ class ReportController extends Controller
             ],
         ]);
     }
+    /**
+     * GET /reports/store-revenue
+     * Fatturato e ordini per negozio (classifica dashboard).
+     */
+    public function storeRevenue(Request $request)
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $days     = min((int) ($request->input('days', 30) ?: 30), 365);
+        $dateFrom = $request->input('date_from') ?: now()->subDays($days)->toDateString();
+        $dateTo   = $request->input('date_to')   ?: now()->toDateString();
+
+        $rows = DB::table('sales_orders as so')
+            ->join('stores as st', 'st.id', '=', 'so.store_id')
+            ->where('so.tenant_id', $tenantId)
+            ->where('so.status', '!=', 'cancelled')
+            ->whereDate('so.created_at', '>=', $dateFrom)
+            ->whereDate('so.created_at', '<=', $dateTo)
+            ->groupBy('so.store_id', 'st.name')
+            ->orderByDesc('revenue')
+            ->select([
+                'so.store_id as id',
+                'st.name',
+                DB::raw('SUM(so.grand_total) as revenue'),
+                DB::raw('COUNT(so.id)        as orders'),
+            ])
+            ->get()
+            ->map(fn ($r) => [
+                'id'      => $r->id,
+                'name'    => $r->name,
+                'revenue' => (float) $r->revenue,
+                'orders'  => (int)   $r->orders,
+            ]);
+
+        return response()->json(['data' => $rows]);
+    }
 }
-
-
-
