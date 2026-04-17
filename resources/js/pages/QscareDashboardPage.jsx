@@ -84,12 +84,11 @@ function KpiCard({ icon: Icon, label, value, sub, color = '#10B981' }) {
 
 // ─── Period Selector ─────────────────────────────────────────────────────────
 const PERIODS = [
-  { key: 'giorno',    label: 'Oggi',        icon: '📅' },
-  { key: 'settimana', label: 'Sett.',        icon: '📆' },
-  { key: 'mese',      label: 'Mese',         icon: '🗓️' },
-  { key: 'trimestre', label: 'Trimestre',    icon: '📊' },
-  { key: 'anno',      label: 'Anno',         icon: '🗃️' },
-  { key: 'custom',    label: 'Personalizza', icon: '✏️' },
+  { key: 'giorno',    label: 'Oggi',     icon: '📅' },
+  { key: 'settimana', label: 'Sett.',     icon: '📆' },
+  { key: 'mese',      label: 'Mese',      icon: '🗓️' },
+  { key: 'trimestre', label: 'Trimestre', icon: '📊' },
+  { key: 'anno',      label: 'Anno',      icon: '🗃️' },
 ];
 
 function getPeriodDates(period, offset = 0) {
@@ -125,19 +124,33 @@ function getPeriodDates(period, offset = 0) {
 function PeriodSelector({ period, setPeriod, offset, setOffset, customFrom, customTo, setCustomFrom, setCustomTo }) {
   const { from, to } = period !== 'custom' ? getPeriodDates(period, offset) : { from: customFrom, to: customTo };
   const canGoNext = period !== 'custom' && offset < 0;
+  const [showCustom, setShowCustom] = React.useState(false);
 
   const label = (period !== 'custom' && from)
     ? (from === to
         ? new Date(from + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
         : `${new Date(from + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })} – ${new Date(to + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}`)
-    : 'Personalizza';
+    : (customFrom && customTo
+        ? `${new Date(customFrom + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })} – ${new Date(customTo + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}`
+        : 'Seleziona date');
+
+  const handleLabelClick = () => {
+    setPeriod('custom');
+    setShowCustom(true);
+  };
+
+  const handlePillClick = (key) => {
+    setPeriod(key);
+    setOffset(0);
+    setShowCustom(false);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* periodo pills */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {PERIODS.map(p => (
-          <button key={p.key} onClick={() => { setPeriod(p.key); setOffset(0); }}
+          <button key={p.key} onClick={() => handlePillClick(p.key)}
             style={{
               padding: '6px 14px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 800,
               background: period === p.key ? '#10B981' : '#f1f5f9',
@@ -149,25 +162,71 @@ function PeriodSelector({ period, setPeriod, offset, setOffset, customFrom, cust
           </button>
         ))}
       </div>
-      {/* nav arrows + date label */}
-      {period !== 'custom' ? (
+
+      {/* nav arrows + date label cliccabile */}
+      <div style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', borderRadius: 12, padding: '8px 14px', border: '1px solid #e2e8f0', width: 'fit-content' }}>
-          <button onClick={() => setOffset(o => o - 1)} style={{ border: 'none', background: 'none', cursor: 'pointer', display: 'flex', color: '#64748b', padding: 2 }}>
-            <ChevronLeft size={18} />
-          </button>
-          <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', minWidth: 180, textAlign: 'center' }}>{label}</span>
-          <button onClick={() => setOffset(o => o + 1)} disabled={!canGoNext}
-            style={{ border: 'none', background: 'none', cursor: canGoNext ? 'pointer' : 'default', display: 'flex', color: canGoNext ? '#64748b' : '#cbd5e1', padding: 2 }}>
-            <ChevronRight size={18} />
-          </button>
+          {/* freccia sinistra — solo per periodi non custom */}
+          {period !== 'custom' && (
+            <button onClick={() => setOffset(o => o - 1)} style={{ border: 'none', background: 'none', cursor: 'pointer', display: 'flex', color: '#64748b', padding: 2 }}>
+              <ChevronLeft size={18} />
+            </button>
+          )}
+
+          {/* label cliccabile → apre il date picker */}
+          <span
+            onClick={handleLabelClick}
+            title="Clicca per scegliere un intervallo personalizzato"
+            style={{
+              fontWeight: 800, fontSize: 13, color: '#0f172a',
+              minWidth: 180, textAlign: 'center',
+              cursor: 'pointer', borderRadius: 6,
+              padding: '2px 6px',
+              transition: 'background 0.15s',
+              userSelect: 'none',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            {label}
+          </span>
+
+          {/* freccia destra — solo per periodi non custom */}
+          {period !== 'custom' && (
+            <button onClick={() => setOffset(o => o + 1)} disabled={!canGoNext}
+              style={{ border: 'none', background: 'none', cursor: canGoNext ? 'pointer' : 'default', display: 'flex', color: canGoNext ? '#64748b' : '#cbd5e1', padding: 2 }}>
+              <ChevronRight size={18} />
+            </button>
+          )}
         </div>
-      ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="sp-input" style={{ width: 150 }} />
-          <span style={{ color: '#94a3b8', fontSize: 12 }}>→</span>
-          <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="sp-input" style={{ width: 150 }} />
-        </div>
-      )}
+
+        {/* Dropdown date picker — appare sotto la label */}
+        {(period === 'custom' || showCustom) && (
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 200,
+            background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)', padding: '16px 18px',
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dal</label>
+              <input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); setPeriod('custom'); }}
+                className="sp-input" style={{ width: 148 }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 16, marginTop: 16 }}>→</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Al</label>
+              <input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); setPeriod('custom'); }}
+                className="sp-input" style={{ width: 148 }} />
+            </div>
+            <button
+              onClick={() => setShowCustom(false)}
+              style={{ marginTop: 16, padding: '6px 14px', borderRadius: 8, background: '#10B981', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+              Applica
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
