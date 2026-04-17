@@ -394,10 +394,12 @@ export default function DashboardPage() {
   // NEW: employee activity (ultime attività = dipendenti)
   const [employeeActivity, setEmployeeActivity] = useState([]);
 
-  // NEW: store revenue ranking
-  const [storeRanking, setStoreRanking] = useState([]);
-  const [storesList, setStoresList] = useState([]);
-  const [donutStoreId, setDonutStoreId] = useState('all');
+  // Store revenue ranking + storico
+  const [storeRanking, setStoreRanking]   = useState([]);
+  const [storeHistory, setStoreHistory]   = useState({ months: [], stores: [] });
+  const [storeTab, setStoreTab]           = useState('ranking'); // 'ranking' | 'history'
+  const [storesList, setStoresList]       = useState([]);
+  const [donutStoreId, setDonutStoreId]   = useState('all');
 
   const fetchData = useCallback(async () => {
     try {
@@ -407,7 +409,7 @@ export default function DashboardPage() {
       const { date_from, date_to, days } = getPeriodDates(activePeriod, customDate);
 
       // Fetch each independently so one failure doesn't break everything
-      const [resSummary, resTrend, resOrders, resStock, resCust, resStores, resEmployees, resStoreRev] = await Promise.allSettled([
+      const [resSummary, resTrend, resOrders, resStock, resCust, resStores, resEmployees, resStoreRev, resStoreHist] = await Promise.allSettled([
         reports.summary({ ...sp, date_from, date_to, days }),
         reports.revenueTrend({ ...sp, period: period.chartPeriod, days, date_from, date_to }),
         ordersApi.getOrders({ ...sp, limit: 200, status: 'paid', date_from, date_to }),
@@ -415,7 +417,8 @@ export default function DashboardPage() {
         customers.getCustomers({ limit: 1 }),
         storesApi.getStores(),
         employeesApi.getEmployees({ limit: 200 }),
-        reports.storeRevenue({ date_from, date_to, days }), // ← classifiche negozi — NO store_id filter per avere tutti
+        reports.storeRevenue({ date_from, date_to, days }),        // classifica periodo
+        reports.storeRevenueHistory({ months: 6 }),                // storico 6 mesi
       ]);
 
       // ── KPI Summary ───────────────────────────────────────────
@@ -513,6 +516,10 @@ export default function DashboardPage() {
       // Store ranking — endpoint dedicato (dati completi, non troncati a 200 ordini)
       if (resStoreRev?.status === 'fulfilled') {
         setStoreRanking(resStoreRev.value?.data?.data || []);
+      }
+      // Storico mensile per negozio
+      if (resStoreHist?.status === 'fulfilled') {
+        setStoreHistory(resStoreHist.value?.data || { months: [], stores: [] });
       }
 
       // ── Customer Count ─────────────────────────────────────────
@@ -761,56 +768,154 @@ export default function DashboardPage() {
 
         {/* ── Classifica Negozi per Fatturato ── */}
         <div style={{ background:'var(--color-surface)', borderRadius:20,
-          boxShadow:'0 1px 8px rgba(0,0,0,0.04)', border:'1px solid var(--color-border)' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'18px 24px', borderBottom:'1px solid var(--color-border)' }}>
-            <span style={{ fontWeight:700, fontSize:14 }}>🏆 Classifica Fatturato per Negozio</span>
-            <span style={{ fontSize:12, color:'var(--color-text-tertiary)' }}>Periodo: {PERIODS.find(p => p.id === activePeriod)?.label}</span>
-          </div>
-          {storeRanking.length === 0 ? (
-            <div style={{ padding:'28px 24px', color:'var(--color-text-tertiary)', fontSize:13, textAlign:'center' }}>
-              Nessun dato negozio disponibile — le vendite vengono associate al punto cassa
+          boxShadow:'0 1px 8px rgba(0,0,0,0.04)', border:'1px solid var(--color-border)', overflow:'hidden' }}>
+
+          {/* Header con tab */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+            padding:'18px 24px', borderBottom:'1px solid var(--color-border)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <Trophy size={18} color="#F59E0B" />
+              <span style={{ fontWeight:800, fontSize:15 }}>Fatturato per Negozio</span>
             </div>
-          ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead>
-                <tr>
-                  {['#','Negozio','Ordini','Fatturato','Quota %'].map(h => (
-                    <th key={h} style={{ padding:'10px 20px', textAlign:'left', fontSize:11,
-                      fontWeight:600, color:'var(--color-text-tertiary)', textTransform:'uppercase', letterSpacing:'0.05em' }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {storeRanking.map((store, i) => {
-                  const totalRev = storeRanking.reduce((s, x) => s + x.revenue, 0) || 1;
-                  const pct = Math.round(store.revenue / totalRev * 100);
-                  return (
-                    <tr key={store.id} style={{ borderTop:'1px solid var(--color-border)' }}>
-                      <td style={{ padding:'10px 20px' }}>
-                        <span style={{ fontSize:14, fontWeight:900, color: i < 3 ? ['#F59E0B','#9CA3AF','#CD7C2A'][i] : 'var(--color-text-tertiary)' }}>
-                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}
-                        </span>
-                      </td>
-                      <td style={{ padding:'10px 20px' }}>
-                        <div style={{ fontWeight:600, fontSize:13 }}>{store.name}</div>
-                      </td>
-                      <td style={{ padding:'10px 20px', fontSize:13, color:'var(--color-text-secondary)' }}>{store.orders}</td>
-                      <td style={{ padding:'10px 20px', fontWeight:700, fontSize:13 }}>{fmt(store.revenue)}</td>
-                      <td style={{ padding:'10px 20px' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                          <div style={{ flex:1, height:6, borderRadius:99, background:'var(--color-border)', overflow:'hidden' }}>
-                            <div style={{ height:'100%', width:`${pct}%`, borderRadius:99, background:STORE_COLORS[i % STORE_COLORS.length] }} />
+            <div style={{ display:'flex', gap:6 }}>
+              {[['ranking','🏆 Classifica'],['history','📈 Storico']].map(([id, label]) => (
+                <button key={id} onClick={() => setStoreTab(id)}
+                  style={{
+                    padding:'5px 14px', borderRadius:20, border:'none', cursor:'pointer',
+                    fontSize:11, fontWeight:700, transition:'all 0.15s',
+                    background: storeTab === id ? '#7B6FD0' : 'var(--color-border)',
+                    color: storeTab === id ? '#fff' : 'var(--color-text-secondary)',
+                  }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* TAB: CLASSIFICA */}
+          {storeTab === 'ranking' && (
+            storeRanking.length === 0 ? (
+              <div style={{ padding:'28px 24px', color:'var(--color-text-tertiary)', fontSize:13, textAlign:'center' }}>
+                Nessuna vendita nel periodo selezionato
+              </div>
+            ) : (() => {
+              const totalRev = storeRanking.reduce((s, x) => s + x.revenue, 0) || 1;
+              return (
+                <div style={{ padding:'16px 24px', display:'flex', flexDirection:'column', gap:14 }}>
+                  {storeRanking.map((store, i) => {
+                    const pct = Math.round(store.revenue / totalRev * 100);
+                    const medals = ['🥇','🥈','🥉'];
+                    const colors = ['#F59E0B','#94A3B8','#CD7C2A'];
+                    const barColor = STORE_COLORS[i % STORE_COLORS.length];
+                    return (
+                      <div key={store.id} style={{
+                        background: i === 0 ? 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.02))'
+                          : 'var(--color-border)',
+                        borderRadius:14, padding:'14px 18px',
+                        border: i === 0 ? '1px solid rgba(245,158,11,0.3)' : '1px solid transparent',
+                      }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
+                          <span style={{ fontSize:22, lineHeight:1 }}>
+                            {i < 3 ? medals[i] : <span style={{ fontSize:13, fontWeight:900, color:'var(--color-text-tertiary)', width:22, display:'inline-block', textAlign:'center' }}>#{i+1}</span>}
+                          </span>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontWeight:800, fontSize:14 }}>{store.name}</div>
+                            <div style={{ fontSize:11, color:'var(--color-text-tertiary)', marginTop:1 }}>
+                              {store.orders} ordini
+                            </div>
                           </div>
-                          <span style={{ fontSize:11, fontWeight:700, minWidth:30, color:'var(--color-text-secondary)' }}>{pct}%</span>
+                          <div style={{ textAlign:'right' }}>
+                            <div style={{ fontSize:18, fontWeight:900, color: i < 3 ? colors[i] : 'var(--color-text)' }}>
+                              {fmt(store.revenue)}
+                            </div>
+                            <div style={{ fontSize:11, color:'var(--color-text-tertiary)' }}>{pct}% del totale</div>
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {/* Barra progresso */}
+                        <div style={{ height:6, borderRadius:99, background:'rgba(0,0,0,0.07)', overflow:'hidden' }}>
+                          <div style={{
+                            height:'100%', width:`${pct}%`, borderRadius:99,
+                            background: barColor,
+                            transition:'width 0.6s cubic-bezier(0.4,0,0.2,1)',
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Totale */}
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'10px 18px',
+                    borderTop:'1px solid var(--color-border)', marginTop:4 }}>
+                    <span style={{ fontSize:12, fontWeight:600, color:'var(--color-text-secondary)' }}>Totale periodo</span>
+                    <span style={{ fontSize:14, fontWeight:900 }}>{fmt(totalRev)}</span>
+                  </div>
+                </div>
+              );
+            })()
+          )}
+
+          {/* TAB: STORICO */}
+          {storeTab === 'history' && (
+            storeHistory.months.length === 0 ? (
+              <div style={{ padding:'28px 24px', color:'var(--color-text-tertiary)', fontSize:13, textAlign:'center' }}>
+                Nessuno storico disponibile
+              </div>
+            ) : (() => {
+              // Costruisci dati per Recharts — {month, store1: val, store2: val, ...}
+              const chartData = storeHistory.months.map(m => {
+                const point = { month: m.slice(0,7) }; // 'YYYY-MM'
+                storeHistory.stores.forEach(s => {
+                  point[s.name] = s.monthly[m]?.revenue ?? 0;
+                });
+                return point;
+              });
+              const itMonth = (ym) => {
+                if (!ym) return '';
+                const [y, mo] = ym.split('-');
+                return `${IT_MONTHS[parseInt(mo)-1].slice(0,3)} ${y.slice(2)}`;
+              };
+              return (
+                <div style={{ padding:'16px 24px' }}>
+                  {/* Legenda */}
+                  <div style={{ display:'flex', gap:16, marginBottom:16, flexWrap:'wrap' }}>
+                    {storeHistory.stores.map((s, i) => (
+                      <div key={s.id} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <div style={{ width:10, height:10, borderRadius:99, background:STORE_COLORS[i % STORE_COLORS.length] }} />
+                        <span style={{ fontSize:12, fontWeight:600 }}>{s.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Grafico */}
+                  <ResponsiveContainer width="100%" height={200}>
+                    <AreaChart data={chartData} margin={{ top:4, right:4, left:0, bottom:0 }}>
+                      <defs>
+                        {storeHistory.stores.map((s, i) => (
+                          <linearGradient key={s.id} id={`sg${i}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%"  stopColor={STORE_COLORS[i % STORE_COLORS.length]} stopOpacity={0.25} />
+                            <stop offset="95%" stopColor={STORE_COLORS[i % STORE_COLORS.length]} stopOpacity={0.02} />
+                          </linearGradient>
+                        ))}
+                      </defs>
+                      <XAxis dataKey="month" tickFormatter={itMonth} tick={{ fontSize:10 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize:10 }} axisLine={false} tickLine={false}
+                        tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={40} />
+                      <Tooltip
+                        formatter={(val, name) => [fmt(val), name]}
+                        labelFormatter={itMonth}
+                        contentStyle={{ borderRadius:10, fontSize:12, border:'1px solid var(--color-border)' }}
+                      />
+                      {storeHistory.stores.map((s, i) => (
+                        <Area key={s.id} type="monotone" dataKey={s.name}
+                          stroke={STORE_COLORS[i % STORE_COLORS.length]}
+                          strokeWidth={2.5}
+                          fill={`url(#sg${i})`}
+                          dot={false} activeDot={{ r:4 }}
+                        />
+                      ))}
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              );
+            })()
           )}
         </div>
 

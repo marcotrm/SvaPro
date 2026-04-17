@@ -172,6 +172,76 @@ class ReportController extends Controller
     }
 
     /**
+     * GET /reports/store-revenue-history
+     * Storico fatturato per negozio, raggruppato per mese.
+     * Restituisce: { stores: [{id, name}], months: ['2026-01', ...], series: [{store_id, data:[{month, revenue}]}] }
+     */
+    public function storeRevenueHistory(Request $request)
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $months   = min((int) ($request->input('months', 6) ?: 6), 24);
+
+        $dateFrom = now()->startOfMonth()->subMonths($months - 1)->toDateString();
+        $dateTo   = now()->toDateString();
+
+        $driver = DB::connection()->getDriverName();
+        $monthExpr = ($driver === 'pgsql') 
+            ? "TO_CHAR(so.created_at, 'YYYY-MM')" 
+            : ($driver === 'sqlite' ? "strftime('%Y-%m', so.created_at)" : "DATE_FORMAT(so.created_at, '%Y-%m')");
+
+        $rows = DB::table('sales_orders as so')
+            ->join('stores as st', 'st.id', '=', 'so.store_id')
+            ->where('so.tenant_id', $tenantId)
+            ->where('so.status', '!=', 'cancelled')
+            ->whereDate('so.created_at', '>=', $dateFrom)
+            ->whereDate('so.created_at', '<=', $dateTo)
+            ->groupBy('so.store_id', 'st.name', DB::raw($monthExpr))
+            ->select([
+                'so.store_id as store_id',
+                'st.name    as store_name',
+                DB::raw("$monthExpr as month"),
+                DB::raw('SUM(so.grand_total) as revenue'),
+                DB::raw('COUNT(so.id)        as orders'),
+            ])
+            ->orderBy('month')
+            ->get();
+
+        // Normalizza in struttura utile al frontend
+        $storesMap = [];
+        $monthsSet = [];
+
+        foreach ($rows as $row) {
+            $sid = $row->store_id;
+            if (!isset($storesMap[$sid])) {
+                $storesMap[$sid] = ['id' => $sid, 'name' => $row->store_name, 'monthly' => []];
+            }
+            $storesMap[$sid]['monthly'][$row->month] = [
+                'revenue' => (float) $row->revenue,
+                'orders'  => (int)   $row->orders,
+            ];
+            $monthsSet[$row->month] = true;
+        }
+
+        $allMonths = array_keys($monthsSet);
+        sort($allMonths);
+
+        // Riempie i mesi mancanti con 0
+        foreach ($storesMap as &$store) {
+            foreach ($allMonths as $m) {
+                if (!isset($store['monthly'][$m])) {
+                    $store['monthly'][$m] = ['revenue' => 0, 'orders' => 0];
+                }
+            }
+            ksort($store['monthly']);
+        }
+
+        return response()->json([
+            'months' => $allMonths,
+            'stores' => array_values($storesMap),
+        ]);
+    }
+
+    /**
      * General summary with KPIs.
      */
     public function summary(Request $request)

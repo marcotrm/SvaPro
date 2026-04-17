@@ -710,6 +710,7 @@ export const reports = {
   summary:             (params = {}) => api.get('/reports/summary', { params }),
   qscareDashboard:     (params = {}) => api.get('/reports/qscare-dashboard', { params }),
   storeRevenue:        (params = {}) => api.get('/reports/store-revenue', { params }),
+  storeRevenueHistory: (params = {}) => api.get('/reports/store-revenue-history', { params }),
   dailyLatest:         ()            => api.get('/reports/daily/latest'),
   downloadDaily:       ()            => api.get('/reports/daily/download', { responseType: 'blob' }),
 };
