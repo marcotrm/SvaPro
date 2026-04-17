@@ -1252,8 +1252,47 @@ export default function ShiftsPage() {
     });
   };
 
-  const handlePrevWeek = () => { const n = new Date(weekStart); n.setDate(n.getDate() - 7); setWeekStart(n); };
-  const handleNextWeek = () => { const n = new Date(weekStart); n.setDate(n.getDate() + 7); setWeekStart(n); };
+  // Controlla se ci sono modifiche non salvate
+  const hasUnsavedChanges = useMemo(() => {
+    const sk = Object.keys(shifts).sort().join(',');
+    const ok = Object.keys(originalShifts).sort().join(',');
+    if (sk !== ok) return true;
+    return Object.keys(shifts).some(k =>
+      shifts[k]?.start_time !== originalShifts[k]?.start_time ||
+      shifts[k]?.end_time   !== originalShifts[k]?.end_time
+    );
+  }, [shifts, originalShifts]);
+
+  // Auto-salva se ci sono modifiche pendenti, poi cambia settimana
+  const changeWeek = async (deltaDays) => {
+    if (hasUnsavedChanges && Object.keys(shifts).length > 0) {
+      const savingToast = toast.loading('💾 Salvataggio turni in corso...');
+      try {
+        const payload = { store_id: storeId, shifts: [], deletions: [] };
+        Object.keys(shifts).forEach(key => {
+          const [empId, dateStr] = splitShiftKey(key);
+          payload.shifts.push({ employee_id: empId, date: dateStr, start_time: shifts[key].start_time, end_time: shifts[key].end_time, color: shifts[key].color });
+        });
+        Object.keys(originalShifts).forEach(key => {
+          if (!shifts[key]) {
+            const [empId, dateStr] = splitShiftKey(key);
+            payload.deletions.push({ employee_id: empId, date: dateStr });
+          }
+        });
+        await shiftsApi.bulkSave(payload);
+        toast.success('✅ Turni salvati automaticamente', { id: savingToast });
+        setOriginalShifts(JSON.parse(JSON.stringify(shifts)));
+      } catch {
+        toast.error('❌ Errore salvataggio automatico — i turni potrebbero andare persi', { id: savingToast });
+      }
+    }
+    const n = new Date(weekStart);
+    n.setDate(n.getDate() + deltaDays);
+    setWeekStart(n);
+  };
+
+  const handlePrevWeek = () => changeWeek(-7);
+  const handleNextWeek = () => changeWeek(+7);
 
   const onCellChange = (empId, dateStr, changes) => {
     const key = `${empId}_${dateStr}`;
