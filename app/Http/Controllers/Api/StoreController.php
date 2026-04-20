@@ -20,12 +20,7 @@ class StoreController extends Controller
             ->where('tenant_id', $tenantId)
             ->orderByDesc('is_main')
             ->orderBy('name')
-            ->get([
-                'id', 'code', 'name', 'address', 'city', 'zip_code', 'country',
-                'phone', 'email', 'timezone', 'is_main',
-                'opening_hours', 'default_start_time', 'late_tolerance_minutes',
-                'auto_reorder_enabled', 'numero_esercizio', 'numero_ordinale', 'parent_store_id', 'company_group'
-            ])
+            ->get()   // select * — resiliente a colonne opzionali non ancora migrate
             ->map(function ($s) use ($tenantId) {
                 // Media settimanale fatturato h18 (lunedì → oggi)
                 $formatted = $this->formatStore($s);
