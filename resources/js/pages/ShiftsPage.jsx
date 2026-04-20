@@ -1210,21 +1210,22 @@ export default function ShiftsPage() {
     loadData();
   }, [loadData]); // ← usa loadData come dipendenza: si triggera solo quando essa cambia
 
-  // Ricerca globale dipendenti — server-side con debounce (usa LIKE su first_name/last_name)
+  // Ricerca globale dipendenti — filtro locale su allEmployeesGlobal (cross-store, già caricata)
   useEffect(() => {
-    if (!globalSearch || globalSearch.length < 2) { setGlobalResults([]); return; }
-    setGlobalSearchLoading(true);
-    const timer = setTimeout(() => {
-      api.get('/employees', { params: { search: globalSearch, per_page: 20 } })
-        .then(res => {
-          setGlobalResults((res.data?.data || []).slice(0, 8));
-          setShowGlobalDrop(true);
-        })
-        .catch(() => setGlobalResults([]))
-        .finally(() => setGlobalSearchLoading(false));
-    }, 300);  // 300ms debounce
-    return () => clearTimeout(timer);
-  }, [globalSearch]);
+    if (!globalSearch || globalSearch.trim().length < 2) { setGlobalResults([]); setShowGlobalDrop(false); return; }
+    const q = globalSearch.trim().toLowerCase();
+    const results = allEmployeesGlobal.filter(em => {
+      const full = ((em.first_name || '') + ' ' + (em.last_name || '')).toLowerCase();
+      return (
+        full.includes(q) ||
+        (em.barcode && em.barcode.toLowerCase().includes(q)) ||
+        (em.employee_code && em.employee_code.toLowerCase().includes(q)) ||
+        String(em.id).includes(q)
+      );
+    }).slice(0, 8);
+    setGlobalResults(results);
+    setShowGlobalDrop(results.length > 0);
+  }, [globalSearch, allEmployeesGlobal]);
 
   // Click-outside per chiudere il dropdown della ricerca globale
   useEffect(() => {
