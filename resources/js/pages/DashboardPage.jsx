@@ -579,25 +579,21 @@ export default function DashboardPage() {
   const ordersSparkline  = monthlyChart.slice(-8).map((_, i) => ({ v: Math.max(0, (kpi?.orders_count || 0) / 8 + (i % 3) * 2) }));
 
   const donutData = useMemo(() => {
-    // Raggruppa per negozio in base al fatturato, non al conto degli ordini
-    const byStore = {};
-    recentOrders.forEach(o => {
-      const sId = String(o.store_id || 'unknown');
-      const name = o.store_name || o.warehouse?.name || (o.store_id ? `Negozio #${o.store_id}` : 'Non assegnato');
-      if (!byStore[sId]) byStore[sId] = { name, value: 0 };
-      byStore[sId].value += parseFloat(o.grand_total || o.total || 0);
-    });
-    const result = Object.values(byStore).filter(r => r.value > 0);
-    if (result.length === 0) {
-      // Fallback: mostra canali se non ci sono vendite
-      return [
-        { name: 'POS',  value: recentOrders.filter(o => o.channel === 'pos').reduce((s,o)=>s+(parseFloat(o.grand_total)||0),0) || 1 },
-        { name: 'Web',  value: recentOrders.filter(o => o.channel === 'web').reduce((s,o)=>s+(parseFloat(o.grand_total)||0),0) || 1 },
-        { name: 'Altro',value: recentOrders.filter(o => !['pos','web'].includes(o.channel)).reduce((s,o)=>s+(parseFloat(o.grand_total)||0),0) || 1 },
-      ];
+    // Raggruppa per negozio in base al fatturato sfruttando i dati completi dal backend
+    if (storeRanking && storeRanking.length > 0) {
+      return storeRanking.map(s => ({
+        name: s.name,
+        value: s.revenue
+      }));
     }
-    return result;
-  }, [recentOrders]);
+    
+    // Fallback se proprio non ci sono dati di vendita nel periodo
+    return [
+      { name: 'POS',  value: 1 },
+      { name: 'Web',  value: 1 },
+      { name: 'Altro',value: 1 },
+    ];
+  }, [storeRanking]);
 
   const avatarColors = ['#9B8FD4','#6C63AC','#C5BEE8','#A78BFA','#7C3AED'];
 

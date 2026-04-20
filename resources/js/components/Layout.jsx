@@ -13,7 +13,8 @@ import {
   Receipt, Star, ArrowRightLeft, MapPin, ChevronLeft, ChevronRight,
   PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store, AlertCircle,
   LayoutDashboard, ShoppingCart, Megaphone, HandCoins,
-  Menu, X, Home, ChevronRight as ChevRight, Calendar, FileSpreadsheet, Zap
+  Menu, X, Home, ChevronRight as ChevRight, Calendar, FileSpreadsheet, Zap,
+  RefreshCw
 } from 'lucide-react';
 
 
@@ -600,6 +601,23 @@ export default function Layout({ user, setUser }) {
             >
               <BarChart3 size={16} />
             </button>
+
+            {/* NEW: Bottone aggiorna pagina */}
+            <button
+              onClick={() => window.location.reload()}
+              title="Aggiorna App"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-secondary)',
+                border: '1px solid var(--color-border)', cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-hover)'; e.currentTarget.style.color = 'var(--color-text)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+            >
+              <RefreshCw size={16} />
+            </button>
+
             {/* ── CAMPANELLA NOTIFICHE ── */}
             <div ref={notifPanelRef} style={{ position: 'relative' }}>
               <button
