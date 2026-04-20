@@ -7,7 +7,6 @@ import {
   User, Search, CheckCircle, AlertCircle, Banknote, CreditCard
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import DatePicker from '../components/DatePicker.jsx';
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
@@ -178,8 +177,9 @@ export default function TesoreriaPage() {
   // ── Movimentazioni ──
   const [movements, setMovements] = useState([]);
   const [histLoading, setHistLoading] = useState(true);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [filterMonth, setFilterMonth] = useState(''); // 'YYYY-MM'
+  const [filterCompany, setFilterCompany] = useState(''); // nome della societa
+  const companiesList = [...new Set((storesList || []).map(s => s.company_group).filter(Boolean))];
 
   // ── balance live per lo store corrente (mostrata in History) ──
   const [storeBalance, setStoreBalance] = useState(null);
@@ -211,13 +211,16 @@ export default function TesoreriaPage() {
     try {
       const params = {};
       if (selectedStoreId) params.store_id = selectedStoreId;
-      if (dateFrom) params.date_from = dateFrom;
-      if (dateTo)   params.date_to   = dateTo;
+      if (filterMonth) {
+        const [y, m] = filterMonth.split('-');
+        params.date_from = `${y}-${m}-01`;
+        params.date_to = new Date(y, m, 0).toISOString().split('T')[0];
+      }
       const res = await cashMovements.get(params);
       setMovements(res.data?.data || []);
     } catch {}
     finally { setHistLoading(false); }
-  }, [selectedStoreId, dateFrom, dateTo]);
+  }, [selectedStoreId, filterMonth]);
 
   /* balance live per il negozio corrente nella history */
   const fetchStoreBalance = useCallback(async () => {
@@ -392,73 +395,123 @@ export default function TesoreriaPage() {
           )}
 
           {/* Filtri */}
-          <div style={{ background: 'var(--color-surface)', padding: 16, borderRadius: 14, display: 'flex', gap: 16, alignItems: 'center', border: '1px solid var(--color-border)' }}>
+          <div style={{ background: 'var(--color-surface)', padding: 16, borderRadius: 14, display: 'flex', gap: 16, alignItems: 'center', border: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
             <Filter size={16} color="var(--color-text-secondary)" />
+            
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>Da:</span>
-              <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Da..." style={{ minWidth: 140 }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>Mese:</span>
+              <input type="month" className="sp-input" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} style={{ padding: '6px 12px', minHeight: 34 }} />
             </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>A:</span>
-              <DatePicker value={dateTo} onChange={setDateTo} placeholder="A..." style={{ minWidth: 140 }} />
-            </div>
-            {(dateFrom || dateTo) && (
-              <button onClick={() => { setDateFrom(''); setDateTo(''); }} style={{ fontSize: 12, fontWeight: 700, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Reset</button>
+
+            {!selectedStoreId && companiesList.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>Società / Holding:</span>
+                <select className="sp-select" value={filterCompany} onChange={e => setFilterCompany(e.target.value)} style={{ minHeight: 34, padding: '6px 12px' }}>
+                  <option value="">Tutte le società...</option>
+                  {companiesList.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+
+            {(filterMonth || filterCompany) && (
+              <button onClick={() => { setFilterMonth(''); setFilterCompany(''); }} style={{ fontSize: 12, fontWeight: 700, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Reset</button>
             )}
           </div>
 
-          {/* Tabella */}
-          <div style={{ background: 'var(--color-surface)', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--color-border)' }}>
-            {histLoading ? (
-              <div style={{ padding: 40, textAlign: 'center' }}><div className="sp-spin" style={{ width: 32, height: 32, margin: '0 auto' }} /></div>
-            ) : movements.length === 0 ? (
-              <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Nessun movimento trovato.</div>
-            ) : (
-              <table className="sp-table" style={{ width: '100%' }}>
-                <thead>
-                  <tr>
-                    <th>Data & Ora</th>
-                    {!selectedStoreId && <th>Negozio</th>}
-                    <th>Operatore</th>
-                    <th>Tipo</th>
-                    <th>Note</th>
-                    <th style={{ textAlign: 'right' }}>Importo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movements.map(m => (
-                    <tr key={m.id}>
-                      <td style={{ fontSize: 12 }}>{new Date(m.created_at).toLocaleString('it-IT')}</td>
-                      {!selectedStoreId && <td style={{ fontWeight: 600 }}>{m.store_name || '-'}</td>}
-                      <td style={{ fontSize: 13 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(123,111,208,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <User size={12} color="#7B6FD0" />
-                          </div>
-                          {m.employee_name || '-'}
-                        </div>
-                      </td>
-                      <td>
-                        {m.type === 'deposit' ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#10B981', fontWeight: 600, background: 'rgba(16,185,129,0.1)', padding: '4px 10px', borderRadius: 99, fontSize: 11 }}>
-                            <ArrowDownCircle size={12} /> Incasso / Versamento
-                          </span>
-                        ) : (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#EF4444', fontWeight: 600, background: 'rgba(239,68,68,0.1)', padding: '4px 10px', borderRadius: 99, fontSize: 11 }}>
-                            <ArrowUpCircle size={12} /> Prelievo / Banca
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ color: 'var(--color-text-secondary)', fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.note || '-'}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 800, fontSize: 15, color: m.type === 'deposit' ? '#10B981' : '#EF4444' }}>
-                        {m.type === 'deposit' ? '+' : '-'}{fmt(m.amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          {/* Calcolo Movimenti Filtrati */}
+          {(() => {
+            const filteredMovements = filterCompany ? movements.filter(m => m.company_group === filterCompany) : movements;
+            const totIn = filteredMovements.filter(m => m.type === 'deposit').reduce((s, m) => s + parseFloat(m.amount || 0), 0);
+            const totOut = filteredMovements.filter(m => m.type === 'withdrawal').reduce((s, m) => s + parseFloat(m.amount || 0), 0);
+
+            return (
+              <>
+                {/* Riquadro Riepilogo Società (visibile se filtrato) */}
+                {(filterMonth || filterCompany) && filteredMovements.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) minmax(200px, 1fr) minmax(200px, 1fr)', gap: 12 }}>
+                    <div style={{ background: 'var(--color-surface)', borderRadius: 14, padding: '16px 20px', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: 'var(--color-text-tertiary)' }}>Movimenti Estratti</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--color-text)' }}>{filteredMovements.length}</div>
+                    </div>
+                    <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: 14, padding: '16px 20px', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#10B981' }}>Totale Entrate (Incassi)</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: '#10B981' }}>{fmt(totIn)}</div>
+                    </div>
+                    <div style={{ background: 'rgba(239,68,68,0.06)', borderRadius: 14, padding: '16px 20px', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#EF4444' }}>Totale Uscite (Versamenti banca)</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: '#EF4444' }}>{fmt(totOut)}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tabella */}
+                <div style={{ background: 'var(--color-surface)', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+                  {histLoading ? (
+                    <div style={{ padding: 40, textAlign: 'center' }}><div className="sp-spin" style={{ width: 32, height: 32, margin: '0 auto' }} /></div>
+                  ) : filteredMovements.length === 0 ? (
+                    <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Nessun movimento trovato per questi filtri.</div>
+                  ) : (
+                    <table className="sp-table" style={{ width: '100%' }}>
+                      <thead>
+                        <tr>
+                          <th>Data & Ora</th>
+                          {!selectedStoreId && <th>Negozio & Società</th>}
+                          <th>Operatore</th>
+                          <th>Tipo</th>
+                          <th>Note</th>
+                          <th style={{ textAlign: 'right' }}>Importo</th>
+                          <th style={{ textAlign: 'right' }}>Fondi Rimanenti</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredMovements.map(m => (
+                          <tr key={m.id}>
+                            <td style={{ fontSize: 12 }}>{new Date(m.created_at).toLocaleString('it-IT')}</td>
+                            {!selectedStoreId && (
+                              <td>
+                                <div style={{ fontWeight: 600 }}>{m.store_name || '-'}</div>
+                                {m.company_group && <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{m.company_group}</div>}
+                              </td>
+                            )}
+                            <td style={{ fontSize: 13 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(123,111,208,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <User size={12} color="#7B6FD0" />
+                                </div>
+                                {m.employee_name || '-'}
+                              </div>
+                            </td>
+                            <td>
+                              {m.type === 'deposit' ? (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#10B981', fontWeight: 600, background: 'rgba(16,185,129,0.1)', padding: '4px 10px', borderRadius: 99, fontSize: 11 }}>
+                                  <ArrowDownCircle size={12} /> Incasso / Versamento
+                                </span>
+                              ) : (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#EF4444', fontWeight: 600, background: 'rgba(239,68,68,0.1)', padding: '4px 10px', borderRadius: 99, fontSize: 11 }}>
+                                  <ArrowUpCircle size={12} /> Prelievo / Banca
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ color: 'var(--color-text-secondary)', fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.note || '-'}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 800, fontSize: 15, color: m.type === 'deposit' ? '#10B981' : '#EF4444' }}>
+                              {m.type === 'deposit' ? '+' : '-'}{fmt(m.amount)}
+                            </td>
+                            <td style={{ textAlign: 'right', fontWeight: 800, fontSize: 14, color: 'var(--color-text)' }}>
+                              {m.balance_after_transaction !== null && m.balance_after_transaction !== undefined ? (
+                                <span style={{ padding: '4px 8px', background: 'var(--color-bg)', borderRadius: 20 }}>{fmt(m.balance_after_transaction)}</span>
+                              ) : (
+                                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 400 }}>N/A</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 

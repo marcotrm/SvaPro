@@ -24,7 +24,7 @@ class StoreController extends Controller
                 'id', 'code', 'name', 'address', 'city', 'zip_code', 'country',
                 'phone', 'email', 'timezone', 'is_main',
                 'opening_hours', 'default_start_time', 'late_tolerance_minutes',
-                'auto_reorder_enabled', 'numero_esercizio', 'numero_ordinale', 'parent_store_id',
+                'auto_reorder_enabled', 'numero_esercizio', 'numero_ordinale', 'parent_store_id', 'company_group'
             ])
             ->map(function ($s) use ($tenantId) {
                 // Media settimanale fatturato h18 (lunedì → oggi)
@@ -99,6 +99,7 @@ class StoreController extends Controller
             'numero_esercizio'       => ['nullable', 'string', 'max:20'],
             'numero_ordinale'        => ['nullable', 'string', 'max:20'],
             'parent_store_id'        => ['nullable', 'integer'],
+            'company_group'          => ['nullable', 'string', 'max:100'],
         ]);
 
         // Codice univoco per tenant
@@ -127,6 +128,7 @@ class StoreController extends Controller
             'numero_esercizio'       => $request->input('numero_esercizio'),
             'numero_ordinale'        => $request->input('numero_ordinale'),
             'parent_store_id'        => $request->filled('parent_store_id') ? (int) $request->input('parent_store_id') : null,
+            'company_group'          => $request->input('company_group'),
             'auto_reorder_enabled'   => true,
             'created_at'             => $now,
             'updated_at'             => $now,
@@ -180,6 +182,7 @@ class StoreController extends Controller
             'numero_esercizio'       => ['nullable', 'string', 'max:20'],
             'numero_ordinale'        => ['nullable', 'string', 'max:20'],
             'parent_store_id'        => ['nullable', 'integer'],
+            'company_group'          => ['nullable', 'string', 'max:100'],
         ]);
 
         $payload = array_filter([
@@ -197,6 +200,7 @@ class StoreController extends Controller
                 ? (int) $request->input('late_tolerance_minutes') : null,
             'numero_esercizio'       => $request->input('numero_esercizio'),
             'numero_ordinale'        => $request->input('numero_ordinale'),
+            'company_group'          => $request->input('company_group'),
         ], fn($v) => $v !== null);
 
         // parent_store_id: gestisce esplicitamente null (rimuovi relazione)
@@ -496,6 +500,7 @@ class StoreController extends Controller
             'numero_esercizio'       => $s->numero_esercizio ?? null,
             'numero_ordinale'        => $s->numero_ordinale ?? null,
             'parent_store_id'        => $s->parent_store_id ?? null,
+            'company_group'          => $s->company_group ?? null,
         ];
     }
 

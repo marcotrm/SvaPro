@@ -55,7 +55,9 @@ class CashMovementController extends Controller
                 'cash_movements.note',
                 'cash_movements.created_at',
                 'cash_movements.store_id',
+                'cash_movements.balance_after_transaction',
                 'stores.name as store_name',
+                'stores.company_group',
                 'users.name as employee_name'
             );
 
@@ -161,13 +163,31 @@ class CashMovementController extends Controller
             if ($emp) $employeeId = $emp->id;
         }
 
+        // Calcolo saldo attuale prima della transazione
+        $deposits = (float) DB::table('cash_movements')
+            ->where('tenant_id', $tenantId)->where('store_id', $storeId)->where('type', 'deposit')->sum('amount');
+        $withdrawals = (float) DB::table('cash_movements')
+            ->where('tenant_id', $tenantId)->where('store_id', $storeId)->where('type', 'withdrawal')->sum('amount');
+        $salesCash = (float) DB::table('sales_orders')
+            ->where('tenant_id', $tenantId)->where('store_id', $storeId)
+            ->where('status', 'paid')->where('channel', 'cash')->sum('grand_total');
+        
+        $currentBalance = round($salesCash + $deposits - $withdrawals, 2);
+        
+        // Nuovo saldo
+        $parsedAmount = (float) $request->input('amount');
+        $newBalance = $request->input('type') === 'deposit' 
+            ? $currentBalance + $parsedAmount 
+            : $currentBalance - $parsedAmount;
+
         $id = DB::table('cash_movements')->insertGetId([
             'tenant_id'   => $tenantId,
             'store_id'    => $storeId,
             'employee_id' => $employeeId,
             'type'        => $request->input('type'),
-            'amount'      => $request->input('amount'),
+            'amount'      => $parsedAmount,
             'note'        => $request->input('note'),
+            'balance_after_transaction' => $newBalance,
             'created_at'  => now(),
             'updated_at'  => now(),
         ]);

@@ -62,6 +62,7 @@ const emptyStore = () => ({
   numero_esercizio: '',
   numero_ordinale: '',
   parent_store_id: '',
+  company_group: '',
 });
 
 // ─── Griglia orari con supporto pausa pranzo ──────────────────────
@@ -223,6 +224,7 @@ function StoreModal({ store, onClose, onSaved }) {
     numero_esercizio: store.numero_esercizio || '',
     numero_ordinale: store.numero_ordinale || '',
     parent_store_id: store.parent_store_id || '',
+    company_group: store.company_group || '',
   } : emptyStore());
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -376,6 +378,16 @@ function StoreModal({ store, onClose, onSaved }) {
                 </select>
                 <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 3 }}>
                   Seleziona un negozio padre per creare una gerarchia categoria/sottocategoria.
+                </p>
+              </div>
+              <div>
+                <label className="sp-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Building2 size={13} /> Società / Holding
+                </label>
+                <input className="sp-input" value={form.company_group} onChange={e => set('company_group', e.target.value)}
+                  placeholder="Es: quisvapogroup" />
+                <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 3 }}>
+                  Gruppo societario per i raggruppamenti in tesoreria.
                 </p>
               </div>
               <div>
