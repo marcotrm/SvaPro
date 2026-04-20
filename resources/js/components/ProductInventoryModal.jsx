@@ -1,36 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { Package, X, MapPin, Loader2, Search } from 'lucide-react';
-import { inventory } from '../api.jsx';
+import { inventory, stores as storesApi } from '../api.jsx';
 import { toast } from 'react-hot-toast';
 
 export default function ProductInventoryModal({ product, onClose }) {
   const [data, setData] = useState([]);
+  const [storesList, setStoresList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const params = product.id ? { product_id: product.id } : { product_variant_id: product.variant_id };
-    inventory.getCrossStore(params)
-      .then(res => {
-        const payload = res.data?.data || res.data || [];
+    Promise.all([
+      inventory.getCrossStore(params),
+      storesApi.getStores()
+    ])
+      .then(([invRes, stRes]) => {
+        const payload = invRes.data?.data || invRes.data || [];
         if (payload.length > 0 && payload[0].stores) {
           const flatData = payload.flatMap(v => v.stores.map(s => ({ ...s, flavor: v.flavor, sku: v.sku })));
           setData(flatData);
         } else {
           setData(Array.isArray(payload) ? payload : []);
         }
+        setStoresList(stRes.data?.data || []);
         setLoading(false);
       })
       .catch(() => {
-        inventory.getStock({ limit: 100 })
-          .then(r => {
-             const payload = r.data?.data || r.data || [];
-             setData(Array.isArray(payload) ? payload : []);
-          })
-          .catch(() => toast.error('Impossibile caricare le giacenze'))
-          .finally(() => setLoading(false));
+        toast.error('Impossibile caricare le giacenze');
+        setLoading(false);
       });
-  }, [product.id]);
+  }, [product.id, product.variant_id]);
 
   const cleanStoreName = (name) => {
     if (!name) return 'Negozio Sconosciuto';
@@ -39,6 +39,18 @@ export default function ProductInventoryModal({ product, onClose }) {
 
   const aggregatedStores = React.useMemo(() => {
     const map = {};
+    
+    // Inizializza la mappa con TUTTI i negozi (per mostrare quelli a 0 stock)
+    storesList.forEach(st => {
+      const locName = cleanStoreName(st.name);
+      map[locName] = {
+        locName,
+        store_city: st.city,
+        totalQty: 0,
+        variants: []
+      };
+    });
+
     data.forEach(row => {
       const rawName = row.store?.name || row.store_name || row.warehouse?.name || row.warehouse_name || 'Negozio sconosciuto';
       const locName = cleanStoreName(rawName);
@@ -56,8 +68,9 @@ export default function ProductInventoryModal({ product, onClose }) {
         map[locName].variants.push({ flavor: row.flavor, sku: row.sku, qty });
       }
     });
+
     return Object.values(map);
-  }, [data]);
+  }, [data, storesList]);
 
   const filteredData = aggregatedStores.filter(row => {
     if (!searchTerm) return true;
