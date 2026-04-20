@@ -206,33 +206,65 @@ function _minsToStr(m) {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
+// Orario standard punto vendita
+const STORE_OPEN_MINS  = _toMins('09:00');
+const STORE_CLOSE_MINS = _toMins('20:00');
+
 function detectGaps(shiftsMap, weekDays) {
   const alerts = [];
-  weekDays.forEach(day => {
+  weekDays.forEach((day, index) => {
+    const isSunday = index === 6; // index 6 è Domenica (settimana inizia di Lunedì)
     const intervals = [];
+    
     Object.entries(shiftsMap).forEach(([key, s]) => {
-      // Estrai la data dagli ultimi 10 caratteri della chiave (formato YYYY-MM-DD)
       const keyDate = key.slice(-10);
       if (keyDate !== day.dateStr) return;
       if (!s.start_time || !s.end_time) return;
+      // Ignora i turni "malattia" o "ferie" se la logica in futuro li salverà come speciali
       const startMins = _toMins(s.start_time);
       const endMins   = _toMins(s.end_time);
       if (startMins < 0 || endMins <= startMins) return;
-      intervals.push({ startMins, endMins, startStr: s.start_time });
+      intervals.push({ startMins, endMins });
     });
-    if (intervals.length < 2) return;
-    // Ordina per ora di inizio (numerica)
-    intervals.sort((a, b) => a.startMins - b.startMins);
-    let maxEnd = intervals[0].endMins;
-    for (let i = 1; i < intervals.length; i++) {
-      const { startMins, endMins, startStr } = intervals[i];
-      if (startMins > maxEnd) {
-        // Buco trovato: da maxEnd a startMins
-        alerts.push({ day: day.label, from: _minsToStr(maxEnd), to: startStr });
+
+    // Se non ci sono turni, segnala buco per tutta la giornata (tranne la domenica, se chiusa default)
+    if (intervals.length === 0) {
+      if (!isSunday) {
+        alerts.push({ day: day.label, from: '09:00', to: '20:00' });
       }
-      if (endMins > maxEnd) maxEnd = endMins;
+      return;
+    }
+
+    // Unisci gli intervalli dei vari dipendenti per trovare la "copertura totale"
+    intervals.sort((a, b) => a.startMins - b.startMins);
+    const merged = [intervals[0]];
+    for (let i = 1; i < intervals.length; i++) {
+      const curr = intervals[i];
+      const last = merged[merged.length - 1];
+      if (curr.startMins <= last.endMins) {
+        last.endMins = Math.max(last.endMins, curr.endMins); // Fusi insieme
+      } else {
+        merged.push(curr); // C'è un gap interno!
+      }
+    }
+
+    // 1. Controlla copertura all'Apertura (09:00)
+    if (merged[0].startMins > STORE_OPEN_MINS) {
+      alerts.push({ day: day.label, from: _minsToStr(STORE_OPEN_MINS), to: _minsToStr(merged[0].startMins) });
+    }
+
+    // 2. Controlla gap intermedi (tra intervalli uniti)
+    for (let i = 0; i < merged.length - 1; i++) {
+      alerts.push({ day: day.label, from: _minsToStr(merged[i].endMins), to: _minsToStr(merged[i+1].startMins) });
+    }
+
+    // 3. Controlla copertura alla Chiusura (20:00)
+    const lastMerged = merged[merged.length - 1];
+    if (lastMerged.endMins < STORE_CLOSE_MINS) {
+      alerts.push({ day: day.label, from: _minsToStr(lastMerged.endMins), to: _minsToStr(STORE_CLOSE_MINS) });
     }
   });
+
   return alerts;
 }
 
