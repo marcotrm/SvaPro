@@ -14,7 +14,7 @@ class RolesPermissionsController extends Controller
     public function matrix(Request $request): JsonResponse
     {
         $roles = DB::table('roles')->orderBy('id')->get(['id', 'code', 'name']);
-        $permissions = DB::table('permissions')->orderBy('id')->get(['id', 'code', 'name', 'description']);
+        $permissions = DB::table('permissions')->orderBy('id')->get(['id', 'code', 'name']);
 
         $assigned = DB::table('role_permissions')
             ->get(['role_id', 'permission_id'])
