@@ -31,6 +31,7 @@ const allNavigation = [
   // 4. Magazzino â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { section: 'Magazzino', icon: Warehouse, items: [
     { label: 'Giacenze & Stock',       href: '/inventory',            icon: Warehouse,      roles: ['superadmin','admin_cliente'] },
+    { label: 'Giacenze Locali',        href: '/warehouse/cross-store', icon: MapPin,         roles: ['superadmin','admin_cliente'] },
     { label: 'Prodotti',               href: '/catalog',              icon: Package,        roles: ['superadmin','admin_cliente'] },
     { label: 'Carico Merce (DDT)',     href: '/supplier-delivery',    icon: Truck,          roles: ['superadmin','admin_cliente'] },
     { label: 'Resi',                   href: '/returns',              icon: RotateCcw,      roles: ['superadmin','admin_cliente'] },

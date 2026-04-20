@@ -271,9 +271,7 @@ export default function InventoryPage() {
       <div className="sp-tabs">
         <button className={`sp-tab ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}>Giacenze</button>
         <button className={`sp-tab ${activeTab === 'movements' ? 'active' : ''}`} onClick={() => setActiveTab('movements')}>Movimenti</button>
-        <button className={`sp-tab ${activeTab === 'cross_store' ? 'active' : ''}`} onClick={() => setActiveTab('cross_store')}>
-          <MapPin size={13} style={{ marginRight: 5 }} />Giacenze Locali
-        </button>
+
         {isSuperAdmin && (
           <button className={`sp-tab ${activeTab === 'by_store' ? 'active' : ''}`} onClick={() => setActiveTab('by_store')}>
             <Store size={13} style={{ marginRight: 5 }} />Per Negozio (Admin)

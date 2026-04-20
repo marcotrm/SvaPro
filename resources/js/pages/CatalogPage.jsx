@@ -13,6 +13,7 @@ export default function CatalogPage() {
   const navigate = useNavigate();
   const { selectedStoreId, displayMode, selectedStore, user } = useOutletContext();
   const isDipendente = (user?.roles || []).includes('dipendente') || user?.role === 'dipendente';
+  if (isDipendente) return <div style={{ padding: 40, textAlign: 'center' }}>Accesso non autorizzato.</div>;
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -129,7 +129,7 @@ export default function ProductInventoryModal({ product, onClose }) {
                         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                           <MapPin size={14} color="#10B981" style={{ marginTop: 2 }} /> 
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <span>{row.locName} {row.store_city ? `(${row.store_city})` : ''}</span>
+                            <span>{row.locName}</span>
                             {row.variants.length > 0 && row.variants.some(v => v.flavor) && (
                               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 500, display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
                                 {row.variants.filter(v => v.qty > 0 && v.flavor).map((v, i) => (

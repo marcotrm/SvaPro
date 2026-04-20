@@ -9,6 +9,7 @@ const CatalogPage = lazy(() => import('./pages/CatalogPage.jsx'));
 const OrdersPage = lazy(() => import('./pages/OrdersPage.jsx'));
 const StockAlertsPage = lazy(() => import('./pages/StockAlertsPage.jsx'));
 const InventoryPage = lazy(() => import('./pages/InventoryPage.jsx'));
+const CrossStoreInventoryPage = lazy(() => import('./pages/CrossStoreInventoryPage.jsx'));
 const CustomersPage = lazy(() => import('./pages/CustomersPage.jsx'));
 const EmployeesPage = lazy(() => import('./pages/EmployeesPage.jsx'));
 const SmartReorderPage = lazy(() => import('./pages/SmartReorderPage.jsx'));
@@ -144,6 +145,7 @@ export default function App() {
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/orders/stock-alerts" element={<StockAlertsPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
+              <Route path="/warehouse/cross-store" element={<CrossStoreInventoryPage />} />
               <Route path="/inventory/smart-reorder" element={<SmartReorderPage />} />
               <Route path="/customers" element={<CustomersPage />} />
               <Route path="/customers/:id" element={<CustomerDetailPage />} />

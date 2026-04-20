@@ -273,7 +273,7 @@ class InventoryController extends Controller
                 'si.product_variant_id',
                 'p.name as product_name',
                 'pv.flavor',
-                'pv.sku as variant_sku',
+                'p.sku as variant_sku',
                 'pv.sale_price',
                 's.id as store_id',
                 's.name as store_name',
