@@ -1796,33 +1796,7 @@ export default function ShiftsPage() {
         )}
       </div>}
 
-      {/* Analisi copertura turni — sempre visibile */}
-      {(() => {
-        const analyzedCount = Object.values(shifts).filter(s => s.start_time && s.end_time).length;
-        if (gapAlerts.length > 0) return (
-          <div style={{ background:'#FEF3C7', border:'1px solid #FCD34D', borderRadius:14, padding:'14px 20px', marginBottom:20, display:'flex', gap:12, alignItems:'flex-start' }}>
-            <AlertTriangle size={20} color="#B45309" style={{ flexShrink:0, marginTop:1 }}/>
-            <div style={{ flex:1 }}>
-              <div style={{ fontWeight:800, fontSize:14, color:'#92400E', marginBottom:4 }}>⚠️ Ore buche rilevate ({analyzedCount} turni analizzati)</div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                {gapAlerts.map((a, i) => (
-                  <span key={i} style={{ background:'rgba(180,83,9,0.12)', color:'#B45309', borderRadius:8, padding:'3px 10px', fontSize:12, fontWeight:700 }}>
-                    {a.day}: nessuna copertura {a.from}–{a.to}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-        if (analyzedCount > 0) return (
-          <div style={{ background:'#F0FDF4', border:'1px solid #86EFAC', borderRadius:14, padding:'12px 20px', marginBottom:20, display:'flex', gap:10, alignItems:'center' }}>
-            <span style={{ fontSize:16 }}>✅</span>
-            <span style={{ fontWeight:700, fontSize:13, color:'#15803D' }}>Nessun buco di copertura questa settimana</span>
-            <span style={{ fontSize:11, color:'#6b7280', marginLeft:4 }}>({analyzedCount} turni analizzati)</span>
-          </div>
-        );
-        return null;
-      })()}
+      {/* L'alert delle ore buche è stato rimosso in quanto generava troppo rumore visivo */}
 
       {/* Navigazione settimana */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '16px 24px', borderRadius: '16px 16px 0 0', border: '1px solid var(--color-border)', borderBottom: 'none' }}>
