@@ -12,34 +12,54 @@ export default function ProductInventoryModal({ product, onClose }) {
     inventory.getCrossStore({ product_id: product.id })
       .then(res => {
         const payload = res.data?.data || res.data || [];
-        // Flatten se raggruppato
         if (payload.length > 0 && payload[0].stores) {
           const flatData = payload.flatMap(v => v.stores.map(s => ({ ...s, flavor: v.flavor, sku: v.sku })));
           setData(flatData);
         } else {
           setData(Array.isArray(payload) ? payload : []);
         }
+        setLoading(false);
       })
       .catch(() => {
-        // Fallback locale
         inventory.getStock({ product_id: product.id, limit: 100 })
           .then(r => {
              const payload = r.data?.data || r.data || [];
              setData(Array.isArray(payload) ? payload : []);
           })
-          .catch(() => toast.error('Impossibile caricare le giacenze'));
-      })
-      .finally(() => setLoading(false));
+          .catch(() => toast.error('Impossibile caricare le giacenze'))
+          .finally(() => setLoading(false));
+      });
   }, [product.id]);
 
-  const filteredData = data.filter(row => {
+  const aggregatedStores = React.useMemo(() => {
+    const map = {};
+    data.forEach(row => {
+      const locName = row.store?.name || row.store_name || row.warehouse?.name || row.warehouse_name || 'Negozio sconosciuto';
+      if (!map[locName]) {
+        map[locName] = {
+          locName,
+          store_city: row.store_city,
+          totalQty: 0,
+          variants: []
+        };
+      }
+      const qty = Number(row.on_hand ?? row.available ?? row.quantity) || 0;
+      map[locName].totalQty += qty;
+      if (row.flavor || qty > 0) {
+        map[locName].variants.push({ flavor: row.flavor, sku: row.sku, qty });
+      }
+    });
+    return Object.values(map);
+  }, [data]);
+
+  const filteredData = aggregatedStores.filter(row => {
     if (!searchTerm) return true;
     const s = searchTerm.toLowerCase();
-    const locName = (row.store?.name || row.store_name || row.warehouse?.name || row.warehouse_name || 'Negozio sconosciuto').toLowerCase();
-    return locName.includes(s) || (row.store_city && row.store_city.toLowerCase().includes(s));
+    const loc = row.locName.toLowerCase();
+    return loc.includes(s) || (row.store_city && row.store_city.toLowerCase().includes(s));
   });
 
-  const totalQty = filteredData.reduce((sum, row) => sum + (Number(row.on_hand ?? row.available ?? row.quantity) || 0), 0);
+  const totalQty = filteredData.reduce((sum, row) => sum + row.totalQty, 0);
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
@@ -95,24 +115,25 @@ export default function ProductInventoryModal({ product, onClose }) {
               </thead>
               <tbody>
                 {filteredData.map((row, idx) => {
-                  const qty = Number(row.on_hand ?? row.available ?? row.quantity) || 0;
-                  const locName = row.store?.name || row.store_name || row.warehouse?.name || row.warehouse_name || 'Negozio sconosciuto';
+                  const qty = row.totalQty;
                   return (
                     <tr key={idx} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td style={{ padding: '14px 22px' }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <MapPin size={14} color="#10B981" /> 
-                          <span style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span>{locName}</span>
-                            {(row.store_city || row.flavor) && (
-                              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 500, marginTop: 2 }}>
-                                {[row.store_city, row.flavor ? `Aroma: ${row.flavor}` : null].filter(Boolean).join(' • ')}
-                              </span>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <MapPin size={14} color="#10B981" style={{ marginTop: 2 }} /> 
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <span>{row.locName} {row.store_city ? `(${row.store_city})` : ''}</span>
+                            {row.variants.length > 0 && row.variants.some(v => v.flavor) && (
+                              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 500, display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
+                                {row.variants.filter(v => v.qty > 0 && v.flavor).map((v, i) => (
+                                  <span key={i}>• {v.flavor}: <strong style={{ color: 'var(--color-text-secondary)' }}>{v.qty}</strong></span>
+                                ))}
+                              </div>
                             )}
-                          </span>
+                          </div>
                         </div>
                       </td>
-                      <td style={{ padding: '14px 22px', textAlign: 'right' }}>
+                      <td style={{ padding: '14px 22px', textAlign: 'right', verticalAlign: 'top' }}>
                         <span style={{ fontSize: 15, fontWeight: 900, color: qty > 0 ? '#10B981' : '#EF4444', background: qty > 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', border: qty > 0 ? '1.5px solid rgba(16,185,129,0.3)' : '1.5px solid rgba(239,68,68,0.3)', padding: '4px 10px', borderRadius: 8 }}>
                           {qty > 0 ? `+${qty}` : 'ESAURITO'}
                         </span>
