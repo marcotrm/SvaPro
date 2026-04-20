@@ -272,7 +272,7 @@ export default function InventoryPage() {
         <button className={`sp-tab ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}>Giacenze</button>
         <button className={`sp-tab ${activeTab === 'movements' ? 'active' : ''}`} onClick={() => setActiveTab('movements')}>Movimenti</button>
         <button className={`sp-tab ${activeTab === 'cross_store' ? 'active' : ''}`} onClick={() => setActiveTab('cross_store')}>
-          <MapPin size={13} style={{ marginRight: 5 }} />Disponibilità Negozi
+          <MapPin size={13} style={{ marginRight: 5 }} />Giacenze Locali
         </button>
         {isSuperAdmin && (
           <button className={`sp-tab ${activeTab === 'by_store' ? 'active' : ''}`} onClick={() => setActiveTab('by_store')}>
@@ -321,9 +321,9 @@ export default function InventoryPage() {
                     <td>
                       <span className="sp-cell-primary">{item.product_name}</span>
                       {item.flavor && <span className="sp-cell-secondary" style={{ marginLeft: 6 }}>— {item.flavor}</span>}
-                      <button onClick={() => setInventoryProduct({ variant_id: item.product_variant_id, name: item.product_name })} 
+                      <button onClick={() => setInventoryProduct({ variant_id: item.product_variant_id, id: item.product_id || item.id, name: item.product_name })} 
                               style={{ marginLeft: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', color: 'var(--color-accent)' }}>
-                        <MapPin size={9} style={{ display: 'inline', marginRight: 4 }}/>Negozi
+                        <MapPin size={9} style={{ display: 'inline', marginRight: 4 }}/>Giacenze Locali
                       </button>
                     </td>
                     <td className="sp-cell-secondary">{item.warehouse_name}</td>
@@ -417,7 +417,7 @@ export default function InventoryPage() {
         <div className="sp-table-wrap">
           <div className="sp-table-toolbar" style={{ padding: '16px 20px' }}>
             <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px', color: 'var(--color-text)' }}>🔍 Disponibilità Prodotti per Negozio</h3>
+              <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px', color: 'var(--color-text)' }}>🔍 Giacenze Locali (Ricerca Multi-Store)</h3>
               <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: 0 }}>
                 Cerca un prodotto per vedere le giacenze disponibili in tutti i negozi.
               </p>

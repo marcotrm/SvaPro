@@ -5,7 +5,7 @@ import {
   Search, Plus, Minus, Trash2, ShoppingCart, X, User,
   MapPin, Zap, Package, ChevronRight, ReceiptText, Loader2,
   ScanBarcode, Cherry, RotateCcw, UserCircle, Tag, Star,
-  Calendar as CalendarIcon, ShieldCheck
+  Calendar as CalendarIcon, ShieldCheck, Info
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import PosCheckoutModal from '../components/PosCheckoutModal.jsx';
@@ -27,7 +27,7 @@ const catPalette = (catId) => CAT_PALETTES[(catId || 0) % CAT_PALETTES.length];
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
 /* ─── ProductCard ───────────────────────────────── */
-function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
+function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode }) {
   const variant   = product.variants?.[0];
   const price     = parseFloat(variant?.sale_price) || 0;
   const stockInfo = variant ? stockMap[variant.id] : null;
@@ -119,6 +119,19 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
             🛡 {fmt(qscarePrice)}
           </div>
         )}
+        {/* Info button */}
+        <button
+          onClick={e => { e.stopPropagation(); onInfo(product); }}
+          style={{
+            position: 'absolute', top: 7, right: 7,
+            background: 'rgba(255,255,255,0.85)', border: 'none',
+            borderRadius: 8, width: 26, height: 26,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', backdropFilter: 'blur(4px)',
+          }}
+        >
+          <Info size={14} color="#555" strokeWidth={2.5} />
+        </button>
 
 
 
@@ -151,15 +164,15 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
             {fmt(price)}
           </span>
           <button
-            onClick={e => { e.stopPropagation(); onInfo(product); }}
+            onClick={e => { e.stopPropagation(); onNegozi(product); }}
             style={{
-              background: 'var(--color-bg)', border: 'none',
+              background: 'var(--color-bg)', border: '1px solid var(--color-border)',
               borderRadius: 8, padding: '4px 8px', fontSize: 11, fontWeight: 700,
               display: 'flex', alignItems: 'center', gap: 4,
               cursor: 'pointer', color: 'var(--color-text-secondary)'
             }}
           >
-            Dettagli
+            <MapPin size={12} color="#10B981" /> Giacenze Locali
           </button>
           {variant?.location && (
             <span style={{ fontSize: 9, color: '#aaa', display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -915,6 +928,7 @@ export default function PosPage() {
                 product={p}
                 onAdd={addToCart}
                 onInfo={setShowProductInfo}
+                onNegozi={setInventoryProduct}
                 stockMap={stockMap}
                 displayMode={displayMode}
               />
