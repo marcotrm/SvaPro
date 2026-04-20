@@ -9,7 +9,8 @@ export default function ProductInventoryModal({ product, onClose }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    inventory.getCrossStore({ product_id: product.id })
+    const params = product.id ? { product_id: product.id } : { product_variant_id: product.variant_id };
+    inventory.getCrossStore(params)
       .then(res => {
         const payload = res.data?.data || res.data || [];
         if (payload.length > 0 && payload[0].stores) {
@@ -21,7 +22,7 @@ export default function ProductInventoryModal({ product, onClose }) {
         setLoading(false);
       })
       .catch(() => {
-        inventory.getStock({ product_id: product.id, limit: 100 })
+        inventory.getStock({ limit: 100 })
           .then(r => {
              const payload = r.data?.data || r.data || [];
              setData(Array.isArray(payload) ? payload : []);
@@ -31,10 +32,16 @@ export default function ProductInventoryModal({ product, onClose }) {
       });
   }, [product.id]);
 
+  const cleanStoreName = (name) => {
+    if (!name) return 'Negozio Sconosciuto';
+    return name.replace(/^(Magazzino\s*(?:\d+\.)?\s*)?(?:Negozio\s*)?/i, '').trim() || name;
+  };
+
   const aggregatedStores = React.useMemo(() => {
     const map = {};
     data.forEach(row => {
-      const locName = row.store?.name || row.store_name || row.warehouse?.name || row.warehouse_name || 'Negozio sconosciuto';
+      const rawName = row.store?.name || row.store_name || row.warehouse?.name || row.warehouse_name || 'Negozio sconosciuto';
+      const locName = cleanStoreName(rawName);
       if (!map[locName]) {
         map[locName] = {
           locName,

@@ -120,19 +120,7 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
           </div>
         )}
 
-        {/* Info button */}
-        <button
-          onClick={e => { e.stopPropagation(); onInfo(product); }}
-          style={{
-            position: 'absolute', top: 7, right: 7,
-            background: 'rgba(255,255,255,0.85)', border: 'none',
-            borderRadius: 8, width: 26, height: 26,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', backdropFilter: 'blur(4px)',
-          }}
-        >
-          <Search size={12} color="#555" strokeWidth={2.5} />
-        </button>
+
 
         {/* Featured badge */}
         {product.is_featured && (
@@ -162,6 +150,17 @@ function ProductCard({ product, onAdd, onInfo, stockMap, displayMode }) {
           <span style={{ fontSize: 17, fontWeight: 800, color: palette.accent }}>
             {fmt(price)}
           </span>
+          <button
+            onClick={e => { e.stopPropagation(); onInfo(product); }}
+            style={{
+              background: 'var(--color-bg)', border: 'none',
+              borderRadius: 8, padding: '4px 8px', fontSize: 11, fontWeight: 700,
+              display: 'flex', alignItems: 'center', gap: 4,
+              cursor: 'pointer', color: 'var(--color-text-secondary)'
+            }}
+          >
+            Dettagli
+          </button>
           {variant?.location && (
             <span style={{ fontSize: 9, color: '#aaa', display: 'flex', alignItems: 'center', gap: 2 }}>
               <MapPin size={8} />{variant.location}

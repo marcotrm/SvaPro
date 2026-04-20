@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, useLocation } from 'react-router-dom';
 import { inventory, stores as storesApi } from '../api.jsx';
 import InventoryMovementModal from '../components/InventoryMovementModal.jsx';
+import ProductInventoryModal from '../components/ProductInventoryModal.jsx';
 import { Search, Plus, AlertTriangle, MapPin, Filter, Store, ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function InventoryPage() {
@@ -14,6 +15,7 @@ export default function InventoryPage() {
   const [filterOutStock, setFilterOutStock] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showMovementModal, setShowMovementModal] = useState(false);
+  const [inventoryProduct, setInventoryProduct] = useState(null);
   const [activeTab, setActiveTab] = useState('stock');
   const [allStoresStock, setAllStoresStock] = useState([]);
   const [storesList, setStoresList] = useState([]);
@@ -319,6 +321,10 @@ export default function InventoryPage() {
                     <td>
                       <span className="sp-cell-primary">{item.product_name}</span>
                       {item.flavor && <span className="sp-cell-secondary" style={{ marginLeft: 6 }}>— {item.flavor}</span>}
+                      <button onClick={() => setInventoryProduct({ variant_id: item.product_variant_id, name: item.product_name })} 
+                              style={{ marginLeft: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', color: 'var(--color-accent)' }}>
+                        <MapPin size={9} style={{ display: 'inline', marginRight: 4 }}/>Negozi
+                      </button>
                     </td>
                     <td className="sp-cell-secondary">{item.warehouse_name}</td>
                     <td>
@@ -604,6 +610,9 @@ export default function InventoryPage() {
         />
       )}
 
+      {inventoryProduct && (
+        <ProductInventoryModal product={inventoryProduct} onClose={() => setInventoryProduct(null)} />
+      )}
     </div>
   );
 }
