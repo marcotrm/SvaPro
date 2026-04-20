@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import PosCheckoutModal from '../components/PosCheckoutModal.jsx';
+import ProductInventoryModal from '../components/ProductInventoryModal.jsx';
 
 /* ─── Category palette (colori di fallback card) ─── */
 const CAT_PALETTES = [
@@ -282,6 +283,7 @@ export default function PosPage() {
   const [customerSearch, setCustomerSearch]     = useState('');
   const [showCustomerDrop, setShowCustomerDrop] = useState(false);
   const [showProductInfo, setShowProductInfo]   = useState(null);
+  const [inventoryProduct, setInventoryProduct] = useState(null);
 
   const [qscareLines, setQscareLines] = useState({}); // { [product_variant_id]: bool }
 
@@ -1496,6 +1498,15 @@ export default function PosPage() {
                 ))}
               </div>
 
+              <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+                <button
+                  onClick={() => { setInventoryProduct(showProductInfo); setShowProductInfo(null); }}
+                  style={{ flex: 1, padding: '12px 0', border: '1.5px solid #10B981', background: 'rgba(16,185,129,0.1)', color: '#10B981', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                >
+                  <MapPin size={16} /> Cerca in altri negozi
+                </button>
+              </div>
+
               <button
                 onClick={() => { addToCart(showProductInfo); setShowProductInfo(null); }}
                 style={{ width: '100%', height: 48, background: 'linear-gradient(135deg, #7B6FD0, #5B50B0)', border: 'none', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
@@ -1519,6 +1530,11 @@ export default function PosPage() {
         onClose={() => setShowResoModal(false)}
         onDone={() => { setShowResoModal(false); clearApiCache(); fetchData(); }}
       />}
+      
+      {/* ─── Modal Giacenze Multi-Store ─── */}
+      {inventoryProduct && (
+        <ProductInventoryModal product={inventoryProduct} onClose={() => setInventoryProduct(null)} />
+      )}
     </div>
   );
 }

@@ -175,8 +175,8 @@ export default function TesoreriaPage() {
   const [filterAlerts, setFilterAlerts] = useState(false); // filtra solo negozi >= 1000
   const CASH_ALERT_THRESHOLD = 1000;
 
-  // ── Movimentazioni ──
   const [movements, setMovements] = useState([]);
+  const [histLoading, setHistLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [filterCompany, setFilterCompany] = useState(''); // nome della societa

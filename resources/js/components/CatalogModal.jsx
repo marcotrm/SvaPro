@@ -172,7 +172,7 @@ const normalizeProduct = (product, storesList, selectedStoreId = '') => {
   };
 };
 
-export default function CatalogModal({ product, storesList = [], suppliers = [], categories = [], selectedStoreId = '', onClose, onSave }) {
+export default function CatalogModal({ product, storesList = [], suppliers = [], categories = [], selectedStoreId = '', onClose, onSave, isDipendente = false }) {
   const [formData, setFormData] = useState(() => normalizeProduct(product, storesList, selectedStoreId));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -473,6 +473,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                           value={formData.qscare_price}
                           onChange={handleChange}
                           placeholder="Es: 9.90"
+                          disabled={isDipendente}
                           style={{ paddingLeft: 28, fontWeight: 700 }}
                         />
                       </div>
@@ -562,12 +563,12 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
                       <div>
                         <label className="sp-label">Prezzo Vendita IVA incl. (EUR) *</label>
                         <div style={{ position: 'relative' }}>
-                          <input className="sp-input" type="number" step="0.01" value={(() => { const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id)); return tc?.rate ? withVat(v.sale_price, tc.rate) : v.sale_price; })()} onChange={e => { const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id)); handleVariantChange(idx, 'sale_price', tc?.rate ? withoutVat(e.target.value, tc.rate) : e.target.value); }} placeholder="0.00" style={{ fontWeight: 700, paddingRight: 80, ...inputStyleV(idx, 'sale_price') }} />
+                          <input className="sp-input" type="number" step="0.01" value={(() => { const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id)); return tc?.rate ? withVat(v.sale_price, tc.rate) : v.sale_price; })()} onChange={e => { const tc = TAX_CLASSES.find(t => String(t.value) === String(v.tax_class_id)); handleVariantChange(idx, 'sale_price', tc?.rate ? withoutVat(e.target.value, tc.rate) : e.target.value); }} placeholder="0.00" disabled={isDipendente} style={{ fontWeight: 700, paddingRight: 80, ...inputStyleV(idx, 'sale_price') }} />
                           <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 10, fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.1)', borderRadius: 5, padding: '2px 6px' }}>IVA incl.</span>
                         </div>
                         {fv(idx, 'sale_price') && <p style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 3 }}>{fv(idx, 'sale_price')}</p>}
                       </div>
-                      <div><label className="sp-label">Costo (EUR)</label><input className="sp-input" type="number" step="0.01" value={v.cost_price} onChange={e => handleVariantChange(idx, 'cost_price', e.target.value)} placeholder="0.00" /></div>
+                      <div><label className="sp-label">Costo (EUR)</label><input className="sp-input" type="number" step="0.01" value={v.cost_price} onChange={e => handleVariantChange(idx, 'cost_price', e.target.value)} placeholder="0.00" disabled={isDipendente} /></div>
                       <div><label className="sp-label">Ubicazione</label><div style={{ position: 'relative' }}><MapPin size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} /><input className="sp-input" value={v.location} onChange={e => handleVariantChange(idx, 'location', e.target.value)} placeholder="Es: Scaffale A3" style={{ paddingLeft: 34 }} /></div></div>
                       {/* Multi-barcode */}
                       <div style={{ gridColumn: '1/-1' }}>
