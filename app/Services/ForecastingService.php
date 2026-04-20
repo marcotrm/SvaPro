@@ -34,7 +34,7 @@ class ForecastingService
                 'pv.id as variant_id',
                 'p.name as product_name',
                 'pv.flavor',
-                'pv.sku',
+                'p.sku',
                 'p.reorder_days',
                 'p.min_stock_qty'
             ])

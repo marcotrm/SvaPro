@@ -21,57 +21,57 @@ import {
 const allNavigation = [
   // â”€â”€ Principale â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { section: 'Principale', icon: LayoutDashboard, items: [
-    { label: 'POS Cassa',              href: '/',               icon: Monitor,     roles: ['superadmin','admin_cliente','dipendente'] },
-    { label: 'Report & Analisi',       href: '/reports',        icon: Activity,    roles: ['superadmin','admin_cliente'] },
-    { label: 'Fatturato Negozi',       href: '/store-revenue',  icon: BarChart3,   roles: ['superadmin','admin_cliente'] },
+    { label: 'POS Cassa',              href: '/',               icon: Monitor,     roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
+    { label: 'Report & Analisi',       href: '/reports',        icon: Activity,    roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Fatturato Negozi',       href: '/store-revenue',  icon: BarChart3,   roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Bolle in Arrivo',       href: '/warehouse/delivery-notes', icon: Truck, roles: ['dipendente'] },
     { label: 'Clienti',                href: '/customers',      icon: Users,       roles: ['dipendente'] },
   ]},
 
   // 4. Magazzino â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { section: 'Magazzino', icon: Warehouse, items: [
-    { label: 'Giacenze & Stock',       href: '/inventory',            icon: Warehouse,      roles: ['superadmin','admin_cliente'] },
-    { label: 'Giacenze Locali',        href: '/warehouse/cross-store', icon: MapPin,         roles: ['superadmin','admin_cliente'] },
-    { label: 'Prodotti',               href: '/catalog',              icon: Package,        roles: ['superadmin','admin_cliente'] },
-    { label: 'Carico Merce (DDT)',     href: '/supplier-delivery',    icon: Truck,          roles: ['superadmin','admin_cliente'] },
-    { label: 'Resi',                   href: '/returns',              icon: RotateCcw,      roles: ['superadmin','admin_cliente'] },
-    { label: 'Trasferimenti',          href: '/stock-transfers',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente'] },
+    { label: 'Giacenze & Stock',       href: '/inventory',            icon: Warehouse,      roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Giacenze Locali',        href: '/warehouse/cross-store', icon: MapPin,         roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Prodotti',               href: '/catalog',              icon: Package,        roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Carico Merce (DDT)',     href: '/supplier-delivery',    icon: Truck,          roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Resi',                   href: '/returns',              icon: RotateCcw,      roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Trasferimenti',          href: '/stock-transfers',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente','store_manager'] },
 
 
-    { label: 'Ordini Riassortimento', href: '/warehouse/restock',          icon: ClipboardList,  roles: ['superadmin','admin_cliente'] },
-    { label: 'Bolle di Scarico',      href: '/warehouse/delivery-notes',   icon: Truck,          roles: ['superadmin','admin_cliente','dipendente'] },
-    { label: 'Consegne Negozi',       href: '/warehouse/store-deliveries', icon: MapPin,         roles: ['superadmin','admin_cliente'] },
+    { label: 'Ordini Riassortimento', href: '/warehouse/restock',          icon: ClipboardList,  roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Bolle di Scarico',      href: '/warehouse/delivery-notes',   icon: Truck,          roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
+    { label: 'Consegne Negozi',       href: '/warehouse/store-deliveries', icon: MapPin,         roles: ['superadmin','admin_cliente','store_manager'] },
   ]},
 
   // 5. Acquisti / Fornitori â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { section: 'Acquisti / Fornitori', icon: ShoppingCart, items: [
-    { label: 'Ordini Fornitori (PO)',  href: '/purchase-orders',   icon: Receipt,  roles: ['superadmin','admin_cliente'] },
-    { label: 'Ricezione Merce',        href: '/store-loading',     icon: Package,  roles: ['superadmin','admin_cliente'] },
-    { label: 'Anagrafica Fornitori',   href: '/suppliers',         icon: Truck,    roles: ['superadmin','admin_cliente'] },
-    { label: 'Fatture Fornitori',      href: '/supplier-invoices', icon: FileText, roles: ['superadmin','admin_cliente'] },
+    { label: 'Ordini Fornitori (PO)',  href: '/purchase-orders',   icon: Receipt,  roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Ricezione Merce',        href: '/store-loading',     icon: Package,  roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Anagrafica Fornitori',   href: '/suppliers',         icon: Truck,    roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Fatture Fornitori',      href: '/supplier-invoices', icon: FileText, roles: ['superadmin','admin_cliente','store_manager'] },
   ]},
 
 
   // 7. Marketing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { section: 'Marketing', icon: Megaphone, items: [
-    { label: 'Promozioni & Bundle',    href: '/promotions',   icon: Gift,        roles: ['superadmin','admin_cliente'] },
+    { label: 'Promozioni & Bundle',    href: '/promotions',   icon: Gift,        roles: ['superadmin','admin_cliente','store_manager'] },
   ]},
 
   // 8. Dipendenti â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { section: 'Dipendenti', icon: Users, items: [
-    { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente'] },
+    { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin'] },
     { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin'] },
     { label: 'Timbra Entrata/Uscita',  href: '/clock-in',     icon: Fingerprint, roles: ['dipendente'] },
-    { label: 'Pianificazione Turni',   href: '/shifts',       icon: Calendar,    roles: ['superadmin','admin_cliente','dipendente'] },
-    { label: 'Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Pianificazione Turni',   href: '/shifts',       icon: Calendar,    roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
+    { label: 'Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
   ]},
 
   // Amministrazione â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { section: 'Amministrazione', icon: Shield, items: [
-    { label: 'Tesoreria & Cassa',      href: '/tesoreria',    icon: HandCoins,        roles: ['superadmin','admin_cliente','dipendente'] },
+    { label: 'Tesoreria & Cassa',      href: '/tesoreria',    icon: HandCoins,        roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
     { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,        roles: ['superadmin'] },
-    { label: 'Dashboard QScare',       href: '/qscare-dashboard', icon: Shield,       roles: ['superadmin','admin_cliente'] },
+    { label: 'Dashboard QScare',       href: '/qscare-dashboard', icon: Shield,       roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,            roles: ['superadmin'] },
     { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,            roles: ['superadmin'] },
     { label: 'Fatturazione',           href: '/invoices',     icon: FileText,         roles: ['superadmin'] },
@@ -80,12 +80,12 @@ const allNavigation = [
 
   // ADM â€” Sezione separata Reportistica Fiscale PLI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { section: 'ADM', icon: FileSpreadsheet, items: [
-    { label: 'Report Fiscali PLI',     href: '/adm',          icon: FileSpreadsheet,  roles: ['superadmin','admin_cliente'] },
+    { label: 'Report Fiscali PLI',     href: '/adm',          icon: FileSpreadsheet,  roles: ['superadmin','admin_cliente','store_manager'] },
   ]},
 
   // Automazioni â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { section: 'Automazioni', icon: Zap, items: [
-    { label: 'Automazioni',           href: '/automazioni',  icon: Zap,             roles: ['superadmin','admin_cliente'] },
+    { label: 'Automazioni',           href: '/automazioni',  icon: Zap,             roles: ['superadmin','admin_cliente','store_manager'] },
   ]},
 
   // 10. Impostazioni â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -534,7 +534,7 @@ export default function Layout({ user, setUser }) {
             </div>
           </div>
           <div className="sp-topbar-actions">
-            {storesList.length > 1 && (
+            {storesList.length > 1 && !userRoles.includes('store_manager') && (
               <select 
                 className="sp-select sp-desktop-only" 
                 style={{ width: 200 }}
@@ -794,7 +794,7 @@ export default function Layout({ user, setUser }) {
             </div>
 
             {/* Store selector in drawer */}
-            {storesList.length > 0 && (
+            {storesList.length > 0 && !userRoles.includes('store_manager') && (
               <div style={{ padding: '12px 16px', borderBottom: '1px solid #1a1a1a' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 6 }}>Negozio Attivo</div>
                 <select
@@ -871,7 +871,7 @@ export default function Layout({ user, setUser }) {
           </button>
 
           {/* DIPENDENTI: Timbra + Bolle */}
-          {userRoles.includes('dipendente') && !userRoles.includes('admin_cliente') && !userRoles.includes('superadmin') ? (
+          {userRoles.includes('dipendente') && !userRoles.includes('admin_cliente') && !userRoles.includes('store_manager') && !userRoles.includes('superadmin') ? (
             <>
               <button
                 className={`sp-mobile-nav-btn ${location.pathname === '/clock-in' ? 'active' : ''}`}

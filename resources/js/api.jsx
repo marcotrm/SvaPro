@@ -472,6 +472,7 @@ export const catalog = {
   importProducts: (formData) => api.post('/catalog/products/import', formData),
   toggleFeatured: (id, isFeatured) => api.patch(`/catalog/products/${id}/featured`, { is_featured: isFeatured }),
   toggleOnline: (id, isOnline) => api.patch(`/catalog/products/${id}`, { is_online: isOnline }),
+  bulkExcise: (data) => api.post('/catalog/bulk-excise', data),
   getBrands: () => api.get('/catalog/brands'),
   getCategories: () => api.get('/catalog/categories'),
   createCategory: (data) => api.post('/catalog/categories', data),

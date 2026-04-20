@@ -84,6 +84,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::put('/catalog/products/{productId}', [CatalogController::class, 'update'])->middleware('permission:catalog.manage');
         Route::delete('/catalog/products/{productId}', [CatalogController::class, 'destroy'])->middleware('permission:catalog.manage');
         Route::patch('/catalog/products/{productId}/featured', [CatalogController::class, 'toggleFeatured'])->middleware('permission:catalog.manage');
+        Route::post('/catalog/bulk-excise', [CatalogController::class, 'bulkExcise'])->middleware('permission:catalog.manage');
 
         Route::post('/catalog/categories', [CatalogController::class, 'storeCategory'])->middleware('permission:catalog.manage');
         Route::put('/catalog/categories/{categoryId}', [CatalogController::class, 'updateCategory'])->middleware('permission:catalog.manage');

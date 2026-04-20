@@ -293,7 +293,7 @@ class InventoryController extends Controller
         } elseif ($q) {
             $query->where(function ($inner) use ($q) {
                 $inner->where('p.name', 'ilike', "%{$q}%")
-                    ->orWhere('pv.sku', 'ilike', "%{$q}%")
+                    ->orWhere('p.sku', 'ilike', "%{$q}%")
                     ->orWhere('pv.flavor', 'ilike', "%{$q}%");
             });
         } else {

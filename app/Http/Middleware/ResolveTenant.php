@@ -30,7 +30,7 @@ class ResolveTenant
 
         $isSuperAdmin = in_array('superadmin', $roleCodes, true);
 
-        // For superadmin: allow switching tenant via X-Tenant-Code header
+        // For superadmin/admin: allow switching tenant via X-Tenant-Code header
         if ($isSuperAdmin && $requestedTenantCode) {
             $tenantId = (int) DB::table('tenants')->where('code', $requestedTenantCode)->value('id');
 
@@ -42,15 +42,34 @@ class ResolveTenant
             return $next($request);
         }
 
-        // For regular users: always use their own tenant_id (ignore X-Tenant-Code)
-        // This prevents 403 loops caused by stale localStorage tenant codes
+        // For regular users: always use their own tenant_id
         $tenantId = (int) $user->tenant_id;
-
         if (! $tenantId) {
             return response()->json(['message' => 'Tenant non assegnato all\'utente.'], 422);
         }
-
         $request->attributes->set('tenant_id', $tenantId);
+
+        // Security check for store_manager and dipendente: force store_id
+        $isStoreManager = in_array('store_manager', $roleCodes, true);
+        $isDipendente = in_array('dipendente', $roleCodes, true);
+        
+        if ($isStoreManager || $isDipendente) {
+            // Find the assigned store_id
+            $assignedStoreId = DB::table('user_roles')
+                ->where('user_id', $user->id)
+                ->whereNotNull('store_id')
+                ->value('store_id');
+            
+            if ($assignedStoreId) {
+                // Force X-Store-ID attribute on request so controllers use it
+                $request->headers->set('X-Store-ID', $assignedStoreId);
+                $request->headers->set('x-store-id', $assignedStoreId);
+                $request->attributes->set('store_id', $assignedStoreId);
+                // Force the query parameter and payload so filters can't be bypassed
+                $request->query->set('store_id', $assignedStoreId);
+                $request->merge(['store_id' => $assignedStoreId]);
+            }
+        }
 
         return $next($request);
     }

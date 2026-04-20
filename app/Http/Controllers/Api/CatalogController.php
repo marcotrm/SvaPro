@@ -89,8 +89,7 @@ class CatalogController extends Controller
                            ->where('product_variants.tenant_id', $tenantId)
                            ->where(function ($vq) use ($term) {
                                $vq->where(DB::raw('LOWER(barcode)'), 'like', "%{$term}%")
-                                  ->orWhere(DB::raw('LOWER(flavor)'), 'like', "%{$term}%")
-                                  ->orWhere(DB::raw('LOWER(sku)'), 'like', "%{$term}%");
+                                  ->orWhere(DB::raw('LOWER(flavor)'), 'like', "%{$term}%");
                            });
                   });
             });
@@ -364,6 +363,9 @@ class CatalogController extends Controller
             'volume_ml' => ['nullable', 'integer', 'min:0'],
             'denominazione_prodotto' => ['nullable', 'string', 'max:255'],
             'numero_confezioni'     => ['nullable', 'integer', 'min:0'],
+            'fiscal_group' => ['nullable', 'string', 'max:50'],
+            'excise_tax' => ['nullable', 'numeric', 'min:0'],
+            'prevalence' => ['nullable', 'string', 'max:100'],
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.sale_price' => ['required', 'numeric', 'min:0'],
             'qscare_price' => ['nullable', 'numeric', 'min:0'],
@@ -483,6 +485,9 @@ class CatalogController extends Controller
             'denominazione_prodotto' => $request->input('denominazione_prodotto'),
             'numero_confezioni'      => $request->filled('numero_confezioni') ? (int) $request->input('numero_confezioni') : null,
             'qscare_price' => $request->has('qscare_price') && $request->input('qscare_price') !== '' ? (float) $request->input('qscare_price') : null,
+            'fiscal_group' => $request->input('fiscal_group'),
+            'excise_tax'   => $request->has('excise_tax') && $request->input('excise_tax') !== '' ? (float) $request->input('excise_tax') : null,
+            'prevalence'   => $request->input('prevalence'),
             'is_active' => true,
             'updated_at' => $now,
         ];
@@ -522,7 +527,6 @@ class CatalogController extends Controller
                 $variantPayload = [
                     'tenant_id' => $tenantId,
                     'product_id' => $productId,
-                    'sku' => $variant['sku'] ?? null,
                     'flavor' => $variant['flavor'] ?? null,
                     'resistance_ohm' => $variant['resistance_ohm'] ?? null,
                     'nicotine_strength' => $variant['nicotine_strength'] ?? null,
@@ -582,10 +586,9 @@ class CatalogController extends Controller
                 if ($variantStoreRows !== []) {
                     DB::table('store_product_variants')->insert($variantStoreRows);
                 }
-                // Auto-crea warehouse per ogni store che non ne ha uno, poi inizializza
-                // stock_items con on_hand=0 in TUTTI i warehouse del tenant.
-                // Così ogni prodotto nuovo è visibile in tutti i negozi sin dalla creazione.
-                if (!$existingVariantId) {
+                    // Auto-crea warehouse per ogni store che non ne ha uno, poi inizializza
+                    // stock_items con on_hand=0 in TUTTI i warehouse del tenant.
+                    // Così ogni prodotto è visibile in tutti i negozi (anche quelli aggiunti dopo l'assegnazione iniziale).
                     $allTenantStores = DB::table('stores')
                         ->where('tenant_id', $tenantId)
                         ->get(['id', 'name']);
@@ -634,7 +637,6 @@ class CatalogController extends Controller
                             ]);
                         }
                     }
-                }
             }
 
             $variantIdsToDelete = DB::table('product_variants')
@@ -744,6 +746,39 @@ class CatalogController extends Controller
         AuditLogger::log($request, 'delete', 'product', $productId, $product->name);
 
         return response()->json(['message' => 'Prodotto eliminato.']);
+    }
+
+    public function bulkExcise(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $excise = $request->input('excise_tax');
+
+        if ($excise === null || $excise === '') {
+            return response()->json(['message' => 'Inserisci un valore per l\'accisa.'], 422);
+        }
+
+        $query = DB::table('products')->where('tenant_id', $tenantId);
+
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->integer('category_id'));
+        }
+
+        if ($request->filled('search')) {
+             $term = strtolower(trim($request->input('search')));
+             $query->where(function ($q) use ($term) {
+                 $q->where(DB::raw('LOWER(name)'), 'like', "%{$term}%")
+                   ->orWhere(DB::raw('LOWER(sku)'), 'like', "%{$term}%");
+             });
+        }
+
+        $affected = $query->update([
+            'excise_tax' => (float) $excise,
+            'updated_at' => now(),
+        ]);
+
+        AuditLogger::log($request, 'update', 'product', 0, "Massive excise update ({$excise}€) on {$affected} products");
+
+        return response()->json(['message' => "Accisa di {$excise}€ applicata a {$affected} prodotti."]);
     }
 
     public function storeCategory(Request $request): JsonResponse

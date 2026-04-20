@@ -6,7 +6,8 @@ import api from '../api.jsx';
 import CatalogModal from '../components/CatalogModal.jsx';
 import ProductInventoryModal from '../components/ProductInventoryModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
-import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star, Trash2 } from 'lucide-react';
+import BulkExciseModal from '../components/BulkExciseModal.jsx';
+import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star, Trash2, DollarSign } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function CatalogPage() {
@@ -26,6 +27,7 @@ export default function CatalogPage() {
   const [duplicating, setDuplicating] = useState(null); // product id in corso
   const [showPsImport, setShowPsImport] = useState(false);
   const [showCsvImport, setShowCsvImport] = useState(false);
+  const [showBulkExcise, setShowBulkExcise] = useState(false);
   const [inventoryProduct, setInventoryProduct] = useState(null);
 
   useEffect(() => { fetchData(); }, [selectedStoreId]);
@@ -213,6 +215,14 @@ export default function CatalogPage() {
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
             <Upload size={16} /> Importa CSV
+          </button>
+          <button
+            className="sp-btn sp-btn-secondary"
+            onClick={() => setShowBulkExcise(true)}
+            title="Applica accisa a piu prodotti in blocco"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <DollarSign size={16} /> Accise Massive
           </button>
           <button className="sp-btn sp-btn-primary" onClick={() => { setSelectedProduct(null); setShowModal(true); }}>
             <Plus size={16} /> Nuovo Prodotto
@@ -425,6 +435,17 @@ export default function CatalogPage() {
           </tbody>
         </table>
       </div>
+
+      {showBulkExcise && (
+        <BulkExciseModal
+          categories={categories}
+          onClose={() => setShowBulkExcise(false)}
+          onSave={() => {
+            setShowBulkExcise(false);
+            fetchData();
+          }}
+        />
+      )}
 
       {showModal && (
         <CatalogModal
