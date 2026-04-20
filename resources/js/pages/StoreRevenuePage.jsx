@@ -311,7 +311,7 @@ export default function StoreRevenuePage() {
       </div>
 
       {/* ══ LAYOUT con pannello laterale colonne ══ */}
-      <div style={{ display:'flex', gap:16, alignItems:'flex-start' }}>
+      <div style={{ display:'flex', gap:16, alignItems:'flex-start', overflow:'hidden', minWidth:0 }}>
 
       {/* ══ TAB: CLASSIFICA (tabella) ══════════════════════════════ */}
       {tab === 'ranking' && (
@@ -338,7 +338,7 @@ export default function StoreRevenuePage() {
               Nessuna vendita nel periodo selezionato
             </div>
           ) : (
-            <div style={{ overflowX:'auto' }}>
+            <div style={{ overflowX:'auto', maxWidth:'100%' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                 <thead>
                   <tr>
