@@ -339,22 +339,14 @@ export default function PosPage() {
         const optEmp = oRes.data?.data?.employees || [];
         const whs = oRes.data?.data?.warehouses || [];
         if (whs.length > 0) setWarehouseId(whs[0].id);
-        // Se getOptions restituisce pochi dipendenti (filtrati per store), carica tutti cross-store
-        if (optEmp.length < 2) {
-          const { employees: empApi } = await import('../api.jsx');
-          const allRes = await empApi.getAllEmployees().catch(() => empApi.getEmployees({ per_page: 500 }));
-          const allList = allRes.data?.data || allRes.data || [];
-          setEmployees(Array.isArray(allList) && allList.length > 0 ? allList : optEmp);
-        } else {
-          // Integra con cross-store in background
-          setEmployees(optEmp);
-          import('../api.jsx').then(({ employees: empApi }) => {
-            empApi.getAllEmployees().then(r => {
-              const all = r.data?.data || r.data || [];
-              if (Array.isArray(all) && all.length > optEmp.length) setEmployees(all);
-            }).catch(() => {});
-          });
-        }
+        setEmployees(optEmp);
+        // Arricchisci con dipendenti cross-store in background
+        import('../api.jsx').then(({ employees: empApi }) => {
+          empApi.getAllEmployees().then(r => {
+            const all = r.data?.data || r.data || [];
+            if (Array.isArray(all) && all.length > optEmp.length) setEmployees(all);
+          }).catch(() => {});
+        });
       } catch { /* continua senza warehouse/employees */ }
 
     } catch { toast.error('Errore caricamento dati POS'); }
@@ -1045,32 +1037,29 @@ export default function PosPage() {
                       if (e.key === 'Enter' && operatorBarcode.trim()) {
                         const val = operatorBarcode.trim();
                         const valLow = val.toLowerCase();
-                        // Prima cerca per nome tra i dipendenti caricati
-                        let found = employees.find(em => {
-                          const full = `${em.first_name||''} ${em.last_name||\''}`.toLowerCase();
-                          return (
-                            (em.barcode && em.barcode.toLowerCase() === valLow) ||
-                            em.id.toString() === valLow ||
-                            full.includes(valLow) ||
-                            (em.employee_code && em.employee_code.toLowerCase() === valLow)
-                          );
-                        });
+                        const empFull = (em) => ((em.first_name || '') + ' ' + (em.last_name || '')).toLowerCase();
+                        let found = employees.find(em =>
+                          (em.barcode && em.barcode.toLowerCase() === valLow) ||
+                          em.id.toString() === valLow ||
+                          empFull(em).includes(valLow) ||
+                          (em.employee_code && em.employee_code.toLowerCase() === valLow)
+                        );
                         if (!found) {
                           try {
                             const { employees: empApi } = await import('../api.jsx');
                             const res = await empApi.getEmployees({ search: val, limit: 10 });
-                            const list = res.data?.data || [];
-                            found = list[0];
+                            found = (res.data?.data || [])[0];
                           } catch {}
                         }
                         if (found) {
                           setSoldByEmployeeId(String(found.id));
-                          setOperatorName(`${found.first_name || ''} ${found.last_name || ''}`.trim() || `Operatore #${found.id}`);
+                          setOperatorName(((found.first_name || '') + ' ' + (found.last_name || '')).trim() || ('Operatore #' + found.id));
                           setOperatorError('');
                           setOperatorBarcode('');
                           setShowOperatorDrop(false);
                         } else {
-                          setOperatorError(`"${val}" non trovato`);
+                          setOperatorError('"' + val + '" non trovato');
+                          setOperatorBarcode('');
                         }
                       }
                     }}
@@ -1079,33 +1068,35 @@ export default function PosPage() {
                     placeholder="Nome o Badge..."
                     autoFocus
                     style={{
-                      width: '100%', background: operatorError ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.06)',
-                      border: `1px solid ${operatorError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                      width: '100%',
+                      background: operatorError ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.06)',
+                      border: '1px solid ' + (operatorError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.1)'),
                       borderRadius: 8, padding: '7px 10px', fontSize: 11, fontWeight: 600, color: '#fff',
                       outline: 'none', fontFamily: 'inherit', letterSpacing: 0, boxSizing: 'border-box',
                     }}
                   />
-                  {/* Dropdown suggestion per nome */}
                   {showOperatorDrop && (() => {
                     const q = operatorBarcode.trim().toLowerCase();
-                    const suggestions = q.length === 0 ? [] : employees.filter(em => {
-                      const full = `${em.first_name||''} ${em.last_name||\''}`.toLowerCase();
-                      return full.includes(q) || (em.barcode && em.barcode.toLowerCase().includes(q)) || em.id.toString().includes(q);
-                    }).slice(0, 8);
-                    if (suggestions.length === 0) return null;
+                    if (!q) return null;
+                    const empFull = (em) => ((em.first_name || '') + ' ' + (em.last_name || '')).toLowerCase();
+                    const suggestions = employees.filter(em =>
+                      empFull(em).includes(q) ||
+                      (em.barcode && em.barcode.toLowerCase().includes(q)) ||
+                      em.id.toString().includes(q)
+                    ).slice(0, 8);
+                    if (!suggestions.length) return null;
                     return (
                       <div style={{
-                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300,
+                        position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0, zIndex: 300,
                         background: '#1e2a3a', border: '1px solid rgba(255,255,255,0.15)',
-                        borderRadius: 8, marginTop: 4, overflow: 'hidden',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                        borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
                       }}>
                         {suggestions.map(em => (
                           <div
                             key={em.id}
                             onMouseDown={() => {
                               setSoldByEmployeeId(String(em.id));
-                              setOperatorName(`${em.first_name || ''} ${em.last_name || ''}`.trim() || `Operatore #${em.id}`);
+                              setOperatorName(((em.first_name || '') + ' ' + (em.last_name || '')).trim() || ('Operatore #' + em.id));
                               setOperatorBarcode('');
                               setOperatorError('');
                               setShowOperatorDrop(false);
