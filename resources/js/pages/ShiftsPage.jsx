@@ -1215,7 +1215,7 @@ export default function ShiftsPage() {
     if (!globalSearch || globalSearch.length < 2) { setGlobalResults([]); return; }
     setGlobalSearchLoading(true);
     const timer = setTimeout(() => {
-      api.get('/employees', { params: { barcode: globalSearch } })
+      api.get('/employees', { params: { search: globalSearch, per_page: 20 } })
         .then(res => {
           setGlobalResults((res.data?.data || []).slice(0, 8));
           setShowGlobalDrop(true);
