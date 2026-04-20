@@ -118,15 +118,15 @@ export default function StoreStatsDrawer({ store, onClose }) {
       if (summRes.status === 'fulfilled') {
         const s = summRes.value.data?.data || summRes.value.data || {};
         setKpi({
-          revenue:     parseFloat(s.total_revenue || s.revenue || 0),
-          orders:      parseInt(s.total_orders || s.orders || 0),
-          avg_ticket:  parseFloat(s.avg_ticket || s.avg_order || 0),
-          customers:   parseInt(s.unique_customers || s.total_customers || 0),
-          cash:        parseFloat(s.cash_total || 0),
-          card:        parseFloat(s.card_total || 0),
-          other:       parseFloat(s.other_total || 0),
-          items_sold:  parseInt(s.items_sold || 0),
-          upt:         parseFloat(s.upt || 0),
+          revenue:     parseFloat(s.total_revenue ?? s.revenue ?? 0),
+          orders:      parseInt(s.total_orders ?? s.orders ?? 0),
+          avg_ticket:  parseFloat(s.avg_ticket ?? s.avg_order ?? 0),
+          customers:   parseInt(s.unique_customers ?? s.total_customers ?? 0),
+          cash:        parseFloat(s.cash_total ?? 0),
+          card:        parseFloat(s.card_total ?? 0),
+          other:       parseFloat(s.other_total ?? 0),
+          items_sold:  parseInt(s.items_sold ?? 0),
+          upt:         parseFloat(s.upt ?? 0),
         });
       } else {
         console.error('[StoreStatsDrawer] summary failed:', summRes.reason?.response?.data || summRes.reason?.message);
