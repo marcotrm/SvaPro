@@ -1112,19 +1112,21 @@ export default function ShiftsPage() {
     setAllEmpLoading(true);
     employeesApi.getAllEmployees()
       .then(res => {
-        const list = res.data?.data || res.data || [];
+        const list = res.data?.data || [];
+        console.log('[ShiftsPage] allEmployeesGlobal caricati:', list.length);
         setAllEmployeesGlobal(Array.isArray(list) ? list : []);
       })
       .catch(() => {
-        // Fallback: prova con getEmployees e per_page massimo
-        employeesApi.getEmployees({ per_page: 500, page: 1 })
-          .then(res => {
-            const list = res.data?.data || res.data || [];
-            setAllEmployeesGlobal(Array.isArray(list) ? list : []);
-          })
-          .catch(() => {
-            attendance.getEmployeesKiosk({}).then(res => setAllEmployeesGlobal(res.data?.data || [])).catch(() => {});
-          });
+        // Fallback: getEmployees con bypass manuale
+        import('../api.jsx').then(({ default: apiInst }) => {
+          apiInst.get('/employees', { params: { per_page: 200, page: 1 }, headers: { 'X-Ignore-Store': '1' } })
+            .then(res => {
+              const list = res.data?.data || [];
+              console.log('[ShiftsPage] fallback dipendenti:', list.length);
+              setAllEmployeesGlobal(Array.isArray(list) ? list : []);
+            })
+            .catch(() => {});
+        });
       })
       .finally(() => setAllEmpLoading(false));
   }, []);

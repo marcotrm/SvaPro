@@ -551,8 +551,24 @@ export const customers = {
 // Employee APIs
 export const employees = {
   getEmployees: (params = {}) => cachedGet('/employees', params, 30000, 300000),
-  // Ritorna TUTTI i dipendenti di TUTTI gli store (bypassa il filtro store_id automatico)
-  getAllEmployees: () => api.get('/employees', { params: { per_page: 500, page: 1, all_stores: 1 }, headers: { 'X-Ignore-Store': '1' } }),
+  // Ritorna TUTTI i dipendenti di TUTTI gli store (bypassa il filtro store_id, pagina tutte le pagine)
+  getAllEmployees: async () => {
+    const headers = { 'X-Ignore-Store': '1' };
+    const allData = [];
+    let page = 1;
+    let hasMore = true;
+    while (hasMore) {
+      const res = await api.get('/employees', { params: { per_page: 100, page, all_stores: 1 }, headers });
+      const pageData = res.data?.data || [];
+      allData.push(...pageData);
+      const meta = res.data?.meta || res.data?.pagination || {};
+      const lastPage = meta.last_page || meta.total_pages || 1;
+      hasMore = pageData.length === 100 && page < lastPage;
+      page++;
+      if (page > 20) break; // safety cap: max 2000 dipendenti
+    }
+    return { data: { data: allData } };
+  },
   getEmployee: (id) => api.get(`/employees/${id}`),
   createEmployee: (data) => api.post('/employees', data),
   updateEmployee: (id, data) => api.put(`/employees/${id}`, data),
