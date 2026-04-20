@@ -1067,10 +1067,15 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ShiftsPage() {
-  const { selectedStoreId, userRoles = [] } = useOutletContext?.() || {};
+  const { selectedStoreId, userRoles = [], user } = useOutletContext?.() || {};
 
-  // Solo Store Manager / Admin possono modificare i turni
-  const canEditShifts = !userRoles.includes('dipendente');
+  // Ruoli turni
+  const isDipendente   = userRoles.includes('dipendente');
+  const isShiftManager = userRoles.includes('admin') || userRoles.includes('shift_manager') || !isDipendente;
+  const currentEmployeeId = user?.employee_id ? String(user.employee_id) : null;
+
+  // Solo admin/shift_manager possono modificare i turni confermati o inserire per altri dipendenti
+  const canEditShifts = isShiftManager;
 
   const [storeId, setStoreId] = useState(selectedStoreId || '');
 
@@ -1184,16 +1189,34 @@ export default function ShiftsPage() {
     try {
       const startDateStr = weekDays[0].dateStr;
       const endDateStr   = weekDays[6].dateStr;
+      const shiftParams  = { store_id: storeId, start_date: startDateStr, end_date: endDateStr };
+      // Dipendente vede solo i propri turni, admin vede tutti
+      if (isDipendente && currentEmployeeId) shiftParams.employee_id = currentEmployeeId;
+
       const [empRes, shRes, tplRes] = await Promise.all([
         attendance.getEmployeesKiosk({ store_id: storeId }),
-        shiftsApi.getAll({ store_id: storeId, start_date: startDateStr, end_date: endDateStr }),
+        shiftsApi.getAll(shiftParams),
         shiftsApi.getTemplates(),
       ]);
-      setEmployees(empRes.data?.data || []);
+
+      // Dipendente: filtra la lista dipendenti per mostrare solo se stesso
+      let empList = empRes.data?.data || [];
+      if (isDipendente && currentEmployeeId) {
+        empList = empList.filter(e => String(e.id) === currentEmployeeId);
+      }
+      setEmployees(empList);
+
       const shiftsMap = {};
       (shRes.data?.data || []).forEach(s => {
         const key = `${s.employee_id}_${s.date}`;
-        shiftsMap[key] = { start_time: s.start_time, end_time: s.end_time, color: s.color };
+        shiftsMap[key] = {
+          id:         s.id,
+          start_time: s.start_time,
+          end_time:   s.end_time,
+          color:      s.color,
+          status:     s.status || 'confirmed',   // proposed | confirmed
+          proposed_by: s.proposed_by || null,
+        };
       });
       setShifts(shiftsMap);
       setOriginalShifts(JSON.parse(JSON.stringify(shiftsMap)));
@@ -1201,7 +1224,7 @@ export default function ShiftsPage() {
     } catch {
       toast.error('Errore caricamento dati');
     } finally { setLoading(false); }
-  }, [storeId, weekDays]); // ← dipendenze corrette: si ricrea quando store o settimana cambiano
+  }, [storeId, weekDays, isDipendente, currentEmployeeId]);
 
   useEffect(() => {
     // Reset + ricarica quando lo store o la settimana cambiano
@@ -1343,19 +1366,14 @@ export default function ShiftsPage() {
   const handlePrevWeek = () => changeWeek(-7);
   const handleNextWeek = () => changeWeek(+7);
 
-  const onCellChange = (empId, dateStr, changes) => {
-    const key = `${empId}_${dateStr}`;
-    setShifts(prev => {
-      const copy = { ...prev };
-      if (!copy[key]) copy[key] = { start_time: '', end_time: '', color: '#10B981' };
-      copy[key] = { ...copy[key], ...changes };
-      return copy;
-    });
-  };
 
   const applyTemplate = (empId, dateStr, tpl) => {
-    onCellChange(empId, dateStr, { start_time: tpl.start_time, end_time: tpl.end_time, color: tpl.color });
-    setActiveCell(null);
+    if (isDipendente && String(empId) === currentEmployeeId) {
+      proposeShift(dateStr, tpl.start_time, tpl.end_time, tpl.color);
+    } else {
+      onCellChange(empId, dateStr, { start_time: tpl.start_time, end_time: tpl.end_time, color: tpl.color });
+      setActiveCell(null);
+    }
   };
 
   const clearCell = (empId, dateStr) => {
@@ -1378,7 +1396,14 @@ export default function ShiftsPage() {
       const payload = { store_id: storeId, shifts: [], deletions: [] };
       Object.keys(shifts).forEach(key => {
         const [empId, dateStr] = splitShiftKey(key);
-        payload.shifts.push({ employee_id: empId, date: dateStr, start_time: shifts[key].start_time, end_time: shifts[key].end_time, color: shifts[key].color });
+        payload.shifts.push({
+          employee_id: empId,
+          date:        dateStr,
+          start_time:  shifts[key].start_time,
+          end_time:    shifts[key].end_time,
+          color:       shifts[key].color,
+          status:      shifts[key].status || 'confirmed',
+        });
       });
       Object.keys(originalShifts).forEach(key => {
         if (!shifts[key]) {
@@ -1393,12 +1418,75 @@ export default function ShiftsPage() {
     finally { setSaving(false); }
   };
 
+  // Dipendente: propone un turno (status=proposed)
+  const proposeShift = async (dateStr, start_time, end_time, color) => {
+    if (!currentEmployeeId) return toast.error('ID dipendente non trovato');
+    const key = `${currentEmployeeId}_${dateStr}`;
+    try {
+      await shiftsApi.propose({
+        employee_id: currentEmployeeId,
+        store_id:    storeId,
+        date:        dateStr,
+        start_time,
+        end_time,
+        color:       color || '#F59E0B',
+        status:      'proposed',
+      });
+    } catch {}
+    setShifts(prev => ({
+      ...prev,
+      [key]: { start_time, end_time, color: color || '#F59E0B', status: 'proposed' },
+    }));
+    toast.success('Turno proposto — in attesa di conferma ⏳');
+    setActiveCell(null);
+  };
+
+  // Shift manager: conferma un singolo turno proposed
+  const confirmOne = async (empId, dateStr) => {
+    const key = `${empId}_${dateStr}`;
+    const sh  = shifts[key];
+    if (!sh) return;
+    try { if (sh.id) await shiftsApi.confirmShift(sh.id); } catch {}
+    setShifts(prev => ({ ...prev, [key]: { ...prev[key], status: 'confirmed' } }));
+    toast.success('Turno confermato ✅');
+  };
+
+  // Shift manager: conferma tutti i turni proposed della settimana
+  const confirmAllProposed = async () => {
+    const toConfirm = Object.entries(shifts).filter(([, v]) => v.status === 'proposed');
+    if (!toConfirm.length) return toast('Nessun turno in attesa', { icon: 'ℹ️' });
+    try { await shiftsApi.confirmAll({ store_id: storeId, start_date: weekDays[0].dateStr, end_date: weekDays[6].dateStr }); } catch {}
+    setShifts(prev => {
+      const copy = { ...prev };
+      toConfirm.forEach(([key]) => { copy[key] = { ...copy[key], status: 'confirmed' }; });
+      return copy;
+    });
+    toast.success(`✅ ${toConfirm.length} turni confermati`);
+  };
+
+  const onCellChange = (empId, dateStr, changes) => {
+    const key    = `${empId}_${dateStr}`;
+    const status = isDipendente ? 'proposed' : 'confirmed';
+    setShifts(prev => {
+      const copy = { ...prev };
+      if (!copy[key]) copy[key] = { start_time: '', end_time: '', color: '#10B981', status };
+      copy[key] = { ...copy[key], ...changes, status: copy[key].status === 'confirmed' ? 'confirmed' : status };
+      return copy;
+    });
+  };
+
   const renderCellMenu = (empId, dateStr) => {
     if (!(activeCell?.empId === empId && activeCell?.dateStr === dateStr)) return null;
+    const isOwnRow = String(empId) === currentEmployeeId;
+    const canPropose = isDipendente && isOwnRow;
+    const title = canPropose ? 'Proponi Turno' : 'Seleziona Turno';
     return (
-      <div style={{ position: 'absolute', top: 5, left: '95%', zIndex: 100, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.3)', width: 220 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Seleziona Turno</div>
+      <div style={{ position: 'absolute', top: 5, left: '95%', zIndex: 100, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.3)', width: 240 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>{title}</div>
+            {canPropose && <div style={{ fontSize: 10, color: '#F59E0B', fontWeight: 600, marginTop: 2 }}>Richiede conferma del responsabile</div>}
+          </div>
           <button onClick={e => { e.stopPropagation(); setActiveCell(null); }} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}><X size={14} /></button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
@@ -1515,18 +1603,29 @@ export default function ShiftsPage() {
           <button onClick={() => setShowExport(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'#6366F1', color:'#fff', border:'none', padding:'10px 16px', borderRadius:12, fontWeight:700, cursor:'pointer' }}>
             <Download size={16} /> Esporta Excel
           </button>
-          {canEditShifts && (
-            <button onClick={saveChanges} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-accent)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.8 : 1 }}>
-              {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} Salva Configurazioni
-            </button>
-          )}
+          {canEditShifts && (() => {
+            const pendingCount = Object.values(shifts).filter(s => s.status === 'proposed').length;
+            return (
+              <>
+                {pendingCount > 0 && (
+                  <button onClick={confirmAllProposed} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16,185,129,0.3)', position: 'relative' }}>
+                    <CheckCircle size={16} /> Conferma tutto
+                    <span style={{ position: 'absolute', top: -6, right: -6, background: '#F59E0B', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pendingCount}</span>
+                  </button>
+                )}
+                <button onClick={saveChanges} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-accent)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.8 : 1 }}>
+                  {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} Salva Configurazioni
+                </button>
+              </>
+            );
+          })()}
         </div>
       </div>
 
-      {/* Banner sola lettura per dipendenti */}
-      {!canEditShifts && (
-        <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#6366F1', fontWeight: 600 }}>
-          <User size={16} /> Visualizzazione sola lettura — solo i responsabili di negozio possono modificare i turni.
+      {/* Banner info per dipendenti */}
+      {isDipendente && (
+        <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 12, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#F59E0B', fontWeight: 600 }}>
+          <User size={16} /> Puoi proporre i tuoi turni cliccando sulle celle — i responsabili li confermeranno.
         </div>
       )}
 
@@ -1737,31 +1836,57 @@ export default function ShiftsPage() {
                     }
 
                     // ── Cella NORMALE ───────────────────────────────────────
+                    const isOwnCell   = String(emp.id) === currentEmployeeId;
+                    const canClick    = canEditShifts || (isDipendente && isOwnCell);
+                    const isProposed  = hasShift && shift.status === 'proposed';
+                    const cellBg      = isProposed
+                      ? 'rgba(245,158,11,0.12)'
+                      : hasShift ? `${shift.color}15` : 'transparent';
+                    const cellBorder  = isProposed
+                      ? '2px dashed rgba(245,158,11,0.6)'
+                      : hasShift ? `1px solid ${shift.color}40` : '1px dashed var(--color-border)';
+                    const cellBorderL = isProposed ? '4px solid #F59E0B' : hasShift ? `4px solid ${shift.color}` : 'none';
+
                     return (
                       <td
                         key={day.dateStr}
                         style={{ padding: '8px', borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)', position: 'relative', background: day.isToday ? 'rgba(16,185,129,0.02)' : 'transparent', verticalAlign: 'top' }}
-                        onClick={() => canEditShifts && setActiveCell({ empId: emp.id, dateStr: day.dateStr })}
+                        onClick={() => canClick && setActiveCell({ empId: emp.id, dateStr: day.dateStr })}
                       >
                         {hasShift ? (
-                          <div style={{ background: `${shift.color}15`, border: `1px solid ${shift.color}40`, borderLeft: `4px solid ${shift.color}`, borderRadius: 8, padding: '8px', cursor: 'pointer', transition: 'all 0.1s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                              <input type="time" value={shift.start_time || ''} onChange={e => { e.stopPropagation(); onCellChange(emp.id, day.dateStr, { start_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '4px', fontSize: 12, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
+                          <div style={{ background: cellBg, border: cellBorder, borderLeft: cellBorderL, borderRadius: 8, padding: '8px', cursor: 'pointer', transition: 'all 0.1s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                            {/* Badge stato */}
+                            {isProposed && (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                <span style={{ fontSize: 9, fontWeight: 800, color: '#F59E0B', background: 'rgba(245,158,11,0.15)', borderRadius: 4, padding: '2px 6px', letterSpacing: '0.04em' }}>⏳ IN ATTESA</span>
+                                {isShiftManager && (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); confirmOne(emp.id, day.dateStr); }}
+                                    style={{ fontSize: 9, fontWeight: 800, color: '#10B981', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 4, padding: '2px 6px', cursor: 'pointer' }}
+                                  >✅ Conferma</button>
+                                )}
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: isProposed ? 0 : 4 }}>
+                              <input type="time" value={shift.start_time || ''} readOnly={isDipendente && !isOwnCell} onChange={e => { e.stopPropagation(); if (canEditShifts || isOwnCell) onCellChange(emp.id, day.dateStr, { start_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '4px', fontSize: 12, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
                               <span style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>-</span>
-                              <input type="time" value={shift.end_time || ''} onChange={e => { e.stopPropagation(); onCellChange(emp.id, day.dateStr, { end_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '4px', fontSize: 12, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
+                              <input type="time" value={shift.end_time || ''} readOnly={isDipendente && !isOwnCell} onChange={e => { e.stopPropagation(); if (canEditShifts || isOwnCell) onCellChange(emp.id, day.dateStr, { end_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '4px', fontSize: 12, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
                             </div>
-                            <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', textAlign: 'center', fontWeight: 600 }}>CARTA TURNO (click p. opzioni)</div>
+                            {!isProposed && <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', textAlign: 'center', fontWeight: 600 }}>click p. opzioni</div>}
                           </div>
                         ) : (
-                          <div style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--color-border)', borderRadius: 8, color: 'var(--color-text-tertiary)', fontSize: 12, cursor: 'pointer', transition: 'all 0.1s' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)'; e.currentTarget.style.color = 'var(--color-text)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}>
-                            + Assegna (Riposo)
-                          </div>
+                          canClick ? (
+                            <div style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--color-border)', borderRadius: 8, color: 'var(--color-text-tertiary)', fontSize: 12, cursor: 'pointer', transition: 'all 0.1s' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)'; e.currentTarget.style.color = 'var(--color-text)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}>
+                              {isDipendente ? '+ Proponi turno' : '+ Assegna (Riposo)'}
+                            </div>
+                          ) : (
+                            <div style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 }}>—</div>
+                          )
                         )}
 
                         {renderCellMenu(emp.id, day.dateStr)}
                       </td>
-                    );
-                  })}
+                    );                  })}
                 </tr>
               );
             })}

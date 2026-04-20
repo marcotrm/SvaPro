@@ -750,6 +750,11 @@ export const shifts = {
   getByEmployee:  (employeeId, params = {}) =>
     api.get('/shifts', { params: { ...params, employee_id: employeeId } }),
   bulkSave:       (data)        => api.post('/shifts/bulk', data),
+  // Dipendente propone turno (status=proposed)
+  propose:        (data)        => api.post('/shifts/propose', data),
+  // Shift manager conferma uno o tutti i turni proposed
+  confirmShift:   (id)          => api.patch(`/shifts/${id}/confirm`),
+  confirmAll:     (params = {}) => api.post('/shifts/confirm-all', params),
   getTemplates:   ()            => api.get('/shifts/templates'),
   saveTemplate:   (data)        => api.post('/shifts/templates', data),
   deleteTemplate: (id)          => api.delete(`/shifts/templates/${id}`),
