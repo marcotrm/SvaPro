@@ -13,12 +13,19 @@ export default function CrossStoreInventoryPage() {
 
   // Ricerca (SKU / Prodotto / Barcode)
   const [productSearch, setProductSearch] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
-  const loadData = useCallback(async () => {
+  // Debounce per evitare chiamate di rete ad ogni singola lettera digitata
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(productSearch), 400);
+    return () => clearTimeout(timer);
+  }, [productSearch]);
+
+  const loadData = useCallback(async (searchQuery = '') => {
     setLoading(true);
     try {
       const [invRes, stRes] = await Promise.all([
-        inventory.getCrossStore(),
+        inventory.getCrossStore({ q: searchQuery }),
         storesApi.getStores(),
       ]);
 
@@ -47,7 +54,9 @@ export default function CrossStoreInventoryPage() {
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Chiama loadData ogni volta che il componente si monta O cambia la query testuale de-bounced
+  useEffect(() => { loadData(debouncedQuery); }, [loadData, debouncedQuery]);
+
 
   const cleanName = (name) => {
     if (!name) return 'Negozio Sconosciuto';
@@ -152,7 +161,7 @@ export default function CrossStoreInventoryPage() {
           </div>
         </div>
 
-        <button onClick={loadData} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)', opacity: loading ? 0.6 : 1 }}>
+        <button onClick={() => loadData(debouncedQuery)} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)', opacity: loading ? 0.6 : 1 }}>
           <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           Sincronizza
         </button>
