@@ -13,7 +13,6 @@ export default function CatalogPage() {
   const navigate = useNavigate();
   const { selectedStoreId, displayMode, selectedStore, user } = useOutletContext();
   const isDipendente = (user?.roles || []).includes('dipendente') || user?.role === 'dipendente';
-  if (isDipendente) return <div style={{ padding: 40, textAlign: 'center' }}>Accesso non autorizzato.</div>;
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -165,6 +164,14 @@ export default function CatalogPage() {
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
       <div style={{ width: 32, height: 32, border: '3px solid var(--color-border)', borderTopColor: 'var(--color-accent)', borderRadius: '50%' }} className="sp-spin" />
+    </div>
+  );
+
+  if (isDipendente) return (
+    <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>Sezione non disponibile</div>
+      <div style={{ fontSize: 13, marginTop: 8 }}>Contatta un amministratore per informazioni sui prodotti.</div>
     </div>
   );
 
