@@ -4,7 +4,8 @@ import { cashMovements, employees as employeesApi } from '../api.jsx';
 import {
   Plus, ArrowDownCircle, ArrowUpCircle, Filter, Store,
   TrendingUp, TrendingDown, DollarSign, Clock, RefreshCw,
-  User, Search, CheckCircle, AlertCircle, Banknote, CreditCard
+  User, Search, CheckCircle, AlertCircle, Banknote, CreditCard,
+  Building2, BarChart2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import DatePicker from '../components/DatePicker.jsx';
@@ -16,8 +17,9 @@ function TabBar({ active, onChange }) {
   return (
     <div style={{ display: 'flex', gap: 4, background: 'var(--color-bg)', borderRadius: 12, padding: 4, border: '1px solid var(--color-border)', width: 'fit-content' }}>
       {[
-        { id: 'live',    label: '🟢 Cassa Live',       },
-        { id: 'history', label: '📋 Movimentazioni',   },
+        { id: 'live',    label: '🟢 Cassa Live' },
+        { id: 'history', label: '📋 Movimentazioni' },
+        { id: 'summary', label: '🏢 Riepilogo Società' },
       ].map(t => (
         <button
           key={t.id}
@@ -185,6 +187,14 @@ export default function TesoreriaPage() {
   // ── balance live per lo store corrente (mostrata in History) ──
   const [storeBalance, setStoreBalance] = useState(null);
 
+  // ── Riepilogo Società ──
+  const [sumFrom, setSumFrom] = useState(() => { const d=new Date(); d.setDate(1); return d.toISOString().slice(0,10); });
+  const [sumTo,   setSumTo]   = useState(() => new Date().toISOString().slice(0,10));
+  const [sumComp, setSumComp] = useState('');
+  const [sumData, setSumData] = useState([]);
+  const [sumComps, setSumComps] = useState([]);
+  const [sumLoading, setSumLoading] = useState(false);
+
   // ── Modal ──
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalStoreId, setModalStoreId] = useState(selectedStoreId || '');
@@ -231,6 +241,37 @@ export default function TesoreriaPage() {
 
   useEffect(() => { fetchBalances(); }, [fetchBalances]);
   useEffect(() => { fetchMovements(); fetchStoreBalance(); }, [fetchMovements, fetchStoreBalance]);
+
+  /* fetch riepilogo società */
+  const fetchSummary = useCallback(async () => {
+    setSumLoading(true);
+    try {
+      const p = {};
+      if (sumFrom) p.date_from = sumFrom;
+      if (sumTo)   p.date_to   = sumTo;
+      if (sumComp) p.company   = sumComp;
+      const res = await cashMovements.summary(p);
+      setSumData(res.data?.data || []);
+      setSumComps(res.data?.companies || []);
+    } catch {}
+    finally { setSumLoading(false); }
+  }, [sumFrom, sumTo, sumComp]);
+
+  useEffect(() => { if (activeTab === 'summary') fetchSummary(); }, [activeTab, fetchSummary]);
+
+  /* running balance retroattivo per movimenti senza balance_after_transaction */
+  const enrichMovements = (movs) => {
+    const run = {};
+    return [...movs].reverse().map(m => {
+      if (!run[m.store_id]) run[m.store_id] = 0;
+      if (m.balance_after_transaction != null) {
+        run[m.store_id] = parseFloat(m.balance_after_transaction);
+        return m;
+      }
+      run[m.store_id] += (m.type === 'deposit' ? 1 : -1) * parseFloat(m.amount || 0);
+      return { ...m, balance_after_transaction: run[m.store_id] };
+    }).reverse();
+  };
 
   /* Auto-refresh balances ogni 30s */
   useEffect(() => {
@@ -466,7 +507,10 @@ export default function TesoreriaPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredMovements.map(m => (
+                        {enrichMovements(filteredMovements).map(m => {
+                          const bal = m.balance_after_transaction;
+                          const balNum = bal != null ? parseFloat(bal) : null;
+                          return (
                           <tr key={m.id}>
                             <td style={{ fontSize: 12 }}>{new Date(m.created_at).toLocaleString('it-IT')}</td>
                             {!selectedStoreId && (
@@ -486,27 +530,28 @@ export default function TesoreriaPage() {
                             <td>
                               {m.type === 'deposit' ? (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#10B981', fontWeight: 600, background: 'rgba(16,185,129,0.1)', padding: '4px 10px', borderRadius: 99, fontSize: 11 }}>
-                                  <ArrowDownCircle size={12} /> Incasso / Versamento
+                                  <ArrowDownCircle size={12} /> Entrata
                                 </span>
                               ) : (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#EF4444', fontWeight: 600, background: 'rgba(239,68,68,0.1)', padding: '4px 10px', borderRadius: 99, fontSize: 11 }}>
-                                  <ArrowUpCircle size={12} /> Prelievo / Banca
+                                  <ArrowUpCircle size={12} /> Prelievo
                                 </span>
                               )}
                             </td>
-                            <td style={{ color: 'var(--color-text-secondary)', fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.note || '-'}</td>
+                            <td style={{ color: 'var(--color-text-secondary)', fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.note || '-'}</td>
                             <td style={{ textAlign: 'right', fontWeight: 800, fontSize: 15, color: m.type === 'deposit' ? '#10B981' : '#EF4444' }}>
                               {m.type === 'deposit' ? '+' : '-'}{fmt(m.amount)}
                             </td>
-                            <td style={{ textAlign: 'right', fontWeight: 800, fontSize: 14, color: 'var(--color-text)' }}>
-                              {m.balance_after_transaction !== null && m.balance_after_transaction !== undefined ? (
-                                <span style={{ padding: '4px 8px', background: 'var(--color-bg)', borderRadius: 20 }}>{fmt(m.balance_after_transaction)}</span>
-                              ) : (
-                                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 400 }}>N/A</span>
-                              )}
+                            <td style={{ textAlign: 'right' }}>
+                              {balNum != null ? (
+                                <span style={{ fontWeight: 800, fontSize: 13, padding: '4px 10px', borderRadius: 20, background: balNum >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', color: balNum >= 0 ? '#10b981' : '#ef4444' }}>
+                                  {fmt(balNum)}
+                                </span>
+                              ) : <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>—</span>}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}}
                       </tbody>
                     </table>
                   )}
@@ -516,6 +561,104 @@ export default function TesoreriaPage() {
           })()}
         </div>
       )}
+      {/* ══ TAB: RIEPILOGO SOCIETÀ ══ */}
+      {activeTab === 'summary' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Filtri */}
+          <div style={{ background: 'var(--color-surface)', borderRadius: 16, padding: '16px 20px', border: '1px solid var(--color-border)', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+            <BarChart2 size={16} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>Da:</span>
+              <DatePicker value={sumFrom} onChange={setSumFrom} style={{ minWidth: 130 }} />
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>A:</span>
+              <DatePicker value={sumTo} onChange={setSumTo} style={{ minWidth: 130 }} />
+            </div>
+            {sumComps.length > 0 && (
+              <select className="sp-select" value={sumComp} onChange={e => setSumComp(e.target.value)} style={{ minHeight: 40, padding: '6px 12px', minWidth: 180 }}>
+                <option value="">Tutte le società</option>
+                {sumComps.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+            <button onClick={fetchSummary} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 10, border: 'none', background: 'var(--color-accent)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+              <RefreshCw size={14} style={{ animation: sumLoading ? 'spin 1s linear infinite' : 'none' }} /> Aggiorna
+            </button>
+          </div>
+
+          {sumLoading ? (
+            <div style={{ textAlign: 'center', padding: 60, color: 'var(--color-text-tertiary)' }}>
+              <div className="sp-spin" style={{ width: 32, height: 32, margin: '0 auto 12px' }} />
+              Calcolo in corso...
+            </div>
+          ) : sumData.length === 0 ? (
+            <div style={{ padding: 60, textAlign: 'center', background: 'var(--color-surface)', borderRadius: 18, border: '1px dashed var(--color-border)', color: 'var(--color-text-tertiary)' }}>
+              <Building2 size={40} style={{ margin: '0 auto 12px', opacity: 0.15 }} />
+              <div style={{ fontWeight: 700 }}>Nessuna società trovata. Assicurati che i negozi abbiano il campo Gruppo Società compilato.</div>
+            </div>
+          ) : (
+            <>
+              {/* Totali aggregati */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+                {[
+                  { label: 'Vendite Totali', v: sumData.reduce((s,d)=>s+d.total_sales,0), bg:'linear-gradient(135deg,#7B6FD0,#5B50B0)', col:'#fff', sub:'rgba(255,255,255,0.6)' },
+                  { label: 'Contanti',       v: sumData.reduce((s,d)=>s+d.cash_sales,0),  bg:'rgba(16,185,129,0.08)', col:'#10b981', sub:'var(--color-text-tertiary)' },
+                  { label: 'POS / Carta',    v: sumData.reduce((s,d)=>s+d.pos_sales,0),   bg:'rgba(59,130,246,0.08)', col:'#3b82f6', sub:'var(--color-text-tertiary)' },
+                  { label: 'Saldo Cassa Live', v: sumData.reduce((s,d)=>s+d.live_balance,0), bg:'var(--color-surface)', col:'var(--color-text)', sub:'var(--color-text-tertiary)' },
+                ].map((m,i)=>(
+                  <div key={i} style={{ borderRadius:16, padding:'16px 20px', background:m.bg, border:'1px solid var(--color-border)' }}>
+                    <div style={{ fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6, color:m.sub }}>{m.label}</div>
+                    <div style={{ fontSize:24, fontWeight:900, color:m.col, letterSpacing:'-0.02em' }}>{fmt(m.v)}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Card per società */}
+              {sumData.map((d,i) => (
+                <div key={i} style={{ background:'var(--color-surface)', borderRadius:18, border:'1px solid var(--color-border)', overflow:'hidden' }}>
+                  <div style={{ padding:'18px 22px', background:'linear-gradient(135deg,#1e1b4b,#312e81)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                      <Building2 size={22} style={{ opacity:0.8 }} />
+                      <div>
+                        <div style={{ fontWeight:900, fontSize:18 }}>{d.company}</div>
+                        <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', marginTop:2 }}>{d.store_count} negozi · {d.period_mov_count} movimenti</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign:'right' }}>
+                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', textTransform:'uppercase' }}>Saldo Cassa Live</div>
+                      <div style={{ fontSize:22, fontWeight:900, color: d.live_balance>=0 ? '#4ade80':'#f87171' }}>{fmt(d.live_balance)}</div>
+                    </div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', borderBottom:'1px solid var(--color-border)' }}>
+                    {[
+                      { label:'💶 Vendite Totali', v:d.total_sales,  col:'var(--color-text)' },
+                      { label:'💵 Contanti',      v:d.cash_sales,  col:'#10b981' },
+                      { label:'💳 POS / Carta',   v:d.pos_sales,   col:'#3b82f6' },
+                    ].map((m,j)=>(
+                      <div key={j} style={{ padding:'14px 18px', borderRight: j<2?'1px solid var(--color-border)':'none' }}>
+                        <div style={{ fontSize:10, fontWeight:800, textTransform:'uppercase', color:'var(--color-text-tertiary)', marginBottom:4 }}>{m.label}</div>
+                        <div style={{ fontSize:20, fontWeight:900, color:m.col }}>{fmt(m.v)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', background:'var(--color-bg)' }}>
+                    {[
+                      { label:'Entrate Cassa', v:d.period_deposits, col:'#10b981' },
+                      { label:'Uscite Cassa',  v:d.period_withdrawals, col:'#ef4444' },
+                      { label:'Netto Cassa',   v:d.period_net, col: d.period_net>=0?'#10b981':'#ef4444' },
+                    ].map((m,j)=>(
+                      <div key={j} style={{ padding:'12px 18px', borderRight: j<2?'1px solid var(--color-border)':'none' }}>
+                        <div style={{ fontSize:10, fontWeight:800, textTransform:'uppercase', color:'var(--color-text-tertiary)', marginBottom:3 }}>{m.label}</div>
+                        <div style={{ fontSize:17, fontWeight:800, color:m.col }}>{fmt(m.v)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
 
       {/* ══ MODAL REGISTRA MOVIMENTO ══ */}
       {isModalOpen && (
@@ -523,11 +666,10 @@ export default function TesoreriaPage() {
           <div className="sp-animate-in" style={{ background: 'var(--color-surface)', width: '100%', maxWidth: 480, borderRadius: 24, padding: 28, boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ marginBottom: 20 }}>
               <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Registra Movimento di Cassa</h2>
-              {modalStoreName && <div style={{ fontSize: 13, color: '#7B6FD0', fontWeight: 600, marginTop: 4 }}>🏪 {modalStoreName}</div>}
+              {modalStoreName && <div style={{ fontSize: 13, color: '#7B6FD0', fontWeight: 600, marginTop: 4 }}>🏥 {modalStoreName}</div>}
             </div>
 
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Tipo */}
               <div>
                 <label className="sp-label">Tipo di Movimento</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -539,22 +681,15 @@ export default function TesoreriaPage() {
                   </button>
                 </div>
               </div>
-
-              {/* Codice Operatore */}
               <OperatorField value={operatorBarcode} onChange={setOperatorBarcode} />
-
-              {/* Importo */}
               <div>
                 <label className="sp-label">Importo (€)</label>
                 <input type="number" step="0.01" min="0.01" className="sp-input" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" required />
               </div>
-
-              {/* Note */}
               <div>
                 <label className="sp-label">Note / Causale</label>
                 <textarea className="sp-input" style={{ minHeight: 70, resize: 'vertical' }} value={note} onChange={e => setNote(e.target.value)} placeholder="Es. Versamento in banca, fondo cassa..." />
               </div>
-
               <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
                 <button type="button" onClick={() => setIsModalOpen(false)} className="sp-button" style={{ flex: 1 }}>Annulla</button>
                 <button type="submit" className="sp-button-primary" style={{ flex: 2 }} disabled={saving}>
