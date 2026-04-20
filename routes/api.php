@@ -70,6 +70,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/roles-permissions/roles', [RolesPermissionsController::class, 'storeRole']);
         Route::put('/roles-permissions/roles/{id}', [RolesPermissionsController::class, 'updateRole']);
         Route::delete('/roles-permissions/roles/{id}', [RolesPermissionsController::class, 'destroyRole']);
+        Route::get('/roles-permissions/users', [RolesPermissionsController::class, 'listUsers']);
+        Route::post('/roles-permissions/users/assign', [RolesPermissionsController::class, 'assignRole']);
+        Route::post('/roles-permissions/users/revoke', [RolesPermissionsController::class, 'revokeRole']);
         
         Route::get('/auth/switchable-users', [AuthController::class, 'switchableUsers']);
         Route::post('/auth/impersonate', [AuthController::class, 'impersonate']);

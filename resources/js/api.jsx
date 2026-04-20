@@ -620,6 +620,9 @@ export const rolesPermissions = {
   createRole: (data) => api.post('/roles-permissions/roles', data),
   updateRole: (id, data) => api.put(`/roles-permissions/roles/${id}`, data),
   deleteRole: (id) => api.delete(`/roles-permissions/roles/${id}`),
+  listUsers: () => api.get('/roles-permissions/users'),
+  assignRole: (userId, roleId) => api.post('/roles-permissions/users/assign', { user_id: userId, role_id: roleId }),
+  revokeRole: (userId, roleId) => api.post('/roles-permissions/users/revoke', { user_id: userId, role_id: roleId }),
 };
 
 // Export APIs
