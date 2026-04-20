@@ -578,23 +578,22 @@ export default function DashboardPage() {
   const revenueSparkbar  = monthlyChart.slice(-8).map(d => ({ v: d.revenue }));
   const ordersSparkline  = monthlyChart.slice(-8).map((_, i) => ({ v: Math.max(0, (kpi?.orders_count || 0) / 8 + (i % 3) * 2) }));
 
-  // Donut: per negozio (automatico, senza switch)
   const donutData = useMemo(() => {
-    // Raggruppa per negozio direttamente
+    // Raggruppa per negozio in base al fatturato, non al conto degli ordini
     const byStore = {};
     recentOrders.forEach(o => {
       const sId = String(o.store_id || 'unknown');
       const name = o.store_name || o.warehouse?.name || (o.store_id ? `Negozio #${o.store_id}` : 'Non assegnato');
       if (!byStore[sId]) byStore[sId] = { name, value: 0 };
-      byStore[sId].value++;
+      byStore[sId].value += parseFloat(o.grand_total || o.total || 0);
     });
-    const result = Object.values(byStore);
+    const result = Object.values(byStore).filter(r => r.value > 0);
     if (result.length === 0) {
-      // Fallback: mostra canali se non ci sono store_id negli ordini
+      // Fallback: mostra canali se non ci sono vendite
       return [
-        { name: 'POS',  value: recentOrders.filter(o => o.channel === 'pos').length  || 1 },
-        { name: 'Web',  value: recentOrders.filter(o => o.channel === 'web').length  || 1 },
-        { name: 'Altro',value: recentOrders.filter(o => !['pos','web'].includes(o.channel)).length || 1 },
+        { name: 'POS',  value: recentOrders.filter(o => o.channel === 'pos').reduce((s,o)=>s+(parseFloat(o.grand_total)||0),0) || 1 },
+        { name: 'Web',  value: recentOrders.filter(o => o.channel === 'web').reduce((s,o)=>s+(parseFloat(o.grand_total)||0),0) || 1 },
+        { name: 'Altro',value: recentOrders.filter(o => !['pos','web'].includes(o.channel)).reduce((s,o)=>s+(parseFloat(o.grand_total)||0),0) || 1 },
       ];
     }
     return result;

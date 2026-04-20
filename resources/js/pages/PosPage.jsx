@@ -5,7 +5,7 @@ import {
   Search, Plus, Minus, Trash2, ShoppingCart, X, User,
   MapPin, Zap, Package, ChevronRight, ReceiptText, Loader2,
   ScanBarcode, Cherry, RotateCcw, UserCircle, Tag, Star,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon, ShieldCheck
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import PosCheckoutModal from '../components/PosCheckoutModal.jsx';
@@ -1293,10 +1293,12 @@ export default function PosPage() {
               if (qscarePrice <= 0) return (
                 <div key={line.product_variant_id} style={{
                   background: 'rgba(234,179,8,0.08)', border: '1.5px solid rgba(234,179,8,0.2)',
-                  borderRadius: 12, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6,
+                  borderRadius: 12, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6,
                 }}>
-                  <span style={{ fontSize: 16 }}>🛡</span>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <ShieldCheck size={18} color="#EAB308" opacity={0.8} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(234,179,8,0.9)' }}>QScare — {line.name}</div>
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Prezzo non configurato in anagrafica</div>
                   </div>
@@ -1315,8 +1317,10 @@ export default function PosPage() {
                     transition: 'all 0.2s',
                   }}
                 >
-                  <span style={{ fontSize: 17 }}>🛡</span>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 8, background: hasQscare ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${hasQscare ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <ShieldCheck size={18} color={hasQscare ? "#10B981" : "rgba(255,255,255,0.3)"} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, fontWeight: 800, color: hasQscare ? '#86efac' : '#fff' }}>
                       QScare — {line.name}
                     </div>

@@ -257,7 +257,7 @@ export default function StoreStatsDrawer({ store, onClose }) {
                 </div>
                 {kpi.customers > 0 && (
                   <div style={{ gridColumn: '1/-1' }}>
-                    <KpiCard icon={Users} label="Clienti Fidelizzati" value={fmtN(kpi.customers)} color="#F59E0B" />
+                    <KpiCard icon={Users} label="Clienti Serviti (Unici)" value={fmtN(kpi.customers)} color="#F59E0B" />
                   </div>
                 )}
               </div>
