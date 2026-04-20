@@ -260,6 +260,7 @@ class InventoryController extends Controller
         $tenantId = (int) $request->attributes->get('tenant_id');
         $q        = trim((string) $request->input('q', ''));
         $variantId = $request->filled('product_variant_id') ? (int) $request->integer('product_variant_id') : null;
+        $productId = $request->filled('product_id') ? (int) $request->integer('product_id') : null;
 
         $query = DB::table('stock_items as si')
             ->join('warehouses as w', 'w.id', '=', 'si.warehouse_id')
@@ -287,6 +288,8 @@ class InventoryController extends Controller
 
         if ($variantId) {
             $query->where('si.product_variant_id', $variantId);
+        } elseif ($productId) {
+            $query->where('p.id', $productId);
         } elseif ($q) {
             $query->where(function ($inner) use ($q) {
                 $inner->where('p.name', 'ilike', "%{$q}%")

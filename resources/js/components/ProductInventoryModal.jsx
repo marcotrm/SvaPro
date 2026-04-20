@@ -1,17 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Package, X, MapPin, Loader2 } from 'lucide-react';
+import { Package, X, MapPin, Loader2, Search } from 'lucide-react';
 import { inventory } from '../api.jsx';
 import { toast } from 'react-hot-toast';
 
 export default function ProductInventoryModal({ product, onClose }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     inventory.getCrossStore({ product_id: product.id })
       .then(res => {
         const payload = res.data?.data || res.data || [];
-        setData(Array.isArray(payload) ? payload : []);
+        // Flatten se raggruppato
+        if (payload.length > 0 && payload[0].stores) {
+          const flatData = payload.flatMap(v => v.stores.map(s => ({ ...s, flavor: v.flavor, sku: v.sku })));
+          setData(flatData);
+        } else {
+          setData(Array.isArray(payload) ? payload : []);
+        }
       })
       .catch(() => {
         // Fallback locale
@@ -25,26 +32,46 @@ export default function ProductInventoryModal({ product, onClose }) {
       .finally(() => setLoading(false));
   }, [product.id]);
 
-  const totalQty = data.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
+  const filteredData = data.filter(row => {
+    if (!searchTerm) return true;
+    const s = searchTerm.toLowerCase();
+    const locName = (row.store?.name || row.store_name || row.warehouse?.name || row.warehouse_name || 'Negozio sconosciuto').toLowerCase();
+    return locName.includes(s) || (row.store_city && row.store_city.toLowerCase().includes(s));
+  });
+
+  const totalQty = filteredData.reduce((sum, row) => sum + (Number(row.on_hand ?? row.available ?? row.quantity) || 0), 0);
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
-      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.4)', width: '100%', maxWidth: 480, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.4)', width: '100%', maxWidth: 520, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
         
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--color-border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(16,185,129,0.15)', border: '1.5px solid rgba(16,185,129,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Package size={20} color="#10B981" />
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(16,185,129,0.15)', border: '1.5px solid rgba(16,185,129,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Package size={22} color="#10B981" />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-text)' }}>Giacenze Locali</div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{product.name}</div>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-text)' }}>Giacenze Locali</div>
-              <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{product.name}</div>
-            </div>
+            <button onClick={onClose} style={{ background: 'var(--color-bg)', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 4 }}>
+              <X size={16} />
+            </button>
           </div>
-          <button onClick={onClose} style={{ background: 'var(--color-bg)', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <X size={16} />
-          </button>
+          
+          <div style={{ position: 'relative' }}>
+            <Search size={16} color="var(--color-text-tertiary)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+            <input 
+              className="sp-input"
+              placeholder="Cerca per nome negozio o città..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ paddingLeft: 38, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, width: '100%' }}
+            />
+          </div>
         </div>
         
         {/* Contenuto */}
@@ -54,9 +81,9 @@ export default function ProductInventoryModal({ product, onClose }) {
               <Loader2 size={32} style={{ margin: '0 auto 10px', animation: 'spin 1s linear infinite' }} />
               <div style={{ fontSize: 13, fontWeight: 600 }}>Cerco inventario in tutti i negozi...</div>
             </div>
-          ) : data.length === 0 ? (
+          ) : filteredData.length === 0 ? (
             <div style={{ padding: '40px 20px', textAlign: 'center', fontSize: 14, color: 'var(--color-text-tertiary)' }}>
-              ⚠️ Nessuna giacenza registrata in alcun negozio per questo prodotto.
+              {searchTerm ? 'Nessun negozio trovato con questo nome.' : '⚠️ Nessuna giacenza registrata in alcun negozio per questo prodotto.'}
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -67,14 +94,22 @@ export default function ProductInventoryModal({ product, onClose }) {
                 </tr>
               </thead>
               <tbody>
-                {data.map((row, idx) => {
-                  const qty = Number(row.quantity) || 0;
-                  const locName = row.store?.name || row.store_name || row.warehouse?.name || 'Store';
+                {filteredData.map((row, idx) => {
+                  const qty = Number(row.on_hand ?? row.available ?? row.quantity) || 0;
+                  const locName = row.store?.name || row.store_name || row.warehouse?.name || row.warehouse_name || 'Negozio sconosciuto';
                   return (
                     <tr key={idx} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td style={{ padding: '14px 22px' }}>
                         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <MapPin size={14} color="#10B981" /> {locName}
+                          <MapPin size={14} color="#10B981" /> 
+                          <span style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span>{locName}</span>
+                            {(row.store_city || row.flavor) && (
+                              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 500, marginTop: 2 }}>
+                                {[row.store_city, row.flavor ? `Aroma: ${row.flavor}` : null].filter(Boolean).join(' • ')}
+                              </span>
+                            )}
+                          </span>
                         </div>
                       </td>
                       <td style={{ padding: '14px 22px', textAlign: 'right' }}>
@@ -91,7 +126,7 @@ export default function ProductInventoryModal({ product, onClose }) {
         </div>
         
         {/* Footer totale */}
-        {!loading && data.length > 0 && (
+        {!loading && filteredData.length > 0 && (
           <div style={{ padding: '18px 22px', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)', borderRadius: '0 0 16px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Totale Multi-Store</span>
             <span style={{ fontSize: 20, fontWeight: 900, color: '#10B981', background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', padding: '6px 16px', borderRadius: 10, boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>{totalQty} pz</span>
