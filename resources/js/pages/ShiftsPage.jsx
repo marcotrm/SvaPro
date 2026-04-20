@@ -1109,7 +1109,9 @@ export default function ShiftsPage() {
   // Solo admin/shift_manager possono modificare i turni confermati o inserire per altri dipendenti
   const canEditShifts = isShiftManager;
 
-  const [storeId, setStoreId] = useState(selectedStoreId || '');
+  // Dipendente: usa il suo store anche se selectedStoreId non è ancora impostato
+  const defaultStoreId = selectedStoreId || (isDipendente && user?.employee_store_id ? String(user.employee_store_id) : '');
+  const [storeId, setStoreId] = useState(defaultStoreId);
 
   const [weekStart, setWeekStart] = useState(() => getStartOfWeek());
   const weekDays = useMemo(() => generateWeekDays(weekStart), [weekStart]);
@@ -1211,7 +1213,14 @@ export default function ShiftsPage() {
     type === 'ferie' ? '🌴 Ferie' : type === 'malattia' ? '🤒 Malattia' : type === 'permesso' ? '📋 Permesso' : '⛔ Indisponibile';
   // ───────────────────────────────────────────────────────────────
 
-  useEffect(() => { if (selectedStoreId) setStoreId(selectedStoreId); }, [selectedStoreId]);
+  useEffect(() => {
+    if (selectedStoreId) {
+      setStoreId(selectedStoreId);
+    } else if (isDipendente && user?.employee_store_id) {
+      // Dipendente: auto-seleziona il suo negozio dal profilo
+      setStoreId(String(user.employee_store_id));
+    }
+  }, [selectedStoreId, isDipendente, user?.employee_store_id]);
 
   // loadData deve essere definita con useCallback PRIMA dell'effect che la chiama,
   // in modo che quando storeId o weekDays cambiano, la nuova versione venga usata.
@@ -1570,6 +1579,18 @@ export default function ShiftsPage() {
     );
   };
 
+  // Dipendente senza employee_id collegato: mostra avviso amministratore
+  if (isDipendente && !currentEmployeeId) return (
+    <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)' }}>Profilo dipendente non collegato</div>
+      <div style={{ fontSize: 13, marginTop: 8, maxWidth: 400, margin: '8px auto 0' }}>
+        Il tuo account utente non è ancora collegato all'anagrafica dipendenti.
+        Contatta un amministratore per associare il tuo profilo al negozio.
+      </div>
+    </div>
+  );
+
   if (!storeId) return (
     <div style={{ padding: '32px' }}>
       {/* Global search available even without store selection */}
@@ -1689,8 +1710,8 @@ export default function ShiftsPage() {
         </div>
       )}
 
-      {/* ── Ricerca globale dipendente (cross-store) ── */}
-      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+      {/* ── Ricerca globale dipendente (cross-store) — solo per admin ── */}
+      {!isDipendente && <div style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ position: 'relative', flex: '0 0 300px' }} ref={globalRef}>
           <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)', pointerEvents: 'none' }} />
           <input
@@ -1751,7 +1772,7 @@ export default function ShiftsPage() {
             </button>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Analisi copertura turni — sempre visibile */}
       {(() => {
