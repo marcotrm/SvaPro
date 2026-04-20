@@ -70,11 +70,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/roles-permissions/roles', [RolesPermissionsController::class, 'storeRole']);
         Route::put('/roles-permissions/roles/{id}', [RolesPermissionsController::class, 'updateRole']);
         Route::delete('/roles-permissions/roles/{id}', [RolesPermissionsController::class, 'destroyRole']);
+        Route::post('/roles-permissions/permissions', [RolesPermissionsController::class, 'storePermission']);
+        Route::delete('/roles-permissions/permissions/{id}', [RolesPermissionsController::class, 'destroyPermission']);
         Route::get('/roles-permissions/users', [RolesPermissionsController::class, 'listUsers']);
+        Route::post('/roles-permissions/users', [RolesPermissionsController::class, 'storeUser']);
+        Route::delete('/roles-permissions/users/{id}', [RolesPermissionsController::class, 'destroyUser']);
         Route::post('/roles-permissions/users/assign', [RolesPermissionsController::class, 'assignRole']);
         Route::post('/roles-permissions/users/revoke', [RolesPermissionsController::class, 'revokeRole']);
-        Route::delete('/roles-permissions/permissions/{id}', [RolesPermissionsController::class, 'destroyPermission']);
-        
         Route::get('/auth/switchable-users', [AuthController::class, 'switchableUsers']);
         Route::post('/auth/impersonate', [AuthController::class, 'impersonate']);
         // Stores CRUD
@@ -320,6 +322,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // Tesoreria - Cash Movements
         Route::get('/cash-movements', [CashMovementController::class, 'index']);
         Route::get('/cash-movements/balances', [CashMovementController::class, 'balances']);
+        Route::get('/cash-movements/summary', [CashMovementController::class, 'summary']);
         Route::post('/cash-movements', [CashMovementController::class, 'store']);
 
         // Attendance - accessibile anche ai dipendenti (per timbrare se stessi)

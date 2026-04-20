@@ -7,6 +7,7 @@ use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class RolesPermissionsController extends Controller
@@ -227,12 +228,112 @@ class RolesPermissionsController extends Controller
         $perm = DB::table('permissions')->where('id', $id)->first();
         if (!$perm) return response()->json(['message' => 'Permesso non trovato.'], 404);
 
-        // Rimuovi assegnazioni ai ruoli
         DB::table('role_permissions')->where('permission_id', $id)->delete();
         DB::table('permissions')->where('id', $id)->delete();
 
         AuditLogger::log($request, 'delete', 'permission', $id, "Eliminato permesso: {$perm->name}");
-
         return response()->json(['message' => 'Permesso eliminato.']);
+    }
+
+    /**
+     * Crea un nuovo permesso/modulo personalizzato.
+     */
+    public function storePermission(Request $request): JsonResponse
+    {
+        $request->validate([
+            'name' => 'required|string|max:100',
+            'code' => 'nullable|string|max:100',
+        ]);
+
+        $name = trim($request->input('name'));
+        $code = $request->input('code')
+            ? Str::slug($request->input('code'), '_')
+            : Str::slug($name, '_');
+
+        if (DB::table('permissions')->where('code', $code)->exists()) {
+            return response()->json(['message' => 'Esiste già un permesso con questo codice.'], 422);
+        }
+
+        $id = DB::table('permissions')->insertGetId([
+            'name'       => $name,
+            'code'       => $code,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditLogger::log($request, 'create', 'permission', $id, "Creato permesso: $name ($code)");
+
+        return response()->json([
+            'message'    => 'Permesso creato.',
+            'permission' => ['id' => $id, 'name' => $name, 'code' => $code],
+        ], 201);
+    }
+
+    /**
+     * Crea un nuovo utente nel tenant dell'admin loggato.
+     */
+    public function storeUser(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $request->validate([
+            'name'     => 'required|string|max:100',
+            'email'    => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8',
+            'role_id'  => 'nullable|integer|exists:roles,id',
+        ]);
+
+        $userId = DB::table('users')->insertGetId([
+            'tenant_id'  => $tenantId,
+            'name'       => $request->input('name'),
+            'email'      => $request->input('email'),
+            'password'   => Hash::make($request->input('password')),
+            'status'     => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Assegna ruolo se fornito
+        if ($request->input('role_id')) {
+            DB::table('user_roles')->insert([
+                'user_id'    => $userId,
+                'role_id'    => (int) $request->input('role_id'),
+                'tenant_id'  => $tenantId,
+                'store_id'   => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        AuditLogger::log($request, 'create', 'user', $userId, "Creato utente: {$request->input('name')} ({$request->input('email')})");
+
+        return response()->json([
+            'message' => 'Utente creato con successo.',
+            'user'    => ['id' => $userId, 'name' => $request->input('name'), 'email' => $request->input('email')],
+        ], 201);
+    }
+
+    /**
+     * Elimina un utente dal tenant (solo se non è il superadmin attuale).
+     */
+    public function destroyUser(Request $request, $id): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $currentUserId = $request->user()->id;
+
+        if ((int) $id === $currentUserId) {
+            return response()->json(['message' => 'Non puoi eliminare te stesso.'], 422);
+        }
+
+        $user = DB::table('users')->where('id', $id)->where('tenant_id', $tenantId)->first();
+        if (!$user) return response()->json(['message' => 'Utente non trovato.'], 404);
+
+        // Rimuovi ruoli e poi l'utente
+        DB::table('user_roles')->where('user_id', $id)->where('tenant_id', $tenantId)->delete();
+        DB::table('users')->where('id', $id)->delete();
+
+        AuditLogger::log($request, 'delete', 'user', $id, "Eliminato utente: {$user->name} ({$user->email})");
+
+        return response()->json(['message' => 'Utente eliminato.']);
     }
 }

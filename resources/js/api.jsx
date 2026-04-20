@@ -620,10 +620,13 @@ export const rolesPermissions = {
   createRole: (data) => api.post('/roles-permissions/roles', data),
   updateRole: (id, data) => api.put(`/roles-permissions/roles/${id}`, data),
   deleteRole: (id) => api.delete(`/roles-permissions/roles/${id}`),
+  createPermission: (data) => api.post('/roles-permissions/permissions', data),
+  deletePermission: (id) => api.delete(`/roles-permissions/permissions/${id}`),
   listUsers: () => api.get('/roles-permissions/users'),
+  createUser: (data) => api.post('/roles-permissions/users', data),
+  deleteUser: (id) => api.delete(`/roles-permissions/users/${id}`),
   assignRole: (userId, roleId) => api.post('/roles-permissions/users/assign', { user_id: userId, role_id: roleId }),
   revokeRole: (userId, roleId) => api.post('/roles-permissions/users/revoke', { user_id: userId, role_id: roleId }),
-  deletePermission: (id) => api.delete(`/roles-permissions/permissions/${id}`),
 };
 
 // Export APIs
@@ -706,6 +709,7 @@ export const pos = {
 export const cashMovements = {
   get:      (params = {}) => api.get('/cash-movements', { params }),
   balances: (params = {}) => api.get('/cash-movements/balances', { params }),
+  summary:  (params = {}) => api.get('/cash-movements/summary', { params }),
   create:   (data) => api.post('/cash-movements', data),
 };
 

@@ -78,9 +78,17 @@ export default function RolesPermissionsPage() {
   const [selectedUserId, setSelU] = useState(null);
 
   // ── Modali ──
-  const [modalType, setModalType] = useState(null); // 'createRole'|'editRole'|'assignUser'
+  // modalType: 'createRole'|'editRole'|'createPermission'|'createUser'
+  const [modalType, setModalType] = useState(null);
   const [roleInput, setRoleInput] = useState('');
   const [processing, setProcessing] = useState(false);
+  // form stati per nuovi modali
+  const [permName, setPermName]   = useState('');
+  const [permCode, setPermCode]   = useState('');
+  const [newUserName, setNewUserName]   = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPw, setNewUserPw]       = useState('');
+  const [newUserRole, setNewUserRole]   = useState('');
 
   // ─ fetch matrice ─────────────────────────────────────────────
   const fetchMatrix = useCallback(async (selectId = null) => {
@@ -184,7 +192,6 @@ export default function RolesPermissionsPage() {
     setProcessing(true); setError('');
     try {
       await rolesPermissions.deletePermission(permId);
-      // Aggiorna state locale senza reload completo
       setPerms(prev => prev.filter(p => p.id !== permId));
       setMatrix(prev => prev.map(row => ({
         ...row,
@@ -192,6 +199,51 @@ export default function RolesPermissionsPage() {
       })));
     } catch (err) {
       setError(err.response?.data?.message || 'Errore eliminazione permesso');
+    } finally { setProcessing(false); }
+  };
+
+  // ─ crea permesso ────────────────────────────────────────────
+  const handleCreatePermission = async (e) => {
+    e.preventDefault();
+    if (!permName.trim()) return;
+    setProcessing(true); setError('');
+    try {
+      const res = await rolesPermissions.createPermission({ name: permName, code: permCode });
+      const newPerm = res.data?.permission;
+      if (newPerm) setPerms(prev => [...prev, newPerm]);
+      setModalType(null); setPermName(''); setPermCode('');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Errore creazione permesso');
+    } finally { setProcessing(false); }
+  };
+
+  // ─ crea utente ──────────────────────────────────────────────
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPw.trim()) return;
+    setProcessing(true); setError('');
+    try {
+      await rolesPermissions.createUser({
+        name: newUserName, email: newUserEmail, password: newUserPw,
+        role_id: newUserRole || undefined,
+      });
+      setModalType(null); setNewUserName(''); setNewUserEmail(''); setNewUserPw(''); setNewUserRole('');
+      await fetchUsers();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Errore creazione utente');
+    } finally { setProcessing(false); }
+  };
+
+  // ─ elimina utente ───────────────────────────────────────────
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Eliminare definitivamente l'utente "${userName}"?\nQuesta azione non è reversibile.`)) return;
+    setProcessing(true); setError('');
+    try {
+      await rolesPermissions.deleteUser(userId);
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      if (selectedUserId === userId) setSelU(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Errore eliminazione utente');
     } finally { setProcessing(false); }
   };
 
@@ -236,10 +288,22 @@ export default function RolesPermissionsPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          {isSuperAdminUser && (
-            <button className="sp-btn" style={{ background: 'var(--color-accent)', color: '#fff', border: 'none', fontWeight: 800 }}
-              onClick={() => { setRoleInput(''); setModalType('createRole'); }}>
-              <Plus size={15} /> Nuovo Ruolo
+          {isSuperAdminUser && tab === 'permissions' && (
+            <>
+              <button className="sp-btn" style={{ background: 'var(--color-accent)', color: '#fff', border: 'none', fontWeight: 800 }}
+                onClick={() => { setRoleInput(''); setModalType('createRole'); }}>
+                <Plus size={15} /> Nuovo Ruolo
+              </button>
+              <button className="sp-btn" style={{ background: '#0891b2', color: '#fff', border: 'none', fontWeight: 800 }}
+                onClick={() => { setPermName(''); setPermCode(''); setModalType('createPermission'); }}>
+                <Plus size={15} /> Nuovo Modulo
+              </button>
+            </>
+          )}
+          {isSuperAdminUser && tab === 'users' && (
+            <button className="sp-btn" style={{ background: '#16a34a', color: '#fff', border: 'none', fontWeight: 800 }}
+              onClick={() => { setNewUserName(''); setNewUserEmail(''); setNewUserPw(''); setNewUserRole(''); setModalType('createUser'); }}>
+              <Plus size={15} /> Nuovo Utente
             </button>
           )}
           <button className="sp-btn sp-btn-secondary" onClick={() => { fetchMatrix(); if (tab === 'users') fetchUsers(); }}>
@@ -470,7 +534,16 @@ export default function RolesPermissionsPage() {
                   transform: isSelected ? 'scale(1.02)' : 'none',
                   transition: 'all 0.18s',
                 }}>
-                  <div style={{ fontWeight: 800, fontSize: 14, color: isSelected ? '#fff' : 'var(--color-text)', marginBottom: 3 }}>{u.name}</div>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: isSelected ? '#fff' : 'var(--color-text)', marginBottom: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    {u.name}
+                    {isSuperAdminUser && (
+                      <button
+                        onClick={e => { e.stopPropagation(); handleDeleteUser(u.id, u.name); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSelected ? 'rgba(255,255,255,0.6)' : '#ef4444', padding: '2px 4px', borderRadius: 6, lineHeight: 1 }}
+                        title="Elimina utente"
+                      >✕</button>
+                    )}
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 11, color: isSelected ? 'rgba(255,255,255,0.65)' : 'var(--color-text-tertiary)' }}>{u.email}</span>
                     <span style={{
@@ -603,6 +676,68 @@ export default function RolesPermissionsPage() {
               </button>
               <button type="submit" disabled={processing} style={{ padding: '11px 24px', borderRadius: 11, border: 'none', background: 'var(--color-accent)', color: '#fff', fontWeight: 800, cursor: processing ? 'wait' : 'pointer', boxShadow: '0 6px 16px rgba(79,70,229,0.28)' }}>
                 {processing ? 'Salvataggio...' : 'Conferma'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ══ MODAL: NUOVO MODULO/PERMESSO ══ */}
+      {modalType === 'createPermission' && (
+        <Modal title="Nuovo Modulo / Permesso" onClose={() => setModalType(null)}>
+          <form onSubmit={handleCreatePermission} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', marginBottom: 6 }}>Nome del modulo *</label>
+              <input autoFocus className="sp-input" placeholder="Es. Gestione magazzino avanzato" value={permName} onChange={e => setPermName(e.target.value)} required />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', marginBottom: 6 }}>
+                Codice univoco <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)' }}>(opzionale — generato automaticamente)</span>
+              </label>
+              <input className="sp-input" placeholder="Es. warehouse_advanced.manage" value={permCode} onChange={e => setPermCode(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 13 }} />
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setModalType(null)} style={{ padding: '11px 20px', borderRadius: 11, border: 'none', background: 'var(--color-bg)', color: 'var(--color-text-secondary)', fontWeight: 800, cursor: 'pointer' }}>Annulla</button>
+              <button type="submit" disabled={processing} style={{ padding: '11px 24px', borderRadius: 11, border: 'none', background: '#0891b2', color: '#fff', fontWeight: 800, cursor: processing ? 'wait' : 'pointer' }}>
+                {processing ? 'Creazione...' : '+ Crea Modulo'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ══ MODAL: NUOVO UTENTE ══ */}
+      {modalType === 'createUser' && (
+        <Modal title="Crea Nuovo Utente" onClose={() => setModalType(null)}>
+          <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', marginBottom: 6 }}>Nome Completo *</label>
+                <input autoFocus className="sp-input" placeholder="Es. Mario Rossi" value={newUserName} onChange={e => setNewUserName(e.target.value)} required />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', marginBottom: 6 }}>Email *</label>
+                <input type="email" className="sp-input" placeholder="Es. mario@esempio.it" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} required />
+              </div>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', marginBottom: 6 }}>Password iniziale *</label>
+              <input type="password" className="sp-input" placeholder="Minimo 8 caratteri" value={newUserPw} onChange={e => setNewUserPw(e.target.value)} required minLength={8} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', marginBottom: 6 }}>Ruolo iniziale <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)' }}>(opzionale)</span></label>
+              <select className="sp-select" value={newUserRole} onChange={e => setNewUserRole(e.target.value)} style={{ width: '100%', minHeight: 42 }}>
+                <option value="">— Nessun ruolo —</option>
+                {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+            <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+              💡 L'utente potrà cambiare la password dal pannello Impostazioni al primo accesso.
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setModalType(null)} style={{ padding: '11px 20px', borderRadius: 11, border: 'none', background: 'var(--color-bg)', color: 'var(--color-text-secondary)', fontWeight: 800, cursor: 'pointer' }}>Annulla</button>
+              <button type="submit" disabled={processing} style={{ padding: '11px 24px', borderRadius: 11, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 800, cursor: processing ? 'wait' : 'pointer' }}>
+                {processing ? 'Creazione...' : '+ Crea Utente'}
               </button>
             </div>
           </form>

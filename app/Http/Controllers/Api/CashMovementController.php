@@ -201,4 +201,93 @@ class CashMovementController extends Controller
             ]
         ], 201);
     }
+
+    /**
+     * Riepilogo per società (company_group) con breakdown contanti/POS.
+     * GET /cash-movements/summary?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&company=...
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $tenantId  = (int) $request->attributes->get('tenant_id');
+        $dateFrom  = $request->input('date_from');
+        $dateTo    = $request->input('date_to');
+        $company   = $request->input('company'); // opzionale — filtra per nome società
+
+        // Recupera tutte le company_group del tenant
+        $storesQuery = DB::table('stores')
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('company_group')
+            ->select('id', 'name', 'company_group');
+        if ($company) $storesQuery->where('company_group', $company);
+        $stores = $storesQuery->get();
+
+        $companies = $stores->groupBy('company_group');
+
+        // Lista di tutte le company (anche senza store esplicito) per il tenant
+        $allCompanies = DB::table('stores')
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('company_group')
+            ->distinct()->pluck('company_group');
+
+        $results = [];
+
+        foreach ($companies as $companyName => $compStores) {
+            $storeIds = $compStores->pluck('id')->toArray();
+
+            // ── Movimenti di cassa nel periodo ────────────────────────
+            $movQuery = DB::table('cash_movements')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('store_id', $storeIds);
+            if ($dateFrom) $movQuery->whereRaw("(created_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom]);
+            if ($dateTo)   $movQuery->whereRaw("(created_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]);
+
+            $totalDeposits    = (float) (clone $movQuery)->where('type', 'deposit')->sum('amount');
+            $totalWithdrawals = (float) (clone $movQuery)->where('type', 'withdrawal')->sum('amount');
+            $movCount         = $movQuery->count();
+
+            // ── Vendite POS nel periodo (pagamenti) ────────────────────
+            $salesQuery = DB::table('payments')
+                ->join('sales_orders', 'sales_orders.id', '=', 'payments.sales_order_id')
+                ->where('sales_orders.tenant_id', $tenantId)
+                ->whereIn('sales_orders.store_id', $storeIds)
+                ->where('payments.status', 'paid');
+            if ($dateFrom) $salesQuery->whereRaw("(payments.paid_at AT TIME ZONE 'Europe/Rome')::date >= ?", [$dateFrom]);
+            if ($dateTo)   $salesQuery->whereRaw("(payments.paid_at AT TIME ZONE 'Europe/Rome')::date <= ?", [$dateTo]);
+
+            $cashSales = (float) (clone $salesQuery)->where('payments.method', 'cash')->sum('payments.amount');
+            $posSales  = (float) (clone $salesQuery)->where('payments.method', 'card')->sum('payments.amount');
+            $totalSales = $cashSales + $posSales;
+
+            // ── Saldo live cassa (tutti i movimenti storici) ───────────
+            $liveDep = (float) DB::table('cash_movements')
+                ->where('tenant_id', $tenantId)->whereIn('store_id', $storeIds)->where('type', 'deposit')->sum('amount');
+            $liveWit = (float) DB::table('cash_movements')
+                ->where('tenant_id', $tenantId)->whereIn('store_id', $storeIds)->where('type', 'withdrawal')->sum('amount');
+            $liveCash = (float) DB::table('sales_orders')
+                ->where('tenant_id', $tenantId)->whereIn('store_id', $storeIds)->where('status','paid')->where('channel','cash')->sum('grand_total');
+            $liveBalance = round($liveCash + $liveDep - $liveWit, 2);
+
+            $results[] = [
+                'company'          => $companyName,
+                'stores'           => $compStores->pluck('name')->toArray(),
+                'store_count'      => count($storeIds),
+                // Periodo selezionato
+                'period_deposits'  => round($totalDeposits, 2),
+                'period_withdrawals' => round($totalWithdrawals, 2),
+                'period_net'       => round($totalDeposits - $totalWithdrawals, 2),
+                'period_mov_count' => $movCount,
+                // Vendite POS nel periodo
+                'cash_sales'       => round($cashSales, 2),
+                'pos_sales'        => round($posSales, 2),
+                'total_sales'      => round($totalSales, 2),
+                // Saldo live corrente
+                'live_balance'     => $liveBalance,
+            ];
+        }
+
+        return response()->json([
+            'data'      => $results,
+            'companies' => $allCompanies->values(),
+        ]);
+    }
 }
