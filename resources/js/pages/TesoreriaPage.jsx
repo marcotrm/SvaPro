@@ -7,6 +7,7 @@ import {
   User, Search, CheckCircle, AlertCircle, Banknote, CreditCard
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import DatePicker from '../components/DatePicker.jsx';
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
@@ -176,8 +177,8 @@ export default function TesoreriaPage() {
 
   // ── Movimentazioni ──
   const [movements, setMovements] = useState([]);
-  const [histLoading, setHistLoading] = useState(true);
-  const [filterMonth, setFilterMonth] = useState(''); // 'YYYY-MM'
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [filterCompany, setFilterCompany] = useState(''); // nome della societa
   const companiesList = [...new Set((storesList || []).map(s => s.company_group).filter(Boolean))];
 
@@ -210,17 +211,13 @@ export default function TesoreriaPage() {
     setHistLoading(true);
     try {
       const params = {};
-      if (selectedStoreId) params.store_id = selectedStoreId;
-      if (filterMonth) {
-        const [y, m] = filterMonth.split('-');
-        params.date_from = `${y}-${m}-01`;
-        params.date_to = new Date(y, m, 0).toISOString().split('T')[0];
-      }
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo)   params.date_to   = dateTo;
       const res = await cashMovements.get(params);
       setMovements(res.data?.data || []);
     } catch {}
     finally { setHistLoading(false); }
-  }, [selectedStoreId, filterMonth]);
+  }, [selectedStoreId, dateFrom, dateTo]);
 
   /* balance live per il negozio corrente nella history */
   const fetchStoreBalance = useCallback(async () => {
@@ -395,26 +392,31 @@ export default function TesoreriaPage() {
           )}
 
           {/* Filtri */}
-          <div style={{ background: 'var(--color-surface)', padding: 16, borderRadius: 14, display: 'flex', gap: 16, alignItems: 'center', border: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
+          <div style={{ background: 'var(--color-surface)', padding: '16px', borderRadius: 14, display: 'flex', gap: 16, alignItems: 'center', border: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
             <Filter size={16} color="var(--color-text-secondary)" />
             
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>Mese:</span>
-              <input type="month" className="sp-input" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} style={{ padding: '6px 12px', minHeight: 34 }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>Da:</span>
+              <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Inizio..." style={{ minWidth: 140 }} />
+            </div>
+
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>A:</span>
+              <DatePicker value={dateTo} onChange={setDateTo} placeholder="Fine..." style={{ minWidth: 140 }} />
             </div>
 
             {!selectedStoreId && companiesList.length > 0 && (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)' }}>Società / Holding:</span>
-                <select className="sp-select" value={filterCompany} onChange={e => setFilterCompany(e.target.value)} style={{ minHeight: 34, padding: '6px 12px' }}>
+                <select className="sp-select" value={filterCompany} onChange={e => setFilterCompany(e.target.value)} style={{ minHeight: 40, padding: '6px 12px' }}>
                   <option value="">Tutte le società...</option>
                   {companiesList.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
             )}
 
-            {(filterMonth || filterCompany) && (
-              <button onClick={() => { setFilterMonth(''); setFilterCompany(''); }} style={{ fontSize: 12, fontWeight: 700, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Reset</button>
+            {(dateFrom || dateTo || filterCompany) && (
+              <button onClick={() => { setDateFrom(''); setDateTo(''); setFilterCompany(''); }} style={{ fontSize: 12, fontWeight: 700, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Reset</button>
             )}
           </div>
 
@@ -427,7 +429,7 @@ export default function TesoreriaPage() {
             return (
               <>
                 {/* Riquadro Riepilogo Società (visibile se filtrato) */}
-                {(filterMonth || filterCompany) && filteredMovements.length > 0 && (
+                {(dateFrom || dateTo || filterCompany) && filteredMovements.length > 0 && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) minmax(200px, 1fr) minmax(200px, 1fr)', gap: 12 }}>
                     <div style={{ background: 'var(--color-surface)', borderRadius: 14, padding: '16px 20px', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: 'var(--color-text-tertiary)' }}>Movimenti Estratti</div>
