@@ -221,4 +221,18 @@ class RolesPermissionsController extends Controller
 
         return response()->json(['message' => 'Ruolo revocato.']);
     }
+
+    public function destroyPermission(Request $request, $id): JsonResponse
+    {
+        $perm = DB::table('permissions')->where('id', $id)->first();
+        if (!$perm) return response()->json(['message' => 'Permesso non trovato.'], 404);
+
+        // Rimuovi assegnazioni ai ruoli
+        DB::table('role_permissions')->where('permission_id', $id)->delete();
+        DB::table('permissions')->where('id', $id)->delete();
+
+        AuditLogger::log($request, 'delete', 'permission', $id, "Eliminato permesso: {$perm->name}");
+
+        return response()->json(['message' => 'Permesso eliminato.']);
+    }
 }

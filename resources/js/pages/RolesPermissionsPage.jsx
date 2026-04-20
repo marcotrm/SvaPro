@@ -178,6 +178,23 @@ export default function RolesPermissionsPage() {
     } finally { setProcessing(false); }
   };
 
+  // ─ elimina permesso ────────────────────────────────────────
+  const handleDeletePermission = async (permId, permName) => {
+    if (!window.confirm(`Eliminare definitivamente il permesso "${permName}"?\nVerrà rimosso da tutti i ruoli che lo hanno assegnato.`)) return;
+    setProcessing(true); setError('');
+    try {
+      await rolesPermissions.deletePermission(permId);
+      // Aggiorna state locale senza reload completo
+      setPerms(prev => prev.filter(p => p.id !== permId));
+      setMatrix(prev => prev.map(row => ({
+        ...row,
+        permission_ids: row.permission_ids.filter(id => id !== permId),
+      })));
+    } catch (err) {
+      setError(err.response?.data?.message || 'Errore eliminazione permesso');
+    } finally { setProcessing(false); }
+  };
+
   // ─ helpers ─────────────────────────────────────────────────
   const isGranted = (roleId, permId) => {
     const row = matrix.find(r => r.role_id === roleId);
@@ -390,6 +407,23 @@ export default function RolesPermissionsPage() {
                                 }}
                               >
                                 {isTogg ? <Loader2 size={13} className="animate-spin inline" /> : granted ? 'Revoca' : 'Concedi'}
+                              </button>
+                            )}
+                            {isSuperAdminUser && (
+                              <button
+                                onClick={() => handleDeletePermission(perm.id, perm.name)}
+                                disabled={processing}
+                                title="Elimina questo permesso dal sistema"
+                                style={{
+                                  flexShrink: 0, padding: '7px 10px', borderRadius: 9, border: 'none',
+                                  background: 'rgba(239,68,68,0.08)', color: '#ef4444',
+                                  cursor: processing ? 'wait' : 'pointer', transition: 'all 0.15s',
+                                  display: 'flex', alignItems: 'center',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.18)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
+                              >
+                                <Trash2 size={14} />
                               </button>
                             )}
                           </div>

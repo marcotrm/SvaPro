@@ -16,6 +16,17 @@ class CheckPermission
             return response()->json(['message' => 'Non autenticato.'], 401);
         }
 
+        // Superadmin bypassa qualsiasi controllo di permission
+        $isSuperAdmin = DB::table('user_roles as ur')
+            ->join('roles as r', 'r.id', '=', 'ur.role_id')
+            ->where('ur.user_id', $user->id)
+            ->where('r.code', 'superadmin')
+            ->exists();
+
+        if ($isSuperAdmin) {
+            return $next($request);
+        }
+
         $userPermissions = DB::table('user_roles as ur')
             ->join('role_permissions as rp', 'rp.role_id', '=', 'ur.role_id')
             ->join('permissions as p', 'p.id', '=', 'rp.permission_id')
