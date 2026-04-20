@@ -281,21 +281,126 @@ export default function StoreRevenuePage() {
             </div>
           )}
 
-          {/* Pulsante configura colonne */}
+          {/* Pulsante configura colonne — con dropdown assoluto */}
           {tab === 'ranking' && (
-            <button
-              onClick={() => setShowPicker(p => !p)}
-              style={{
-                display:'flex', alignItems:'center', gap:5, padding:'7px 13px',
-                background: showPicker ? 'rgba(123,111,208,0.15)' : 'var(--color-surface)',
-                border: `1px solid ${showPicker ? '#7B6FD0' : 'var(--color-border)'}`,
-                borderRadius:9, cursor:'pointer', fontSize:11, fontWeight:700,
-                color: showPicker ? '#7B6FD0' : 'var(--color-text-secondary)',
-              }}
-            >
-              <Settings2 size={12}/>
-              Variabili ({activeKeys.length - 2} / {ALL_COLUMNS.length - 2})
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowPicker(p => !p)}
+                style={{
+                  display:'flex', alignItems:'center', gap:5, padding:'7px 13px',
+                  background: showPicker ? 'rgba(123,111,208,0.15)' : 'var(--color-surface)',
+                  border: `1px solid ${showPicker ? '#7B6FD0' : 'var(--color-border)'}`,
+                  borderRadius:9, cursor:'pointer', fontSize:11, fontWeight:700,
+                  color: showPicker ? '#7B6FD0' : 'var(--color-text-secondary)',
+                }}
+              >
+                <Settings2 size={12}/>
+                Variabili ({activeKeys.length - 2} / {ALL_COLUMNS.length - 2})
+              </button>
+
+              {/* ══ PANNELLO VARIABILI (dropdown assoluto) ══ */}
+              {showPicker && (
+                <>
+                  {/* Overlay click-outside */}
+                  <div
+                    onClick={() => setShowPicker(false)}
+                    style={{ position:'fixed', inset:0, zIndex:199 }}
+                  />
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    right: 0,
+                    zIndex: 200,
+                    width: 240,
+                    background: 'var(--color-surface)',
+                    borderRadius: 14,
+                    border: '1px solid var(--color-border)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+                    overflow: 'hidden',
+                  }}>
+                    {/* Header */}
+                    <div style={{
+                      padding: '11px 14px', background: 'var(--color-bg)',
+                      borderBottom: '1px solid var(--color-border)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Variabili in Analisi
+                      </div>
+                      <button onClick={() => setShowPicker(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--color-text-tertiary)', padding:2 }}>
+                        <X size={14}/>
+                      </button>
+                    </div>
+
+                    {/* Colonne attive */}
+                    <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--color-border)' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                        Inserite in Analisi
+                      </div>
+                      {ALL_COLUMNS.filter(c => !c.always && activeKeys.includes(c.key)).map(col => (
+                        <div key={col.key} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '6px 8px', borderRadius: 8, marginBottom: 2,
+                          background: 'rgba(123,111,208,0.06)',
+                          border: '1px solid rgba(123,111,208,0.15)',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <GripVertical size={12} style={{ color: 'var(--color-text-tertiary)', opacity: 0.4 }}/>
+                            <span style={{ fontSize: 12, fontWeight: 600 }}>{col.label}</span>
+                          </div>
+                          <button
+                            onClick={() => toggleColumn(col.key)}
+                            title="Rimuovi"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: 2, opacity: 0.7, flexShrink: 0 }}
+                          >
+                            <Trash2 size={12}/>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Colonne disponibili */}
+                    <div style={{ padding: '10px 12px' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                        Disponibili
+                      </div>
+                      {ALL_COLUMNS.filter(c => !c.always && !activeKeys.includes(c.key)).map(col => (
+                        <div
+                          key={col.key}
+                          onClick={() => toggleColumn(col.key)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '6px 8px', borderRadius: 8, marginBottom: 2,
+                            cursor: 'pointer', transition: 'background 0.1s',
+                            color: 'var(--color-text-secondary)',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <span style={{ fontSize: 16, color: '#10B981', fontWeight: 700, lineHeight: 1 }}>+</span>
+                          <span style={{ fontSize: 12, fontWeight: 600 }}>{col.label}</span>
+                        </div>
+                      ))}
+                      {ALL_COLUMNS.filter(c => !c.always && !activeKeys.includes(c.key)).length === 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '8px 0' }}>
+                          Tutte le colonne sono attive
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Reset */}
+                    <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-border)', textAlign: 'center' }}>
+                      <button
+                        onClick={() => setActiveKeys(DEFAULT_ACTIVE)}
+                        style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        Ripristina tutte
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           <button onClick={load} disabled={loading} style={{
@@ -310,8 +415,8 @@ export default function StoreRevenuePage() {
         </div>
       </div>
 
-      {/* ══ LAYOUT con pannello laterale colonne ══ */}
-      <div style={{ display:'flex', gap:16, alignItems:'flex-start', overflow:'hidden', minWidth:0 }}>
+      {/* ══ LAYOUT tabella ══ */}
+      <div style={{ position: 'relative' }}>
 
       {/* ══ TAB: CLASSIFICA (tabella) ══════════════════════════════ */}
       {tab === 'ranking' && (
@@ -390,98 +495,6 @@ export default function StoreRevenuePage() {
               </table>
             </div>
           )}
-        </div>
-      )}
-
-      {/* ══ PANNELLO LATERALE: Variabili in Analisi ══ */}
-      {showPicker && tab === 'ranking' && (
-        <div style={{
-          width: 240, flexShrink: 0,
-          background: 'var(--color-surface)',
-          borderRadius: 16, border: '1px solid var(--color-border)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          overflow: 'hidden',
-          alignSelf: 'flex-start',
-        }}>
-          {/* Header pannello */}
-          <div style={{
-            padding: '12px 14px', background: 'var(--color-bg)',
-            borderBottom: '1px solid var(--color-border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Variabili/Valori in Analisi
-            </div>
-            <button onClick={() => setShowPicker(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--color-text-tertiary)', padding:2 }}>
-              <X size={14}/>
-            </button>
-          </div>
-
-          {/* Colonne attive (rimuovibili) */}
-          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--color-border)' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-              Inserite in Analisi
-            </div>
-            {ALL_COLUMNS.filter(c => !c.always && activeKeys.includes(c.key)).map(col => (
-              <div key={col.key} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '6px 8px', borderRadius: 8, marginBottom: 2,
-                background: 'rgba(123,111,208,0.06)',
-                border: '1px solid rgba(123,111,208,0.15)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <GripVertical size={12} style={{ color: 'var(--color-text-tertiary)', opacity: 0.4 }}/>
-                  <span style={{ fontSize: 12, fontWeight: 600 }}>{col.label}</span>
-                </div>
-                <button
-                  onClick={() => toggleColumn(col.key)}
-                  title="Rimuovi"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: 2, opacity: 0.7, flexShrink: 0 }}
-                >
-                  <Trash2 size={12}/>
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* Colonne disattive (aggiungibili) */}
-          <div style={{ padding: '10px 12px' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-              Disponibili
-            </div>
-            {ALL_COLUMNS.filter(c => !c.always && !activeKeys.includes(c.key)).map(col => (
-              <div
-                key={col.key}
-                onClick={() => toggleColumn(col.key)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '6px 8px', borderRadius: 8, marginBottom: 2,
-                  cursor: 'pointer', transition: 'background 0.1s',
-                  color: 'var(--color-text-secondary)',
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                <span style={{ fontSize: 16, color: '#10B981', fontWeight: 700, lineHeight: 1 }}>+</span>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{col.label}</span>
-              </div>
-            ))}
-            {ALL_COLUMNS.filter(c => !c.always && !activeKeys.includes(c.key)).length === 0 && (
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '8px 0' }}>
-                Tutte le colonne sono attive
-              </div>
-            )}
-          </div>
-
-          {/* Reset */}
-          <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-border)', textAlign: 'center' }}>
-            <button
-              onClick={() => setActiveKeys(DEFAULT_ACTIVE)}
-              style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-            >
-              Ripristina tutte
-            </button>
-          </div>
         </div>
       )}
 
