@@ -248,9 +248,20 @@ class ReportController extends Controller
     {
         $tenantId = $request->attributes->get('tenant_id');
         $storeId  = $this->getSecureStoreId($request);
-        $days     = min((int) ($request->input('days', 30) ?: 30), 365);
         $dateFrom = $request->input('date_from');
         $dateTo   = $request->input('date_to');
+
+        if ($dateFrom && $dateTo) {
+            try {
+                $parsedFrom = \Carbon\Carbon::parse($dateFrom);
+                $parsedTo   = \Carbon\Carbon::parse($dateTo);
+                $days = max(1, $parsedFrom->diffInDays($parsedTo) + 1);
+            } catch (\Throwable $e) {
+                $days = 30;
+            }
+        } else {
+            $days = min((int) ($request->input('days', 30) ?: 30), 365);
+        }
 
         try {
             $orderBase = DB::table('sales_orders')
@@ -278,9 +289,17 @@ class ReportController extends Controller
             // Previous period for comparison
             $prevBase = DB::table('sales_orders')
                 ->where('tenant_id', $tenantId)
-                ->where('status', 'paid')
-                ->where('created_at', '>=', now()->subDays($days * 2))
-                ->where('created_at', '<', now()->subDays($days));
+                ->where('status', 'paid');
+
+            if ($dateFrom && $dateTo) {
+                $prevDateTo = \Carbon\Carbon::parse($dateFrom)->subDay()->toDateString();
+                $prevDateFrom = \Carbon\Carbon::parse($prevDateTo)->subDays($days - 1)->toDateString();
+                $prevBase->whereDate('created_at', '>=', $prevDateFrom)
+                         ->whereDate('created_at', '<=', $prevDateTo);
+            } else {
+                $prevBase->where('created_at', '>=', now()->subDays($days * 2))
+                         ->where('created_at', '<', now()->subDays($days));
+            }
 
             if ($storeId) {
                 $prevBase->where('store_id', $storeId);
@@ -291,13 +310,20 @@ class ReportController extends Controller
                 DB::raw('coalesce(sum(grand_total), 0) as revenue')
             )->first();
 
-            $customerCount = DB::table('customers')
-                ->where('tenant_id', $tenantId)
-                ->count();
-            $newCustomers = DB::table('customers')
-                ->where('tenant_id', $tenantId)
-                ->where('created_at', '>=', now()->subDays($days))
-                ->count();
+            $customerCount = DB::table('customers')->where('tenant_id', $tenantId)->count();
+            
+            // Reale calcolo dei clienti serviti (unici) nel periodo richiesto e per lo store (se filtrato)
+            $uniqueCustomersQuery = (clone $orderBase)->whereNotNull('customer_id');
+            $periodCustomers = $uniqueCustomersQuery->distinct()->count('customer_id');
+
+            $newCustQuery = DB::table('customers')->where('tenant_id', $tenantId);
+            if ($dateFrom && $dateTo) {
+                $newCustQuery->whereDate('created_at', '>=', $dateFrom)
+                             ->whereDate('created_at', '<=', $dateTo);
+            } else {
+                $newCustQuery->where('created_at', '>=', now()->subDays($days));
+            }
+            $newCustomers = $newCustQuery->count();
 
             $lowStock = 0;
             try {
@@ -368,7 +394,7 @@ class ReportController extends Controller
                 'delta_revenue'    => $deltaRevenue,
                 'delta_orders'     => $deltaOrders,
                 'total_customers'  => $customerCount,
-                'unique_customers' => $customerCount,
+                'unique_customers' => $periodCustomers,
                 'new_customers'    => $newCustomers,
                 'low_stock'        => $lowStock,
                 'cash_total'       => round((float) $cashTotal, 2),

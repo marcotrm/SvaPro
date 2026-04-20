@@ -244,7 +244,7 @@ export default function Layout({ user, setUser }) {
   const [lowStockCount, setLowStockCount] = React.useState(0);
   const [showStoreStats, setShowStoreStats] = React.useState(false);
 
-  // â”€â”€â”€ Notifiche cassa â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Notifiche cassa ──────────────────────────────────────────
   const CASH_THRESHOLD = 1000;
   const SNOOZE_MS = 3 * 60 * 60 * 1000; // 3 ore
   const SNOOZE_KEY = 'svapro_notif_snooze_v1';
@@ -290,13 +290,13 @@ export default function Layout({ user, setUser }) {
         // Mostra solo allerte non in snooze
         const visibleAlerts = allAlerts.filter(a => !snoozed[String(a.store_id ?? a.id)]);
         setCashAlertStores(visibleAlerts);
-        // Conta solo le nuove allerte visibili (store che non erano giÃ  in alert)
+        // Conta solo le nuove allerte visibili (store che non erano già in alert)
         const newAlerts = visibleAlerts.filter(a => !prevAlertIdsRef.current.has(a.store_id ?? a.id));
         if (newAlerts.length > 0) {
           setUnreadAlerts(prev => prev + newAlerts.length);
           newAlerts.forEach(a => prevAlertIdsRef.current.add(a.store_id ?? a.id));
         }
-        // Rimuovi dalla lista prev gli store che non sono piÃ¹ in allerta
+        // Rimuovi dalla lista prev gli store che non sono più in allerta
         const alertIds = new Set(visibleAlerts.map(a => a.store_id ?? a.id));
         [...prevAlertIdsRef.current].forEach(id => { if (!alertIds.has(id)) prevAlertIdsRef.current.delete(id); });
       } catch { /* silent */ }
@@ -381,7 +381,7 @@ export default function Layout({ user, setUser }) {
         {/* Nav */}
         <nav className="sp-sidebar-nav" style={{ padding: collapsed ? '8px 0' : '12px 10px' }}>
           {filteredNav.map((section) => {
-            // Accordions always closed â€” navigazione solo via flyout hover
+            // Accordions always closed — navigazione solo via flyout hover
             return (
               <div
                 key={section.section}
@@ -411,7 +411,7 @@ export default function Layout({ user, setUser }) {
                   </div>
                 )}
 
-                {/* Items: sempre nascosti â€” visibili solo nel flyout */}
+                {/* Items: sempre nascosti — visibili solo nel flyout */}
                 <div style={{ maxHeight: '0px', overflow: 'hidden' }} />
               </div>
             );
@@ -423,7 +423,7 @@ export default function Layout({ user, setUser }) {
           <div
             className="sp-user-card"
             onClick={handleLogout}
-            title={collapsed ? `${user?.name || 'Utente'} â€” Logout` : 'Logout'}
+            title={collapsed ? `${user?.name || 'Utente'} — Logout` : 'Logout'}
             style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : {}}
           >
             <div className="sp-user-avatar" style={{ flexShrink: 0 }}>
@@ -442,7 +442,7 @@ export default function Layout({ user, setUser }) {
         </div>
       </aside>
 
-      {/* â”€â”€ FLYOUT HOVER SUBMENU â”€â”€ */}
+      {/* ── FLYOUT HOVER SUBMENU ── */}
       {flyout && (
         <div
           onMouseEnter={cancelTimer}
@@ -566,7 +566,7 @@ export default function Layout({ user, setUser }) {
             {/* Bottone Scheda (VapeCalc) */}
             <button
               onClick={() => setShowMichelePanel(true)}
-              title="Scheda â€” Tabelle Nicotina"
+              title="Scheda — Tabelle Nicotina"
               className="sp-desktop-only"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -600,7 +600,7 @@ export default function Layout({ user, setUser }) {
             >
               <BarChart3 size={16} />
             </button>
-            {/* â”€â”€ CAMPANELLA NOTIFICHE â”€â”€ */}
+            {/* ── CAMPANELLA NOTIFICHE ── */}
             <div ref={notifPanelRef} style={{ position: 'relative' }}>
               <button
                 className="sp-btn sp-btn-ghost sp-btn-icon"
@@ -636,8 +636,8 @@ export default function Layout({ user, setUser }) {
                 }}>
                   {/* Header */}
                   <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ fontWeight: 800, fontSize: 13, color: '#fff' }}>ðŸ”” Notifiche Cassa</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Soglia: â‚¬{CASH_THRESHOLD.toLocaleString()}</div>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: '#fff' }}>🔔 Notifiche Cassa</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Soglia: €{CASH_THRESHOLD.toLocaleString()}</div>
                   </div>
 
                   {/* Lista allerte */}
@@ -664,7 +664,7 @@ export default function Layout({ user, setUser }) {
                     )}
                     {!dailyReportAvailable && cashAlertStores.length === 0 ? (
                       <div style={{ padding: '24px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>
-                        âœ… Nessuna allerta attiva
+                        ✅ Nessuna allerta attiva
                       </div>
                     ) : (
                       cashAlertStores.map((s, i) => (
@@ -681,7 +681,7 @@ export default function Layout({ user, setUser }) {
                             <div style={{ fontWeight: 900, fontSize: 14, color: '#ef4444' }}>
                               {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(s.balance)}
                             </div>
-                            <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: 8 }}>âš  ALLERTA</span>
+                            <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: 8 }}>⚠️ ALLERTA</span>
                           </div>
                         </div>
                       ))
@@ -749,7 +749,7 @@ export default function Layout({ user, setUser }) {
         }}
       />
 
-      {/* â”€â”€ MOBILE DRAWER â”€â”€ */}
+      {/* ── MOBILE DRAWER ── */}
       {mobileDrawerOpen && (
         <>
           {/* Overlay */}
@@ -832,17 +832,17 @@ export default function Layout({ user, setUser }) {
                 style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 10, border: 'none', background: 'rgba(239,68,68,0.08)', color: '#f87171', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
               >
                 <LogOut size={16} />
-                <span>Esci â€” {user?.name || 'Utente'}</span>
+                <span>Esci — {user?.name || 'Utente'}</span>
               </button>
             </div>
           </div>
         </>
       )}
 
-      {/* â”€â”€ MOBILE BOTTOM NAV â€” role-aware â”€â”€ */}
+      {/* ── MOBILE BOTTOM NAV — role-aware ── */}
       <nav className="sp-mobile-nav" aria-label="Navigazione principale mobile">
         <div className="sp-mobile-nav-inner">
-          {/* POS Cassa â€” tutti i ruoli */}
+          {/* POS Cassa — tutti i ruoli */}
           <button
             className={`sp-mobile-nav-btn ${location.pathname === '/' || location.pathname === '/pos' ? 'active' : ''}`}
             onClick={() => navigate('/')}
