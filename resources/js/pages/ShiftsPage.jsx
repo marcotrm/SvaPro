@@ -2076,26 +2076,48 @@ export default function ShiftsPage() {
       {/* Modal selezione template/Aggiunta turno */}
       {renderActiveCellModal()}
 
-      {/* Jolly picker dropdown — position:fixed per evitare clipping */}
+      {/* Jolly picker dropdown — Modal centrale anziché select posizionata assolutamente */}
       {showJollyPicker && (
-        <>
-          <div onClick={() => setShowJollyPicker(false)} style={{ position: 'fixed', inset: 0, zIndex: 8888 }} />
-          <div style={{
-            position: 'fixed', top: jollyPickerPos.top, left: jollyPickerPos.left, width: jollyPickerPos.width,
-            zIndex: 8889, background: 'var(--color-surface)', border: '1.5px solid rgba(139,92,246,0.4)',
-            borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.18)', maxHeight: 340, display: 'flex', flexDirection: 'column',
-          }}>
-            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--color-border)' }}>
-              <input autoFocus value={jollySearch}
+        <div 
+          onClick={() => setShowJollyPicker(false)} 
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        >
+          <div 
+            style={{
+              background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.4)', 
+              width: '100%', maxWidth: 460, maxHeight: '85vh', display: 'flex', flexDirection: 'column'
+            }} 
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--color-border)' }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#8B5CF6' }}>Aggiungi Dipendente Jolly</div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Assegna dipendenti che appartengono ad altri store</div>
+              </div>
+              <button 
+                onClick={() => setShowJollyPicker(false)} 
+                style={{ background: 'var(--color-bg)', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
+              <input 
+                autoFocus 
+                value={jollySearch}
                 onChange={e => setJollySearch(e.target.value)}
-                placeholder={allEmpLoading ? 'Caricamento...' : 'Cerca dipendente da tutti gli store...'}
+                placeholder={allEmpLoading ? 'Caricamento dipendenti...' : 'Cerca dipendente (nome, badge)...'}
                 disabled={allEmpLoading}
-                style={{ width: '100%', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, outline: 'none', boxSizing: 'border-box', color: 'var(--color-text)' }}
+                style={{ width: '100%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '12px 16px', fontSize: 14, fontWeight: 600, outline: 'none', boxSizing: 'border-box', color: 'var(--color-text)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}
               />
             </div>
-            <div style={{ overflowY: 'auto', flex: 1 }}>
+            
+            <div style={{ overflowY: 'auto', flex: 1, padding: '8px 0' }}>
               {allEmpLoading ? (
-                <div style={{ padding: '20px', textAlign: 'center', fontSize: 13, color: 'var(--color-text-tertiary)' }}>⏳ Caricamento dipendenti...</div>
+                <div style={{ padding: '30px 20px', textAlign: 'center', fontSize: 14, color: 'var(--color-text-tertiary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                  ⏳ Caricamento dipendenti extra...
+                </div>
               ) : (() => {
                 const q = jollySearch.toLowerCase().trim();
                 const already = new Set([...employees.map(e => e.id), ...extraEmployees.map(e => e.id)]);
@@ -2103,39 +2125,50 @@ export default function ShiftsPage() {
                   const name = `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim().toLowerCase();
                   return !already.has(e.id) && (!q || name.includes(q));
                 });
+                
                 if (list.length === 0) return (
-                  <div style={{ padding: '24px', textAlign: 'center', fontSize: 13, color: 'var(--color-text-tertiary)' }}>
-                    {q ? `Nessun risultato per "${q}"` : allEmployeesGlobal.length === 0 ? '⚠️ Nessun dipendente caricato' : 'Tutti i dipendenti sono già in griglia'}
+                  <div style={{ padding: '40px 20px', textAlign: 'center', fontSize: 14, color: 'var(--color-text-tertiary)' }}>
+                    {q ? `Nessun risultato per "${q}"` : allEmployeesGlobal.length === 0 ? '⚠️ Nessun dipendente caricato a sistema' : 'Tutti i dipendenti sono già presenti in griglia'}
                   </div>
                 );
+                
                 return list.map(emp => {
                   const name = `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || '?';
                   const store = emp.store_name || emp.store?.name || '—';
                   return (
-                    <div key={emp.id} onClick={e => { e.stopPropagation(); addJolly(emp); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', cursor: 'pointer', borderBottom: '1px solid var(--color-border)', transition: 'background 0.1s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.07)'}
+                    <div 
+                      key={emp.id} 
+                      onClick={e => { e.stopPropagation(); addJolly(emp); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 22px', cursor: 'pointer', borderBottom: '1px solid var(--color-border)', transition: 'background 0.15s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.06)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
-                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(139,92,246,0.15)', border: '2px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, color: '#8B5CF6', flexShrink: 0 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(139,92,246,0.15)', border: '2px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: '#8B5CF6', flexShrink: 0 }}>
                         {name.charAt(0)}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>{name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{emp.role || 'Operatore'} — {store}</div>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-text)' }}>{name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{emp.role || 'Operatore'} — {store}</div>
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#8B5CF6', background: 'rgba(139,92,246,0.1)', borderRadius: 6, padding: '3px 10px', flexShrink: 0 }}>Jolly</span>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: '#8B5CF6', borderRadius: 8, padding: '4px 10px', flexShrink: 0, boxShadow: '0 2px 4px rgba(139,92,246,0.4)' }}>+ Jolly</span>
                     </div>
                   );
                 });
               })()}
             </div>
-            <div style={{ padding: '8px 14px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{allEmployeesGlobal.length > 0 ? `${allEmployeesGlobal.length} dipendenti totali` : ''}</span>
-              <button onClick={() => setShowJollyPicker(false)} style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}>Chiudi</button>
+            <div style={{ padding: '12px 22px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-bg)', borderRadius: '0 0 16px 16px' }}>
+              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{allEmployeesGlobal.length > 0 ? `${allEmployeesGlobal.length} dipendenti totali` : ''}</span>
+              <button 
+                onClick={() => setShowJollyPicker(false)} 
+                style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 12px', borderRadius: 8 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                Chiudi
+              </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
