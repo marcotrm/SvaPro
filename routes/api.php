@@ -64,8 +64,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/audit-logs/{logId}', [AuditController::class, 'show']);
         Route::get('/tenant-settings', [StoreController::class, 'tenantSettings']);
         Route::put('/tenant-settings', [StoreController::class, 'updateTenantSettings']);
+        
         Route::get('/roles-permissions', [RolesPermissionsController::class, 'matrix']);
         Route::post('/roles-permissions/toggle', [RolesPermissionsController::class, 'toggle'])->middleware('permission:roles.manage');
+        Route::post('/roles-permissions/roles', [RolesPermissionsController::class, 'storeRole']);
+        Route::put('/roles-permissions/roles/{id}', [RolesPermissionsController::class, 'updateRole']);
+        Route::delete('/roles-permissions/roles/{id}', [RolesPermissionsController::class, 'destroyRole']);
+        
         Route::get('/auth/switchable-users', [AuthController::class, 'switchableUsers']);
         Route::post('/auth/impersonate', [AuthController::class, 'impersonate']);
         // Stores CRUD

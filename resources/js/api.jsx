@@ -617,6 +617,9 @@ export const audit = {
 export const rolesPermissions = {
   getMatrix: () => cachedGet('/roles-permissions', {}, 60000, 600000),
   toggle: (roleId, permissionId) => api.post('/roles-permissions/toggle', { role_id: roleId, permission_id: permissionId }),
+  createRole: (data) => api.post('/roles-permissions/roles', data),
+  updateRole: (id, data) => api.put(`/roles-permissions/roles/${id}`, data),
+  deleteRole: (id) => api.delete(`/roles-permissions/roles/${id}`),
 };
 
 // Export APIs

@@ -285,121 +285,20 @@ export default function StoreRevenuePage() {
           {tab === 'ranking' && (
             <div style={{ position: 'relative' }}>
               <button
-                onClick={() => setShowPicker(p => !p)}
+                onClick={() => setShowPicker(true)}
                 style={{
-                  display:'flex', alignItems:'center', gap:5, padding:'7px 13px',
+                  display:'flex', alignItems:'center', gap:6, padding:'8px 16px',
                   background: showPicker ? 'rgba(123,111,208,0.15)' : 'var(--color-surface)',
-                  border: `1px solid ${showPicker ? '#7B6FD0' : 'var(--color-border)'}`,
-                  borderRadius:9, cursor:'pointer', fontSize:11, fontWeight:700,
+                  border: `1.5px solid ${showPicker ? '#7B6FD0' : 'var(--color-border)'}`,
+                  borderRadius:12, cursor:'pointer', fontSize:12, fontWeight:700,
                   color: showPicker ? '#7B6FD0' : 'var(--color-text-secondary)',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: showPicker ? '0 0 0 4px rgba(123,111,208,0.1)' : 'none',
                 }}
               >
-                <Settings2 size={12}/>
+                <Settings2 size={14} style={{ color: showPicker ? '#7B6FD0' : '#94A3B8' }}/>
                 Variabili ({activeKeys.length - 2} / {ALL_COLUMNS.length - 2})
               </button>
-
-              {/* ══ PANNELLO VARIABILI (dropdown assoluto) ══ */}
-              {showPicker && (
-                <>
-                  {/* Overlay click-outside */}
-                  <div
-                    onClick={() => setShowPicker(false)}
-                    style={{ position:'fixed', inset:0, zIndex:199 }}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 6px)',
-                    right: 0,
-                    zIndex: 200,
-                    width: 240,
-                    background: 'var(--color-surface)',
-                    borderRadius: 14,
-                    border: '1px solid var(--color-border)',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
-                    overflow: 'hidden',
-                  }}>
-                    {/* Header */}
-                    <div style={{
-                      padding: '11px 14px', background: 'var(--color-bg)',
-                      borderBottom: '1px solid var(--color-border)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        Variabili in Analisi
-                      </div>
-                      <button onClick={() => setShowPicker(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--color-text-tertiary)', padding:2 }}>
-                        <X size={14}/>
-                      </button>
-                    </div>
-
-                    {/* Colonne attive */}
-                    <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--color-border)' }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-                        Inserite in Analisi
-                      </div>
-                      {ALL_COLUMNS.filter(c => !c.always && activeKeys.includes(c.key)).map(col => (
-                        <div key={col.key} style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '6px 8px', borderRadius: 8, marginBottom: 2,
-                          background: 'rgba(123,111,208,0.06)',
-                          border: '1px solid rgba(123,111,208,0.15)',
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <GripVertical size={12} style={{ color: 'var(--color-text-tertiary)', opacity: 0.4 }}/>
-                            <span style={{ fontSize: 12, fontWeight: 600 }}>{col.label}</span>
-                          </div>
-                          <button
-                            onClick={() => toggleColumn(col.key)}
-                            title="Rimuovi"
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: 2, opacity: 0.7, flexShrink: 0 }}
-                          >
-                            <Trash2 size={12}/>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Colonne disponibili */}
-                    <div style={{ padding: '10px 12px' }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-                        Disponibili
-                      </div>
-                      {ALL_COLUMNS.filter(c => !c.always && !activeKeys.includes(c.key)).map(col => (
-                        <div
-                          key={col.key}
-                          onClick={() => toggleColumn(col.key)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 8,
-                            padding: '6px 8px', borderRadius: 8, marginBottom: 2,
-                            cursor: 'pointer', transition: 'background 0.1s',
-                            color: 'var(--color-text-secondary)',
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
-                          <span style={{ fontSize: 16, color: '#10B981', fontWeight: 700, lineHeight: 1 }}>+</span>
-                          <span style={{ fontSize: 12, fontWeight: 600 }}>{col.label}</span>
-                        </div>
-                      ))}
-                      {ALL_COLUMNS.filter(c => !c.always && !activeKeys.includes(c.key)).length === 0 && (
-                        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '8px 0' }}>
-                          Tutte le colonne sono attive
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Reset */}
-                    <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-border)', textAlign: 'center' }}>
-                      <button
-                        onClick={() => setActiveKeys(DEFAULT_ACTIVE)}
-                        style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-                      >
-                        Ripristina tutte
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
             </div>
           )}
 
@@ -599,7 +498,160 @@ export default function StoreRevenuePage() {
         </div>
       )}
 
+
       </div>{/* fine layout flex */}
+
+      {/* ══ PANNELLO VARIABILI (SIDE DRAWER) ══════════════════════════ */}
+      {showPicker && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          {/* Overlay sfocato */}
+          <div 
+            onClick={() => setShowPicker(false)}
+            style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(5px)', animation: 'rvFadeIn 0.3s ease-out' }}
+          />
+          
+          {/* Drawer */}
+          <div style={{ 
+            width: 360, background: 'var(--color-surface)', height: '100%', position: 'relative', zIndex: 1001,
+            boxShadow: '-10px 0 50px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column',
+            animation: 'rvSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)', borderLeft: '1px solid var(--color-border)'
+          }}>
+            {/* Drawer Header */}
+            <div style={{ padding: '24px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ background: 'rgba(123,111,208,0.15)', borderRadius: 10, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Settings2 size={18} color="#7B6FD0" />
+                  </div>
+                  <h2 style={{ fontSize: 18, fontWeight: 900, margin: 0, color: 'var(--color-text)' }}>Analisi Variabili</h2>
+                </div>
+                <button 
+                  onClick={() => setShowPicker(false)}
+                  style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--color-text-secondary)', transition: 'all 0.2s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#FEE2E2'; e.currentTarget.style.color = '#EF4444'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: 0 }}>
+                Seleziona le colonne da visualizzare nel report
+              </p>
+            </div>
+
+            {/* Drawer Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+              
+              {/* In analisi */}
+              <div style={{ marginBottom: 32 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#7B6FD0', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                    Visibili nel Report ({activeKeys.length - 2})
+                  </div>
+                  <button
+                    onClick={() => setActiveKeys(DEFAULT_ACTIVE)}
+                    style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Reset
+                  </button>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {ALL_COLUMNS.filter(c => !c.always && activeKeys.includes(c.key)).map(col => (
+                    <div key={col.key} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '12px 14px', borderRadius: 14,
+                      background: 'rgba(123,111,208,0.04)',
+                      border: '1.5px solid rgba(123,111,208,0.1)',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(123,111,208,0.3)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(123,111,208,0.1)'}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <GripVertical size={14} style={{ color: '#7B6FD0', opacity: 0.4 }}/>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>{col.label}</span>
+                      </div>
+                      <button
+                        onClick={() => toggleColumn(col.key)}
+                        style={{ height: 24, width: 24, borderRadius: 6, background: '#FEE2E2', border: 'none', cursor: 'pointer', color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        <Trash2 size={12}/>
+                      </button>
+                    </div>
+                  ))}
+                  {ALL_COLUMNS.filter(c => !c.always && activeKeys.includes(c.key)).length === 0 && (
+                    <div style={{ padding: '20px', textAlign: 'center', background: 'var(--color-bg)', borderRadius: 14, border: '1px dashed var(--color-border)', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
+                      Nessuna colonna opzionale attiva
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Disponibili */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+                  Aggiungi all'Analisi ({ALL_COLUMNS.length - activeKeys.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {ALL_COLUMNS.filter(c => !c.always && !activeKeys.includes(c.key)).map(col => (
+                    <div
+                      key={col.key}
+                      onClick={() => toggleColumn(col.key)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '12px 14px', borderRadius: 14,
+                        cursor: 'pointer', transition: 'all 0.2s',
+                        background: 'var(--color-bg)',
+                        border: '1.5px solid var(--color-border)',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#F0FDF4'; e.currentTarget.style.borderColor = '#10B981'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg)'; e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                    >
+                      <div style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900 }}>+</div>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>{col.label}</span>
+                    </div>
+                  ))}
+                  {ALL_COLUMNS.filter(c => !c.always && !activeKeys.includes(c.key)).length === 0 && (
+                    <div style={{ padding: '20px', textAlign: 'center', background: 'rgba(16, 185, 129, 0.05)', borderRadius: 14, border: '1px dashed rgba(16, 185, 129, 0.2)', color: '#10B981', fontSize: 13, fontWeight: 600 }}>
+                      ✨ Tutte le variabili sono attive
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Drawer Footer */}
+            <div style={{ padding: '20px 24px', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
+              <button 
+                onClick={() => setShowPicker(false)}
+                style={{ width:'100%', padding:'12px', borderRadius:14, background:'linear-gradient(135deg, #7B6FD0, #5B50B0)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 4px 12px rgba(123, 111, 208, 0.3)' }}
+              >
+                Applica Modifiche
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ ANIMAZIONI ══ */}
+      <style>{`
+        @keyframes rvSlideIn {
+          from { transform: translateX(100%); opacity: 0.5; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes rvFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
