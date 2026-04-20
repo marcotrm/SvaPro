@@ -264,9 +264,8 @@ class AttendanceController extends Controller
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
             ->when($storeId, fn($q) => $q->where('store_id', $storeId))
-            ->select(['id', 'first_name', 'last_name', 'barcode', 'expected_start_time', 'store_id'])
             ->orderBy('first_name')
-            ->get();
+            ->get(); // select * — resiliente a colonne opzionali non ancora migrate
 
         // Timbrature di oggi (ordina per checked_in_at cosÃ¬ keyBy terrÃ  l'ultimo record della giornata)
         $today = DB::table('employee_attendances')
@@ -284,9 +283,9 @@ class AttendanceController extends Controller
                 'name'                 => trim("{$emp->first_name} {$emp->last_name}"),
                 'first_name'           => $emp->first_name,
                 'last_name'            => $emp->last_name,
-                'barcode'              => $emp->barcode,
+                'barcode'              => $emp->barcode ?? null,
                 'store_id'             => $emp->store_id,
-                'expected_start_time'  => $emp->expected_start_time,
+                'expected_start_time'  => $emp->expected_start_time ?? null,
                 'status'               => $att
                     ? ($att->checked_out_at ? ($att->notes === 'Pausa' ? 'pausa' : 'fuori') : 'presente')
                     : 'assente',

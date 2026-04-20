@@ -1234,35 +1234,57 @@ export default function ShiftsPage() {
       // Dipendente vede solo i propri turni, admin vede tutti
       if (isDipendente && currentEmployeeId) shiftParams.employee_id = currentEmployeeId;
 
-      const [empRes, shRes, tplRes] = await Promise.all([
-        attendance.getEmployeesKiosk({ store_id: storeId }),
-        shiftsApi.getAll(shiftParams),
-        shiftsApi.getTemplates(),
-      ]);
+      // Chiama le API separatamente per isolare gli errori
+      let empRes = null, shRes = null, tplRes = null;
+      try {
+        [empRes, shRes, tplRes] = await Promise.all([
+          attendance.getEmployeesKiosk({ store_id: storeId }),
+          shiftsApi.getAll(shiftParams),
+          shiftsApi.getTemplates(),
+        ]);
+      } catch (apiErr) {
+        console.error('[ShiftsPage] API error:', apiErr?.response?.data || apiErr.message);
+        // Prova a caricare almeno i turni
+        try { shRes = await shiftsApi.getAll(shiftParams); } catch {}
+        try { tplRes = await shiftsApi.getTemplates(); } catch {}
+      }
 
       // Dipendente: filtra la lista dipendenti per mostrare solo se stesso
-      let empList = empRes.data?.data || [];
+      let empList = empRes?.data?.data || [];
       if (isDipendente && currentEmployeeId) {
         empList = empList.filter(e => String(e.id) === currentEmployeeId);
+        // Fallback: se la lista è vuota (API ha fallito o employee_id non trovato),
+        // crea un record sintetico dai dati del profilo utente
+        if (empList.length === 0 && user) {
+          empList = [{
+            id:         Number(currentEmployeeId),
+            name:       `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Tu',
+            first_name: user.first_name || user.name || 'Tu',
+            last_name:  user.last_name || '',
+            store_id:   Number(user.employee_store_id || storeId),
+            barcode:    user.employee_barcode || null,
+            status:     'assente',
+          }];
+        }
       }
       setEmployees(empList);
 
       const shiftsMap = {};
-      (shRes.data?.data || []).forEach(s => {
+      (shRes?.data?.data || []).forEach(s => {
         const key = `${s.employee_id}_${s.date}`;
         shiftsMap[key] = {
           id:         s.id,
           start_time: s.start_time,
           end_time:   s.end_time,
           color:      s.color,
-          status:     s.status || 'confirmed',   // proposed | confirmed
+          status:     s.status || 'confirmed',
           proposed_by: s.proposed_by || null,
         };
       });
       setShifts(shiftsMap);
       setOriginalShifts(JSON.parse(JSON.stringify(shiftsMap)));
-      setTemplates(tplRes.data?.data || []);
-    } catch {
+      setTemplates(tplRes?.data?.data || []);
+    } catch (err) {
       toast.error('Errore caricamento dati');
     } finally { setLoading(false); }
   }, [storeId, weekDays, isDipendente, currentEmployeeId]);
