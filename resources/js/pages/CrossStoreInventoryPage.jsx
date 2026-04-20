@@ -1,25 +1,19 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { inventory, stores as storesApi } from '../api.jsx';
-import { MapPin, Search, RefreshCw, Store, Package, X, ChevronRight } from 'lucide-react';
+import { MapPin, Search, RefreshCw, Package, Store, ArrowDownIcon } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function CrossStoreInventoryPage() {
   const { selectedStoreId } = useOutletContext?.() || {};
 
-  // ── Dati globali ─────────────────────────────────────────────────────
-  const [allData, setAllData]     = useState([]);   // righe cross-store raw
-  const [storesList, setStoresList] = useState([]); // lista negozi
+  const [allData, setAllData]     = useState([]);
+  const [storesList, setStoresList] = useState([]);
   const [loading, setLoading]     = useState(true);
 
-  // ── Ricerca ──────────────────────────────────────────────────────────
-  const [storeSearch, setStoreSearch]   = useState('');   // filtro colonna sinistra
-  const [productSearch, setProductSearch] = useState(''); // cerca per codice/sku/nome prodotto
+  // Ricerca (SKU / Prodotto / Barcode)
+  const [productSearch, setProductSearch] = useState('');
 
-  // ── Negozio selezionato (colonna sinistra → destra) ──────────────────
-  const [selectedStore, setSelectedStore] = useState(null);
-
-  // ── Carica dati ──────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -28,7 +22,6 @@ export default function CrossStoreInventoryPage() {
         storesApi.getStores(),
       ]);
 
-      // Normalizza inventario cross-store
       const payload = invRes.data?.data || invRes.data || [];
       let flat = [];
       if (payload.length > 0 && payload[0]?.stores) {
@@ -44,15 +37,7 @@ export default function CrossStoreInventoryPage() {
         flat = Array.isArray(payload) ? payload : [];
       }
       setAllData(flat);
-
-      // Lista negozi definitiva
-      const slist = stRes.data?.data || [];
-      setStoresList(slist);
-
-      // Auto-seleziona il primo negozio se non ce n'è uno selezionato
-      if (slist.length > 0 && !selectedStore) {
-        setSelectedStore(slist[0]);
-      }
+      setStoresList(stRes.data?.data || []);
     } catch {
       toast.error('Impossibile caricare le giacenze locali');
       setAllData([]);
@@ -60,344 +45,255 @@ export default function CrossStoreInventoryPage() {
     } finally {
       setLoading(false);
     }
-  }, []); // eslint-disable-line
+  }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ── Utilità ──────────────────────────────────────────────────────────
   const cleanName = (name) => {
     if (!name) return 'Negozio Sconosciuto';
     return name.replace(/^(Magazzino\s*(?:\d+\.)?\s*)?(?:Negozio\s*)?/i, '').trim() || name;
   };
 
-  // ── Negozi filtrati (colonna sinistra) ───────────────────────────────
-  const filteredStores = useMemo(() => {
-    if (!storeSearch.trim()) return storesList;
-    const q = storeSearch.toLowerCase();
-    return storesList.filter(s =>
-      (s.name || '').toLowerCase().includes(q) ||
-      (s.city || '').toLowerCase().includes(q) ||
-      (s.code || '').toLowerCase().includes(q)
-    );
-  }, [storesList, storeSearch]);
+  // ── LOGICA DI FILTRAGGIO SIMILE AL REPORT FATTURATI ──
+  // Per ogni negozio calcoliamo lo stock in base al prodotto cercato.
+  // Se non c'è ricerca, aggreghiamo lo stock TOTALE di quel negozio (come overview globale).
+  const tableData = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    
+    // Raggruppiamo i dati RAW per Negozio
+    const storeMap = {};
+    storesList.forEach(st => {
+      storeMap[st.id] = {
+        id: st.id,
+        name: cleanName(st.name),
+        city: st.city,
+        totalQty: 0,
+        matchedProducts: []
+      };
+    });
 
-  // ── Se c'è ricerca prodotto → mostra negozi che hanno quel prodotto ──
-  const productSearchActive = productSearch.trim().length > 0;
-
-  // Aggregazione: per negozio → prodotti con qty
-  const byStore = useMemo(() => {
-    const map = {};
+    // Aggiungiamo anche i negozi presenti nelle giacenze ma che magari non sono in storesList (ad es. magazzini fantasma)
     allData.forEach(row => {
-      const stName = row.store?.name || row.store_name || row.warehouse?.name || 'Negozio Sconosciuto';
       const stId   = row.store?.id   || row.store_id   || row.warehouse?.id;
-      const key    = stId ? String(stId) : stName;
-      if (!map[key]) map[key] = { stId, stName, products: [] };
+      const stName = row.store?.name || row.store_name || row.warehouse?.name || 'Negozio Sconosciuto';
+      const key = stId || stName;
+
+      if (!storeMap[key]) {
+        storeMap[key] = { id: key, name: cleanName(stName), totalQty: 0, matchedProducts: [] };
+      }
 
       const qty = Number(row.on_hand ?? row.available ?? row.quantity) || 0;
       const prodName = row.product_name || row.name || 'Prodotto Sconosciuto';
-      const existing = map[key].products.find(p => p.name === prodName);
-      if (existing) {
-        existing.totalQty += qty;
-        if (row.flavor || row.sku) existing.variants.push({ flavor: row.flavor, sku: row.sku, qty });
-      } else {
-        map[key].products.push({
-          name: prodName,
-          sku:  row.sku,
-          totalQty: qty,
-          variants: (row.flavor || row.sku) ? [{ flavor: row.flavor, sku: row.sku, qty }] : [],
-        });
+      const sku = row.sku || '';
+      const flavor = row.flavor || '';
+
+      // Se c'è una query di ricerca prodotto, filtriamo le righe
+      let matches = true;
+      if (q) {
+        matches = prodName.toLowerCase().includes(q) || sku.toLowerCase().includes(q) || flavor.toLowerCase().includes(q);
+      }
+
+      if (matches) {
+        storeMap[key].totalQty += qty;
+        if (qty > 0 || row.sku || row.flavor) { // Memorizziamo un riassunto dei prodotti matchati per questo negozio se c"è q
+             storeMap[key].matchedProducts.push({ name: prodName, sku, flavor, qty });
+        }
       }
     });
-    return map;
-  }, [allData]);
 
-  // ── Prodotti del negozio selezionato (con filtro ricerca) ─────────────
-  const selectedStoreKey = useMemo(() => {
-    if (!selectedStore) return null;
-    // Prova prima per id, poi per nome
-    const byId = Object.values(byStore).find(s => String(s.stId) === String(selectedStore.id));
-    if (byId) return byId;
-    const byName = Object.values(byStore).find(s =>
-      cleanName(s.stName).toLowerCase() === cleanName(selectedStore.name).toLowerCase()
-    );
-    return byName || null;
-  }, [byStore, selectedStore]);
+    // Rimuovi i negozi che non hanno giacenza corrispondente, SE stiamo cercando qualcosa
+    let list = Object.values(storeMap);
+    if (q) {
+        list = list.filter(st => st.matchedProducts.length > 0);
+    } else {
+        // Se non sto cercando nulla, mostro i branch principali ordinati
+        list = list.filter(st => st.totalQty > 0 || storesList.some(s => String(s.id) === String(st.id)));
+    }
 
-  const productsToShow = useMemo(() => {
-    const prods = selectedStoreKey?.products || [];
-    if (!productSearch.trim()) return prods;
-    const q = productSearch.toLowerCase();
-    return prods.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      (p.sku && p.sku.toLowerCase().includes(q)) ||
-      p.variants.some(v => v.sku && v.sku.toLowerCase().includes(q) || v.flavor && v.flavor.toLowerCase().includes(q))
-    );
-  }, [selectedStoreKey, productSearch]);
+    // Ordina per quantità decrescente
+    list.sort((a, b) => b.totalQty - a.totalQty);
 
-  // ── Ricerca globale prodotto → negozi che lo tengono ─────────────────
-  const storesWithProduct = useMemo(() => {
-    if (!productSearchActive) return [];
-    const q = productSearch.toLowerCase();
-    return Object.values(byStore).filter(s =>
-      s.products.some(p =>
-        p.name.toLowerCase().includes(q) ||
-        (p.sku && p.sku.toLowerCase().includes(q)) ||
-        p.variants.some(v =>
-          (v.sku && v.sku.toLowerCase().includes(q)) ||
-          (v.flavor && v.flavor.toLowerCase().includes(q))
-        )
-      )
-    );
-  }, [byStore, productSearch, productSearchActive]);
+    return list;
+  }, [allData, storesList, productSearch]);
 
-  // ────────────────────────────────────────────────────────────────────
+  const globalTotalQty = tableData.reduce((acc, row) => acc + row.totalQty, 0);
+
   const thStyle = {
-    padding: '10px 14px',
-    borderBottom: '2px solid var(--color-border)',
-    background: 'var(--color-bg)',
+    padding: '12px 14px',
+    color: '#9CA3AF',
+    fontSize: 12,
     fontWeight: 700,
-    fontSize: 11,
-    color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    whiteSpace: 'nowrap',
+    borderBottom: '1px solid var(--color-border)',
+    textAlign: 'left'
+  };
+
+  const getBadgeColor = (index, qty) => {
+    if (qty <= 0) return '#EF4444'; // Rosso (esaurito)
+    if (index === 0) return '#8B5CF6'; // Viola per il primo (più stock)
+    if (index === 1) return '#F59E0B'; // Arancione
+    if (index === 2) return '#10B981'; // Verde
+    return '#E5E7EB'; // Grigio default
   };
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
+    <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto' }}>
+      
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ background: 'linear-gradient(135deg,#10B981,#059669)', borderRadius: 14, width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(16,185,129,0.3)' }}>
-            <MapPin size={22} color="#fff" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ background: '#F59E0B', borderRadius: 14, width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(245,158,11,0.3)' }}>
+            <MapPin size={24} color="#fff" />
           </div>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: 'var(--color-text)' }}>Giacenze Locali</h1>
-            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 1 }}>
-              {storesList.length} negozi · {productSearchActive ? `${storesWithProduct.length} con "${productSearch}"` : 'Stock multi-store'}
+            <h1 style={{ fontSize: 22, fontWeight: 900, margin: 0, color: 'var(--color-text)' }}>Giacenze Locali Negozi</h1>
+            <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+              Cerca un articolo e scopri in tempo reale le disponibilità stock nei punti vendita
             </div>
           </div>
         </div>
 
-        {/* Barra ricerca prodotto centrale */}
-        <div style={{ flex: '1 1 320px', maxWidth: 420, position: 'relative' }}>
-          <Package size={14} color="var(--color-text-tertiary)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-          <input
-            id="product-search"
-            className="sp-input"
-            placeholder="🔍 Cerca prodotto / SKU / codice..."
-            value={productSearch}
-            onChange={e => setProductSearch(e.target.value)}
-            style={{ paddingLeft: 36, paddingRight: productSearch ? 32 : 14, width: '100%', fontWeight: 600, fontSize: 13 }}
-          />
-          {productSearch && (
-            <button onClick={() => setProductSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', padding: 2 }}>
-              <X size={13} />
-            </button>
-          )}
-        </div>
-
-        <button onClick={loadData} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', opacity: loading ? 0.6 : 1 }}>
+        <button onClick={loadData} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)', opacity: loading ? 0.6 : 1 }}>
           <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-          Aggiorna
+          Sincronizza
         </button>
       </div>
 
-      {/* ── Se c'è ricerca prodotto attiva → mostra pannello risultati globali ── */}
-      {productSearchActive && (
-        <div style={{ background: 'var(--color-surface)', border: '1.5px solid rgba(16,185,129,0.3)', borderRadius: 16, padding: '16px 20px', boxShadow: '0 2px 12px rgba(16,185,129,0.08)' }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#10B981', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Search size={15} />
-            Negozi con "{productSearch}" in store
+      {/* ── Controls (Ricerca Prodotto Piena Laghezza) ── */}
+      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+        <div style={{ flex: 1, position: 'relative' }}>
+          <Search size={16} color="var(--color-text-tertiary)" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          <input
+            autoFocus
+            className="sp-input"
+            placeholder="Spara barcode, cerca per nome prodotto o SKU per trovare le giacenze..."
+            value={productSearch}
+            onChange={e => setProductSearch(e.target.value)}
+            style={{ width: '100%', padding: '12px 16px 12px 42px', fontSize: 15, fontWeight: 600, borderRadius: 12, border: '1.5px solid var(--color-border)', background: 'var(--color-bg)' }}
+          />
+        </div>
+      </div>
+
+      {/* ── Table Container ── */}
+      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
+        
+        {/* Table Header Info */}
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg)' }}>
+          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+             {productSearch ? `Risultati per "${productSearch}" (Limite righe: ${tableData.length})` : `Tutti i negozi (${tableData.length})`}
           </div>
-          {storesWithProduct.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
-              Nessun negozio ha questo prodotto in giacenza.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-              {storesWithProduct.map((s, i) => {
-                const prods = s.products.filter(p => {
-                  const q = productSearch.toLowerCase();
-                  return p.name.toLowerCase().includes(q) ||
-                    (p.sku && p.sku.toLowerCase().includes(q)) ||
-                    p.variants.some(v => (v.sku && v.sku.toLowerCase().includes(q)) || (v.flavor && v.flavor.toLowerCase().includes(q)));
-                });
-                const totalQty = prods.reduce((acc, p) => acc + p.totalQty, 0);
-                // Trova il negozio nella lista
-                const st = storesList.find(st => String(st.id) === String(s.stId)) || { name: s.stName };
-                return (
-                  <button key={i} onClick={() => { setSelectedStore(st); setProductSearch(''); }}
-                    style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 16px', background: 'var(--color-bg)', border: '1.5px solid rgba(16,185,129,0.25)', borderRadius: 12, cursor: 'pointer', textAlign: 'left', minWidth: 160 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: 13, color: 'var(--color-text)' }}>
-                      <MapPin size={12} color="#10B981" />
-                      {cleanName(st.name || s.stName)}
-                    </div>
-                    {prods.map((p, pi) => (
-                      <div key={pi} style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                        {p.name}: <span style={{ fontWeight: 800, color: totalQty > 0 ? '#10B981' : '#EF4444' }}>{p.totalQty} pz</span>
-                      </div>
-                    ))}
-                  </button>
-                );
-              })}
+          {productSearch && (
+            <div style={{ fontSize: 12, color: 'var(--color-text-text)', fontWeight: 600 }}>
+             Totale giacenza di rete trovata: <span style={{ color: '#10B981', fontWeight: 800, fontSize: 13 }}>{globalTotalQty} pz</span>
             </div>
           )}
         </div>
-      )}
 
-      {/* ── Layout due colonne ── */}
-      {loading ? (
-        <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
-          <RefreshCw size={36} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
-          Caricamento giacenze...
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16, alignItems: 'start' }}>
-
-          {/* ── Colonna SX: Lista negozi ── */}
-          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-            {/* Ricerca negozio */}
-            <div style={{ padding: '12px 12px 10px', borderBottom: '1px solid var(--color-border)', position: 'relative' }}>
-              <Search size={13} color="var(--color-text-tertiary)" style={{ position: 'absolute', left: 22, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-              <input
-                id="store-search"
-                className="sp-input"
-                placeholder="Cerca negozio..."
-                value={storeSearch}
-                onChange={e => setStoreSearch(e.target.value)}
-                style={{ paddingLeft: 30, width: '100%', fontSize: 12, padding: '7px 10px 7px 28px' }}
-              />
-            </div>
-
-            {/* Lista */}
-            <div style={{ maxHeight: 520, overflowY: 'auto' }}>
-              {filteredStores.length === 0 ? (
-                <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)' }}>Nessun negozio trovato</div>
-              ) : filteredStores.map(st => {
-                const stData  = Object.values(byStore).find(s => String(s.stId) === String(st.id) || cleanName(s.stName).toLowerCase() === cleanName(st.name).toLowerCase());
-                const totalQty = stData?.products.reduce((acc, p) => acc + p.totalQty, 0) ?? null;
-                const isActive = selectedStore?.id === st.id;
-                return (
-                  <button key={st.id} onClick={() => setSelectedStore(st)}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 14px', background: isActive ? 'rgba(16,185,129,0.08)' : 'transparent', border: 'none', borderLeft: isActive ? '3px solid #10B981' : '3px solid transparent', cursor: 'pointer', textAlign: 'left', gap: 8, transition: 'all 0.1s' }}
-                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-bg)'; }}
-                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {st.name}
-                      </div>
-                      {st.city && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>{st.city}</div>}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                      {totalQty !== null && (
-                        <span style={{ fontSize: 11, fontWeight: 800, color: totalQty > 0 ? '#10B981' : '#EF4444', background: totalQty > 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', padding: '2px 7px', borderRadius: 6 }}>
-                          {totalQty}
-                        </span>
-                      )}
-                      {isActive && <ChevronRight size={12} color="#10B981" />}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ padding: '8px 14px', borderTop: '1px solid var(--color-border)', fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>
-              {filteredStores.length} negozi
-            </div>
+        {/* Table Body */}
+        {loading ? (
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
+            <RefreshCw size={36} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
+            Calcolo giacenze in corso...
           </div>
-
-          {/* ── Colonna DX: Prodotti del negozio selezionato ── */}
-          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-            {!selectedStore ? (
-              <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
-                <Store size={40} style={{ opacity: 0.15, margin: '0 auto 12px', display: 'block' }} />
-                <div style={{ fontSize: 14 }}>Seleziona un negozio</div>
-              </div>
-            ) : (
-              <>
-                {/* Intestazione negozio selezionato */}
-                <div style={{ padding: '14px 18px', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <MapPin size={16} color="#10B981" />
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--color-text)' }}>{selectedStore.name}</div>
-                      {selectedStore.city && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{selectedStore.city}</div>}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-                    {productsToShow.length} prodotti {productSearch ? `per "${productSearch}"` : 'in giacenza'}
-                  </div>
-                </div>
-
-                {/* Tabella prodotti */}
-                {productsToShow.length === 0 ? (
-                  <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
-                    <Package size={32} style={{ opacity: 0.15, margin: '0 auto 12px', display: 'block' }} />
-                    {productSearch ? `Nessun prodotto per "${productSearch}"` : 'Nessuna giacenza per questo negozio'}
-                  </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{...thStyle, width: 50, textAlign: 'center'}}>#</th>
+                  <th style={thStyle}>Azienda (Negozio)</th>
+                  <th style={thStyle}>Posizione</th>
+                  <th style={{...thStyle, width: '40%'}}>Dettaglio Prodotto / Varianti (Match)</th>
+                  <th style={{...thStyle, textAlign: 'right', paddingRight: 32}}>Q.tà Giacenza</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableData.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
+                      <Package size={36} style={{ opacity: 0.2, margin: '0 auto 12px', display: 'block' }}/>
+                      {productSearch ? 'Questo prodotto non \u00e8 disponibile in nessun punto vendita.' : 'Nessun negozio o giacenza rilevata.'}
+                    </td>
+                  </tr>
                 ) : (
-                  <div style={{ overflowX: 'auto', maxHeight: 480, overflowY: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                      <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                        <tr>
-                          <th style={thStyle}>Prodotto</th>
-                          <th style={thStyle}>SKU</th>
-                          <th style={thStyle}>Varianti</th>
-                          <th style={{ ...thStyle, textAlign: 'right' }}>Q.tà</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {productsToShow.map((p, pi) => (
-                          <tr key={pi}
-                            style={{ borderBottom: '1px solid var(--color-border)', transition: 'background 0.1s' }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                          >
-                            <td style={{ padding: '14px 14px', fontWeight: 700, color: 'var(--color-text)' }}>
-                              {p.name}
-                            </td>
-                            <td style={{ padding: '14px 14px', color: 'var(--color-text-secondary)', fontFamily: 'monospace', fontSize: 12 }}>
-                              {p.sku || p.variants[0]?.sku || '—'}
-                            </td>
-                            <td style={{ padding: '14px 14px' }}>
-                              {p.variants.some(v => v.flavor) ? (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 8px', fontSize: 11, color: 'var(--color-text-secondary)' }}>
-                                  {p.variants.filter(v => v.qty > 0 && v.flavor).map((v, vi) => (
-                                    <span key={vi} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', padding: '1px 6px', borderRadius: 5 }}>
-                                      {v.flavor}: <strong>{v.qty}</strong>
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>—</span>
-                              )}
-                            </td>
-                            <td style={{ padding: '14px 14px', textAlign: 'right' }}>
-                              <span style={{
-                                fontSize: 14, fontWeight: 900,
-                                color: p.totalQty > 0 ? '#10B981' : '#EF4444',
-                                background: p.totalQty > 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                                border: `1.5px solid ${p.totalQty > 0 ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                                padding: '3px 10px', borderRadius: 8,
-                              }}>
-                                {p.totalQty > 0 ? `+${p.totalQty}` : 'ESAURITO'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+                  tableData.map((row, i) => {
+                    const badgeColor = getBadgeColor(i, row.totalQty);
+                    
+                    // Raggruppiamo i prodotti matchati per nome per una visualizzazione pulita
+                    const compactProds = {};
+                    row.matchedProducts.forEach(p => {
+                       if (!compactProds[p.name]) compactProds[p.name] = { name: p.name, total: 0, skus: [] };
+                       compactProds[p.name].total += p.qty;
+                       if (p.sku || p.flavor) compactProds[p.name].skus.push(`${p.flavor || ''} ${p.sku ? `[${p.sku}]` : ''}: ${p.qty}pz`.trim());
+                    });
 
-        </div>
-      )}
+                    return (
+                      <tr key={row.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background 0.1s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <td style={{ padding: '16px 14px', textAlign: 'center', color: '#9CA3AF', fontSize: 13, fontWeight: 700 }}>
+                          #{i + 1}
+                        </td>
+                        <td style={{ padding: '16px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            {/* Pallino colorato di stato / rank */}
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: badgeColor, flexShrink: 0 }} />
+                            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--color-text)', textTransform: 'uppercase' }}>
+                              {row.name}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '16px 14px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
+                          {row.city || '-'}
+                        </td>
+                        <td style={{ padding: '16px 14px' }}>
+                            {/* Mostriamo i prodotti che hanno causato il match - max 3 altrimenti troppo lungo */}
+                            {productSearch ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    {Object.values(compactProds).slice(0, 3).map((cp, cpi) => (
+                                        <div key={cpi}>
+                                           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>{cp.name}</div>
+                                           {cp.skus.length > 0 && (
+                                               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                                  {cp.skus.join(' • ')}
+                                               </div>
+                                           )}
+                                        </div>
+                                    ))}
+                                    {Object.values(compactProds).length > 3 && (
+                                        <div style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 700 }}>+ altri {Object.values(compactProds).length - 3} prodotti</div>
+                                    )}
+                                </div>
+                            ) : (
+                                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 13, fontStyle: 'italic' }}>
+                                    Overview globale giacenze store...
+                                </span>
+                            )}
+                        </td>
+                        <td style={{ padding: '16px 32px 16px 14px', textAlign: 'right' }}>
+                          <span style={{ fontSize: 15, fontWeight: 800, color: row.totalQty > 0 ? '#10B981' : '#EF4444' }}>
+                            {row.totalQty > 0 ? row.totalQty : '0'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+              {/* Riga del totale footer come screenshot */}
+              {tableData.length > 0 && productSearch && (
+                 <tfoot style={{ background: 'var(--color-bg)', borderTop: '2px solid var(--color-border)' }}>
+                   <tr>
+                     <td colSpan={4} style={{ padding: '16px 14px', textAlign: 'right', fontWeight: 800, color: 'var(--color-text)', fontSize: 13 }}>
+                       TOTALE RICERCA
+                     </td>
+                     <td style={{ padding: '16px 32px 16px 14px', textAlign: 'right', fontWeight: 800, color: '#10B981', fontSize: 16 }}>
+                       {globalTotalQty}
+                     </td>
+                   </tr>
+                 </tfoot>
+              )}
+            </table>
+          </div>
+        )}
+      </div>
 
     </div>
   );
