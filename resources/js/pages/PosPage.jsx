@@ -466,6 +466,7 @@ export default function PosPage() {
         product_variant_id: variant.id,
         name: product.name,
         sku: product.sku,
+        image: product.image,
         price: parseFloat(variant.sale_price) || 0,
         qty: 1,
         location: variant.location || '',
@@ -1229,15 +1230,6 @@ export default function PosPage() {
                 ))}
               </div>
 
-              {/* Nota ordine */}
-              <div style={{ marginTop: 8 }}>
-                <input
-                  value={note}
-                  onChange={e => setNote(e.target.value)}
-                  placeholder="Nota ordine..."
-                  style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 12px', fontSize: 11, color: 'rgba(255,255,255,0.6)', outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
 
               {/* Codice Promozionale */}
               <div style={{ marginTop: 10 }}>
@@ -1441,6 +1433,7 @@ export default function PosPage() {
         <PosCheckoutModal
           cartTotal={cartTotalFinal}
           cartLines={cartLines}
+          qscareTotal={effectiveQscarePrice}
           onComplete={handleCheckout}
           onCancel={() => setShowCheckoutModal(false)}
           lockDiscount={isDipendente}

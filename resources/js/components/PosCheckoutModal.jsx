@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, CreditCard, Banknote, Printer, FileText, Gift, Zap, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { getImageUrl } from '../api.jsx';
 
 const QUICK_AMOUNTS = [5, 10, 20, 50, 100];
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
-export default function PosCheckoutModal({ cartTotal, cartLines = [], onComplete, onCancel, lockDiscount = false }) {
+export default function PosCheckoutModal({ cartTotal, cartLines = [], qscareTotal = 0, onComplete, onCancel, lockDiscount = false }) {
   const [discountType, setDiscountType]   = useState('none');
   const [discountValue, setDiscountValue] = useState('');
   const [cashAmount, setCashAmount]       = useState(() => cartTotal > 0 ? cartTotal.toFixed(2) : '');
@@ -91,10 +92,19 @@ export default function PosCheckoutModal({ cartTotal, cartLines = [], onComplete
                   padding: '9px 0',
                   borderBottom: i < cartLines.length - 1 ? '1px solid var(--color-border)' : 'none',
                 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{line.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>
-                      {fmt(line.price)} × {line.qty}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                    {line.image ? (
+                       <img src={getImageUrl(line.image)} alt="" style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--color-border)', flexShrink: 0 }} />
+                    ) : (
+                       <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                         <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>No IMG</span>
+                       </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{line.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>
+                        {fmt(line.price)} × {line.qty}
+                      </div>
                     </div>
                   </div>
                   <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-text)', flexShrink: 0, marginLeft: 12 }}>
@@ -107,12 +117,18 @@ export default function PosCheckoutModal({ cartTotal, cartLines = [], onComplete
             {/* Totali */}
             <div style={{ padding: '14px 20px', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-                <span>Subtotale</span>
-                <span style={{ fontWeight: 700 }}>{fmt(cartTotal)}</span>
+                <span>Subtotale Cassa {qscareTotal > 0 ? '(Pz.)' : ''}</span>
+                <span style={{ fontWeight: 700 }}>{fmt(cartTotal - (qscareTotal || 0))}</span>
               </div>
+              {qscareTotal > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#10B981', marginBottom: 6 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>🛡 QScare Copertura</span>
+                  <span style={{ fontWeight: 800 }}>+{fmt(qscareTotal)}</span>
+                </div>
+              )}
               {discountAmount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#10B981', marginBottom: 6 }}>
-                  <span>Sconto</span>
+                  <span>Sconto Applicato</span>
                   <span style={{ fontWeight: 700 }}>-{fmt(discountAmount)}</span>
                 </div>
               )}
@@ -197,9 +213,9 @@ export default function PosCheckoutModal({ cartTotal, cartLines = [], onComplete
                   </div>
                   <span style={{ fontSize: 14, fontWeight: 700 }}>Contanti</span>
                   <button
-                    onClick={() => setCashAmount(Math.max(0, finalTotal - (parseFloat(cardAmount) || 0)).toFixed(2))}
+                    onClick={() => { setCashAmount(finalTotal > 0 ? finalTotal.toFixed(2) : ''); setCardAmount(''); }}
                     style={{ marginLeft: 'auto', padding: '3px 8px', fontSize: 11, fontWeight: 700, background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                  ><Zap size={11} /> Autofill</button>
+                  ><Zap size={11} /> 100% Contanti</button>
                 </div>
                 <div style={{ position: 'relative', marginBottom: 8 }}>
                   <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, fontWeight: 700, color: 'var(--color-text-tertiary)' }}>€</span>
@@ -248,9 +264,9 @@ export default function PosCheckoutModal({ cartTotal, cartLines = [], onComplete
                   </div>
                   <span style={{ fontSize: 14, fontWeight: 700 }}>POS / Carta / Satispay</span>
                   <button
-                    onClick={() => setCardAmount(Math.max(0, finalTotal - (parseFloat(cashAmount) || 0)).toFixed(2))}
+                    onClick={() => { setCardAmount(finalTotal > 0 ? finalTotal.toFixed(2) : ''); setCashAmount(''); }}
                     style={{ marginLeft: 'auto', padding: '3px 8px', fontSize: 11, fontWeight: 700, background: 'rgba(59,130,246,0.1)', color: '#3B82F6', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                  ><Zap size={11} /> Autofill</button>
+                  ><Zap size={11} /> 100% POS</button>
                 </div>
                 <div style={{ position: 'relative' }}>
                   <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, fontWeight: 700, color: 'var(--color-text-tertiary)' }}>€</span>
