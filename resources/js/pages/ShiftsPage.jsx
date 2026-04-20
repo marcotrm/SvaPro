@@ -1507,37 +1507,65 @@ export default function ShiftsPage() {
     });
   };
 
-  const renderCellMenu = (empId, dateStr) => {
-    if (!(activeCell?.empId === empId && activeCell?.dateStr === dateStr)) return null;
+  const renderCellMenu = () => {
+    if (!activeCell) return null;
+    const { empId, dateStr } = activeCell;
     const isOwnRow = String(empId) === currentEmployeeId;
     const canPropose = isDipendente && isOwnRow;
-    const title = canPropose ? 'Proponi Turno' : 'Seleziona Turno';
+    const title = canPropose ? 'Proponi Turno' : 'Assegna Turno';
+
+    // Se stiamo stampando le righe della tabella, non facciamo nulla.
+    // L'abbiamo spostato fuori dal loop della tabella nel return principale!
+    return null;
+  };
+
+  const renderActiveCellModal = () => {
+    if (!activeCell) return null;
+    const { empId, dateStr } = activeCell;
+    const isOwnRow = String(empId) === currentEmployeeId;
+    const canPropose = isDipendente && isOwnRow;
+    const title = canPropose ? 'Proponi Turno' : 'Assegna Turno';
+    
     return (
-      <div style={{ position: 'absolute', top: 5, left: '95%', zIndex: 100, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.3)', width: 240 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>{title}</div>
-            {canPropose && <div style={{ fontSize: 10, color: '#F59E0B', fontWeight: 600, marginTop: 2 }}>Richiede conferma del responsabile</div>}
-          </div>
-          <button onClick={e => { e.stopPropagation(); setActiveCell(null); }} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}><X size={14} /></button>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
-          {templates.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '10px 0' }}>Nessun template.</div>
-          ) : templates.map(t => (
-            <button key={t.id} onClick={() => applyTemplate(empId, dateStr, t)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', transition: 'all 0.1s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg)'}>
-              <div style={{ width: 12, height: 12, borderRadius: '50%', background: t.color || '#10B981' }} />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>{t.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{t.start_time} - {t.end_time}</div>
-              </div>
+      <div 
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        onClick={() => setActiveCell(null)}
+      >
+        <div 
+          style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, padding: 20, boxShadow: '0 20px 40px rgba(0,0,0,0.4)', width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-text)' }}>{title}</div>
+              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Data: {dateStr}</div>
+              {canPropose && <div style={{ fontSize: 11, color: '#F59E0B', fontWeight: 600, marginTop: 4 }}>Richiede conferma del responsabile</div>}
+            </div>
+            <button onClick={() => setActiveCell(null)} style={{ background: 'var(--color-bg)', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={16} />
             </button>
-          ))}
+          </div>
+          
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>Modelli disponibili</div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
+            {templates.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '20px 0' }}>Nessun template configurato.</div>
+            ) : templates.map(t => (
+              <button key={t.id} onClick={() => applyTemplate(empId, dateStr, t)} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--color-bg)', border: '1px solid var(--color-border)', padding: '12px 14px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', transition: 'all 0.1s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg)'}>
+                <div style={{ width: 14, height: 14, borderRadius: '50%', background: t.color || '#10B981', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-text)' }}>{t.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600 }}>{t.start_time} - {t.end_time}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div style={{ height: 1, background: 'var(--color-border)', margin: '16px 0' }} />
+          <button onClick={() => clearCell(empId, dateStr)} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: 'none', width: '100%', padding: '12px', borderRadius: 12, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+            <Trash size={16} /> Cancella Turno / Riposo
+          </button>
         </div>
-        <div style={{ height: 1, background: 'var(--color-border)', margin: '10px 0' }} />
-        <button onClick={() => clearCell(empId, dateStr)} style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: 'none', width: '100%', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-          <Trash size={14} /> Cancella Turno (Riposo)
-        </button>
       </div>
     );
   };
@@ -2044,6 +2072,9 @@ export default function ShiftsPage() {
           onClose={() => setShowImport(false)}
         />
       )}
+
+      {/* Modal selezione template/Aggiunta turno */}
+      {renderActiveCellModal()}
 
       {/* Jolly picker dropdown — position:fixed per evitare clipping */}
       {showJollyPicker && (

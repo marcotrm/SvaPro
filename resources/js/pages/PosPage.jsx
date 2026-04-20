@@ -299,31 +299,37 @@ export default function PosPage() {
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
 
       // Carica prodotti — top 20 più venduti + prodotti in evidenza
-      // Questi sono i prodotti presenti nella home del POS
-      const [topRes, featRes, cRes] = await Promise.all([
-        catalog.getProducts({ sort: 'top_selling', limit: 20, ...(selectedStoreId ? { store_id: selectedStoreId } : {}) }),
-        catalog.getProducts({ limit: 30, is_featured: 1, ...(selectedStoreId ? { store_id: selectedStoreId } : {}) }),
-        catalog.getCategories(),
-      ]);
+      let topProds = [], featProds = [], allCats = [];
+      try {
+        const topRes = await catalog.getProducts({ sort: 'top_selling', limit: 20, ...(selectedStoreId ? { store_id: selectedStoreId } : {}) });
+        topProds = topRes.data?.data || [];
+      } catch (err) { console.error('Error loading top products', err); }
+
+      try {
+        const featRes = await catalog.getProducts({ limit: 30, is_featured: 1, ...(selectedStoreId ? { store_id: selectedStoreId } : {}) });
+        featProds = featRes.data?.data || [];
+      } catch (err) { console.error('Error loading featured products', err); }
+
+      try {
+        const cRes = await catalog.getCategories();
+        allCats = cRes.data?.data || [];
+        setCategories(allCats.filter(c => !c.parent_id));
+      } catch (err) { console.error('Error loading categories', err); }
+
       // Merge top-selling + featured, senza duplicati
-      const topProds = topRes.data?.data || [];
-      const featProds = featRes.data?.data || [];
       const merged = new Map();
       [...topProds, ...featProds].forEach(p => merged.set(p.id, p));
       setProducts(Array.from(merged.values()));
 
-      const allCats = cRes.data?.data || [];
-      setCategories(allCats.filter(c => !c.parent_id));
-
-      // Carica stock separatamente — se fallisce il POS funziona comunque
+      // Carica stock separatamente
       try {
         const stRes = await inventory.getStock({ ...sp, limit: 2000 });
         const sm = {};
         (stRes.data?.data || []).forEach(si => { sm[si.product_variant_id] = si; });
         setStockMap(sm);
-      } catch { /* stock non disponibile, POS funziona senza giacenze */ }
+      } catch { /* stock non disponibile */ }
 
-      // Carica clienti — solo admin, dipendente può ricevere 403
+      // Carica clienti separatamente
       try {
         const aRes = await customersApi.getCustomers({ limit: 1000 });
         const normalizedCustomers = (aRes.data?.data || []).map(c => ({
@@ -333,7 +339,7 @@ export default function PosPage() {
         setAllCustomers(normalizedCustomers);
       } catch { setAllCustomers([]); }
 
-      // Carica opzioni ordine (warehouse, employees) — disponibile per dipendente
+      // Carica opzioni ordine (warehouse, employees)
       try {
         const oRes = await ordersApi.getOptions(sp);
         const optEmp = oRes.data?.data?.employees || [];
@@ -349,7 +355,10 @@ export default function PosPage() {
         });
       } catch { /* continua senza warehouse/employees */ }
 
-    } catch { toast.error('Errore caricamento dati POS'); }
+    } catch (err) { 
+      console.error('POS Gen error:', err);
+      toast.error('Errore caricamento POS: ' + (err.message || 'Controlla connessione')); 
+    }
     finally { setLoading(false); }
   }, [selectedStoreId]);
 
