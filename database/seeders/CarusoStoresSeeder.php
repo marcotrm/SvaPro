@@ -52,16 +52,29 @@ class CarusoStoresSeeder extends Seeder
 
         // ── Permessi (idempotente) ────────────────────────────────────────────
         $permissions = [
-            'tenant.manage', 'tax.manage', 'orders.manage', 'inventory.manage',
-            'employees.manage', 'loyalty.manage', 'catalog.manage', 'customers.manage',
-            'suppliers.manage', 'purchase_orders.manage', 'pos_sessions.manage',
-            'invoices.manage', 'documents.generate', 'reports.view',
-            'shipping.manage', 'audit.view', 'roles.manage',
+            'tenant.manage'          => 'Gestione configurazione tenant',
+            'tax.manage'             => 'Gestione tasse e accise',
+            'orders.manage'          => 'Gestione ordini di vendita',
+            'inventory.manage'       => 'Gestione inventario e magazzino',
+            'employees.manage'       => 'Gestione dipendenti',
+            'loyalty.manage'         => 'Gestione programma fedeltà',
+            'catalog.manage'         => 'Gestione catalogo prodotti',
+            'customers.manage'       => 'Gestione clienti',
+            'suppliers.manage'       => 'Gestione fornitori',
+            'purchase_orders.manage' => 'Gestione ordini di acquisto',
+            'pos_sessions.manage'    => 'Gestione sessioni POS',
+            'invoices.manage'        => 'Gestione fatture e SDI',
+            'documents.generate'     => 'Generazione documenti e DDT',
+            'reports.view'           => 'Visualizzazione report e analisi',
+            'shipping.manage'        => 'Gestione spedizioni',
+            'audit.view'             => 'Visualizzazione audit log',
+            'roles.manage'           => 'Gestione ruoli e permessi',
+            'admin_panel.view'       => 'Accesso pannello amministrazione',
         ];
-        foreach ($permissions as $code) {
+        foreach ($permissions as $code => $name) {
             DB::table('permissions')->updateOrInsert(
                 ['code' => $code],
-                ['name' => ucfirst(str_replace('.', ' ', $code)), 'updated_at' => $now, 'created_at' => $now]
+                ['name' => $name, 'updated_at' => $now, 'created_at' => $now]
             );
         }
 
