@@ -453,7 +453,7 @@ export default function RolesPermissionsPage() {
           {/* LISTA UTENTI */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-              Utenti del tenant
+              Utenti del sistema
             </div>
             {usersLoading ? (
               <div style={{ padding: 20, textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
@@ -501,7 +501,7 @@ export default function RolesPermissionsPage() {
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{selectedUser.email}</div>
                   </div>
                   <span style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '5px 14px', borderRadius: 20 }}>
-                    {selectedUser.roles?.length ?? 0} ruoli attivi
+                    {selectedUser.roles?.length ?? 0} ruoli assegnati
                   </span>
                 </div>
 

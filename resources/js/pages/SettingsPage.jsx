@@ -290,7 +290,7 @@ export default function SettingsPage() {
                     <Field label="Ragione Sociale">
                       <Input icon={Building2} value={tenantName} onChange={e => setTenantName(e.target.value)} required />
                     </Field>
-                    <Field label="Partita IVA / Tax ID">
+                    <Field label="Partita IVA / Cod. Fiscale">
                       <Input icon={Landmark} value={tenantVat} onChange={e => setTenantVat(e.target.value)} />
                     </Field>
                   </div>
@@ -314,7 +314,7 @@ export default function SettingsPage() {
                     <span style={{ fontSize: 22 }}>🛡</span>
                     <div>
                       <div style={{ fontWeight: 900, fontSize: 14, color: 'var(--color-text)' }}>QScare — Assicurazione Dispositivo</div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Toggle disponibile nel POS per ogni vendita</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Opzione attivabile nel POS per ogni vendita</div>
                     </div>
                   </div>
                   <Field label="Prezzo Assicurazione (€)" hint="Lascia vuoto per disabilitare QScare nel POS.">
@@ -336,10 +336,10 @@ export default function SettingsPage() {
                       <Input icon={Wifi} type="url" value={wooUrl} onChange={e => setWooUrl(e.target.value)} placeholder="https://www.ilmiosito.it" />
                     </Field>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                      <Field label="Consumer Key (ck_...)">
+                      <Field label="Chiave API (ck_...)">
                         <Input type="text" value={wooKey} onChange={e => setWooKey(e.target.value)} placeholder="ck_xxx" style={{ fontFamily: 'monospace', fontSize: 12 }} />
                       </Field>
-                      <Field label="Consumer Secret (cs_...)">
+                      <Field label="Segreto API (cs_...)">
                         <Input type="password" value={wooSecret} onChange={e => setWooSecret(e.target.value)} placeholder="cs_xxx" />
                       </Field>
                     </div>
