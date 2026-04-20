@@ -294,8 +294,7 @@ class InventoryController extends Controller
             $query->where(function ($inner) use ($q) {
                 $inner->where('p.name', 'ilike', "%{$q}%")
                     ->orWhere('pv.sku', 'ilike', "%{$q}%")
-                    ->orWhere('pv.flavor', 'ilike', "%{$q}%")
-                    ->orWhere('pv.barcode', $q);
+                    ->orWhere('pv.flavor', 'ilike', "%{$q}%");
             });
         } else {
             // Senza filtri ritorna solo i prodotti con scarsa disponibilità
