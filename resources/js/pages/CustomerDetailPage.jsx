@@ -126,7 +126,7 @@ export default function CustomerDetailPage() {
             {[
               { label: 'Ordini', value: ordersList.length },
               { label: 'Speso', value: fmt(totalSpent) },
-              { label: 'Punti', value: Math.floor(totalSpent) },
+              { label: 'Punti', value: loyaltyData?.wallet?.points_balance ?? 0 },
             ].map(kpi => (
               <div key={kpi.label} style={{ textAlign: 'center' }}>
                 <div style={{ color: '#fff', fontWeight: 900, fontSize: 20 }}>{kpi.value}</div>
@@ -536,9 +536,9 @@ export default function CustomerDetailPage() {
         <div style={{ display: 'grid', gap: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
             {[
-              { label: 'Punti Disponibili', value: Math.floor(totalSpent) - (loyaltyData?.total_redeemed || 0), color: '#4f46e5' },
-              { label: 'Punti Guadagnati', value: Math.floor(totalSpent), color: '#16a34a' },
-              { label: 'Punti Utilizzati', value: loyaltyData?.total_redeemed || 0, color: '#d97706' },
+              { label: 'Punti Disponibili', value: loyaltyData?.wallet?.points_balance ?? 0, color: '#4f46e5' },
+              { label: 'Punti Guadagnati', value: loyaltyData?.total_earned ?? 0, color: '#16a34a' },
+              { label: 'Punti Utilizzati', value: loyaltyData?.total_redeemed ?? 0, color: '#d97706' },
             ].map(kpi => (
               <div key={kpi.label} className="card-v3" style={{ padding: '20px 24px', textAlign: 'center' }}>
                 <div style={{ fontSize: 32, fontWeight: 900, color: kpi.color }}>{kpi.value.toLocaleString()}</div>
@@ -548,7 +548,7 @@ export default function CustomerDetailPage() {
           </div>
 
           <div className="card-v3" style={{ padding: '16px 20px', background: '#f8fafc', color: '#64748b', fontSize: 13 }}>
-            💡 <strong>Info:</strong> I punti vengono calcolati automaticamente sulla base del totale speso dal cliente (1€ speso = 1 punto guadagnato).
+            💡 <strong>Info:</strong> I punti vengono calcolati automaticamente sulla base del totale speso dal cliente (1€ speso = 1 punto guadagnato. 100 punti = 1€ di sconto).
           </div>
 
           {(loyaltyData?.transactions?.length > 0) && (

@@ -1144,8 +1144,8 @@ class OrderController extends Controller
         // taxTotal / exciseTotal sono solo per la RENDICONTAZIONE contabile, NON si aggiungono al totale
         $grandTotal = round($subtotal - $discountTotal, 2);
 
-        $earnedLoyaltyPoints = (int) floor($grandTotal / 10);
-        $loyaltyMonetary = round($earnedLoyaltyPoints * 0.05, 2);
+        $earnedLoyaltyPoints = (int) floor($grandTotal);
+        $loyaltyMonetary = round($earnedLoyaltyPoints * 0.01, 2);
 
         $employeeFormula = (string) (DB::table('compensation_rules')
             ->where('active', true)

@@ -182,8 +182,10 @@ class LoyaltyController extends Controller
             ->where('tenant_id', $tenantId)
             ->where('customer_id', $customerId)
             ->orderByDesc('id')
-            ->limit(20)
-            ->get();
+            ->get(); // Prendi tutto per i calcoli, limitiamo poi per il ritorno
+
+        $totalEarned = (int) $ledger->where('event_type', 'earn')->sum('points_delta');
+        $totalRedeemed = (int) abs($ledger->where('event_type', 'redeem')->sum('points_delta'));
 
         $devices = DB::table('loyalty_device_tokens')
             ->where('tenant_id', $tenantId)
@@ -200,7 +202,9 @@ class LoyaltyController extends Controller
 
         return response()->json([
             'wallet' => $wallet,
-            'ledger' => $ledger,
+            'ledger' => $ledger->take(20), // Ritorna solo le ultime 20 per la tabella
+            'total_earned' => $totalEarned,
+            'total_redeemed' => $totalRedeemed,
             'devices' => $devices,
             'notifications' => $notifications,
         ]);
@@ -323,7 +327,7 @@ class LoyaltyController extends Controller
             return response()->json(['message' => 'Punti insufficienti per il riscatto.'], 422);
         }
 
-        $monetaryValue = round($requestedPoints * 0.05, 2);
+        $monetaryValue = round($requestedPoints * 0.01, 2);
 
         return response()->json([
             'customer_id' => $customerId,
@@ -475,7 +479,7 @@ class LoyaltyController extends Controller
             return response()->json(['message' => 'Punti insufficienti.'], 422);
         }
 
-        $monetaryValue = round($requestedPoints * 0.05, 2);
+        $monetaryValue = round($requestedPoints * 0.01, 2);
 
         DB::table('loyalty_wallets')
             ->where('tenant_id', $tenantId)
