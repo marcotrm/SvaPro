@@ -540,28 +540,76 @@ class StoreController extends Controller
             return response()->json(['message' => 'Nessun numero WhatsApp configurato per questo negozio.'], 422);
         }
 
+        // Controlla prima che Twilio sia configurato
+        $sid   = config('services.twilio.sid');
+        $token = config('services.twilio.token');
+        $from  = config('services.twilio.whatsapp_from', 'whatsapp:+14155238886');
+
+        if (empty($sid) || empty($token)) {
+            return response()->json([
+                'message' => '⚠️ Twilio non configurato. Aggiungi TWILIO_SID e TWILIO_TOKEN nelle variabili d\'ambiente di Railway.',
+            ], 503);
+        }
+
+        // Normalizza numero: deve iniziare con +
+        $phoneClean = preg_replace('/\s+/', '', $phone);
+        if (!str_starts_with($phoneClean, '+')) {
+            $phoneClean = '+' . ltrim($phoneClean, '0');
+        }
+
         $body = "✅ *Test notifica SvaPro*\n"
               . "📍 Negozio: *{$store->name}*\n"
               . "🕐 " . now()->setTimezone('Europe/Rome')->format('d/m/Y H:i') . "\n\n"
               . "Le notifiche di ritardo dipendente sono attive su questo numero.";
 
-        $whatsapp = app(WhatsAppService::class);
-        $sent = $whatsapp->send($phone, $body);
+        // Chiama Twilio direttamente per ottenere l'errore dettagliato
+        $url  = "https://api.twilio.com/2010-04-01/Accounts/{$sid}/Messages.json";
+        $data = http_build_query([
+            'From' => $from,
+            'To'   => 'whatsapp:' . $phoneClean,
+            'Body' => $body,
+        ]);
 
-        if ($sent) {
-            return response()->json(['message' => "✅ Messaggio di test inviato a {$phone}"]);
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $data,
+            CURLOPT_USERPWD        => "{$sid}:{$token}",
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
+            CURLOPT_TIMEOUT        => 15,
+        ]);
+        $response  = curl_exec($ch);
+        $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            return response()->json(['message' => "❌ Errore di rete: {$curlError}"], 500);
         }
 
-        // Controlla se Twilio è configurato
-        $sid = config('services.twilio.sid');
-        if (empty($sid)) {
-            return response()->json([
-                'message' => '⚠️ Twilio non configurato. Aggiungi TWILIO_SID e TWILIO_TOKEN nelle variabili d\'ambiente Railway.',
-                'configured' => false,
-            ], 503);
+        $decoded = json_decode($response, true);
+
+        if ($httpCode >= 200 && $httpCode < 300) {
+            return response()->json(['message' => "✅ Messaggio inviato a {$phoneClean} (SID: " . ($decoded['sid'] ?? '?') . ")"]);
         }
 
-        return response()->json(['message' => '❌ Invio fallito. Controlla i log e le credenziali Twilio.'], 500);
+        // Twilio ha risposto con errore — mostriamo il messaggio esatto
+        $twilioMsg  = $decoded['message'] ?? 'Errore sconosciuto';
+        $twilioCode = $decoded['code']    ?? $httpCode;
+
+        $hints = [
+            21608 => 'Il numero non è verificato nel sandbox Twilio. Il destinatario deve prima inviare "join [parola]" al numero sandbox +14155238886.',
+            21211 => 'Numero non valido. Usa il formato internazionale: +39XXXXXXXXXX',
+            20003 => 'Credenziali errate: TWILIO_SID o TWILIO_TOKEN non validi.',
+            63007 => 'Canale WhatsApp non abilitato. Verifica le impostazioni nel tuo account Twilio.',
+        ];
+        $hint = $hints[$twilioCode] ?? null;
+
+        $msg = "❌ Twilio errore {$twilioCode}: {$twilioMsg}";
+        if ($hint) $msg .= "\n💡 {$hint}";
+
+        return response()->json(['message' => $msg], 422);
     }
 
     // ─── Helpers ────────────────────────────────────────────────────
