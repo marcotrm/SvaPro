@@ -313,68 +313,45 @@ export default function PosPage() {
       setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
 
-      // Carica prodotti — top 20 più venduti + prodotti in evidenza
-      let topProds = [], featProds = [], allCats = [];
-      try {
-        const topRes = await catalog.getProducts({ sort: 'top_selling', limit: 20, ...(selectedStoreId ? { store_id: selectedStoreId } : {}) });
-        topProds = topRes.data?.data || [];
-      } catch (err) { console.error('Error loading top products', err); }
+      // Carica prodotti e categorie in parallelo
+      const [topRes, featRes, cRes] = await Promise.allSettled([
+        catalog.getProducts({ sort: 'top_selling', limit: 20, ...sp }),
+        catalog.getProducts({ limit: 30, is_featured: 1, ...sp }),
+        catalog.getCategories(),
+      ]);
 
-      try {
-        const featRes = await catalog.getProducts({ limit: 30, is_featured: 1, ...(selectedStoreId ? { store_id: selectedStoreId } : {}) });
-        featProds = featRes.data?.data || [];
-      } catch (err) { console.error('Error loading featured products', err); }
+      const topProds  = topRes.status  === 'fulfilled' ? (topRes.value.data?.data  || []) : [];
+      const featProds = featRes.status === 'fulfilled' ? (featRes.value.data?.data || []) : [];
+      const allCats   = cRes.status    === 'fulfilled' ? (cRes.value.data?.data   || []) : [];
 
-      try {
-        const cRes = await catalog.getCategories();
-        allCats = cRes.data?.data || [];
-        setCategories(allCats.filter(c => !c.parent_id));
-      } catch (err) { console.error('Error loading categories', err); }
-
-      // Merge top-selling + featured, senza duplicati
+      setCategories(allCats.filter(c => !c.parent_id));
       const merged = new Map();
       [...topProds, ...featProds].forEach(p => merged.set(p.id, p));
       setProducts(Array.from(merged.values()));
 
-      // Carica stock separatamente
-      try {
-        const stRes = await inventory.getStock({ ...sp, limit: 2000 });
+      // Stock e opzioni ordine in parallelo (NON i clienti — lazy loaded)
+      const [stRes, oRes] = await Promise.allSettled([
+        inventory.getStock({ ...sp, limit: 500 }),
+        ordersApi.getOptions(sp),
+      ]);
+
+      if (stRes.status === 'fulfilled') {
         const sm = {};
-        (stRes.data?.data || []).forEach(si => { sm[si.product_variant_id] = si; });
+        (stRes.value.data?.data || []).forEach(si => { sm[si.product_variant_id] = si; });
         setStockMap(sm);
-      } catch { /* stock non disponibile */ }
+      }
 
-      // Carica clienti separatamente
-      try {
-        const aRes = await customersApi.getCustomers({ limit: 1000 });
-        const normalizedCustomers = (aRes.data?.data || []).map(c => ({
-          ...c,
-          name: c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email || `Cliente #${c.id}`,
-        }));
-        setAllCustomers(normalizedCustomers);
-      } catch { setAllCustomers([]); }
-
-      // Carica opzioni ordine (warehouse, employees)
-      try {
-        const oRes = await ordersApi.getOptions(sp);
-        const optEmp = oRes.data?.data?.employees || [];
-        const whs = oRes.data?.data?.warehouses || [];
+      if (oRes.status === 'fulfilled') {
+        const optEmp = oRes.value.data?.data?.employees || [];
+        const whs    = oRes.value.data?.data?.warehouses || [];
         if (whs.length > 0) setWarehouseId(whs[0].id);
         setEmployees(optEmp);
-        // Arricchisci con dipendenti cross-store in background
-        import('../api.jsx').then(({ employees: empApi }) => {
-          empApi.getAllEmployees().then(r => {
-            const all = r.data?.data || r.data || [];
-            if (Array.isArray(all) && all.length > optEmp.length) setEmployees(all);
-          }).catch(() => {});
-        });
-      } catch { /* continua senza warehouse/employees */ }
+      }
 
-    } catch (err) { 
+    } catch (err) {
       console.error('POS Gen error:', err);
-      toast.error('Errore caricamento POS: ' + (err.message || 'Controlla connessione')); 
-    }
-    finally { setLoading(false); }
+      toast.error('Errore caricamento POS');
+    } finally { setLoading(false); }
   }, [selectedStoreId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -697,40 +674,41 @@ export default function PosPage() {
     return matchS && matchF && matchC;
   }).slice(0, 30), [products, searchTerm, flavorTerm, activeCategory]);
 
-  const filteredCustomers = useMemo(() => {
-    const s = customerSearch.toLowerCase().trim();
-    if (!s) return allCustomers.slice(0, 8);
-    return allCustomers.filter(c => {
-      // Per i dipendenti, ricerca solo per nome/cognome/codice tessera (no dati sensibili)
-      const fields = isDipendente
-        ? [c.first_name, c.last_name, c.code, String(c.id)]
-        : [c.name, c.email, c.first_name, c.last_name, c.fidelity_card, c.phone, c.code, String(c.id)];
-      const haystack = fields.filter(Boolean).join(' ').toLowerCase();
-      return haystack.includes(s);
-    }).slice(0, 8);
-  }, [allCustomers, customerSearch, isDipendente]);
+  // Ricerca clienti: API-driven con debounce (non più filtraggio locale su 1000 record)
+  const [filteredCustomers, setFilteredCustomers] = useState([]);
+  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
 
-  // Auto-selezione cliente: invio automatico dopo essersi fermati per 1 secondo
   useEffect(() => {
-    if (!customerSearch.trim() || selectedCustomer) return;
-    const delayId = setTimeout(() => {
-      const s = customerSearch.trim().toLowerCase();
-      const exactMatch = allCustomers.find(c =>
-        (c.fidelity_card && c.fidelity_card.toLowerCase() === s) ||
-        (c.phone         && c.phone.toLowerCase()         === s) ||
-        (c.email         && c.email.toLowerCase()         === s) ||
-        (c.code          && c.code.toLowerCase()          === s) ||
-        String(c.id) === s
-      );
-      if (exactMatch) {
-        setSelectedCustomer(exactMatch);
-        setCustomerSearch('');
-        setShowCustomerDrop(false);
-        toast.success(`Cliente: ${exactMatch.name || `${exactMatch.first_name || ''} ${exactMatch.last_name || ''}`}`, { icon: '👤' });
-      }
-    }, 1000); // 1 SECONDO WAIT
-    return () => clearTimeout(delayId);
-  }, [customerSearch, allCustomers, selectedCustomer]);
+    if (!customerSearch.trim() || selectedCustomer) { setFilteredCustomers([]); return; }
+    const timer = setTimeout(async () => {
+      setCustomerSearchLoading(true);
+      try {
+        const res = await customersApi.getCustomers({ q: customerSearch.trim(), limit: 8 });
+        const list = (res.data?.data || []).map(c => ({
+          ...c,
+          name: c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email || `Cliente #${c.id}`,
+        }));
+        setFilteredCustomers(list);
+        // Auto-selezione se match esatto (barcode/tessera)
+        const s = customerSearch.trim().toLowerCase();
+        const exact = list.find(c =>
+          (c.fidelity_card && c.fidelity_card.toLowerCase() === s) ||
+          (c.code          && c.code.toLowerCase()          === s) ||
+          (c.phone         && c.phone.toLowerCase()         === s) ||
+          String(c.id) === s
+        );
+        if (exact) {
+          setSelectedCustomer(exact);
+          setCustomerSearch('');
+          setFilteredCustomers([]);
+          setShowCustomerDrop(false);
+          toast.success(`Cliente: ${exact.name}`, { icon: '👤' });
+        }
+      } catch { setFilteredCustomers([]); }
+      finally { setCustomerSearchLoading(false); }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [customerSearch, selectedCustomer]);
 
   /* Cross-sell */
   const crossSell = useMemo(() => {
@@ -1020,18 +998,18 @@ export default function PosPage() {
                 <Trash2 size={12} /> Svuota
               </button>
             )}
-            {selectedCustomer && (selectedCustomer.points_balance ?? 0) >= 0 && (
+            <button
+              onClick={() => setShowResoModal(true)}
+              style={{ background: 'rgba(251,191,36,0.12)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#fbbf24', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <RotateCcw size={12} /> Reso
+            </button>
+            {selectedCustomer && (
               <button
                 onClick={() => setShowPointsModal(true)}
                 style={{ background: pointsRedeemed > 0 ? 'rgba(251,191,36,0.25)' : 'rgba(251,191,36,0.12)', border: pointsRedeemed > 0 ? '1px solid rgba(251,191,36,0.5)' : 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#fbbf24', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span style={{ fontSize: 13 }}>⭐</span> Punti{pointsRedeemed > 0 ? ` (-${fmt(pointsDiscountAmt)})` : ''}
               </button>
             )}
-            <button
-              onClick={() => setShowResoModal(true)}
-              style={{ background: 'rgba(251,191,36,0.12)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#fbbf24', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <RotateCcw size={12} /> Reso
-            </button>
           </div>
 
           {/* ─── Operatore + Cliente in 2 colonne ─── */}
