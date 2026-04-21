@@ -713,6 +713,14 @@ export const cashMovements = {
   create:   (data) => api.post('/cash-movements', data),
 };
 
+export const coinShipments = {
+  list:      (params = {}) => api.get('/coin-shipments', { params }),
+  create:    (data)        => api.post('/coin-shipments', data),
+  confirm:   (id)          => api.post(`/coin-shipments/${id}/confirm`),
+  reject:    (id)          => api.post(`/coin-shipments/${id}/reject`),
+  dashboard: (params = {}) => api.get('/coin-shipments/dashboard', { params }),
+};
+
 // Promotion APIs
 export const promotions = {
   getAll: (params = {}) => cachedGet('/promotions', params, 15000, 120000),

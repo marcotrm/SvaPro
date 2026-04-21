@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\DeliveryNoteController;
 use App\Http\Controllers\Api\RestockOrderController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\CashMovementController;
+use App\Http\Controllers\Api\CoinShipmentController;
 use App\Http\Controllers\Api\GamificationController;
 use App\Http\Controllers\Api\PrestashopController;
 use App\Http\Controllers\Api\AdmController;
@@ -324,6 +325,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/cash-movements/balances', [CashMovementController::class, 'balances']);
         Route::get('/cash-movements/summary', [CashMovementController::class, 'summary']);
         Route::post('/cash-movements', [CashMovementController::class, 'store']);
+
+        // Tesoreria - Pacchi Monete
+        Route::get('/coin-shipments', [CoinShipmentController::class, 'index']);
+        Route::post('/coin-shipments', [CoinShipmentController::class, 'store']);
+        Route::post('/coin-shipments/{id}/confirm', [CoinShipmentController::class, 'confirm']);
+        Route::post('/coin-shipments/{id}/reject', [CoinShipmentController::class, 'reject']);
+        Route::get('/coin-shipments/dashboard', [CoinShipmentController::class, 'dashboardStats']);
 
         // Attendance - accessibile anche ai dipendenti (per timbrare se stessi)
         Route::get('/attendance/live', [AttendanceController::class, 'live']);
