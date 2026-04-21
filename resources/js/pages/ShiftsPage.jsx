@@ -1249,23 +1249,20 @@ export default function ShiftsPage() {
         try { tplRes = await shiftsApi.getTemplates(); } catch {}
       }
 
-      // Dipendente: filtra la lista dipendenti per mostrare solo se stesso
+      // Dipendente: vede tutti i dipendenti dello store (non solo se stesso)
+      // In sola lettura sulle righe degli altri — può solo proporre turni su se stesso
       let empList = empRes?.data?.data || [];
-      if (isDipendente && currentEmployeeId) {
-        empList = empList.filter(e => String(e.id) === currentEmployeeId);
-        // Fallback: se la lista è vuota (API ha fallito o employee_id non trovato),
-        // crea un record sintetico dai dati del profilo utente
-        if (empList.length === 0 && user) {
-          empList = [{
-            id:         Number(currentEmployeeId),
-            name:       `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Tu',
-            first_name: user.first_name || user.name || 'Tu',
-            last_name:  user.last_name || '',
-            store_id:   Number(user.employee_store_id || storeId),
-            barcode:    user.employee_barcode || null,
-            status:     'assente',
-          }];
-        }
+      if (isDipendente && currentEmployeeId && empList.length === 0 && user) {
+        // Fallback se API fallisce: almeno il dipendente stesso
+        empList = [{
+          id:         Number(currentEmployeeId),
+          name:       `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Tu',
+          first_name: user.first_name || user.name || 'Tu',
+          last_name:  user.last_name || '',
+          store_id:   Number(user.employee_store_id || storeId),
+          barcode:    user.employee_barcode || null,
+          status:     'assente',
+        }];
       }
       setEmployees(empList);
 
@@ -1481,7 +1478,7 @@ export default function ShiftsPage() {
     finally { setSaving(false); }
   };
 
-  // Dipendente: propone un turno (status=proposed)
+  // Dipendente: propone un turno (status=proposed) e notifica il manager
   const proposeShift = async (dateStr, start_time, end_time, color) => {
     if (!currentEmployeeId) return toast.error('ID dipendente non trovato');
     const key = `${currentEmployeeId}_${dateStr}`;
@@ -1494,6 +1491,19 @@ export default function ShiftsPage() {
         end_time,
         color:       color || '#F59E0B',
         status:      'proposed',
+      });
+      // Notifica tutti gli admin/manager dello store
+      await import('../api.jsx').then(async ({ employees: empApi }) => {
+        try {
+          // Carica i manager dello store
+          const empName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.name || 'Un dipendente';
+          await empApi.notifyStoreManagers(storeId, {
+            type: 'shift_proposed',
+            title: '📅 Turno in attesa di conferma',
+            body: `${empName} ha proposto un turno per il ${dateStr} (${start_time} - ${end_time}). Vai in Pianificazione Turni per approvare.`,
+            reference_type: 'shift',
+          });
+        } catch { /* silent — la notifica è non bloccante */ }
       });
     } catch {}
     setShifts(prev => ({
@@ -1916,13 +1926,25 @@ export default function ShiftsPage() {
                     const isOwnCell   = String(emp.id) === currentEmployeeId;
                     const canClick    = canEditShifts || (isDipendente && isOwnCell);
                     const isProposed  = hasShift && shift.status === 'proposed';
-                    const cellBg      = isProposed
+                    const isConfirmed = hasShift && shift.status === 'confirmed';
+
+                    // Lato dipendente: verde=confermato, giallo=proposto
+                    // Lato admin: usa il colore del template
+                    const cellBg = isProposed
                       ? 'rgba(245,158,11,0.12)'
-                      : hasShift ? `${shift.color}15` : 'transparent';
-                    const cellBorder  = isProposed
+                      : isConfirmed && isDipendente
+                        ? 'rgba(16,185,129,0.12)'
+                        : hasShift ? `${shift.color}15` : 'transparent';
+                    const cellBorder = isProposed
                       ? '2px dashed rgba(245,158,11,0.6)'
-                      : hasShift ? `1px solid ${shift.color}40` : '1px dashed var(--color-border)';
-                    const cellBorderL = isProposed ? '4px solid #F59E0B' : hasShift ? `4px solid ${shift.color}` : 'none';
+                      : isConfirmed && isDipendente
+                        ? '1px solid rgba(16,185,129,0.4)'
+                        : hasShift ? `1px solid ${shift.color}40` : '1px dashed var(--color-border)';
+                    const cellBorderL = isProposed
+                      ? '4px solid #F59E0B'
+                      : isConfirmed && isDipendente
+                        ? '4px solid #10B981'
+                        : hasShift ? `4px solid ${shift.color}` : 'none';
 
                     return (
                       <td
@@ -1942,6 +1964,11 @@ export default function ShiftsPage() {
                                     style={{ fontSize: 9, fontWeight: 800, color: '#10B981', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 4, padding: '2px 6px', cursor: 'pointer' }}
                                   >✅ Conferma</button>
                                 )}
+                              </div>
+                            )}
+                            {isConfirmed && isDipendente && (
+                              <div style={{ marginBottom: 4 }}>
+                                <span style={{ fontSize: 9, fontWeight: 800, color: '#10B981', background: 'rgba(16,185,129,0.15)', borderRadius: 4, padding: '2px 6px', letterSpacing: '0.04em' }}>✅ CONFERMATO</span>
                               </div>
                             )}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: isProposed ? 0 : 4 }}>

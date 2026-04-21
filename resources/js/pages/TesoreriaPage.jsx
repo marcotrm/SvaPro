@@ -16,16 +16,16 @@ const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency:
 function TabBar({ active, onChange, isDipendente }) {
   const tabs = isDipendente
     ? [
-        { id: 'live',    label: '🟢 Cassa Live' },
-        { id: 'daily',   label: '📈 Incasso Giornaliero' },
+        { id: 'live',    label: '💰 Saldo Cassa' },
+        { id: 'daily',   label: '📤 Contanti Cassa' },
         { id: 'coins',   label: '🪙 Pacchi Monete' },
       ]
     : [
-        { id: 'live',    label: '🟢 Cassa Live' },
+        { id: 'live',    label: '💰 Saldo Cassa' },
         { id: 'history', label: '📋 Movimentazioni' },
         { id: 'coins',   label: '🪙 Pacchi Monete' },
         { id: 'summary', label: '🏢 Riepilogo Società' },
-        { id: 'daily',   label: '📈 Incasso Giornaliero' },
+        { id: 'daily',   label: '📤 Contanti Cassa' },
       ];
   return (
     <div style={{ display: 'flex', gap: 4, background: 'var(--color-bg)', borderRadius: 12, padding: 4, border: '1px solid var(--color-border)', width: 'fit-content', flexWrap:'wrap' }}>

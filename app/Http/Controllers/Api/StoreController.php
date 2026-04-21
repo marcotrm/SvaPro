@@ -456,6 +456,55 @@ class StoreController extends Controller
         ]);
     }
 
+    /**
+     * POST /stores/{storeId}/notify-managers
+     * Invia una notifica a tutti gli admin/manager del tenant
+     * (usato dai dipendenti per notificare turni proposti)
+     */
+    public function notifyManagers(Request $request, int $storeId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $title = $request->input('title', '🔔 Nuova notifica');
+        $body  = $request->input('body', '');
+        $type  = $request->input('type', 'info');
+
+        // Trova tutti gli utenti admin/admin_cliente del tenant
+        $adminUserIds = DB::table('user_roles as ur')
+            ->join('roles as r', 'r.id', '=', 'ur.role_id')
+            ->join('users as u', 'u.id', '=', 'ur.user_id')
+            ->where('u.tenant_id', $tenantId)
+            ->whereIn('r.code', ['superadmin', 'admin_cliente', 'admin', 'shift_manager'])
+            ->where('u.status', 'active')
+            ->pluck('ur.user_id')
+            ->unique();
+
+        $now = now();
+        $inserted = 0;
+        foreach ($adminUserIds as $userId) {
+            // Trova l'employee_id dell'admin (se esiste)
+            $empId = DB::table('employees')
+                ->where('tenant_id', $tenantId)
+                ->where('user_id', $userId)
+                ->value('id');
+
+            DB::table('employee_notifications')->insert([
+                'tenant_id'      => $tenantId,
+                'employee_id'    => $empId,
+                'user_id'        => $userId,
+                'type'           => $type,
+                'title'          => $title,
+                'body'           => $body,
+                'is_read'        => 0,
+                'created_at'     => $now,
+                'updated_at'     => $now,
+            ]);
+            $inserted++;
+        }
+
+        return response()->json(['message' => "Notifica inviata a {$inserted} manager.", 'sent' => $inserted]);
+    }
+
     // ─── Helpers ────────────────────────────────────────────────────
     private function formatStore(\stdClass $s): array
     {

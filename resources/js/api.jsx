@@ -582,6 +582,8 @@ export const employees = {
   getNotifications:       (employeeId, params = {}) => api.get(`/employees/${employeeId}/notifications`, { params }),
   markNotificationRead:   (employeeId, notifId)    => api.post(`/employees/${employeeId}/notifications/${notifId}/read`),
   markAllNotificationsRead: (employeeId)            => api.post(`/employees/${employeeId}/notifications/read-all`),
+  // Notifica manager di uno store (usata da dipendente per proposta turno)
+  notifyStoreManagers: (storeId, data) => api.post(`/stores/${storeId}/notify-managers`, data),
 };
 
 // Loyalty APIs

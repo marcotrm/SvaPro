@@ -89,6 +89,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::delete('/stores/{storeId}', [StoreController::class, 'destroy']);
         Route::post('/stores/{storeId}/credentials', [StoreController::class, 'createCredentials']);
         Route::get('/stores/{storeId}/credentials', [StoreController::class, 'getCredentials']);
+        Route::post('/stores/{storeId}/notify-managers', [StoreController::class, 'notifyManagers']);
         Route::get('/loyalty/monitoring/push-stats', [LoyaltyController::class, 'pushMonitoringStats']);
 
         // Catalog WRITE - solo admin
@@ -253,6 +254,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'getTemplates']);
         Route::post('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'saveTemplate'])->middleware('permission:employees.manage');
         Route::delete('/shifts/templates/{id}', [\App\Http\Controllers\Api\ShiftController::class, 'deleteTemplate'])->middleware('permission:employees.manage');
+        // Proposta turno (dipendente) e conferma (manager)
+        Route::post('/shifts/propose', [\App\Http\Controllers\Api\ShiftController::class, 'propose']);
+        Route::post('/shifts/confirm-all', [\App\Http\Controllers\Api\ShiftController::class, 'confirmAll'])->middleware('permission:employees.manage');
+        Route::post('/shifts/{id}/confirm', [\App\Http\Controllers\Api\ShiftController::class, 'confirmShift'])->middleware('permission:employees.manage');
 
         // Stock Transfers / DDT
         Route::get('/stock-transfers', [StockTransferController::class, 'index']);
@@ -316,6 +321,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // Dipendente ha bisogno di vedere i negozi per il selettore store nel POS
         Route::get('/stores', [StoreController::class, 'index']);
         Route::get('/stores/{storeId}', [StoreController::class, 'show']);
+        // Dipendente: notifica manager per turni proposti
+        Route::post('/stores/{storeId}/notify-managers', [StoreController::class, 'notifyManagers']);
 
         // POS Sessions
         Route::get('/pos/sessions', [PosSessionController::class, 'index']);
