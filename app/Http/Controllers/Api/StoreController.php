@@ -23,9 +23,12 @@ class StoreController extends Controller
             ->orderBy('name')
             ->get()   // select * — resiliente a colonne opzionali non ancora migrate
             ->map(function ($s) use ($tenantId) {
-                // Media settimanale fatturato h18 (lunedì → oggi)
                 $formatted = $this->formatStore($s);
-                $formatted['revenue_18'] = $this->calculateRevenue18WeeklyAvg($tenantId, $s->id);
+                try {
+                    $formatted['revenue_18'] = $this->calculateRevenue18WeeklyAvg($tenantId, $s->id);
+                } catch (\Throwable $e) {
+                    $formatted['revenue_18'] = 0.0;
+                }
                 return $formatted;
             });
 
