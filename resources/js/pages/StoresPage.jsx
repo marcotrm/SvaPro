@@ -465,7 +465,8 @@ function StoreModal({ store, onClose, onSaved }) {
                     type="button"
                     onClick={async () => {
                       try {
-                        const res = await employeesApi.testWhatsapp(store.id);
+                        // Passa il numero dal form nel body (funziona anche prima di salvare)
+                        const res = await employeesApi.testWhatsapp(store.id, { phone: form.whatsapp_notify_phone });
                         toast.success(res.data.message || '✅ Test inviato!');
                       } catch (err) {
                         const msg = err?.response?.data?.message || 'Errore invio test';

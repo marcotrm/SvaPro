@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers\Api;
 
@@ -179,6 +179,7 @@ class StoreController extends Controller
             'numero_ordinale'        => ['nullable', 'string', 'max:20'],
             'parent_store_id'        => ['nullable', 'integer'],
             'company_group'          => ['nullable', 'string', 'max:100'],
+            'whatsapp_notify_phone'  => ['nullable', 'string', 'max:30'],
         ]);
 
         $payload = array_filter([
@@ -197,7 +198,14 @@ class StoreController extends Controller
             'numero_esercizio'       => $request->input('numero_esercizio'),
             'numero_ordinale'        => $request->input('numero_ordinale'),
             'company_group'          => $request->input('company_group'),
+            'whatsapp_notify_phone'  => $request->has('whatsapp_notify_phone')
+                ? ($request->input('whatsapp_notify_phone') ?: null) : null,
         ], fn($v) => $v !== null);
+
+        // Gestisci esplicitamente whatsapp_notify_phone = '' (svuota il campo)
+        if ($request->has('whatsapp_notify_phone') && $request->input('whatsapp_notify_phone') === '') {
+            $payload['whatsapp_notify_phone'] = null;
+        }
 
         // parent_store_id: gestisce esplicitamente null (rimuovi relazione)
         if ($request->has('parent_store_id')) {
@@ -523,7 +531,8 @@ class StoreController extends Controller
             return response()->json(['message' => 'Negozio non trovato.'], 404);
         }
 
-        $phone = $store->whatsapp_notify_phone ?? null;
+        // Accetta il numero direttamente dal body (utile per testare prima di salvare)
+        $phone = $request->input('phone') ?: ($store->whatsapp_notify_phone ?? null);
         if (!$phone) {
             return response()->json(['message' => 'Nessun numero WhatsApp configurato per questo negozio.'], 422);
         }

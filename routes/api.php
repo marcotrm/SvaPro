@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuditController;
@@ -125,6 +125,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/customers/bulk/email', [CustomerController::class, 'bulkEmail']);
 
         Route::get('/employees', [EmployeeController::class, 'index']);
+        Route::get('/employees/global-list', [EmployeeController::class, 'globalList']);
         Route::get('/employees/analytics/top-performers', [EmployeeController::class, 'topPerformers']);
         Route::post('/employees', [EmployeeController::class, 'store'])->middleware('permission:employees.manage');
         Route::put('/employees/{employeeId}', [EmployeeController::class, 'update'])->middleware('permission:employees.manage');

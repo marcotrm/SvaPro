@@ -554,7 +554,13 @@ export const employees = {
   getEmployees: (params = {}) => cachedGet('/employees', params, 30000, 300000),
   // Ritorna TUTTI i dipendenti di TUTTI gli store (bypassa il filtro store_id, pagina tutte le pagine)
   getAllEmployees: async () => {
-    const headers = { 'X-Ignore-Store': '1' };
+    // Prima prova: endpoint dedicato che bypassa il filtro store_id del middleware
+    try {
+      const res = await api.get('/employees/global-list');
+      const list = res.data?.data || [];
+      if (list.length > 0) return { data: { data: list } };
+    } catch (_) {}
+    // Fallback: paginazione manuale
     const allData = [];
     let page = 1;
     let hasMore = true;
@@ -584,7 +590,7 @@ export const employees = {
   markAllNotificationsRead: (employeeId)            => api.post(`/employees/${employeeId}/notifications/read-all`),
   // Notifica manager di uno store (usata da dipendente per proposta turno)
   notifyStoreManagers: (storeId, data) => api.post(`/stores/${storeId}/notify-managers`, data),
-  testWhatsapp:        (storeId)       => api.post(`/stores/${storeId}/test-whatsapp`),
+  testWhatsapp:        (storeId, data) => api.post(`/stores/${storeId}/test-whatsapp`, data || {}),
 };
 
 // Loyalty APIs

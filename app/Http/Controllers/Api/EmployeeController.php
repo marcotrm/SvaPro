@@ -47,6 +47,41 @@ class EmployeeController extends Controller
         return response()->json(['data' => $employees]);
     }
 
+    /**
+     * GET /employees/global-list
+     * Restituisce TUTTI i dipendenti attivi del tenant, indipendentemente dallo store.
+     * Usato dal Jolly picker nella pianificazione turni.
+     * Legge tenant_id dall'attribute (impostato dal middleware, sicuro),
+     * ma ignora il store_id forzato dal middleware per ruoli dipendente/store_manager.
+     */
+    public function globalList(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $employees = DB::table('employees as e')
+            ->leftJoin('stores as s', 's.id', '=', 'e.store_id')
+            ->where('e.tenant_id', $tenantId)
+            ->where('e.status', 'active')
+            ->orderBy('e.first_name')
+            ->select([
+                'e.id',
+                'e.first_name',
+                'e.last_name',
+                'e.barcode',
+                'e.store_id',
+                'e.photo_url',
+                'e.status',
+                'e.expected_start_time',
+                's.name as store_name',
+            ])
+            ->get()
+            ->map(fn($e) => array_merge((array) $e, [
+                'name' => trim("{$e->first_name} {$e->last_name}"),
+            ]));
+
+        return response()->json(['data' => $employees]);
+    }
+
     public function topPerformers(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
