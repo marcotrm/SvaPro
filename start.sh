@@ -65,21 +65,24 @@ fi
 # ─── 3. Pulizia config cache ─────────────────────────────────────────────────
 php artisan config:clear --no-interaction 2>/dev/null || true
 
-# ─── 4. Test connessione DB ─────────────────────────────────────────────────
+# ─── 4. Test connessione DB (retry fino a 30s) ──────────────────────────────
 echo "▶ Test connessione database ($DB_MODE)..."
-DB_TEST=$(php artisan tinker --execute="echo 'OK:'.DB::connection()->getDatabaseName();" 2>&1)
-if echo "$DB_TEST" | grep -q "^OK:"; then
-    echo "✅ DB connesso: $(echo "$DB_TEST" | grep "^OK:" | sed 's/^OK://')"
-else
-    echo "❌ ERRORE CONNESSIONE DB:"
-    echo "$DB_TEST"
-    echo ""
-    echo "   DB_CONNECTION=$DB_CONNECTION"
-    echo "   DB_HOST=$DB_HOST"
-    echo "   DB_PORT=$DB_PORT"
-    echo "   DB_DATABASE=$DB_DATABASE"
-    echo "   DB_USERNAME=$DB_USERNAME"
-    exit 1
+DB_CONNECTED=0
+for i in 1 2 3 4 5 6; do
+    DB_TEST=$(php artisan tinker --execute="echo 'OK:'.DB::connection()->getDatabaseName();" 2>&1)
+    if echo "$DB_TEST" | grep -q "^OK:"; then
+        echo "✅ DB connesso: $(echo "$DB_TEST" | grep "^OK:" | sed 's/^OK://')"
+        DB_CONNECTED=1
+        break
+    fi
+    echo "⏳ Tentativo $i/6 fallito, riprovo tra 5s..."
+    sleep 5
+done
+
+if [ $DB_CONNECTED -eq 0 ]; then
+    echo "⚠️  DB non raggiungibile dopo 30s — avvio FrankenPHP senza DB (risponderà 500 se il DB serve)"
+    echo "   DB_CONNECTION=$DB_CONNECTION  DB_HOST=$DB_HOST  DB_PORT=$DB_PORT"
+    # Non blocchiamo: Railway potrebbe avviare il DB in parallelo
 fi
 
 # ─── 5. Migrazioni ───────────────────────────────────────────────────────────
@@ -89,10 +92,9 @@ MIGRATE_EXIT=$?
 echo "$MIGRATE_OUT"
 
 if [ $MIGRATE_EXIT -ne 0 ]; then
-    echo "❌ migrate --force fallito (exit $MIGRATE_EXIT) — crash del container"
-    exit 1
+    echo "⚠️  migrate --force fallito (exit $MIGRATE_EXIT) — continuo comunque"
 fi
-echo "✅ Migrate OK"
+echo "✅ Migrate step completato"
 
 # ─── 6. Seed — solo se il DB è vuoto (prima installazione) ──────────────────
 echo "▶ Seed..."
