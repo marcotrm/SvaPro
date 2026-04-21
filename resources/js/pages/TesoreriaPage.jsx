@@ -910,8 +910,9 @@ export default function TesoreriaPage() {
                           <button type="button"
                             onClick={() => setCoinBD(p => ({...p, [val]: Math.max(0, parseInt(p[val]||0)-1)}))}
                             style={{ width:36, height:36, borderRadius:10, border:'1px solid var(--color-border)', background:'var(--color-surface)', cursor:'pointer', fontWeight:900, fontSize:20, lineHeight:1, color:'var(--color-text)' }}>−</button>
-                          <input type="number" min="0" value={qty}
+                          <input type="number" min="0" value={qty || ''}
                             onChange={e => setCoinBD(p => ({...p, [val]: parseInt(e.target.value)||0}))}
+                            onFocus={e => e.target.select()}
                             style={{ width:56, textAlign:'center', border:'2px solid var(--color-border)', borderRadius:10, padding:'6px 0', fontWeight:900, fontSize:18, background:'var(--color-bg)', color:'var(--color-text)' }} />
                           <button type="button"
                             onClick={() => setCoinBD(p => ({...p, [val]: parseInt(p[val]||0)+1}))}
