@@ -1218,28 +1218,50 @@ export default function PosPage() {
               <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden', marginBottom: 10 }}>
                 {cartLines.map((line, idx) => (
                   <div key={line.product_variant_id} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    display: 'flex', alignItems: 'center',
                     padding: '8px 12px', gap: 8,
                     borderBottom: idx < cartLines.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
                   }}>
+                    {/* Nome + prezzo unitario */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {line.name}
                       </div>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>x{line.qty}</div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                        {line.price.toLocaleString('it-IT', { minimumFractionDigits: 2 })} € cad.
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd' }}>
-                        {(line.price * line.qty).toLocaleString('it-IT', { minimumFractionDigits: 2 })} €
-                      </span>
+
+                    {/* Stepper qty */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
                       <button
-                        onClick={() => removeFromCart(line.product_variant_id)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', display: 'flex', padding: 0 }}
-                        title="Rimuovi"
+                        onClick={() => updateQty(line.product_variant_id, -1)}
+                        style={{ background: 'none', border: 'none', color: '#fff', width: 26, height: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.8 }}
                       >
-                        <X size={13} />
+                        <Minus size={11} />
+                      </button>
+                      <span style={{ color: '#fff', fontSize: 13, fontWeight: 800, minWidth: 20, textAlign: 'center', padding: '0 2px' }}>{line.qty}</span>
+                      <button
+                        onClick={() => updateQty(line.product_variant_id, 1)}
+                        style={{ background: 'none', border: 'none', color: '#fff', width: 26, height: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.8 }}
+                      >
+                        <Plus size={11} />
                       </button>
                     </div>
+
+                    {/* Totale riga */}
+                    <span style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd', flexShrink: 0, minWidth: 52, textAlign: 'right' }}>
+                      {(line.price * line.qty).toLocaleString('it-IT', { minimumFractionDigits: 2 })} €
+                    </span>
+
+                    {/* Rimuovi */}
+                    <button
+                      onClick={() => removeFromCart(line.product_variant_id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', display: 'flex', padding: 0, flexShrink: 0 }}
+                      title="Rimuovi"
+                    >
+                      <X size={13} />
+                    </button>
                   </div>
                 ))}
               </div>
