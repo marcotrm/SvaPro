@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Http\Controllers\Api;
 
@@ -601,6 +601,7 @@ class StoreController extends Controller
             'numero_ordinale'        => $s->numero_ordinale ?? null,
             'parent_store_id'        => $s->parent_store_id ?? null,
             'company_group'          => $s->company_group ?? null,
+            'whatsapp_notify_phone'  => $s->whatsapp_notify_phone ?? null,
         ];
     }
 
