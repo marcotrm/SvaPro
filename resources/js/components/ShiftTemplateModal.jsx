@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { shifts } from '../api.jsx';
+import { shifts, clearApiCache } from '../api.jsx';
 import { X, Plus, Trash2, Clock, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ConfirmModal from './ConfirmModal.jsx';
@@ -34,6 +34,7 @@ export default function ShiftTemplateModal({ onClose }) {
     try {
       setAdding(true);
       await shifts.saveTemplate(form);
+      clearApiCache();
       toast.success('Template creato con successo');
       setForm({ name: '', start_time: '09:00', end_time: '18:00', color: '#10B981' });
       await loadTemplates();
@@ -53,6 +54,7 @@ export default function ShiftTemplateModal({ onClose }) {
     setConfirmToDelete(null);
     try {
       await shifts.deleteTemplate(id);
+      clearApiCache();
       toast.success('Template eliminato');
       setTemplates(t => t.filter(x => x.id !== id));
     } catch {
