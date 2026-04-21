@@ -578,6 +578,10 @@ export const employees = {
   getTopPerformers: (params = {}) => cachedGet('/employees/analytics/top-performers', params, 30000, 300000),
   getKpiDashboard: (params = {}) => cachedGet('/employees/kpi-dashboard', params, 15000, 120000),
   setKpiTarget: (employeeId, data) => api.post(`/employees/${employeeId}/kpi-target`, data),
+  // Notifiche dipendente
+  getNotifications:       (employeeId, params = {}) => api.get(`/employees/${employeeId}/notifications`, { params }),
+  markNotificationRead:   (employeeId, notifId)    => api.post(`/employees/${employeeId}/notifications/${notifId}/read`),
+  markAllNotificationsRead: (employeeId)            => api.post(`/employees/${employeeId}/notifications/read-all`),
 };
 
 // Loyalty APIs

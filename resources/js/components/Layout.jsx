@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { auth, stores, clearApiCache, cashMovements as cashApi, reports, exports_ } from '../api.jsx';
+import { auth, stores, clearApiCache, cashMovements as cashApi, reports, exports_, employees as employeesApi } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
 import { Toaster } from 'react-hot-toast';
 import ChatWidget, { ChatTopbarButtons } from './ChatWidget.jsx';
@@ -257,6 +257,9 @@ export default function Layout({ user, setUser }) {
   const [showMichelePanel, setShowMichelePanel] = React.useState(false);
   const [dailyReportAvailable, setDailyReportAvailable] = React.useState(false);
   const [dailyReportBody, setDailyReportBody] = React.useState('');
+  // ── Notifiche dipendente (pacco monete ecc.) ──
+  const [empNotifs, setEmpNotifs]           = React.useState([]);
+  const [unreadEmpNotifs, setUnreadEmpNotifs] = React.useState(0);
   const prevAlertIdsRef = useRef(new Set());
   const notifPanelRef   = useRef();
 
@@ -331,6 +334,24 @@ export default function Layout({ user, setUser }) {
     }
   }, [userRoles]);
 
+  // Poll notifiche dipendente (pacco monete, ecc.) ogni 30s
+  useEffect(() => {
+    if (!userRoles.includes('dipendente')) return;
+    const empId = user?.employee_id;
+    if (!empId) return;
+    const pollEmpNotifs = async () => {
+      try {
+        const res = await employeesApi.getNotifications(empId, { is_read: 0 });
+        const notifs = res.data?.data || [];
+        setEmpNotifs(notifs);
+        setUnreadEmpNotifs(notifs.length);
+      } catch { /* silent */ }
+    };
+    pollEmpNotifs();
+    const t3 = setInterval(pollEmpNotifs, 30000);
+    return () => clearInterval(t3);
+  }, [userRoles, user?.employee_id]);
+
   // Chiudi pannello notifiche cliccando fuori
   useEffect(() => {
     if (!showNotifPanel) return;
@@ -342,6 +363,11 @@ export default function Layout({ user, setUser }) {
   const openNotifPanel = () => {
     setShowNotifPanel(v => !v);
     setUnreadAlerts(0); // segna come lette
+    // Marca come lette le notifiche dipendente
+    if (unreadEmpNotifs > 0 && user?.employee_id) {
+      employeesApi.markAllNotificationsRead(user.employee_id).catch(() => {});
+      setUnreadEmpNotifs(0);
+    }
   };
 
   // Chiude il pannello e silenzia le allerte correnti per 3 ore
@@ -628,17 +654,18 @@ export default function Layout({ user, setUser }) {
                 onClick={openNotifPanel}
               >
                 <Bell size={18} />
-                {(unreadAlerts > 0 || cashAlertStores.length > 0) && (
+                {(unreadAlerts > 0 || cashAlertStores.length > 0 || unreadEmpNotifs > 0) && (
                   <span style={{
                     position: 'absolute', top: 4, right: 4,
                     minWidth: 16, height: 16, borderRadius: 8,
-                    background: '#EF4444', border: '2px solid white',
+                    background: unreadEmpNotifs > 0 ? '#f59e0b' : '#EF4444',
+                    border: '2px solid white',
                     fontSize: 9, fontWeight: 900, color: '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: '0 3px',
-                    animation: unreadAlerts > 0 ? 'spBadgePulse 1.5s ease-out infinite' : 'none',
+                    animation: 'spBadgePulse 1.5s ease-out infinite',
                   }}>
-                    {cashAlertStores.length}
+                    {unreadEmpNotifs > 0 ? unreadEmpNotifs : cashAlertStores.length}
                   </span>
                 )}
               </button>
@@ -661,7 +688,23 @@ export default function Layout({ user, setUser }) {
 
                   {/* Lista allerte */}
                   <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-                    {dailyReportAvailable && (
+                    {/* ── Notifiche dipendente (pacco monete) ── */}
+                  {empNotifs.length > 0 && empNotifs.map(n => (
+                    <div key={n.id} style={{
+                      padding: '12px 16px',
+                      borderBottom: '1px solid rgba(255,255,255,0.05)',
+                      background: 'rgba(245,158,11,0.1)',
+                    }}>
+                      <div style={{ fontWeight: 800, fontSize: 13, color: '#fbbf24' }}>{n.title}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>{n.body}</div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
+                        {new Date(n.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* ── Notifiche cassa (admin) ── */}
+                  {dailyReportAvailable && (
                       <div style={{
                         padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         borderBottom: '1px solid rgba(255,255,255,0.05)',
