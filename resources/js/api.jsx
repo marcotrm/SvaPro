@@ -867,16 +867,4 @@ export const chat = {
   getConversations: ()            => api.get('/chat/conversations'),
 };
 
-// ── Ordini di Acquisto (Purchase Orders) ────────────────────────
-export const purchaseOrders = {
-  getAll:            (params = {}) => api.get('/purchase-orders', { params }),
-  getOne:            (id)          => api.get(`/purchase-orders/${id}`),
-  create:            (data)        => api.post('/purchase-orders', data),
-  update:            (id, data)    => api.put(`/purchase-orders/${id}`, data),
-  send:              (id)          => api.post(`/purchase-orders/${id}/send`),
-  receive:           (id, data)    => api.post(`/purchase-orders/${id}/receive`, data),
-  cancel:            (id)          => api.post(`/purchase-orders/${id}/cancel`),
-  autoSuggest:       (params = {}) => api.get('/purchase-orders/auto-suggest', { params }),
-  patchFulfillment:  (id, status)  => api.patch(`/purchase-orders/${id}/fulfillment`, { fulfillment_status: status }),
-};
 
