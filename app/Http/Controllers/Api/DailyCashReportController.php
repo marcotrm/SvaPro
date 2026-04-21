@@ -41,10 +41,10 @@ class DailyCashReportController extends Controller
         if (Schema::hasTable('coin_shipments')) {
             $coinsReceived = round((float) DB::table('coin_shipments')
                 ->where('tenant_id', $tenantId)
-                ->where('destination_store_id', $storeId)
-                ->where('status', 'delivered')
+                ->where('to_store_id', $storeId)
+                ->where('status', 'confirmed')
                 ->whereRaw("DATE(confirmed_at AT TIME ZONE 'Europe/Rome') = ?", [$date])
-                ->sum('amount'), 2);
+                ->sum('total_amount'), 2);
         }
 
         // Somma già inviata oggi (tutti gli invii precedenti)
