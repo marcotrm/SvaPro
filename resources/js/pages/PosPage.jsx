@@ -308,9 +308,9 @@ export default function PosPage() {
   const promoRef = useRef(null);
 
   /* Load data */
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (background = false) => {
     try {
-      setLoading(true);
+      if (!background) setLoading(true);
       const sp = selectedStoreId ? { store_id: selectedStoreId } : {};
 
       // Carica prodotti e categorie in parallelo
@@ -351,7 +351,9 @@ export default function PosPage() {
     } catch (err) {
       console.error('POS Gen error:', err);
       toast.error('Errore caricamento POS');
-    } finally { setLoading(false); }
+    } finally {
+      if (!background) setLoading(false);
+    }
   }, [selectedStoreId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -629,7 +631,7 @@ export default function PosPage() {
       setTimeout(() => operatorBarcodeRef.current?.focus(), 100);
       // Notifica dashboard e altri componenti che è avvenuta una vendita
       window.dispatchEvent(new CustomEvent('orderPlaced'));
-      clearApiCache(); fetchData();
+      clearApiCache(); fetchData(true);
     } catch (err) {
       const msg = err.response?.data?.errors
         ? Object.values(err.response.data.errors).flat().join(' • ')
