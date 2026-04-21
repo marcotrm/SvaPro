@@ -1106,8 +1106,9 @@ export default function ShiftsPage() {
   const isShiftManager = userRoles.includes('admin') || userRoles.includes('shift_manager') || !isDipendente;
   const currentEmployeeId = user?.employee_id ? String(user.employee_id) : null;
 
-  // Solo admin/shift_manager possono modificare i turni confermati o inserire per altri dipendenti
+  // Solo admin/shift_manager possono modificare turni altrui. Il dipendente può modificare solo la propria riga
   const canEditShifts = isShiftManager;
+  const canSaveShifts = true; // Tutti possono salvare, il backend filtra/usa 'proposed' per i dipendenti
 
   // Dipendente: usa il suo store anche se selectedStoreId non è ancora impostato
   const defaultStoreId = selectedStoreId || (isDipendente && user?.employee_store_id ? String(user.employee_store_id) : '');
@@ -1231,9 +1232,7 @@ export default function ShiftsPage() {
       const startDateStr = weekDays[0].dateStr;
       const endDateStr   = weekDays[6].dateStr;
       const shiftParams  = { store_id: storeId, start_date: startDateStr, end_date: endDateStr };
-      // Dipendente vede solo i propri turni, admin vede tutti
-      if (isDipendente && currentEmployeeId) shiftParams.employee_id = currentEmployeeId;
-
+      
       // Chiama le API separatamente per isolare gli errori
       let empRes = null, shRes = null, tplRes = null;
       try {
@@ -1436,12 +1435,8 @@ export default function ShiftsPage() {
 
 
   const applyTemplate = (empId, dateStr, tpl) => {
-    if (isDipendente && String(empId) === currentEmployeeId) {
-      proposeShift(dateStr, tpl.start_time, tpl.end_time, tpl.color);
-    } else {
-      onCellChange(empId, dateStr, { start_time: tpl.start_time, end_time: tpl.end_time, color: tpl.color });
-      setActiveCell(null);
-    }
+    onCellChange(empId, dateStr, { start_time: tpl.start_time, end_time: tpl.end_time, color: tpl.color });
+    setActiveCell(null);
   };
 
   const clearCell = (empId, dateStr) => {
@@ -1480,7 +1475,7 @@ export default function ShiftsPage() {
         }
       });
       await shiftsApi.bulkSave(payload);
-      toast.success('Turni salvati con successo');
+      toast.success(isDipendente ? 'Turni proposti con successo — in attesa di conferma ⏳' : 'Turni salvati con successo ✅');
       setOriginalShifts(JSON.parse(JSON.stringify(shifts)));
     } catch { toast.error('Errore nel salvataggio'); }
     finally { setSaving(false); }
@@ -1724,18 +1719,18 @@ export default function ShiftsPage() {
           <button onClick={() => setShowExport(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'#6366F1', color:'#fff', border:'none', padding:'10px 16px', borderRadius:12, fontWeight:700, cursor:'pointer' }}>
             <Download size={16} /> Esporta Excel
           </button>
-          {canEditShifts && (() => {
+          {canSaveShifts && (() => {
             const pendingCount = Object.values(shifts).filter(s => s.status === 'proposed').length;
             return (
               <>
-                {pendingCount > 0 && (
+                {canEditShifts && pendingCount > 0 && (
                   <button onClick={confirmAllProposed} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16,185,129,0.3)', position: 'relative' }}>
                     <CheckCircle size={16} /> Conferma tutto
                     <span style={{ position: 'absolute', top: -6, right: -6, background: '#F59E0B', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pendingCount}</span>
                   </button>
                 )}
-                <button onClick={saveChanges} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-accent)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.8 : 1 }}>
-                  {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} Salva Configurazioni
+                <button onClick={saveChanges} disabled={saving || !hasUnsavedChanges} style={{ display: 'flex', alignItems: 'center', gap: 8, background: hasUnsavedChanges ? 'var(--color-accent)' : '#9ca3af', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 12, fontWeight: 700, cursor: saving || !hasUnsavedChanges ? 'default' : 'pointer', opacity: saving || !hasUnsavedChanges ? 0.7 : 1 }}>
+                  {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} {isDipendente ? 'Invia Conferma Turni' : 'Salva Configurazioni'}
                 </button>
               </>
             );

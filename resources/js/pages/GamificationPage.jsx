@@ -304,7 +304,6 @@ export default function GamificationPage() {
             <thead><tr>
               <th style={{ width: 40 }}>#</th>
               <th>Dipendente</th>
-              <th>Badge</th>
               <th>Regole Punti</th>
               <th style={{ textAlign: 'right' }}>Punti Totali</th>
             </tr></thead>
@@ -331,11 +330,6 @@ export default function GamificationPage() {
                         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{emp.employee_name}</div>
                       </div>
                     </div>
-                  </td>
-                  <td>
-                    <span style={{ background: emp.badge.bg, color: emp.badge.color, padding: '4px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                      <span>{emp.badge.icon}</span> {emp.badge.label}
-                    </span>
                   </td>
                   <td>
                     {emp.breakdown && Object.keys(emp.breakdown).length > 0 && (
@@ -373,7 +367,7 @@ export default function GamificationPage() {
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '48px 20px' }}>
+                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '48px 20px' }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
                   <div style={{ fontWeight: 700, color: 'var(--color-text)', marginBottom: 6 }}>Nessun punteggio per il periodo selezionato</div>
                   <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', maxWidth: 380, margin: '0 auto', lineHeight: 1.6 }}>

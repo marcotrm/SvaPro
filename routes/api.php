@@ -248,16 +248,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/attendance', [AttendanceController::class, 'index']);
         Route::get('/attendance/history', [AttendanceController::class, 'history']);
 
-        // Shifts & Rostering
-        Route::get('/shifts', [\App\Http\Controllers\Api\ShiftController::class, 'index']);
-        Route::post('/shifts/bulk', [\App\Http\Controllers\Api\ShiftController::class, 'bulkSave'])->middleware('permission:employees.manage');
-        Route::get('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'getTemplates']);
-        Route::post('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'saveTemplate'])->middleware('permission:employees.manage');
-        Route::delete('/shifts/templates/{id}', [\App\Http\Controllers\Api\ShiftController::class, 'deleteTemplate'])->middleware('permission:employees.manage');
-        // Proposta turno (dipendente) e conferma (manager)
-        Route::post('/shifts/propose', [\App\Http\Controllers\Api\ShiftController::class, 'propose']);
-        Route::post('/shifts/confirm-all', [\App\Http\Controllers\Api\ShiftController::class, 'confirmAll'])->middleware('permission:employees.manage');
-        Route::post('/shifts/{id}/confirm', [\App\Http\Controllers\Api\ShiftController::class, 'confirmShift'])->middleware('permission:employees.manage');
+
 
         // Stock Transfers / DDT
         Route::get('/stock-transfers', [StockTransferController::class, 'index']);
@@ -386,6 +377,16 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
 
         // Employee's own shifts
         Route::get('/employee/my-shifts', [\App\Http\Controllers\Api\ShiftController::class, 'myShifts']);
+
+        // Shifts & Rostering
+        Route::get('/shifts', [\App\Http\Controllers\Api\ShiftController::class, 'index']);
+        Route::post('/shifts/bulk', [\App\Http\Controllers\Api\ShiftController::class, 'bulkSave']);
+        Route::post('/shifts/propose', [\App\Http\Controllers\Api\ShiftController::class, 'propose']);
+        Route::patch('/shifts/{id}/confirm', [\App\Http\Controllers\Api\ShiftController::class, 'confirmShift'])->middleware('permission:employees.manage');
+        Route::post('/shifts/confirm-all', [\App\Http\Controllers\Api\ShiftController::class, 'confirmAll'])->middleware('permission:employees.manage');
+        Route::get('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'getTemplates']);
+        Route::post('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'saveTemplate'])->middleware('permission:employees.manage');
+        Route::delete('/shifts/templates/{id}', [\App\Http\Controllers\Api\ShiftController::class, 'deleteTemplate'])->middleware('permission:employees.manage');
 
         // Reports — accessibili anche ai dipendenti (filtrati automaticamente al proprio store)
         Route::get('/reports/summary', [ReportController::class, 'summary']);
