@@ -1237,14 +1237,19 @@ export default function ShiftsPage() {
       // Chiama le API separatamente per isolare gli errori
       let empRes = null, shRes = null, tplRes = null;
       try {
+        // Usa getEmployees (tutti i dipendenti dello store) invece di getEmployeesKiosk
+        // che restituisce solo chi ha fatto check-in oggi
         [empRes, shRes, tplRes] = await Promise.all([
-          attendance.getEmployeesKiosk({ store_id: storeId }),
+          employeesApi.getEmployees({ store_id: storeId, per_page: 200 }),
           shiftsApi.getAll(shiftParams),
           shiftsApi.getTemplates(),
         ]);
       } catch (apiErr) {
         console.error('[ShiftsPage] API error:', apiErr?.response?.data || apiErr.message);
-        // Prova a caricare almeno i turni
+        // Fallback: kiosk endpoint
+        try {
+          empRes = await attendance.getEmployeesKiosk({ store_id: storeId });
+        } catch {}
         try { shRes = await shiftsApi.getAll(shiftParams); } catch {}
         try { tplRes = await shiftsApi.getTemplates(); } catch {}
       }
@@ -2164,10 +2169,16 @@ export default function ShiftsPage() {
                 </div>
               ) : (() => {
                 const q = jollySearch.toLowerCase().trim();
-                const already = new Set([...employees.map(e => e.id), ...extraEmployees.map(e => e.id)]);
+                // Esclude solo i jolly già aggiunti manualmente (extraEmployees)
+                // Non esclude i dipendenti dello store base — l'admin può aggiungere jolly da qualsiasi store
+                const alreadyExtra = new Set(extraEmployees.map(e => e.id));
                 const list = allEmployeesGlobal.filter(e => {
+                  if (alreadyExtra.has(e.id)) return false;
+                  if (!q) return true;
                   const name = `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim().toLowerCase();
-                  return !already.has(e.id) && (!q || name.includes(q));
+                  const barcode = (e.barcode ?? '').toLowerCase();
+                  const code = (e.employee_code ?? '').toLowerCase();
+                  return name.includes(q) || barcode.includes(q) || code.includes(q) || String(e.id).includes(q);
                 });
                 
                 if (list.length === 0) return (
