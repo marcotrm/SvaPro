@@ -12,10 +12,14 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
     first_name: employee?.first_name || '',
     last_name: employee?.last_name || '',
     barcode: employee?.barcode || '',
+    employee_code: employee?.employee_code || '',
+    max_spending_limit: employee?.max_spending_limit || '',
+    price_list_id: employee?.price_list_id || '',
     hire_date: employee?.hire_date || '',
     status: employee?.status || 'active',
     photo_url: employee?.photo_url || '',
   });
+  const [activeTab, setActiveTab] = useState('profilo');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
@@ -28,6 +32,9 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       first_name: employee?.first_name || '',
       last_name: employee?.last_name || '',
       barcode: employee?.barcode || '',
+      employee_code: employee?.employee_code || '',
+      max_spending_limit: employee?.max_spending_limit || '',
+      price_list_id: employee?.price_list_id || '',
       hire_date: employee?.hire_date || '',
       status: employee?.status || 'active',
       photo_url: employee?.photo_url || '',
@@ -112,17 +119,38 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900">
-            {employee ? 'Modifica Dipendente' : 'Nuovo Dipendente'}
-          </h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
-            <X size={20} />
-          </button>
-        </div>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '90vh' }}>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+            <h2 className="text-xl font-bold text-gray-900">
+              {employee ? 'Modifica Dipendente' : 'Nuovo Dipendente'}
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 -mr-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 rounded-full transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="flex border-b border-gray-100 px-6 shrink-0 pt-2 gap-6 relative">
+            <button
+              onClick={() => setActiveTab('profilo')}
+              className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'profilo' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              Profilo
+              {activeTab === 'profilo' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full" />}
+            </button>
+            <button
+              onClick={() => setActiveTab('acquisti')}
+              className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'acquisti' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              Impostazioni Acquisti
+              {activeTab === 'acquisti' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full" />}
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            <div className="p-6 space-y-4 overflow-y-auto">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 flex items-center gap-2">
               <Shield size={16} className="shrink-0" />
@@ -130,6 +158,8 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
             </div>
           )}
 
+          {activeTab === 'profilo' && (
+            <>
           {/* ── FOTO PROFILO ── */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, paddingBottom: 8 }}>
             {/* Avatar / preview */}
@@ -286,6 +316,55 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
               <option value="inactive">Inattivo</option>
             </select>
           </div>
+            </>
+          )}
+
+          {activeTab === 'acquisti' && (
+            <>
+              <div>
+                <label className={labelClass}>Codice Acquisto Operatore</label>
+                <input
+                  type="text"
+                  name="employee_code"
+                  value={formData.employee_code}
+                  onChange={handleChange}
+                  placeholder="Codice utilizzato in cassa"
+                  className={`${inputClass} font-mono tracking-widest ${fe('employee_code') ? 'border-red-400' : ''}`}
+                />
+                {fe('employee_code') && <p className="mt-1 text-xs text-red-500">{fe('employee_code')}</p>}
+                <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Un codice supplementare, utile per abilitare l'operatore agli acquisti a costo.</p>
+              </div>
+
+              <div>
+                <label className={labelClass}>Limite di Spesa Massimo (€)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="max_spending_limit"
+                  value={formData.max_spending_limit}
+                  onChange={handleChange}
+                  placeholder="Es. 150.00"
+                  className={`${inputClass} ${fe('max_spending_limit') ? 'border-red-400' : ''}`}
+                />
+                {fe('max_spending_limit') && <p className="mt-1 text-xs text-red-500">{fe('max_spending_limit')}</p>}
+              </div>
+
+              <div>
+                <label className={labelClass}>Listino Dipendenti</label>
+                <input
+                  type="number"
+                  name="price_list_id"
+                  value={formData.price_list_id}
+                  onChange={handleChange}
+                  placeholder="ID listino"
+                  className={`${inputClass} ${fe('price_list_id') ? 'border-red-400' : ''}`}
+                />
+                {fe('price_list_id') && <p className="mt-1 text-xs text-red-500">{fe('price_list_id')}</p>}
+                <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Specifica l'ID del listino prezzi decurtato da applicare.</p>
+              </div>
+            </>
+          )}
 
           <div className="flex gap-3 justify-end pt-2">
             <button
