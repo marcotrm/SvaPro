@@ -706,20 +706,46 @@ export default function TesoreriaPage() {
                   {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
 
-                {/* Riga info: totale giorno + già inviato */}
+                {/* Breakdown 3 badge: Contanti | Monete | Già Inviato */}
                 {dailyPreview && (
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginBottom: 20 }}>
-                    <div>
-                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Fatturato Totale</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text)' }}>{fmt(dailyPreview.total_today || 0)}</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+
+                    {/* Contanti */}
+                    <div style={{
+                      flex: 1, minWidth: 90, padding: '12px 16px', borderRadius: 14,
+                      background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
+                      textAlign: 'center',
+                    }}>
+                      <div style={{ fontSize: 18, marginBottom: 4 }}>💵</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#a5b4fc', marginBottom: 6 }}>Contanti</div>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: '#818cf8' }}>{fmt(dailyPreview.cash_sales || 0)}</div>
                     </div>
-                    <div style={{ width: 1, background: 'var(--color-border)' }} />
-                    <div>
-                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Già Inviato</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#10b981' }}>{fmt(dailyPreview.already_sent || 0)}</div>
+
+                    {/* Monete */}
+                    <div style={{
+                      flex: 1, minWidth: 90, padding: '12px 16px', borderRadius: 14,
+                      background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
+                      textAlign: 'center',
+                    }}>
+                      <div style={{ fontSize: 18, marginBottom: 4 }}>🪙</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#fbbf24', marginBottom: 6 }}>Monete</div>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: '#f59e0b' }}>{fmt(dailyPreview.coins_received || 0)}</div>
                     </div>
+
+                    {/* Già Inviato */}
+                    <div style={{
+                      flex: 1, minWidth: 90, padding: '12px 16px', borderRadius: 14,
+                      background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
+                      textAlign: 'center',
+                    }}>
+                      <div style={{ fontSize: 18, marginBottom: 4 }}>✅</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6ee7b7', marginBottom: 6 }}>Già Inviato</div>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: '#10b981' }}>{fmt(dailyPreview.already_sent || 0)}</div>
+                    </div>
+
                   </div>
                 )}
+
 
                 {/* Delta grande */}
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>

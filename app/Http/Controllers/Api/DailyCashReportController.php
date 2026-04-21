@@ -7,6 +7,7 @@ use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DailyCashReportController extends Controller
 {
@@ -19,25 +20,39 @@ class DailyCashReportController extends Controller
         $storeId = $this->resolveStoreId($request);
         if (!$storeId) return response()->json(['message' => 'Store non trovato.'], 422);
 
-        // Totale vendite del giorno
-        $sales = DB::table('sales_orders')
+        // Totale vendite del giorno per canale
+        $salesByChannel = DB::table('sales_orders')
             ->where('tenant_id', $tenantId)
             ->where('store_id', $storeId)
             ->where('status', 'paid')
             ->whereRaw("(paid_at AT TIME ZONE 'Europe/Rome')::date = ?", [$date])
-            ->select(DB::raw('SUM(grand_total) as total'), DB::raw('COUNT(*) as count'))
-            ->first();
+            ->select('channel', DB::raw('SUM(grand_total) as total'), DB::raw('COUNT(*) as count'))
+            ->groupBy('channel')
+            ->get()
+            ->keyBy('channel');
 
-        $totalToday  = round((float) ($sales?->total ?? 0), 2);
-        $txCount     = (int) ($sales?->count ?? 0);
+        $cashSales  = round((float) ($salesByChannel['cash']?->total ?? 0), 2);
+        $posSales   = round((float) ($salesByChannel['pos']?->total  ?? 0), 2);
+        $totalToday = round($cashSales + $posSales, 2);
+        $txCount    = (int) ($salesByChannel['cash']?->count ?? 0) + (int) ($salesByChannel['pos']?->count ?? 0);
+
+        // Monete ricevute oggi da pacchi monete confermati
+        $coinsReceived = 0.0;
+        if (Schema::hasTable('coin_shipments')) {
+            $coinsReceived = round((float) DB::table('coin_shipments')
+                ->where('tenant_id', $tenantId)
+                ->where('destination_store_id', $storeId)
+                ->where('status', 'delivered')
+                ->whereRaw("DATE(confirmed_at AT TIME ZONE 'Europe/Rome') = ?", [$date])
+                ->sum('amount'), 2);
+        }
 
         // Somma già inviata oggi (tutti gli invii precedenti)
-        $alreadySent = (float) DB::table('daily_cash_reports')
+        $alreadySent = round((float) DB::table('daily_cash_reports')
             ->where('tenant_id', $tenantId)
             ->where('store_id', $storeId)
             ->where('report_date', $date)
-            ->sum('total');
-        $alreadySent = round($alreadySent, 2);
+            ->sum('total'), 2);
 
         $remaining = round($totalToday - $alreadySent, 2);
 
@@ -55,10 +70,13 @@ class DailyCashReportController extends Controller
             'date'               => $date,
             'store_id'           => $storeId,
             'total_today'        => $totalToday,
+            'cash_sales'         => $cashSales,   // 💵 Contanti (vendite in contante)
+            'pos_sales'          => $posSales,    // 💳 POS (carte)
+            'coins_received'     => $coinsReceived, // 🪙 Monete (pacchi monete confermati oggi)
             'already_sent'       => $alreadySent,
             'remaining'          => max(0, $remaining),
             'transactions_count' => $txCount,
-            'can_send'           => $remaining > 0.01, // c'è ancora qualcosa da inviare
+            'can_send'           => $remaining > 0.01,
             'last_sent_at'       => $lastReport?->created_at,
             'last_sent_by'       => $lastReport?->submitted_by_name,
             'last_amount'        => $lastReport?->last_amount,
