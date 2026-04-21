@@ -7,7 +7,7 @@ const QUICK_AMOUNTS = [5, 10, 20, 50, 100];
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
-export default function PosCheckoutModal({ cartTotal, cartLines = [], qscareTotal = 0, onComplete, onCancel, lockDiscount = false }) {
+export default function PosCheckoutModal({ cartTotal, cartLines = [], qscareTotal = 0, selectedCustomer = null, pointsRedeemed = 0, onComplete, onCancel, lockDiscount = false }) {
   const [discountType, setDiscountType]   = useState('none');
   const [discountValue, setDiscountValue] = useState('');
   const [cashAmount, setCashAmount]       = useState(() => cartTotal > 0 ? cartTotal.toFixed(2) : '');
@@ -94,10 +94,10 @@ export default function PosCheckoutModal({ cartTotal, cartLines = [], qscareTota
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                     {line.image ? (
-                       <img src={getImageUrl(line.image)} alt="" style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--color-border)', flexShrink: 0 }} />
+                       <img src={getImageUrl(line.image)} alt="" style={{ width: 54, height: 54, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--color-border)', flexShrink: 0 }} />
                     ) : (
-                       <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                         <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>No IMG</span>
+                       <div style={{ width: 54, height: 54, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                         <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>📦</span>
                        </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -113,6 +113,23 @@ export default function PosCheckoutModal({ cartTotal, cartLines = [], qscareTota
                 </div>
               ))}
             </div>
+
+            {/* Punti fedeltà riscattati */}
+            {selectedCustomer && pointsRedeemed > 0 && (
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--color-border)', background: 'rgba(251,191,36,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 18 }}>⭐</span>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#fbbf24' }}>Punti fedeltà riscattati</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{selectedCustomer.name}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{pointsRedeemed} punti × €0,01</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: '#10B981' }}>-{fmt(pointsRedeemed * 0.01)}</span>
+                </div>
+              </div>
+            )}
 
             {/* Totali */}
             <div style={{ padding: '14px 20px', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>

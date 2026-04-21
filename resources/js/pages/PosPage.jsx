@@ -272,6 +272,7 @@ export default function PosPage() {
   const searchRef                       = useRef(null);
 
   const [cartLines, setCartLines]       = useState([]);
+  const [pointsRedeemed, setPointsRedeemed] = useState(0); // punti usati come sconto
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
 
@@ -641,7 +642,7 @@ export default function PosPage() {
         order_discount_amount: totalCombinedDiscount > 0 ? totalCombinedDiscount : (payload.order_discount_amount ?? 0),
       });
       toast.success('✅ Vendita completata!');
-      setCartLines([]); setSelectedCustomer(null); setNote(''); setShowCheckoutModal(false); setQscareLines({});
+      setCartLines([]); setSelectedCustomer(null); setPointsRedeemed(0); setNote(''); setShowCheckoutModal(false); setQscareLines({});
       setAppliedPromo(null); setPromoCode(''); setPromoError('');
       // Reset operatore dopo ogni vendita (deve riscannerizzare)
       setSoldByEmployeeId(''); setOperatorBarcode(''); setOperatorName(''); setOperatorError('');
@@ -1155,19 +1156,45 @@ export default function PosPage() {
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <User size={9} /> Cliente
               </div>
-              {selectedCustomer ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(123,111,208,0.15)', border: '1px solid rgba(123,111,208,0.3)', borderRadius: 8, padding: '7px 10px', minHeight: 36 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCustomer.name}</div>
-                    {customerDiscountPct > 0 && (
-                      <div style={{ fontSize: 9, fontWeight: 800, color: '#86efac' }}>🎟️ -{customerDiscountPct}%</div>
+                {selectedCustomer ? (
+                  <div style={{ background: 'rgba(123,111,208,0.15)', border: '1px solid rgba(123,111,208,0.3)', borderRadius: 8, padding: '8px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCustomer.name}</div>
+                        {customerDiscountPct > 0 && (
+                          <div style={{ fontSize: 9, fontWeight: 800, color: '#86efac' }}>🎟️ -{customerDiscountPct}%</div>
+                        )}
+                      </div>
+                      <button onClick={() => { setSelectedCustomer(null); setPointsRedeemed(0); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', flexShrink: 0 }}>
+                        <X size={12} />
+                      </button>
+                    </div>
+                    {/* Badge punti */}
+                    {(selectedCustomer.points_balance ?? 0) > 0 && (
+                      <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 14 }}>⭐</span>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24' }}>{selectedCustomer.points_balance} pt</span>
+                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>(≈ €{((selectedCustomer.points_balance ?? 0) * 0.01).toFixed(2)})</span>
+                        </div>
+                        {pointsRedeemed === 0 ? (
+                          <button
+                            onClick={() => setPointsRedeemed(selectedCustomer.points_balance ?? 0)}
+                            style={{ fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.12)', color: '#fbbf24', cursor: 'pointer' }}
+                          >Usa punti</button>
+                        ) : (
+                          <button
+                            onClick={() => setPointsRedeemed(0)}
+                            style={{ fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.12)', color: '#fc8181', cursor: 'pointer' }}
+                          >✕ Rimuovi</button>
+                        )}
+                      </div>
+                    )}
+                    {pointsRedeemed > 0 && (
+                      <div style={{ marginTop: 4, fontSize: 9, color: '#86efac', fontWeight: 700 }}>✅ -€{(pointsRedeemed * 0.01).toFixed(2)} sconto punti applicato</div>
                     )}
                   </div>
-                  <button onClick={() => setSelectedCustomer(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', flexShrink: 0 }}>
-                    <X size={12} />
-                  </button>
-                </div>
-              ) : (
+                ) : (
                 <div style={{ position: 'relative' }}>
                   <User size={11} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }} />
                   <input
@@ -1471,9 +1498,11 @@ export default function PosPage() {
       {/* ─── Checkout Modal ─── */}
       {showCheckoutModal && (
         <PosCheckoutModal
-          cartTotal={cartTotalFinal}
+          cartTotal={Math.max(0, cartTotalFinal - (pointsRedeemed * 0.01))}
           cartLines={cartLines}
           qscareTotal={effectiveQscarePrice}
+          selectedCustomer={selectedCustomer}
+          pointsRedeemed={pointsRedeemed}
           onComplete={handleCheckout}
           onCancel={() => setShowCheckoutModal(false)}
           lockDiscount={isDipendente}
