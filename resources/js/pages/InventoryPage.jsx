@@ -303,7 +303,8 @@ export default function InventoryPage() {
                 <th>Prodotto</th>
                 <th>Magazzino</th>
                 <th>Ubicazione</th>
-                <th>Disponibile</th>
+                <th>Store (locale)</th>
+                <th title="Somma su tutti i magazzini del tenant — stesso dato del POS">Tot. Tenant (POS)</th>
                 <th>Riservato</th>
                 <th>Pt. Riordino</th>
                 <th title="Giorni stimati all'esaurimento scorte (ultimi 30 gg)">Rotazione (gg)</th>
@@ -336,6 +337,16 @@ export default function InventoryPage() {
                       <span style={{ fontWeight: 700, color: isOut ? 'var(--color-error)' : isLow ? 'var(--color-warning)' : 'var(--color-success)' }}>
                         {item.available ?? item.on_hand}
                       </span>
+                    </td>
+                    <td>
+                      {item.total_on_hand != null ? (
+                        <span style={{ fontWeight: 700, fontSize: 13, color: item.total_on_hand > 0 ? 'var(--color-success)' : 'var(--color-error)' }}>
+                          {item.total_on_hand}
+                          {item.total_on_hand > (item.available ?? item.on_hand) && (
+                            <span title="Stock presente in altri magazzini" style={{ marginLeft: 5, fontSize: 10, color: '#6366f1', fontWeight: 600 }}>📦 +altri</span>
+                          )}
+                        </span>
+                      ) : <span style={{ color: 'var(--color-text-tertiary)' }}>—</span>}
                     </td>
                     <td className="sp-cell-secondary sp-font-mono">{item.reserved || 0}</td>
                     <td className="sp-cell-secondary sp-font-mono">{item.reorder_point || '—'}</td>

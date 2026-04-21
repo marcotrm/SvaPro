@@ -14,55 +14,111 @@ class InventoryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
-        $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
+        $storeId  = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
 
         if ($storeId !== null && ! DB::table('stores')->where('tenant_id', $tenantId)->where('id', $storeId)->exists()) {
             return response()->json(['message' => 'Store non valido per il tenant.'], 422);
         }
 
-        $baseQuery = DB::table('stock_items as si')
-            ->join('warehouses as w', 'w.id', '=', 'si.warehouse_id')
-            ->join('product_variants as pv', 'pv.id', '=', 'si.product_variant_id')
-            ->join('products as p', 'p.id', '=', 'pv.product_id')
-            ->where('si.tenant_id', $tenantId)
-            ->when($storeId !== null, fn ($query) => $query->where('w.store_id', $storeId))
-            ->orderBy('p.name');
+        // Trova warehouse_id del negozio selezionato
+        $warehouseId = null;
+        if ($storeId !== null) {
+            $warehouseId = DB::table('warehouses')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', $storeId)
+                ->orderBy('id')
+                ->value('id');
+        }
 
-        // Prova prima con campi extra (barcode su p, cost_price su pv)
-        try {
-            $rows = (clone $baseQuery)->select([
-                'si.id',
-                'si.warehouse_id',
-                'w.name as warehouse_name',
-                'si.product_variant_id',
-                'p.barcode',
-                'p.sku as product_sku',
-                'p.name as product_name',
-                'pv.flavor',
-                'pv.sale_price',
-                'pv.cost_price',
-                'si.on_hand',
-                'si.reserved',
-                'si.reorder_point',
-                'si.safety_stock',
-                DB::raw('(si.on_hand - si.reserved) as available'),
-            ])->get();
-        } catch (\Throwable) {
-            // Fallback senza colonne opzionali
-            $rows = (clone $baseQuery)->select([
-                'si.id',
-                'si.warehouse_id',
-                'w.name as warehouse_name',
-                'si.product_variant_id',
-                'p.name as product_name',
-                'pv.flavor',
-                'pv.sale_price',
-                'si.on_hand',
-                'si.reserved',
-                'si.reorder_point',
-                'si.safety_stock',
-                DB::raw('(si.on_hand - si.reserved) as available'),
-            ])->get();
+        // Totale stock per variante su TUTTI i warehouse del tenant (come il POS/Catalogo)
+        $totalStockSub = DB::table('stock_items')
+            ->where('tenant_id', $tenantId)
+            ->select('product_variant_id',
+                DB::raw('SUM(on_hand)  as total_on_hand'),
+                DB::raw('SUM(reserved) as total_reserved'))
+            ->groupBy('product_variant_id');
+
+        // Query principale: prende le varianti con tutti i prodotti del tenant
+        // e fa LEFT JOIN sullo stock_items del warehouse specifico (o tutti se nessun filtro)
+        $query = DB::table('product_variants as pv')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->leftJoinSub($totalStockSub, 'ts', 'ts.product_variant_id', '=', 'pv.id')
+            ->where('p.tenant_id', $tenantId)
+            ->orderBy('p.name')
+            ->orderBy('pv.flavor');
+
+        if ($warehouseId) {
+            // LEFT JOIN sullo stock del warehouse specifico
+            $query->leftJoin(DB::raw("(SELECT * FROM stock_items WHERE warehouse_id = {$warehouseId} AND tenant_id = {$tenantId}) AS si_store"),
+                'si_store.product_variant_id', '=', 'pv.id');
+
+            try {
+                $rows = $query->select([
+                    DB::raw('COALESCE(si_store.id, 0) as id'),
+                    DB::raw("{$warehouseId} as warehouse_id"),
+                    'pv.id as product_variant_id',
+                    'p.name as product_name',
+                    'pv.flavor',
+                    'pv.sale_price',
+                    DB::raw('COALESCE(si_store.on_hand, 0)   as on_hand'),
+                    DB::raw('COALESCE(si_store.reserved, 0)  as reserved'),
+                    DB::raw('COALESCE(si_store.reorder_point, 0) as reorder_point'),
+                    DB::raw('COALESCE(si_store.safety_stock, 0)  as safety_stock'),
+                    DB::raw('COALESCE(si_store.on_hand, 0) - COALESCE(si_store.reserved, 0) as available'),
+                    DB::raw('COALESCE(ts.total_on_hand, 0)  as total_on_hand'),   // totale tenant (come POS)
+                    DB::raw('COALESCE(ts.total_reserved, 0) as total_reserved'),
+                    'p.barcode',
+                    'p.sku as product_sku',
+                    'pv.cost_price',
+                ])->get();
+            } catch (\Throwable) {
+                $rows = $query->select([
+                    DB::raw('COALESCE(si_store.id, 0) as id'),
+                    DB::raw("{$warehouseId} as warehouse_id"),
+                    'pv.id as product_variant_id',
+                    'p.name as product_name',
+                    'pv.flavor',
+                    'pv.sale_price',
+                    DB::raw('COALESCE(si_store.on_hand, 0)  as on_hand'),
+                    DB::raw('COALESCE(si_store.reserved, 0) as reserved'),
+                    DB::raw('COALESCE(si_store.on_hand, 0) - COALESCE(si_store.reserved, 0) as available'),
+                    DB::raw('COALESCE(ts.total_on_hand, 0)  as total_on_hand'),
+                ])->get();
+            }
+        } else {
+            // Senza filtro store: somma tutti i warehouse (comportamento originale aggregato)
+            try {
+                $rows = $query->select([
+                    'pv.id as id',
+                    DB::raw('NULL as warehouse_id'),
+                    'pv.id as product_variant_id',
+                    'p.name as product_name',
+                    'pv.flavor',
+                    'pv.sale_price',
+                    DB::raw('COALESCE(ts.total_on_hand, 0)  as on_hand'),
+                    DB::raw('COALESCE(ts.total_reserved, 0) as reserved'),
+                    DB::raw('0 as reorder_point'),
+                    DB::raw('0 as safety_stock'),
+                    DB::raw('COALESCE(ts.total_on_hand, 0) - COALESCE(ts.total_reserved, 0) as available'),
+                    DB::raw('COALESCE(ts.total_on_hand, 0)  as total_on_hand'),
+                    'p.barcode',
+                    'p.sku as product_sku',
+                    'pv.cost_price',
+                ])->get();
+            } catch (\Throwable) {
+                $rows = $query->select([
+                    'pv.id as id',
+                    DB::raw('NULL as warehouse_id'),
+                    'pv.id as product_variant_id',
+                    'p.name as product_name',
+                    'pv.flavor',
+                    'pv.sale_price',
+                    DB::raw('COALESCE(ts.total_on_hand, 0)  as on_hand'),
+                    DB::raw('COALESCE(ts.total_reserved, 0) as reserved'),
+                    DB::raw('COALESCE(ts.total_on_hand, 0) - COALESCE(ts.total_reserved, 0) as available'),
+                    DB::raw('COALESCE(ts.total_on_hand, 0)  as total_on_hand'),
+                ])->get();
+            }
         }
 
         return response()->json(['data' => $rows]);
