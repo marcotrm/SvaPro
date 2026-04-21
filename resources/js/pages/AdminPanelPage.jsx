@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
   BarChart3, Users, ShoppingBag, Truck, Landmark, Calendar,
@@ -15,7 +15,7 @@ import CustomersPage from './CustomersPage.jsx';
 import SuppliersPage from './SuppliersPage.jsx';
 import EmployeesPage from './EmployeesPage.jsx';
 import CategoryPage from './CategoryPage.jsx';
-// â”€â”€ Palette colori â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Palette colori ──────────────────────────────────────────────────────────
 const C = {
   bg:        '#F5F7FA',
   sidebar:   '#0E1726',
@@ -31,7 +31,7 @@ const C = {
   textSub:   '#64748B',
 };
 
-// â”€â”€ Menu sezioni interne â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Menu sezioni interne ─────────────────────────────────────────────────────
 const SECTIONS = [
   { id: 'dashboard',       label: 'Dashboard',         icon: BarChart3   },
   { id: 'anagrafiche',     label: 'Anagrafiche',       icon: Users       },
@@ -39,14 +39,14 @@ const SECTIONS = [
   { id: 'acquisti',        label: 'Acquisti',          icon: Truck       },
   { id: 'tesoreria',       label: 'Tesoreria',         icon: Landmark    },
   { id: 'scadenziario',    label: 'Scadenziario',      icon: Calendar    },
-  { id: 'contabilita',     label: 'ContabilitÃ ',       icon: BookOpen    },
+  { id: 'contabilita',     label: 'Contabilità',       icon: BookOpen    },
   { id: 'iva',             label: 'IVA e Fiscale',     icon: PieChart    },
   { id: 'conto_economico', label: 'Conto Economico',   icon: TrendingDown},
   { id: 'documenti',       label: 'Documenti',         icon: FolderOpen  },
   { id: 'report',          label: 'Report',            icon: TrendingUp  },
 ];
 
-// â”€â”€ Componenti riutilizzabili â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Componenti riutilizzabili ────────────────────────────────────────────────
 const KPICard = ({ label, value, sub, color = C.accent, icon: Icon, trend, loading }) => (
   <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '20px 22px', flex: 1, minWidth: 160 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -146,9 +146,9 @@ const LoadingSpinner = () => (
   </div>
 );
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// SEZIONE DASHBOARD â€” dati reali da reports.summary
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════════════════════
+// SEZIONE DASHBOARD — dati reali da reports.summary
+// ══════════════════════════════════════════════════════════════════════════════
 
 const SectionDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -169,8 +169,8 @@ const SectionDashboard = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const fmt = (v) => v != null ? `â‚¬ ${Number(v).toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : 'â€”';
-  const num = (v) => v != null ? Number(v).toLocaleString('it-IT') : 'â€”';
+  const fmt = (v) => v != null ? `€ ${Number(v).toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '—';
+  const num = (v) => v != null ? Number(v).toLocaleString('it-IT') : '—';
 
   return (
     <div>
@@ -182,7 +182,7 @@ const SectionDashboard = () => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16, marginBottom: 16 }}>
-        {/* Grafico andamento â€” placeholder visivo */}
+        {/* Grafico andamento — placeholder visivo */}
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 14 }}>Andamento Incassi</div>
@@ -208,7 +208,7 @@ const SectionDashboard = () => {
                     lbl = d.toLocaleDateString('it-IT', { month: 'short' });
                   }
                   return (
-                    <div key={i} title={`â‚¬ ${val.toLocaleString('it-IT')}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    <div key={i} title={`€ ${val.toLocaleString('it-IT')}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                       <div style={{ width: '100%', height: `${pct}%`, background: `linear-gradient(to top, ${C.accent}, ${C.accent}66)`, borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease' }} />
                       <div style={{ fontSize: 9, color: C.muted, textTransform: 'capitalize' }}>{lbl}</div>
                     </div>
@@ -249,9 +249,9 @@ const SectionDashboard = () => {
   );
 };
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// SEZIONE ANAGRAFICHE â€” dati reali: Clienti, Dipendenti, Fornitori
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════════════════════
+// SEZIONE ANAGRAFICHE — dati reali: Clienti, Dipendenti, Fornitori
+// ══════════════════════════════════════════════════════════════════════════════
 
 // Generic CRUD form/list for new mock tabs
 const GenericCrudTab = ({ title, fields, defaultData }) => {
@@ -377,9 +377,9 @@ const SectionAnagrafiche = () => {
   );
 };
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// SEZIONE VENDITE â€” ordini reali  
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════════════════════
+// SEZIONE VENDITE — ordini reali  
+// ══════════════════════════════════════════════════════════════════════════════
 
 const SectionVendite = () => {
   const [subTab, setSubTab] = useState('ordini');
@@ -404,7 +404,7 @@ const SectionVendite = () => {
       .finally(() => setLoading(false));
   }, [subTab]);
 
-  const formatEur = (v) => `â‚¬ ${Number(v || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`;
+  const formatEur = (v) => `€ ${Number(v || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`;
 
   return (
     <div>
@@ -430,8 +430,8 @@ const SectionVendite = () => {
                 rows={ordersList.map(o => (
                   <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => navigate('/orders')}>
                     <Td mono>{o.order_number || `ORD-${o.id}`}</Td>
-                    <Td>{o.created_at ? new Date(o.created_at).toLocaleDateString('it-IT') : 'â€”'}</Td>
-                    <Td><span style={{ fontWeight: 600 }}>{o.customer_name || o.customer?.full_name || 'â€”'}</span></Td>
+                    <Td>{o.created_at ? new Date(o.created_at).toLocaleDateString('it-IT') : '—'}</Td>
+                    <Td><span style={{ fontWeight: 600 }}>{o.customer_name || o.customer?.full_name || '—'}</span></Td>
                     <Td><span style={{ fontWeight: 700, color: C.success }}>{formatEur(o.grand_total)}</span></Td>
                     <Td><StatoBadge stato={o.status} /></Td>
                     <Td>
@@ -457,16 +457,16 @@ const SectionVendite = () => {
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
           <AlertCircle size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Sezione in costruzione</div>
-          <div style={{ fontSize: 13, color: C.textSub }}>La sezione {TABS.find(t => t[0] === subTab)?.[1]} sarÃ  disponibile a breve.</div>
+          <div style={{ fontSize: 13, color: C.textSub }}>La sezione {TABS.find(t => t[0] === subTab)?.[1]} sarà disponibile a breve.</div>
         </div>
       )}
     </div>
   );
 };
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════════════════════
 // SEZIONE ACQUISTI
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════════════════════
 
 const SectionAcquisti = () => {
   const navigate = useNavigate();
@@ -511,7 +511,7 @@ const SectionAcquisti = () => {
   );
 };
 
-// â”€â”€â”€ Cash Alert Monitor (usato in Tesoreria) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Cash Alert Monitor (usato in Tesoreria) ────────────────────────────────
 function CashAlertMonitor() {
   const [storeBalances, setStoreBalances] = useState([]);
   const [loading, setLoading]             = useState(true);
@@ -560,7 +560,7 @@ function CashAlertMonitor() {
           </div>
           <div>
             <div style={{ fontWeight: 800, fontSize: 15, color: C.text }}>Monitoraggio Cassa Live</div>
-            <div style={{ fontSize: 12, color: C.textSub }}>Aggiornamento ogni 30s Â· Soglia allerta â‰¥ â‚¬1.000</div>
+            <div style={{ fontSize: 12, color: C.textSub }}>Aggiornamento ogni 30s · Soglia allerta ≥ €1.000</div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -570,7 +570,7 @@ function CashAlertMonitor() {
               style={{ fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
                 background: alertOnly ? '#ef4444' : 'rgba(239,68,68,0.12)', color: alertOnly ? '#fff' : '#ef4444', transition: 'all 0.2s' }}
             >
-              ðŸ”´ {alertStores.length} negoz{alertStores.length === 1 ? 'io' : 'i'} â‰¥ â‚¬1.000
+              🔴 {alertStores.length} negoz{alertStores.length === 1 ? 'io' : 'i'} ≥ €1.000
             </button>
           )}
           <button onClick={loadBalances} title="Aggiorna" style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.textSub, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -596,7 +596,7 @@ function CashAlertMonitor() {
               }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: C.textSub, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
                   <span>{store.name}</span>
-                  {isAlert && <span style={{ fontSize: 10, fontWeight: 800, color: '#ef4444', background: 'rgba(239,68,68,0.15)', padding: '1px 6px', borderRadius: 10 }}>âš  ALLERTA</span>}
+                  {isAlert && <span style={{ fontSize: 10, fontWeight: 800, color: '#ef4444', background: 'rgba(239,68,68,0.15)', padding: '1px 6px', borderRadius: 10 }}>⚠ ALLERTA</span>}
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 900, color: isAlert ? '#ef4444' : C.text }}>{fmt(store.balance)}</div>
               </div>
@@ -608,17 +608,17 @@ function CashAlertMonitor() {
   );
 }
 
-// Mock sections â€” con bottoni "Crea" e link alle pagine dedicate
+// Mock sections — con bottoni "Crea" e link alle pagine dedicate
 const SectionTesoreria = () => {
   const navigate = useNavigate();
   return (
     <div>
       <CashAlertMonitor />
       <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
-        <KPICard label="Saldo Totale"       value="â€”"  color={C.success} icon={Wallet}     />
-        <KPICard label="Saldo Banca"        value="â€”"  color={C.accent}  icon={Landmark}   />
-        <KPICard label="Saldo Cassa"        value="â€”"  color={C.gold}    icon={DollarSign} />
-        <KPICard label="Flusso Previsto 7gg" value="â€”" color={C.warning} icon={TrendingUp} />
+        <KPICard label="Saldo Totale"       value="—"  color={C.success} icon={Wallet}     />
+        <KPICard label="Saldo Banca"        value="—"  color={C.accent}  icon={Landmark}   />
+        <KPICard label="Saldo Cassa"        value="—"  color={C.gold}    icon={DollarSign} />
+        <KPICard label="Flusso Previsto 7gg" value="—" color={C.warning} icon={TrendingUp} />
       </div>
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
         <Wallet size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
@@ -642,7 +642,7 @@ const SectionScadenziario = () => (
 const SectionContabilita = () => (
   <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
     <BookOpen size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
-    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>ContabilitÃ </div>
+    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Contabilità</div>
     <div style={{ fontSize: 13, color: C.textSub }}>Modulo in sviluppo.</div>
   </div>
 );
@@ -674,10 +674,10 @@ const SectionReport = () => {
   return (
     <div>
       <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
-        <KPICard label="Fatturato Totale" value="â€”" color={C.success} icon={TrendingUp}   />
-        <KPICard label="Costi Totali"     value="â€”" color={C.danger}  icon={TrendingDown} />
-        <KPICard label="Margine"          value="â€”" color={C.accent}  icon={Target}       />
-        <KPICard label="Clienti Attivi"   value="â€”" color={C.gold}    icon={Users}        />
+        <KPICard label="Fatturato Totale" value="—" color={C.success} icon={TrendingUp}   />
+        <KPICard label="Costi Totali"     value="—" color={C.danger}  icon={TrendingDown} />
+        <KPICard label="Margine"          value="—" color={C.accent}  icon={Target}       />
+        <KPICard label="Clienti Attivi"   value="—" color={C.gold}    icon={Users}        />
       </div>
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
         <TrendingUp size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
@@ -690,23 +690,23 @@ const SectionReport = () => {
   );
 };
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════════════════════
 // CONTO ECONOMICO NEGOZIO
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════════════════════
 
 const DEFAULT_CATEGORIES = [
-  { id: 'affitto',        label: 'Affitto / Leasing',       icon: 'ðŸ ' },
-  { id: 'corrente',       label: 'Corrente Elettrica',       icon: 'âš¡' },
-  { id: 'gas',            label: 'Gas',                      icon: 'ðŸ”¥' },
-  { id: 'telefono',       label: 'Telefono / Internet',      icon: 'ðŸ“±' },
-  { id: 'dipendenti',     label: 'Stipendi Dipendenti',      icon: 'ðŸ‘¥' },
-  { id: 'contributi',     label: 'Contributi / INPS',        icon: 'ðŸ›ï¸' },
-  { id: 'pubblicita',     label: 'PubblicitÃ  & Marketing',   icon: 'ðŸ“£' },
-  { id: 'forniture',      label: 'Forniture & Materiali',    icon: 'ðŸ“¦' },
-  { id: 'commercialista', label: 'Commercialista / Consulenze', icon: 'ðŸ“‹' },
-  { id: 'assicurazione',  label: 'Assicurazione',            icon: 'ðŸ›¡ï¸' },
-  { id: 'tasse',          label: 'Tasse & Imposte',          icon: 'ðŸ¦' },
-  { id: 'altro',          label: 'Altri Costi',              icon: 'ðŸ“Ž' },
+  { id: 'affitto',        label: 'Affitto / Leasing',       icon: '🏠' },
+  { id: 'corrente',       label: 'Corrente Elettrica',       icon: '⚡' },
+  { id: 'gas',            label: 'Gas',                      icon: '🔥' },
+  { id: 'telefono',       label: 'Telefono / Internet',      icon: '📱' },
+  { id: 'dipendenti',     label: 'Stipendi Dipendenti',      icon: '👥' },
+  { id: 'contributi',     label: 'Contributi / INPS',        icon: '🏛️' },
+  { id: 'pubblicita',     label: 'Pubblicità & Marketing',   icon: '📣' },
+  { id: 'forniture',      label: 'Forniture & Materiali',    icon: '📦' },
+  { id: 'commercialista', label: 'Commercialista / Consulenze', icon: '📋' },
+  { id: 'assicurazione',  label: 'Assicurazione',            icon: '🛡️' },
+  { id: 'tasse',          label: 'Tasse & Imposte',          icon: '🏦' },
+  { id: 'altro',          label: 'Altri Costi',              icon: '📎' },
 ];
 
 const SectionContoEconomico = ({ selectedStoreId }) => {
@@ -714,132 +714,204 @@ const SectionContoEconomico = ({ selectedStoreId }) => {
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`);
   const [storesList, setStoresList] = useState([]);
   const [storeId, setStoreId] = useState('all');
+  const [revenue, setRevenue] = useState(null);
+  const [loadingRevenue, setLoadingRevenue] = useState(false);
+  const [expenses, setExpenses] = useState({});
+  const [customCats, setCustomCats] = useState([]);
+  const [newCatLabel, setNewCatLabel] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  // Sync with global store selector
+  const lsKey = `svapro_conto_eco_${storeId}_${month}`;
+
+  // Sync con il selettore store globale
   useEffect(() => {
     if (selectedStoreId) setStoreId(String(selectedStoreId));
-    else setStoreId('all');
   }, [selectedStoreId]);
 
+  // Carica negozi
   useEffect(() => {
     storesApi.getStores().then(r => setStoresList(r.data?.data || [])).catch(() => {});
   }, []);
-  const [summary,  setSummary]  = useState(null);
-  const [stores_,  setStores_]  = useState([]);
-  const [loading,  setLoading]  = useState(false);
 
-  const fmt = (v) => v != null
-    ? `â‚¬ ${Number(v).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    : 'â€”';
-
+  // Carica spese dal localStorage
   useEffect(() => {
-    const [y, m] = month.split('-');
-    setLoading(true); setSummary(null); setStores_([]);
-    const params = { year: y, month: m, ...(storeId !== 'all' ? { store_id: storeId } : {}) };
-    Promise.all([
-      reports.summary(params).catch(() => null),
-      reports.storeRevenue(params).catch(() => null),
-    ]).then(([sumRes, storeRes]) => {
-      setSummary(sumRes?.data?.data || sumRes?.data || null);
-      const raw = storeRes?.data?.data || storeRes?.data || [];
-      setStores_(Array.isArray(raw) ? raw : []);
-    }).finally(() => setLoading(false));
+    try {
+      const saved = JSON.parse(localStorage.getItem(lsKey) || '{}');
+      setExpenses(saved.expenses || {});
+      setCustomCats(saved.customCats || []);
+    } catch { setExpenses({}); setCustomCats([]); }
+  }, [lsKey]);
+
+  // Carica ricavi dal backend
+  useEffect(() => {
+    const fetchRevenue = async () => {
+      setLoadingRevenue(true);
+      try {
+        const [y, m] = month.split('-');
+        const params = { year: y, month: m, ...(storeId !== 'all' ? { store_id: storeId } : {}) };
+        const res = await reports.summary(params);
+        const data = res?.data?.data || res?.data || {};
+        setRevenue(parseFloat(data.total_net_revenue ?? data.net_revenue ?? data.total_revenue ?? data.total ?? 0));
+      } catch { setRevenue(null); }
+      finally { setLoadingRevenue(false); }
+    };
+    fetchRevenue();
   }, [month, storeId]);
 
-  const revenue      = parseFloat(summary?.total_net_revenue ?? summary?.net_revenue ?? summary?.total_revenue ?? summary?.total ?? 0) || 0;
-  const orders       = parseInt(summary?.total_orders ?? summary?.orders_count ?? 0) || 0;
-  const avgOrder     = orders > 0 ? revenue / orders : 0;
-  const cogs         = parseFloat(summary?.total_cost ?? summary?.cogs ?? 0) || 0;
-  const margine      = revenue > 0 ? ((revenue - cogs) / revenue * 100) : null;
+  const allCats = [...DEFAULT_CATEGORIES, ...customCats.map(c => ({ id: c.id, label: c.label, icon: '💼' }))];
 
-  const monthLabel   = new Date(month + '-01').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+  const totalExpenses = allCats.reduce((acc, c) => acc + (parseFloat(expenses[c.id]) || 0), 0);
+  const utile = revenue != null ? (revenue - totalExpenses) : null;
+
+  const handleExpenseChange = (id, val) => {
+    setExpenses(prev => ({ ...prev, [id]: val }));
+  };
+
+  const handleSave = () => {
+    setSaving(true);
+    localStorage.setItem(lsKey, JSON.stringify({ expenses, customCats }));
+    setTimeout(() => setSaving(false), 600);
+  };
+
+  const addCustomCat = () => {
+    if (!newCatLabel.trim()) return;
+    const id = `custom_${Date.now()}`;
+    setCustomCats(prev => [...prev, { id, label: newCatLabel.trim() }]);
+    setNewCatLabel('');
+  };
+
+  const removeCustomCat = (id) => {
+    setCustomCats(prev => prev.filter(c => c.id !== id));
+    setExpenses(prev => { const n = {...prev}; delete n[id]; return n; });
+  };
+
+  const fmt = (v) => v != null ? `€ ${Number(v).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Filter: mese + negozio */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
+      {/* Filtri */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Mese di competenza</div>
-          <input
-            type="month"
-            value={month}
-            onChange={e => setMonth(e.target.value)}
-            style={{ padding: '10px 16px', borderRadius: 12, border: `2px solid ${C.accent}`, fontSize: 15, fontWeight: 700, color: C.text, background: '#fff', cursor: 'pointer', outline: 'none' }}
-          />
-        </div>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Negozio</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Negozio</div>
           <select value={storeId} onChange={e => setStoreId(e.target.value)}
-            style={{ padding: '10px 14px', borderRadius: 12, border: `1px solid ${C.border}`, fontSize: 13, cursor: 'pointer', background: '#fff', fontWeight: 600, height: 44 }}>
+            style={{ padding: '9px 14px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, cursor: 'pointer', background: '#fff' }}>
             <option value="all">Tutti i negozi</option>
-            {storesList.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+            {storesList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
-        {loading && <Loader size={18} style={{ animation: 'spin 1s linear infinite', opacity: 0.4 }} />}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Mese di competenza</div>
+          <input type="month" value={month} onChange={e => setMonth(e.target.value)}
+            style={{ padding: '9px 14px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13 }} />
+        </div>
+        <button onClick={handleSave} style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: saving ? C.success : C.accent, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s' }}>
+          {saving ? <><CheckCircle2 size={14} /> Salvato!</> : <><Download size={14} /> Salva Dati</>}
+        </button>
       </div>
 
-      {/* â”€â”€ KPI Riepilogo â”€â”€ */}
+      {/* KPI Riepilogo */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
-        {[
-          { label: 'ðŸ’° Fatturato Netto', value: fmt(revenue),    color: C.success, sub: 'Da vendite POS' },
-          { label: 'ðŸ§¾ NÂ° Ordini',       value: orders || 'â€”',   color: C.accent,  sub: 'Transazioni totali' },
-          { label: 'ðŸ“Š Scontrino Medio', value: fmt(avgOrder),   color: C.gold,    sub: 'Media per ordine' },
-          { label: 'ðŸ“‰ Costo Merce',     value: fmt(cogs),       color: C.danger,  sub: 'COGS stimato' },
-          ...(margine != null ? [{ label: 'ðŸ“ˆ Margine Lordo', value: `${margine.toFixed(1)}%`, color: margine >= 40 ? C.success : margine >= 20 ? C.gold : C.danger, sub: 'Su ricavi netti' }] : []),
-        ].map(k => (
-          <div key={k.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 20px' }}>
-            <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>{k.label}</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: loading ? C.muted : k.color }}>
-              {loading ? 'â€¦' : k.value}
-            </div>
-            <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>{k.sub}</div>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>💰 Ricavi (Vendite)</div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: C.success }}>
+            {loadingRevenue ? <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} /> : fmt(revenue)}
           </div>
-        ))}
+          <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>Fatturato netto da ordini</div>
+        </div>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>📉 Totale Spese</div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: C.danger }}>{fmt(totalExpenses)}</div>
+          <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>Somma di tutti i costi</div>
+        </div>
+        <div style={{ background: utile != null && utile >= 0 ? '#F0FDF4' : '#FEF2F2', border: `2px solid ${utile != null && utile >= 0 ? C.success : C.danger}`, borderRadius: 14, padding: '18px 20px' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, color: utile != null && utile >= 0 ? C.success : C.danger }}>
+            {utile != null && utile >= 0 ? '📈 Utile Netto' : '📉 Perdita'}
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 900, color: utile != null && utile >= 0 ? C.success : C.danger }}>
+            {utile != null ? fmt(utile) : '—'}
+          </div>
+          {utile != null && revenue != null && revenue > 0 && (
+            <div style={{ fontSize: 11, marginTop: 4, color: utile >= 0 ? C.success : C.danger }}>
+              Margine: {((utile / revenue) * 100).toFixed(1)}%
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* â”€â”€ Breakdown per negozio â”€â”€ */}
-      {stores_.length > 0 && (
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, fontWeight: 800, fontSize: 14 }}>
-            ðŸ“ Fatturato per Negozio â€” {monthLabel}
-          </div>
-          <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {stores_.sort((a,b) => (parseFloat(b.total_revenue||b.revenue||0)) - (parseFloat(a.total_revenue||a.revenue||0))).map((s, i) => {
-              const val = parseFloat(s.total_revenue ?? s.revenue ?? s.net_revenue ?? 0);
-              const maxVal = parseFloat(stores_[0]?.total_revenue ?? stores_[0]?.revenue ?? 1);
-              const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
-              return (
-                <div key={s.store_id ?? s.id ?? i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: `hsl(${(i*67+210)%360},55%,52%)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize: 10, fontWeight: 900, color:'#fff', flexShrink: 0 }}>
-                    {i+1}
-                  </div>
-                  <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 100 }}>
-                    {s.store_name ?? s.name ?? `Store ${s.store_id}`}
-                  </div>
-                  <div style={{ flex: 3, background: '#F1F5F9', borderRadius: 6, height: 10, overflow: 'hidden' }}>
-                    <div style={{ width: `${pct}%`, height: '100%', background: `hsl(${(i*67+210)%360},55%,52%)`, borderRadius: 6, transition: 'width 0.4s ease' }} />
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: C.success, minWidth: 110, textAlign: 'right' }}>
-                    {fmt(val)}
-                  </div>
+      {/* Tabella spese */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontWeight: 800, fontSize: 15, color: C.text }}>📋 Voci di Costo</div>
+          <div style={{ fontSize: 12, color: C.textSub }}>Inserisci gli importi mensili per ogni voce</div>
+        </div>
+        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {allCats.map(cat => {
+            const val = expenses[cat.id] ?? '';
+            const isCustom = customCats.some(c => c.id === cat.id);
+            return (
+              <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: val && parseFloat(val) > 0 ? '#FEF9EC' : '#F8FAFC', border: `1px solid ${val && parseFloat(val) > 0 ? '#FDE68A' : C.border}`, transition: 'all 0.15s' }}>
+                <span style={{ fontSize: 18, flexShrink: 0 }}>{cat.icon}</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: C.text }}>{cat.label}</span>
+                <div style={{ position: 'relative', width: 160 }}>
+                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: C.muted, fontWeight: 700 }}>€</span>
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={val}
+                    onChange={e => handleExpenseChange(cat.id, e.target.value)}
+                    placeholder="0,00"
+                    style={{ width: '100%', padding: '8px 10px 8px 28px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontWeight: 700, color: val && parseFloat(val) > 0 ? C.danger : C.text, textAlign: 'right', boxSizing: 'border-box', background: '#fff', outline: 'none' }}
+                  />
                 </div>
-              );
-            })}
+                {val && parseFloat(val) > 0 && (
+                  <span style={{ fontSize: 12, fontWeight: 800, color: C.danger, minWidth: 90, textAlign: 'right' }}>{fmt(parseFloat(val))}</span>
+                )}
+                {isCustom && (
+                  <button onClick={() => removeCustomCat(cat.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: 4, display: 'flex', alignItems: 'center' }}>
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Aggiungi voce personalizzata */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
+            <input value={newCatLabel} onChange={e => setNewCatLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomCat()}
+              placeholder="+ Aggiungi voce personalizzata (es: Manutenzione)..."
+              style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, background: '#F8FAFC', outline: 'none' }} />
+            <button onClick={addCustomCat} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: C.accent, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+              <Plus size={14} />
+            </button>
           </div>
         </div>
-      )}
+      </div>
 
-      {!loading && !summary && (
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 40, textAlign: 'center', color: C.textSub, fontSize: 14 }}>
-          <TrendingDown size={36} style={{ opacity: 0.2, margin: '0 auto 12px', display: 'block' }} />
-          Nessun dato disponibile per {monthLabel}
+      {/* Riepilogo finale */}
+      {utile != null && (
+        <div style={{ padding: '20px 24px', background: utile >= 0 ? 'linear-gradient(135deg, #F0FDF4, #DCFCE7)' : 'linear-gradient(135deg, #FEF2F2, #FEE2E2)', border: `2px solid ${utile >= 0 ? '#86EFAC' : '#FCA5A5'}`, borderRadius: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: utile >= 0 ? '#166534' : '#991B1B', marginBottom: 4 }}>
+                {utile >= 0 ? '✅ Risultato Positivo' : '⚠️ Risultato Negativo'} — {month.split('-').reverse().join('/')}
+              </div>
+              <div style={{ fontSize: 11, color: utile >= 0 ? '#166534' : '#991B1B', opacity: 0.7 }}>
+                Ricavi {fmt(revenue)} — Costi {fmt(totalExpenses)}
+              </div>
+            </div>
+            <div style={{ fontSize: 36, fontWeight: 900, color: utile >= 0 ? '#166534' : '#991B1B', letterSpacing: '-0.02em' }}>
+              {fmt(utile)}
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGINA PRINCIPALE
+// ══════════════════════════════════════════════════════════════════════════════
+
 export default function AdminPanelPage() {
   const { selectedStoreId } = useOutletContext?.() || {};
   const [active, setActive] = useState('dashboard');
@@ -868,7 +940,7 @@ export default function AdminPanelPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)', background: C.bg, margin: '-24px -32px -40px', overflow: 'hidden' }}>
 
-      {/* â”€â”€ Tab Bar orizzontale â”€â”€ */}
+      {/* ── Tab Bar orizzontale ── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 2,
         background: C.sidebar, padding: '10px 16px',
@@ -902,13 +974,13 @@ export default function AdminPanelPage() {
         })}
       </div>
 
-      {/* â”€â”€ Main Content â”€â”€ */}
+      {/* ── Main Content ── */}
       <div style={{ flex: 1, overflow: 'auto', padding: 28 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: C.text, letterSpacing: '-0.02em' }}>
               {current?.icon && React.createElement(current.icon, { size: 20, style: { display: 'inline', marginRight: 8, verticalAlign: 'middle', color: C.accent } })}
-              Dashboard Amministrativa â€” {current?.label}
+              Dashboard Amministrativa — {current?.label}
             </h1>
             <div style={{ fontSize: 13, color: C.textSub, marginTop: 2 }}>
               Vista aggiornata al {new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}
