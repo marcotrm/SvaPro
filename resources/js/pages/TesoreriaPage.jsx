@@ -617,7 +617,8 @@ export default function TesoreriaPage() {
                             </td>
                           </tr>
                           );
-                        })}}
+                        })}
+
                       </tbody>
                     </table>
                   )}
