@@ -1149,8 +1149,7 @@ export default function ShiftsPage() {
   const [allEmpLoading, setAllEmpLoading] = useState(false);
 
   useEffect(() => {
-    setAllEmpLoading(true);
-    employeesApi.getAllEmployees()
+    if (isDipendente) { setAllEmployeesGlobal([]); return; } setAllEmpLoading(true); employeesApi.getAllEmployees()
       .then(res => {
         const list = res.data?.data || [];
         console.log('[ShiftsPage] allEmployeesGlobal caricati:', list.length);

@@ -260,6 +260,19 @@ class AttendanceController extends Controller
         $tenantId = (int) $request->attributes->get('tenant_id');
         $storeId  = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
 
+        /** @var \App\Models\User|null $user */
+        $user = $request->user();
+        if ($user && $user->hasRole('dipendente')) {
+            // Forza lo store_id del dipendente
+            $empStoreId = DB::table('employees')->where('id', $user->employee_id)->value('store_id');
+            if ($empStoreId) {
+                $storeId = $empStoreId;
+            } else if (!$storeId) {
+                // Dipendente senza store id associato e senza store selezionato: non può vedere nessuno
+                return response()->json(['data' => []]);
+            }
+        }
+
         $employees = DB::table('employees')
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
