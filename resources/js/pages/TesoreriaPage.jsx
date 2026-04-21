@@ -323,13 +323,12 @@ export default function TesoreriaPage() {
   useEffect(() => { if (activeTab === 'daily') fetchDaily(); }, [activeTab, fetchDaily]);
 
   const handleSubmitDaily = async () => {
-    if (dailyPreview?.already_submitted) return;
+    if (!(dailyPreview?.can_send)) return;
     setDailySub(true);
     try {
-      await dailyCashReports.submit({ notes: dailyNotes });
-      toast.success('Incasso giornaliero inviato!');
-      setDailyNotes('');
-      fetchDaily();
+      await dailyCashReports.submit({});
+      toast.success('Incasso inviato! Il saldo del superadmin è aggiornato.');
+      fetchDaily(); // ricarica preview aggiornato
     } catch (e) { toast.error(e.response?.data?.message || 'Errore'); }
     finally { setDailySub(false); }
   };
@@ -697,55 +696,74 @@ export default function TesoreriaPage() {
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-secondary)' }}>Caricamento...</div>
           ) : (
             <>
-              {/* Card principale — solo totale */}
+              {/* Card principale — delta incasso */}
               <div style={{
                 background: 'var(--color-surface)', borderRadius: 20, padding: 32,
                 border: '1px solid var(--color-border)', textAlign: 'center',
                 boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
               }}>
-                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 600, marginBottom: 8 }}>
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 600, marginBottom: 20 }}>
                   {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-                  Fatturato di Oggi
+
+                {/* Riga info: totale giorno + già inviato */}
+                {dailyPreview && (
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginBottom: 20 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Fatturato Totale</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text)' }}>{fmt(dailyPreview.total_today || 0)}</div>
+                    </div>
+                    <div style={{ width: 1, background: 'var(--color-border)' }} />
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Già Inviato</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#10b981' }}>{fmt(dailyPreview.already_sent || 0)}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Delta grande */}
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+                  Da Inviare
                 </div>
                 <div style={{
                   fontSize: 56, fontWeight: 900, letterSpacing: '-0.03em',
-                  background: 'linear-gradient(135deg, #7B6FD0, #6366f1)',
+                  background: (dailyPreview?.remaining || 0) > 0
+                    ? 'linear-gradient(135deg, #7B6FD0, #6366f1)'
+                    : 'linear-gradient(135deg, #10b981, #059669)',
                   WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                   marginBottom: 8,
                 }}>
-                  {fmt(dailyPreview?.total || 0)}
+                  {fmt(dailyPreview?.remaining || 0)}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 28 }}>
-                  {dailyPreview?.transactions_count || 0} transazioni
+                  {dailyPreview?.transactions_count || 0} transazioni oggi
                 </div>
 
-                {dailyPreview?.already_submitted ? (
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 8,
-                    padding: '12px 24px', borderRadius: 14,
-                    background: 'rgba(16,185,129,0.1)', color: '#10b981',
-                    fontWeight: 700, fontSize: 14,
-                  }}>
-                    ✓ Inviato da {dailyPreview.submitted_by_name} — {new Date(dailyPreview.submitted_at).toLocaleString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                {/* Ultimo invio */}
+                {dailyPreview?.last_sent_at && (
+                  <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 20 }}>
+                    Ultimo invio: <strong style={{ color: 'var(--color-text-secondary)' }}>{fmt(dailyPreview.last_amount)}</strong> — {dailyPreview.last_sent_by} alle {new Date(dailyPreview.last_sent_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
                   </div>
-                ) : (
-                  <button
-                    onClick={handleSubmitDaily}
-                    disabled={dailySubmitting || (dailyPreview?.total || 0) === 0}
-                    style={{
-                      padding: '14px 48px', borderRadius: 14, border: 'none', cursor: 'pointer',
-                      background: 'linear-gradient(135deg, #7B6FD0, #6366f1)', color: '#fff',
-                      fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em',
-                      opacity: dailySubmitting ? 0.7 : 1,
-                      boxShadow: '0 4px 18px rgba(99,102,241,0.35)',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {dailySubmitting ? 'Invio in corso...' : '📤 Invia Incasso'}
-                  </button>
                 )}
+
+                {/* Bottone — sempre visibile, disabilitato solo se non c'è delta */}
+                <button
+                  onClick={handleSubmitDaily}
+                  disabled={dailySubmitting || !dailyPreview?.can_send}
+                  style={{
+                    padding: '14px 48px', borderRadius: 14, border: 'none', cursor: dailyPreview?.can_send ? 'pointer' : 'not-allowed',
+                    background: dailyPreview?.can_send
+                      ? 'linear-gradient(135deg, #7B6FD0, #6366f1)'
+                      : 'var(--color-surface-hover)',
+                    color: dailyPreview?.can_send ? '#fff' : 'var(--color-text-tertiary)',
+                    fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em',
+                    opacity: dailySubmitting ? 0.7 : 1,
+                    boxShadow: dailyPreview?.can_send ? '0 4px 18px rgba(99,102,241,0.35)' : 'none',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {dailySubmitting ? 'Invio in corso...' : dailyPreview?.can_send ? '📤 Invia Incasso' : '✓ Tutto Inviato'}
+                </button>
               </div>
 
               {/* Storico report — visibile a tutti */}
