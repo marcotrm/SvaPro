@@ -491,28 +491,29 @@ class PurchaseOrderController extends Controller
                 })
                 ->where('p.tenant_id', $tenantId)
                 ->where('p.is_active', true)
-                ->whereRaw('COALESCE(si.qty_on_hand, 0) <= COALESCE(pv.reorder_point, p.min_stock, 5)')
+                ->whereRaw('COALESCE(si.on_hand, 0) <= COALESCE(si.reorder_point, 5)')
                 ->select([
                     'pv.id as variant_id',
                     'p.name as product_name',
                     'pv.flavor',
                     'p.sku',
-                    DB::raw('COALESCE(si.qty_on_hand, 0) as qty_on_hand'),
-                    DB::raw('COALESCE(pv.reorder_point, p.min_stock, 5) as reorder_point'),
-                    DB::raw('COALESCE(pv.reorder_qty, p.reorder_qty, 10) as suggested_qty'),
-                    DB::raw('COALESCE(pv.last_cost, 0) as unit_cost'),
-                    'p.supplier_id',
+                    DB::raw('COALESCE(si.on_hand, 0) as qty_on_hand'),
+                    DB::raw('COALESCE(si.reorder_point, 5) as reorder_point'),
+                    DB::raw('GREATEST(COALESCE(si.reorder_point, 5) - COALESCE(si.on_hand, 0), 1) as suggested_qty'),
+                    DB::raw('COALESCE(pv.cost_price, 0) as unit_cost'),
+                    'p.default_supplier_id as supplier_id',
                 ]);
 
             if ($supplierId) {
-                $q->where('p.supplier_id', (int) $supplierId);
+                $q->where('p.default_supplier_id', (int) $supplierId);
             }
 
-            $items = $q->orderByRaw('COALESCE(si.qty_on_hand, 0) ASC')->get();
+            $items = $q->orderByRaw('COALESCE(si.on_hand, 0) ASC')->get();
 
             return response()->json(['data' => $items]);
         } catch (\Throwable $e) {
             return response()->json(['data' => [], 'error' => $e->getMessage()], 200);
         }
+
     }
 }
