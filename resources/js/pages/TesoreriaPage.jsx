@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { cashMovements, coinShipments, dailyCashReports, employees as employeesApi } from '../api.jsx';
 import {
   Plus, ArrowDownCircle, ArrowUpCircle, Filter, Store,
-  TrendingUp, TrendingDown, DollarSign, Clock, RefreshCw,
+  TrendingUp, TrendingDown, DollarSign, Clock, RefreshCw, Lock,
   User, Search, CheckCircle, AlertCircle, Banknote, CreditCard,
   Building2, BarChart2, Package, PackageCheck, PackageX, Coins
 } from 'lucide-react';
@@ -16,7 +16,7 @@ const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency:
 function TabBar({ active, onChange, isDipendente }) {
   const tabs = isDipendente
     ? [
-        { id: 'live',    label: '💰 Saldo Cassa' },
+        { id: 'live',    label: '🔒 Cassaforte' },
         { id: 'daily',   label: '📤 Contanti Cassa' },
         { id: 'coins',   label: '🪙 Pacchi Monete' },
       ]
@@ -459,7 +459,75 @@ export default function TesoreriaPage() {
             <div style={{ textAlign: 'center', padding: 60, color: 'var(--color-text-tertiary)' }}>Caricamento saldi...</div>
           ) : balances.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 60, color: 'var(--color-text-tertiary)' }}>Nessun negozio trovato.</div>
+          ) : isDipendente ? (
+            // ── VISTA DIPENDENTE: Cassaforte del suo store ──────────────
+            (() => {
+              const myStore = balances.find(b => String(b.store_id) === String(selectedStoreId || balances[0]?.store_id)) || balances[0];
+              if (!myStore) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--color-text-tertiary)' }}>Dati non disponibili.</div>;
+              const cashTotal  = (myStore.sales_cash || 0) + (myStore.coin_amount || 0);
+              const cashPart   = myStore.sales_cash  || 0;
+              const coinPart   = myStore.coin_amount || 0;
+              const isPositive = myStore.balance >= 0;
+              return (
+                <div style={{ maxWidth: 440, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                  {/* Box cassaforte principale */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
+                    borderRadius: 24, padding: '32px 28px', textAlign: 'center',
+                    border: '1px solid rgba(99,102,241,0.3)',
+                    boxShadow: '0 8px 32px rgba(99,102,241,0.2)',
+                    position: 'relative', overflow: 'hidden',
+                  }}>
+                    {/* Icona decorativa */}
+                    <div style={{ position: 'absolute', top: 16, right: 20, opacity: 0.08 }}>
+                      <Lock size={72} color="#fff" />
+                    </div>
+
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Cassaforte</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>{myStore.store_name}</div>
+
+                    {/* Totale grande */}
+                    <div style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', marginBottom: 4 }}>
+                      {fmt(myStore.balance)}
+                    </div>
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '4px 12px', borderRadius: 20,
+                      background: isPositive ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
+                      color: isPositive ? '#6ee7b7' : '#fca5a5',
+                      fontSize: 12, fontWeight: 700, marginBottom: 24,
+                    }}>
+                      {isPositive ? '✓ Saldo regolare' : '⚠ Saldo negativo'}
+                    </div>
+
+                    {/* Contanti | Monete */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: '16px 12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div style={{ fontSize: 22, marginBottom: 6 }}>💵</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Contanti</div>
+                        <div style={{ fontSize: 24, fontWeight: 900, color: '#a5b4fc' }}>{fmt(cashPart)}</div>
+                      </div>
+                      <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: '16px 12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div style={{ fontSize: 22, marginBottom: 6 }}>🪙</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>Monete</div>
+                        <div style={{ fontSize: 24, fontWeight: 900, color: '#fde68a' }}>{fmt(coinPart)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ultimo movimento */}
+                  {myStore.last_movement && (
+                    <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                      <Clock size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                      Ultimo movimento: {new Date(myStore.last_movement.created_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()
           ) : (
+            // ── VISTA ADMIN: griglia tutti i negozi ─────────────────────
             <>
               {/* ── PANNELLO ALLERTA CASSA ────────────────────────────── */}
               {(() => {
@@ -477,7 +545,7 @@ export default function TesoreriaPage() {
                       </div>
                       <div>
                         <div style={{ fontWeight: 800, fontSize: 14, color: '#ef4444' }}>
-                          {alertStores.length} {alertStores.length === 1 ? 'negozio' : 'negozi'} con cassa ≥ €{CASH_ALERT_THRESHOLD.toLocaleString('it-IT')}
+                          {alertStores.length} {alertStores.length === 1 ? 'negozio' : 'negozi'} con cassa &ge; &euro;{CASH_ALERT_THRESHOLD.toLocaleString('it-IT')}
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
                           {alertStores.map(s => s.store_name).join(' · ')}
