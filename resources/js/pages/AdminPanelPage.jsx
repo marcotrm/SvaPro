@@ -11,7 +11,10 @@ import {
 } from 'lucide-react';
 import { customers as customersApi, suppliers as suppliersApi, employees as employeesApi, reports, orders as ordersApi, cashMovements as cashMovementsApi, stores as storesApi } from '../api.jsx';
 import { toast } from 'react-hot-toast';
-
+import CustomersPage from './CustomersPage.jsx';
+import SuppliersPage from './SuppliersPage.jsx';
+import EmployeesPage from './EmployeesPage.jsx';
+import CategoryPage from './CategoryPage.jsx';
 // ── Palette colori ──────────────────────────────────────────────────────────
 const C = {
   bg:        '#F5F7FA',
@@ -250,12 +253,66 @@ const SectionDashboard = () => {
 // SEZIONE ANAGRAFICHE — dati reali: Clienti, Dipendenti, Fornitori
 // ══════════════════════════════════════════════════════════════════════════════
 
+// Generic CRUD form/list for new mock tabs
+const GenericCrudTab = ({ title, fields, defaultData }) => {
+  const [data, setData] = useState(defaultData || []);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({});
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    setData([...data, { id: Date.now(), ...form }]);
+    setForm({});
+    setShowForm(false);
+    toast.success(`${title} creato con successo!`);
+  };
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <h3 style={{ fontSize: 18, fontWeight: 800 }}>{title}</h3>
+        <button onClick={() => setShowForm(!showForm)} className="sp-btn sp-btn-primary" style={{ padding: '8px 16px', fontSize: 13, gap: 6, display: 'flex', alignItems: 'center' }}>
+          {showForm ? 'Annulla' : <><Plus size={14} /> Crea Nuovo</>}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleSave} style={{ background: '#f8fafc', padding: 20, borderRadius: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            {fields.map(f => (
+              <div key={f.name}>
+                <label className="sp-label">{f.label}</label>
+                <input required className="sp-input" type={f.type || 'text'} value={form[f.name] || ''} onChange={e => setForm({...form, [f.name]: e.target.value})} />
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 16, textAlign: 'right' }}>
+            <button type="submit" className="sp-btn sp-btn-primary">Salva {title}</button>
+          </div>
+        </form>
+      )}
+
+      {data.length === 0 ? (
+        <EmptyState message={`Nessun ${title.toLowerCase()} configurato.`} />
+      ) : (
+        <Table
+          headers={fields.map(f => f.label).concat(['Azioni'])}
+          rows={data.map((item, i) => (
+            <tr key={item.id || i}>
+              {fields.map(f => <Td key={f.name}>{item[f.name]}</Td>)}
+              <Td>
+                <button onClick={() => setData(data.filter(d => d.id !== item.id))} style={{ color: C.danger, background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={14} /></button>
+              </Td>
+            </tr>
+          ))}
+        />
+      )}
+    </div>
+  );
+};
+
 const SectionAnagrafiche = () => {
   const [subTab, setSubTab] = useState('clienti');
-  const [search, setSearch] = useState('');
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   const TABS = [
     ['clienti',    'Clienti'],
@@ -264,99 +321,9 @@ const SectionAnagrafiche = () => {
     ['pagamenti',  'Metodi Pagamento'],
     ['banche',     'Banche/Casse'],
     ['iva',        'Aliquote IVA'],
+    ['categoria',  'Categorie'],
+    ['listini',    'Listini'],
   ];
-
-  const fetchData = useCallback(async (tab) => {
-    setLoading(true);
-    try {
-      let res;
-      if (tab === 'clienti')    res = await customersApi.getCustomers({ per_page: 50 });
-      if (tab === 'dipendenti') res = await employeesApi.getEmployees({ per_page: 50 });
-      if (tab === 'fornitori')  res = await suppliersApi.getAll({ per_page: 50 });
-      setData(res?.data?.data || res?.data || []);
-    } catch {
-      setData([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    setSearch('');
-    if (['clienti', 'dipendenti', 'fornitori'].includes(subTab)) fetchData(subTab);
-    else setData([]);
-  }, [subTab, fetchData]);
-
-  const filtered = useMemo(() => {
-    if (!search) return data;
-    const q = search.toLowerCase();
-    return data.filter(r => {
-      const name = r.full_name || r.first_name || r.name || r.company_name || '';
-      const email = r.email || '';
-      return name.toLowerCase().includes(q) || email.toLowerCase().includes(q);
-    });
-  }, [data, search]);
-
-  const handleNew = () => {
-    if (subTab === 'clienti')    navigate('/customers');
-    if (subTab === 'dipendenti') navigate('/employees');
-    if (subTab === 'fornitori')  navigate('/suppliers');
-  };
-
-  const handleView = (item) => {
-    if (subTab === 'clienti')    navigate(`/customers/${item.id}`);
-    if (subTab === 'dipendenti') navigate(`/employees`);
-    if (subTab === 'fornitori')  navigate(`/suppliers`);
-  };
-
-  const renderClienteRow = (c) => (
-    <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/customers/${c.id}`)}>
-      <Td><span style={{ fontWeight: 700 }}>{c.full_name || c.name}</span></Td>
-      <Td mono>{c.phone || '—'}</Td>
-      <Td mono>{c.email || '—'}</Td>
-      <Td><span style={{ fontSize: 12, color: C.textSub }}>{c.loyalty_tier || '—'}</span></Td>
-      <Td><StatoBadge stato={c.status || 'attivo'} /></Td>
-      <Td>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={e => { e.stopPropagation(); navigate(`/customers/${c.id}`); }} style={{ padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 7, background: '#fff', cursor: 'pointer' }} title="Visualizza">
-            <Eye size={13} style={{ color: C.textSub }} />
-          </button>
-        </div>
-      </Td>
-    </tr>
-  );
-
-  const renderDipendenteRow = (e) => (
-    <tr key={e.id}>
-      <Td><span style={{ fontWeight: 700 }}>{`${e.first_name || ''} ${e.last_name || ''}`.trim()}</span></Td>
-      <Td>{e.role || e.position || '—'}</Td>
-      <Td mono>{e.email || '—'}</Td>
-      <Td mono>{e.phone || '—'}</Td>
-      <Td><StatoBadge stato={e.status || 'active'} /></Td>
-      <Td>
-        <button onClick={() => navigate('/employees')} style={{ padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 7, background: '#fff', cursor: 'pointer' }} title="Visualizza">
-          <ExternalLink size={13} style={{ color: C.accent }} />
-        </button>
-      </Td>
-    </tr>
-  );
-
-  const renderFornitoreRow = (f) => (
-    <tr key={f.id}>
-      <Td><span style={{ fontWeight: 700 }}>{f.name || f.company_name}</span></Td>
-      <Td mono>{f.vat_number || f.piva || '—'}</Td>
-      <Td mono>{f.phone || '—'}</Td>
-      <Td mono>{f.email || '—'}</Td>
-      <Td><StatoBadge stato={f.status || 'attivo'} /></Td>
-      <Td>
-        <button onClick={() => navigate('/suppliers')} style={{ padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 7, background: '#fff', cursor: 'pointer' }} title="Visualizza">
-          <Eye size={13} style={{ color: C.textSub }} />
-        </button>
-      </Td>
-    </tr>
-  );
-
-  const isRealTab = ['clienti', 'dipendenti', 'fornitori'].includes(subTab);
 
   return (
     <div>
@@ -368,50 +335,44 @@ const SectionAnagrafiche = () => {
         ))}
       </div>
 
-      {isRealTab ? (
-        <>
-          <SearchBar
-            placeholder={`Cerca ${subTab}...`}
-            value={search}
-            onChange={setSearch}
-            onNew={handleNew}
-            newLabel={subTab === 'clienti' ? 'Nuovo Cliente' : subTab === 'dipendenti' ? 'Nuovo Dipendente' : 'Nuovo Fornitore'}
+      <div style={{ marginTop: 20 }}>
+        {subTab === 'clienti' && <CustomersPage />}
+        {subTab === 'dipendenti' && <EmployeesPage />}
+        {subTab === 'fornitori' && <SuppliersPage />}
+        {subTab === 'categoria' && <CategoryPage />}
+        
+        {subTab === 'pagamenti' && (
+          <GenericCrudTab 
+            title="Metodi Pagamento" 
+            fields={[{label: 'Nome Metodo', name: 'nome'}, {label: 'Tipo', name: 'tipo'}]} 
+            defaultData={[{id: 1, nome: 'Contanti', tipo: 'Cash'}, {id: 2, nome: 'Carta di Credito', tipo: 'POS'}]} 
           />
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-            {loading ? <LoadingSpinner /> : filtered.length === 0 ? (
-              <EmptyState
-                message={`Nessun ${subTab === 'dipendenti' ? 'dipendente' : subTab === 'fornitori' ? 'fornitore' : 'cliente'} trovato`}
-                icon={Users}
-                action={handleNew}
-                actionLabel="Crea nuovo"
-              />
-            ) : (
-              <Table
-                headers={
-                  subTab === 'clienti'    ? ['Nome', 'Telefono', 'Email', 'Tier', 'Stato', 'Azioni'] :
-                  subTab === 'dipendenti' ? ['Nome', 'Ruolo', 'Email', 'Telefono', 'Stato', 'Azioni'] :
-                  ['Nome / Azienda', 'P.IVA', 'Telefono', 'Email', 'Stato', 'Azioni']
-                }
-                rows={filtered.slice(0, 50).map(item =>
-                  subTab === 'clienti'    ? renderClienteRow(item) :
-                  subTab === 'dipendenti' ? renderDipendenteRow(item) :
-                  renderFornitoreRow(item)
-                )}
-              />
-            )}
-          </div>
-          <div style={{ marginTop: 10, fontSize: 12, color: C.muted }}>
-            {filtered.length} {subTab} mostrati
-            {filtered.length >= 50 && ' — vai alla pagina dedicata per vedere tutti'}
-          </div>
-        </>
-      ) : (
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 32, textAlign: 'center' }}>
-          <AlertCircle size={36} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Sezione in costruzione</div>
-          <div style={{ fontSize: 13, color: C.textSub }}>La gestione di {subTab} sarà disponibile a breve.</div>
-        </div>
-      )}
+        )}
+
+        {subTab === 'banche' && (
+          <GenericCrudTab 
+            title="Banche e Casse" 
+            fields={[{label: 'Nome Banca', name: 'nome'}, {label: 'IBAN', name: 'iban'}]} 
+            defaultData={[{id: 1, nome: 'Banca Intesa', iban: 'IT00A12345678901234567890'}]} 
+          />
+        )}
+
+        {subTab === 'iva' && (
+          <GenericCrudTab 
+            title="Aliquote IVA" 
+            fields={[{label: 'Codice', name: 'codice'}, {label: 'Percentuale', name: 'percentuale', type: 'number'}]} 
+            defaultData={[{id: 1, codice: 'IVA22', percentuale: '22'}, {id: 2, codice: 'IVA10', percentuale: '10'}]} 
+          />
+        )}
+
+        {subTab === 'listini' && (
+          <GenericCrudTab 
+            title="Listini Prezzo" 
+            fields={[{label: 'Nome Listino', name: 'nome'}, {label: 'Descrizione', name: 'desc'}]} 
+            defaultData={[{id: 1, nome: 'Listino Base', desc: 'Prezzi di listino standard'}, {id: 2, nome: 'Listino Rivenditori', desc: 'Sconto 20%'}]} 
+          />
+        )}
+      </div>
     </div>
   );
 };
