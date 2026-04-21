@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Http\Controllers\Api;
 
@@ -55,7 +55,10 @@ class CustomerController extends Controller
             ->leftJoin('loyalty_cards as lc', function ($join) use ($tenantId) {
                 $join->on('lc.customer_id', '=', 'c.id')
                     ->where('lc.tenant_id', '=', $tenantId);
-            ->leftJoin('loyalty_wallets as lw', function ($join) use ($tenantId) { $join->on('lw.customer_id', '=', 'c.id')->where('lw.tenant_id', '=', $tenantId); });
+            })
+            ->leftJoin('loyalty_wallets as lw', function ($join) use ($tenantId) {
+                $join->on('lw.customer_id', '=', 'c.id')
+                    ->where('lw.tenant_id', '=', $tenantId);
             })
             ->leftJoin('employees as emp_reg', 'emp_reg.id', '=', 'c.created_by_employee_id')
             ->leftJoin('users as u_creator', function ($join) {
