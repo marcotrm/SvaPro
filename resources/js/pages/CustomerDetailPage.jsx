@@ -534,10 +534,9 @@ export default function CustomerDetailPage() {
       {/* ── LOYALTY ── */}
       {activeTab === 'loyalty' && (
         <div style={{ display: 'grid', gap: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
             {[
               { label: 'Punti Disponibili', value: loyaltyData?.wallet?.points_balance ?? 0, color: '#4f46e5' },
-              { label: 'Punti Guadagnati', value: loyaltyData?.total_earned ?? 0, color: '#16a34a' },
               { label: 'Punti Utilizzati', value: loyaltyData?.total_redeemed ?? 0, color: '#d97706' },
             ].map(kpi => (
               <div key={kpi.label} className="card-v3" style={{ padding: '20px 24px', textAlign: 'center' }}>

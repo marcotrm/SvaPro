@@ -31,7 +31,7 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode }
   const variant   = product.variants?.[0];
   const price     = parseFloat(variant?.sale_price) || 0;
   const stockInfo = variant ? stockMap[variant.id] : null;
-  const onHand    = variant?.stock_quantity ?? variant?.on_hand ?? stockInfo?.on_hand ?? 0;
+  const onHand    = stockInfo?.on_hand ?? variant?.stock_quantity ?? variant?.on_hand ?? 0;
   const palette   = catPalette(product.category_id);
   const imgUrl    = product.image_url ? getImageUrl(product.image_url) : null;
   const inStock   = onHand > 0;
@@ -448,7 +448,7 @@ export default function PosPage() {
     if (!variant) return;
     // Blocca aggiunta se stock 0
     const stockInfo = stockMap[variant.id];
-    const onHand = product.variants?.[0]?.stock_quantity ?? product.variants?.[0]?.on_hand ?? stockInfo?.on_hand ?? 0;
+    const onHand = stockInfo?.on_hand ?? product.variants?.[0]?.stock_quantity ?? product.variants?.[0]?.on_hand ?? 0;
     if (onHand <= 0) {
       toast.error(`❌ ${product.name} non disponibile in magazzino`, { duration: 2000 });
       return;
@@ -1774,6 +1774,12 @@ function PointsModal({ customer, pointsRedeemed, pointsDiscountAmt, cartTotal, f
             onChange={e => {
               const raw = e.target.value.replace(/[^0-9]/g, '');
               setInputRaw(raw);
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                const pts = Math.min(maxUsable, Math.max(0, parseInt(inputRaw) || 0));
+                if (pts >= 100 && pts % 100 === 0) onApply(pts);
+              }
             }}
             style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: '12px 16px', fontSize: 22, fontWeight: 800, color: '#fbbf24', outline: 'none', boxSizing: 'border-box' }}
           />
