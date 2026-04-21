@@ -451,7 +451,7 @@ class OrderController extends Controller
                 return response()->json(['message' => 'Punti insufficienti nel wallet per il riscatto richiesto.'], 422);
             }
 
-            $pointsDiscount = round($pointsToRedeem * 0.05, 2);
+            $pointsDiscount = round($pointsToRedeem * 0.01, 2); // 1 punto = €0.01
             $quote['totals']['discount_total'] += $pointsDiscount;
             $quote['totals']['grand_total'] = max(0, $quote['totals']['grand_total'] - $pointsDiscount);
         }
@@ -791,14 +791,16 @@ class OrderController extends Controller
             return $orderId;
         });
 
-        $pdfUrl = null;
+        // PDF generato in background (dispatch async) per non bloccare la response
         try {
-            $html = "<h1>Ordine Vendita #{$orderId}</h1><p>Totale: EUR " . number_format($quote['totals']['grand_total'], 2) . "</p>";
-            $pdfContent = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->output();
-            $path = "orders/{$tenantId}/{$orderId}.pdf";
-            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdfContent);
-            $pdfUrl = '/storage/' . $path;
-        } catch (\Throwable $e) {}
+            dispatch(function () use ($orderId, $tenantId, $quote) {
+                $html = "<h1>Ordine Vendita #{$orderId}</h1><p>Totale: EUR " . number_format($quote['totals']['grand_total'], 2) . "</p>";
+                $pdfContent = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->output();
+                $path = "orders/{$tenantId}/{$orderId}.pdf";
+                \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdfContent);
+            })->afterResponse();
+            $pdfUrl = '/storage/orders/' . $tenantId . '/' . $orderId . '.pdf';
+        } catch (\Throwable $e) { $pdfUrl = null; }
 
         AuditLogger::log($request, 'create', 'order', $orderId, 'Ordine #' . $orderId . ' €' . number_format($quote['totals']['grand_total'], 2), null, $pdfUrl);
 

@@ -458,7 +458,7 @@ export default function PosPage() {
         product_variant_id: variant.id,
         name: product.name,
         sku: product.sku,
-        image: product.image,
+        image: product.image_url || product.image || null,
         price: parseFloat(variant.sale_price) || 0,
         qty: 1,
         location: variant.location || '',
