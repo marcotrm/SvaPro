@@ -41,6 +41,7 @@ class EmployeeController extends Controller
         }
 
         $employees = $this->employeeBaseQuery($tenantId, $storeId)
+            ->where('e.status', 'active')
             ->orderByDesc('e.id')
             ->get();
 
