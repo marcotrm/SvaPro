@@ -762,62 +762,61 @@ export default function TesoreriaPage() {
               <div style={{ fontWeight:700 }}>Nessun pacco monete trovato.</div>
             </div>
           ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               {coins.map(c => {
                 const isPending   = c.status === 'pending';
                 const isConfirmed = c.status === 'confirmed';
-                const statusColor = isPending ? '#f59e0b' : isConfirmed ? '#10b981' : '#ef4444';
+                const borderColor = isPending ? '#f59e0b' : isConfirmed ? '#10b981' : '#ef4444';
                 const statusBg    = isPending ? 'rgba(245,158,11,0.1)' : isConfirmed ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+                const statusColor = isPending ? '#f59e0b' : isConfirmed ? '#10b981' : '#ef4444';
                 const statusLabel = isPending ? '⏳ In attesa' : isConfirmed ? '✅ Confermato' : '❌ Rifiutato';
                 const bd = c.coin_breakdown || {};
                 return (
-                  <div key={c.id} style={{ background:'var(--color-surface)', borderRadius:16, border:`1px solid ${isPending ? 'rgba(245,158,11,0.3)' : 'var(--color-border)'}`, overflow:'hidden' }}>
+                  <div key={c.id} style={{ background:'var(--color-surface)', borderRadius:16, border:'1px solid var(--color-border)', borderLeft:`4px solid ${borderColor}`, overflow:'hidden' }}>
                     <div style={{ padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-                        <div style={{ width:42, height:42, borderRadius:12, background:'rgba(245,158,11,0.12)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                          <Package size={20} color="#f59e0b" />
+                      {/* Left: info */}
+                      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                        <div style={{ width:44, height:44, borderRadius:12, background:`${statusBg}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          <Package size={20} color={borderColor} />
                         </div>
                         <div>
-                          <div style={{ fontWeight:800, fontSize:15, color:'var(--color-text)' }}>
-                            Pacco #{c.id} → {c.store_name}
-                          </div>
+                          <div style={{ fontWeight:800, fontSize:14, color:'var(--color-text)' }}>Pacco #{c.id} → <span style={{ color:'var(--color-accent)' }}>{c.store_name}</span></div>
                           <div style={{ fontSize:11, color:'var(--color-text-tertiary)', marginTop:2 }}>
-                            Preparato da {c.from_user_name} · {new Date(c.created_at).toLocaleString('it-IT',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+                            👤 {c.from_user_name} · {new Date(c.created_at).toLocaleString('it-IT',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}
                           </div>
                           {isConfirmed && c.confirmed_by_name && (
-                            <div style={{ fontSize:11, color:'#10b981', marginTop:1 }}>
-                              ✓ Confermato da {c.confirmed_by_name} · {new Date(c.confirmed_at).toLocaleString('it-IT',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
-                            </div>
+                            <div style={{ fontSize:11, color:'#10b981', marginTop:1 }}>✓ {c.confirmed_by_name} · {new Date(c.confirmed_at).toLocaleString('it-IT',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
                           )}
                         </div>
                       </div>
-                      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                      {/* Right: amount + status + actions */}
+                      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
                         <div style={{ textAlign:'right' }}>
-                          <div style={{ fontSize:11, color:'var(--color-text-tertiary)', fontWeight:600 }}>Totale</div>
-                          <div style={{ fontSize:22, fontWeight:900, color:'var(--color-text)' }}>{fmt(c.total_amount)}</div>
+                          <div style={{ fontSize:10, fontWeight:700, color:'var(--color-text-tertiary)', textTransform:'uppercase' }}>Totale</div>
+                          <div style={{ fontSize:20, fontWeight:900, color:'var(--color-text)' }}>{fmt(c.total_amount)}</div>
                         </div>
-                        <span style={{ padding:'5px 12px', borderRadius:20, background:statusBg, color:statusColor, fontWeight:700, fontSize:11, whiteSpace:'nowrap' }}>{statusLabel}</span>
+                        <span style={{ padding:'4px 12px', borderRadius:20, background:statusBg, color:borderColor, fontWeight:700, fontSize:11, whiteSpace:'nowrap' }}>{statusLabel}</span>
                         {isPending && (
-                          <div style={{ display:'flex', gap:8 }}>
-                            <button onClick={() => handleConfirmCoin(c.id)} style={{ display:'flex', alignItems:'center', gap:5, padding:'8px 14px', borderRadius:10, border:'none', background:'#10b981', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>
-                              <PackageCheck size={14} /> Conferma
+                          <div style={{ display:'flex', gap:6 }}>
+                            <button onClick={() => handleConfirmCoin(c.id)} style={{ display:'flex', alignItems:'center', gap:5, padding:'8px 14px', borderRadius:10, border:'none', background:'#10b981', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer', boxShadow:'0 2px 8px rgba(16,185,129,0.3)' }}>
+                              <PackageCheck size={13}/> Conferma
                             </button>
-                            <button onClick={() => handleRejectCoin(c.id)} style={{ display:'flex', alignItems:'center', gap:5, padding:'8px 14px', borderRadius:10, border:'none', background:'rgba(239,68,68,0.1)', color:'#ef4444', fontWeight:800, fontSize:12, cursor:'pointer' }}>
-                              <PackageX size={14} /> Rifiuta
+                            <button onClick={() => handleRejectCoin(c.id)} style={{ display:'flex', alignItems:'center', gap:5, padding:'8px 12px', borderRadius:10, border:'1px solid #ef4444', background:'transparent', color:'#ef4444', fontWeight:800, fontSize:12, cursor:'pointer' }}>
+                              <PackageX size={13}/> Rifiuta
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
-                    {/* Breakdown monete */}
-                    {Object.keys(bd).length > 0 && (
-                      <div style={{ padding:'10px 18px', background:'var(--color-bg)', borderTop:'1px solid var(--color-border)', display:'flex', gap:10, flexWrap:'wrap' }}>
+                    {/* Breakdown chips */}
+                    {Object.entries(bd).filter(([,q]) => parseInt(q)>0).length > 0 && (
+                      <div style={{ padding:'8px 18px 10px', background:'var(--color-bg)', borderTop:'1px solid var(--color-border)', display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
                         {Object.entries(bd).filter(([,q]) => parseInt(q)>0).map(([val,qty]) => (
-                          <div key={val} style={{ padding:'4px 12px', borderRadius:20, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)', fontSize:12, fontWeight:700, color:'#b45309' }}>
-                            🪙 €{val} × {qty} = {fmt(parseFloat(val)*parseInt(qty))}
+                          <div key={val} style={{ display:'flex', alignItems:'center', gap:5, padding:'3px 12px', borderRadius:20, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.25)', fontSize:12, fontWeight:700, color:'#92400e' }}>
+                            <span style={{ fontSize:14 }}>🪙</span> €{val} <span style={{ opacity:0.5 }}>×</span> {qty}
                           </div>
                         ))}
-                        {c.notes && <div style={{ fontSize:11, color:'var(--color-text-tertiary)', marginLeft:'auto', fontStyle:'italic' }}>📝 {c.notes}</div>}
+                        {c.notes && <span style={{ fontSize:11, color:'var(--color-text-tertiary)', marginLeft:'auto', fontStyle:'italic' }}>📝 {c.notes}</span>}
                       </div>
                     )}
                   </div>
@@ -830,56 +829,96 @@ export default function TesoreriaPage() {
 
       {/* ══ MODAL NUOVO PACCO MONETE ══ */}
       {coinModal && (
-        <div style={{ position:'fixed', inset:0, zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)' }}>
-          <div className="sp-animate-in" style={{ background:'var(--color-surface)', width:'100%', maxWidth:540, borderRadius:24, padding:28, boxShadow:'0 24px 60px rgba(0,0,0,0.2)', maxHeight:'90vh', overflowY:'auto' }}>
-            <div style={{ marginBottom:20 }}>
-              <h2 style={{ margin:0, fontSize:20, fontWeight:800 }}>🪙 Nuovo Pacco Monete</h2>
-              <p style={{ margin:'4px 0 0', fontSize:13, color:'var(--color-text-secondary)' }}>Inserisci le monete — il totale verrà calcolato automaticamente.</p>
-            </div>
-            <form onSubmit={handleCreateCoin} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+        <div style={{ position:'fixed', inset:0, zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.6)', backdropFilter:'blur(8px)' }}>
+          <div className="sp-animate-in" style={{ background:'var(--color-surface)', width:'100%', maxWidth:480, borderRadius:28, boxShadow:'0 32px 80px rgba(0,0,0,0.3)', maxHeight:'92vh', overflowY:'auto', border:'1px solid var(--color-border)' }}>
+
+            {/* Header */}
+            <div style={{ padding:'24px 28px 0', display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
               <div>
-                <label className="sp-label">Negozio destinatario *</label>
-                <select className="sp-select" value={coinStore} onChange={e => setCoinStore(e.target.value)} style={{ width:'100%', minHeight:42 }} required>
+                <div style={{ fontSize:28 }}>🪙</div>
+                <h2 style={{ margin:'6px 0 4px', fontSize:20, fontWeight:900, color:'var(--color-text)' }}>Nuovo Pacco Monete</h2>
+                <p style={{ margin:0, fontSize:12, color:'var(--color-text-tertiary)' }}>Il totale viene calcolato automaticamente</p>
+              </div>
+              <button type="button" onClick={() => setCoinModal(false)}
+                style={{ width:34, height:34, borderRadius:10, border:'1px solid var(--color-border)', background:'var(--color-bg)', cursor:'pointer', fontSize:16, color:'var(--color-text-secondary)', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleCreateCoin} style={{ padding:'20px 28px 28px', display:'flex', flexDirection:'column', gap:18 }}>
+
+              {/* Store select */}
+              <div>
+                <label className="sp-label" style={{ marginBottom:6, display:'block' }}>Negozio destinatario *</label>
+                <select className="sp-select" value={coinStore} onChange={e => setCoinStore(e.target.value)} style={{ width:'100%' }} required>
                   <option value="">— Seleziona negozio —</option>
                   {(storesList || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
 
+              {/* Coin cards */}
               <div>
-                <label className="sp-label" style={{ marginBottom:10 }}>Composizione pacco monete</label>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                  {Object.entries(coinBreakdown).map(([val, qty]) => (
-                    <div key={val} style={{ background:'var(--color-bg)', borderRadius:12, padding:'10px 14px', border:'1px solid var(--color-border)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
-                      <span style={{ fontWeight:800, fontSize:14 }}>🪙 €{val}</span>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <button type="button" onClick={() => setCoinBD(p => ({...p, [val]: Math.max(0, parseInt(p[val]||0)-1)}))}
-                          style={{ width:28, height:28, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-surface)', cursor:'pointer', fontWeight:800, fontSize:16, lineHeight:1 }}>−</button>
-                        <input type="number" min="0" value={qty}
-                          onChange={e => setCoinBD(p => ({...p, [val]: parseInt(e.target.value)||0}))}
-                          style={{ width:50, textAlign:'center', border:'1px solid var(--color-border)', borderRadius:8, padding:'4px 6px', fontWeight:800, fontSize:14, background:'var(--color-bg)', color:'var(--color-text)' }} />
-                        <button type="button" onClick={() => setCoinBD(p => ({...p, [val]: parseInt(p[val]||0)+1}))}
-                          style={{ width:28, height:28, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-surface)', cursor:'pointer', fontWeight:800, fontSize:16, lineHeight:1 }}>+</button>
+                <label className="sp-label" style={{ marginBottom:10, display:'block' }}>Composizione pacco</label>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {Object.entries(coinBreakdown).map(([val, qty]) => {
+                    const subtotal = parseFloat(val) * parseInt(qty || 0);
+                    const active = parseInt(qty) > 0;
+                    return (
+                      <div key={val} style={{
+                        display:'flex', alignItems:'center', gap:14, padding:'14px 18px',
+                        borderRadius:16, border:`2px solid ${active ? '#f59e0b' : 'var(--color-border)'}`,
+                        background: active ? 'rgba(245,158,11,0.06)' : 'var(--color-bg)',
+                        transition:'all 0.15s'
+                      }}>
+                        {/* Coin icon */}
+                        <div style={{ width:48, height:48, borderRadius:'50%', background: active ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'var(--color-surface)', border:`2px solid ${active ? '#f59e0b' : 'var(--color-border)'}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow: active ? '0 4px 12px rgba(245,158,11,0.35)' : 'none', transition:'all 0.15s' }}>
+                          <span style={{ fontSize:13, fontWeight:900, color: active ? '#fff' : 'var(--color-text-tertiary)' }}>€{val}</span>
+                        </div>
+
+                        {/* Label */}
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontWeight:800, fontSize:15, color:'var(--color-text)' }}>€{val}</div>
+                          {active && <div style={{ fontSize:11, color:'#f59e0b', fontWeight:700, marginTop:1 }}>Subtotale: {fmt(subtotal)}</div>}
+                        </div>
+
+                        {/* Stepper */}
+                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <button type="button"
+                            onClick={() => setCoinBD(p => ({...p, [val]: Math.max(0, parseInt(p[val]||0)-1)}))}
+                            style={{ width:36, height:36, borderRadius:10, border:'1px solid var(--color-border)', background:'var(--color-surface)', cursor:'pointer', fontWeight:900, fontSize:20, lineHeight:1, color:'var(--color-text)' }}>−</button>
+                          <input type="number" min="0" value={qty}
+                            onChange={e => setCoinBD(p => ({...p, [val]: parseInt(e.target.value)||0}))}
+                            style={{ width:56, textAlign:'center', border:'2px solid var(--color-border)', borderRadius:10, padding:'6px 0', fontWeight:900, fontSize:18, background:'var(--color-bg)', color:'var(--color-text)' }} />
+                          <button type="button"
+                            onClick={() => setCoinBD(p => ({...p, [val]: parseInt(p[val]||0)+1}))}
+                            style={{ width:36, height:36, borderRadius:10, border:'none', background:'#f59e0b', cursor:'pointer', fontWeight:900, fontSize:20, lineHeight:1, color:'#fff', boxShadow:'0 2px 8px rgba(245,158,11,0.4)' }}>+</button>
+                        </div>
                       </div>
-                      <span style={{ fontSize:12, fontWeight:700, color:'var(--color-text-secondary)', minWidth:50, textAlign:'right' }}>{fmt(parseFloat(val)*parseInt(qty||0))}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
-              <div style={{ background:'linear-gradient(135deg,#f59e0b,#d97706)', borderRadius:14, padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', color:'#fff' }}>
-                <span style={{ fontWeight:800, fontSize:15 }}>Totale Pacco</span>
-                <span style={{ fontWeight:900, fontSize:26, letterSpacing:'-0.02em' }}>{fmt(computedCoinAmount)}</span>
+              {/* Totale */}
+              <div style={{ borderRadius:18, overflow:'hidden', background:'linear-gradient(135deg,#f59e0b,#b45309)', padding:'18px 22px', display:'flex', alignItems:'center', justifyContent:'space-between', boxShadow:'0 8px 24px rgba(245,158,11,0.3)' }}>
+                <div>
+                  <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.7)', textTransform:'uppercase', letterSpacing:'0.06em' }}>Totale Pacco</div>
+                  <div style={{ fontSize:32, fontWeight:900, color:'#fff', letterSpacing:'-0.03em', lineHeight:1.1 }}>{fmt(computedCoinAmount)}</div>
+                </div>
+                <div style={{ fontSize:40, opacity:0.25 }}>🪙</div>
               </div>
 
+              {/* Note */}
               <div>
-                <label className="sp-label">Note</label>
-                <textarea className="sp-input" style={{ minHeight:60, resize:'vertical' }} value={coinNotes} onChange={e => setCoinNotes(e.target.value)} placeholder="Es. Monete per fondo cassa apertura..." />
+                <label className="sp-label" style={{ marginBottom:6, display:'block' }}>Note (opzionale)</label>
+                <textarea className="sp-input" style={{ minHeight:56, resize:'vertical' }} value={coinNotes}
+                  onChange={e => setCoinNotes(e.target.value)} placeholder="Es. Fondo cassa apertura..." />
               </div>
 
-              <div style={{ display:'flex', gap:12 }}>
+              {/* Actions */}
+              <div style={{ display:'flex', gap:10 }}>
                 <button type="button" onClick={() => setCoinModal(false)} className="sp-button" style={{ flex:1 }}>Annulla</button>
-                <button type="submit" className="sp-button-primary" style={{ flex:2 }} disabled={coinSaving || computedCoinAmount <= 0}>
-                  {coinSaving ? 'Invio...' : '📦 Invia Pacco allo Store'}
+                <button type="submit" className="sp-button-primary" style={{ flex:2, gap:8, display:'flex', alignItems:'center', justifyContent:'center' }}
+                  disabled={coinSaving || computedCoinAmount <= 0}>
+                  <Package size={15}/> {coinSaving ? 'Invio...' : 'Invia Pacco allo Store'}
                 </button>
               </div>
             </form>
