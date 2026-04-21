@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuditController;
@@ -294,7 +294,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/chat/messages/read', [ChatController::class, 'markRead']);
     });
 
-    Route::middleware('role:superadmin,admin_cliente,dipendente')->group(function () {
+    Route::middleware('role:superadmin,admin_cliente,dipendente,magazziniere')->group(function () {
         // Catalog: accessibile anche ai dipendenti per il POS
         Route::get('/catalog/products', [CatalogController::class, 'index']);
         Route::get('/catalog/brands', [CatalogController::class, 'brands']);
@@ -398,6 +398,14 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/reports/qscare-dashboard', [ReportController::class, 'qscareDashboard']);
         Route::get('/reports/store-revenue', [ReportController::class, 'storeRevenue']);
         Route::get('/reports/store-revenue-history', [ReportController::class, 'storeRevenueHistory']);
+
+        // Stock Transfers / DDT — magazziniere + dipendente
+        Route::get('/stock-transfers', [StockTransferController::class, 'index']);
+        Route::post('/stock-transfers', [StockTransferController::class, 'store']);
+        Route::post('/stock-transfers/{id}/send', [StockTransferController::class, 'send']);
+        Route::post('/stock-transfers/{id}/receive', [StockTransferController::class, 'receive']);
+        Route::post('/stock-transfers/{id}/cancel', [StockTransferController::class, 'cancel']);
+        Route::delete('/stock-transfers/{id}', [StockTransferController::class, 'destroy']);
     });
 
     Route::middleware('role:superadmin,admin_cliente,dipendente,cliente_finale')->group(function () {

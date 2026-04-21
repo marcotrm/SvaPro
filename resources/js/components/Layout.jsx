@@ -24,7 +24,7 @@ const allNavigation = [
     { label: 'POS Cassa',              href: '/',               icon: Monitor,     roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
     { label: 'Report & Analisi',       href: '/reports',        icon: Activity,    roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Fatturato Negozi',       href: '/store-revenue',  icon: BarChart3,   roles: ['superadmin','admin_cliente','store_manager'] },
-    { label: 'Bolle in Arrivo',       href: '/warehouse/delivery-notes', icon: Truck, roles: ['dipendente'] },
+    { label: 'Bolle in Arrivo',       href: '/warehouse/delivery-notes', icon: Truck, roles: ['dipendente','magazziniere'] },
     { label: 'Clienti',                href: '/customers',      icon: Users,       roles: ['dipendente'] },
   ]},
 
@@ -35,11 +35,11 @@ const allNavigation = [
     { label: 'Prodotti',               href: '/catalog',              icon: Package,        roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Carico Merce (DDT)',     href: '/supplier-delivery',    icon: Truck,          roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Resi',                   href: '/returns',              icon: RotateCcw,      roles: ['superadmin','admin_cliente','store_manager'] },
-    { label: 'Trasferimenti',          href: '/stock-transfers',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Trasferimenti DDT',      href: '/stock-transfers',      icon: ArrowRightLeft, roles: ['superadmin','admin_cliente','store_manager','magazziniere'] },
 
 
     { label: 'Ordini Riassortimento', href: '/warehouse/restock',          icon: ClipboardList,  roles: ['superadmin','admin_cliente','store_manager'] },
-    { label: 'Bolle di Scarico',      href: '/warehouse/delivery-notes',   icon: Truck,          roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
+    { label: 'Bolle di Scarico',      href: '/warehouse/delivery-notes',   icon: Truck,          roles: ['superadmin','admin_cliente','store_manager','dipendente','magazziniere'] },
     { label: 'Consegne Negozi',       href: '/warehouse/store-deliveries', icon: MapPin,         roles: ['superadmin','admin_cliente','store_manager'] },
   ]},
 

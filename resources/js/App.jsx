@@ -138,7 +138,11 @@ export default function App() {
           
           <Route element={<ProtectedRoute user={user} />}>
             <Route element={<Layout user={user} setUser={setUser} />}>
-              <Route path="/" element={<PosPage />} />
+              <Route path="/" element={
+                user?.roles?.includes('magazziniere') && !user?.roles?.includes('superadmin') && !user?.roles?.includes('admin_cliente')
+                  ? <Navigate to="/stock-transfers" replace />
+                  : <PosPage />
+              } />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/catalog" element={<CatalogPage />} />
               <Route path="/catalog/categories" element={<CategoryPage />} />
