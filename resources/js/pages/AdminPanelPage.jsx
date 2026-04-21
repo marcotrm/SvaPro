@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
   BarChart3, Users, ShoppingBag, Truck, Landmark, Calendar,
   BookOpen, TrendingUp, FileText, FolderOpen, PieChart,
@@ -709,7 +709,7 @@ const DEFAULT_CATEGORIES = [
   { id: 'altro',          label: 'Altri Costi',              icon: '📎' },
 ];
 
-const SectionContoEconomico = () => {
+const SectionContoEconomico = ({ selectedStoreId }) => {
   const now = new Date();
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`);
   const [storesList, setStoresList] = useState([]);
@@ -722,6 +722,11 @@ const SectionContoEconomico = () => {
   const [saving, setSaving] = useState(false);
 
   const lsKey = `svapro_conto_eco_${storeId}_${month}`;
+
+  // Sync con il selettore store globale
+  useEffect(() => {
+    if (selectedStoreId) setStoreId(String(selectedStoreId));
+  }, [selectedStoreId]);
 
   // Carica negozi
   useEffect(() => {
@@ -744,7 +749,7 @@ const SectionContoEconomico = () => {
       try {
         const [y, m] = month.split('-');
         const params = { year: y, month: m, ...(storeId !== 'all' ? { store_id: storeId } : {}) };
-        const res = await reports.getSummary?.(params) || await reports.getCashSummary?.(params);
+        const res = await reports.summary(params);
         const data = res?.data?.data || res?.data || {};
         setRevenue(parseFloat(data.total_net_revenue ?? data.net_revenue ?? data.total_revenue ?? data.total ?? 0));
       } catch { setRevenue(null); }
@@ -908,6 +913,7 @@ const SectionContoEconomico = () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 export default function AdminPanelPage() {
+  const { selectedStoreId } = useOutletContext?.() || {};
   const [active, setActive] = useState('dashboard');
   const [hoveredTab, setHoveredTab] = useState(null);
 
@@ -921,7 +927,7 @@ export default function AdminPanelPage() {
       case 'scadenziario':     return <SectionScadenziario />;
       case 'contabilita':      return <SectionContabilita />;
       case 'iva':              return <SectionIva />;
-      case 'conto_economico':  return <SectionContoEconomico />;
+      case 'conto_economico':  return <SectionContoEconomico selectedStoreId={selectedStoreId} />;
       case 'documenti':        return <SectionDocumenti />;
       case 'report':           return <SectionReport />;
       default:                 return null;

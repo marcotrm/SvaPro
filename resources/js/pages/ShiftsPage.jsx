@@ -1230,7 +1230,12 @@ export default function ShiftsPage() {
     try {
       const startDateStr = weekDays[0].dateStr;
       const endDateStr   = weekDays[6].dateStr;
-      const shiftParams  = { store_id: storeId, start_date: startDateStr, end_date: endDateStr };
+      // Per i dipendenti: cerca i propri turni su QUALUNQUE store (il superadmin può
+      // averli salvati con uno store_id diverso da quello del dipendente).
+      // Non passiamo store_id così il backend non filtra per negozio.
+      const shiftParams = isDipendente && currentEmployeeId
+        ? { employee_id: currentEmployeeId, start_date: startDateStr, end_date: endDateStr }
+        : { store_id: storeId, start_date: startDateStr, end_date: endDateStr };
       
       // Chiama le API separatamente per isolare gli errori
       let empRes = null, shRes = null, tplRes = null;
@@ -1275,8 +1280,13 @@ export default function ShiftsPage() {
       const empIdSet = new Set(empList.map(e => String(e.id)));
       const shiftsMap = {};
       (shRes?.data?.data || []).forEach(s => {
-        // Filtra i turni orfani: solo quelli di dipendenti presenti in questo store
-        if (!empIdSet.has(String(s.employee_id))) return;
+        // Per i dipendenti: mostra solo i propri turni (bypassa il filtro store per non perdere turni assegnati dal superadmin)
+        if (isDipendente) {
+          if (currentEmployeeId && String(s.employee_id) !== String(currentEmployeeId)) return;
+        } else {
+          // Filtra i turni orfani: solo quelli di dipendenti presenti in questo store
+          if (!empIdSet.has(String(s.employee_id))) return;
+        }
         const key = `${s.employee_id}_${s.date}`;
         shiftsMap[key] = {
           id:         s.id,
@@ -1822,7 +1832,25 @@ export default function ShiftsPage() {
         )}
       </div>}
 
-      {/* L'alert delle ore buche è stato rimosso in quanto generava troppo rumore visivo */}
+      {/* ── Warning buca copertura (non invasivo) ── */}
+      {!isDipendente && !loading && gapAlerts.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: 'rgba(245,158,11,0.07)',
+          border: '1px solid rgba(245,158,11,0.22)',
+          borderRadius: 12, padding: '8px 14px',
+          marginBottom: 12, fontSize: 13,
+          color: '#b45309', fontWeight: 600,
+        }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+          <span>
+            {gapAlerts.length === 1
+              ? <>Giorno senza copertura: <strong>{gapAlerts[0].label}</strong></>
+              : <>Giorni senza copertura: <strong>{gapAlerts.map(d => d.label.split(' ')[0]).join(', ')}</strong></>
+            }
+          </span>
+        </div>
+      )}
 
       {/* Navigazione settimana */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '16px 24px', borderRadius: '16px 16px 0 0', border: '1px solid var(--color-border)', borderBottom: 'none' }}>

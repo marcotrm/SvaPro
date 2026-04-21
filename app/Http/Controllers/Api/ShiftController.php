@@ -150,63 +150,6 @@ class ShiftController extends Controller
         return response()->json(['message' => 'Template eliminato.']);
     }
 
-    /**
-     * POST /shifts/propose
-     * Dipendente propone un turno.
-     */
-    public function propose(Request $request): JsonResponse
-    {
-        $tenantId = (int)$request->attributes->get('tenant_id');
-        
-        $shift = Shift::updateOrCreate(
-            [
-                'tenant_id' => $tenantId,
-                'store_id' => $request->integer('store_id'),
-                'employee_id' => $request->integer('employee_id'),
-                'date' => $request->input('date'),
-            ],
-            [
-                'start_time' => $request->input('start_time'),
-                'end_time' => $request->input('end_time'),
-                'color' => $request->input('color'),
-                'status' => 'proposed',
-                'proposed_by' => $request->integer('employee_id'),
-            ]
-        );
-
-        return response()->json(['message' => 'Turno proposto, in attesa di conferma.', 'data' => $shift]);
-    }
-
-    /**
-     * PATCH /shifts/{id}/confirm
-     * Conferma singolo turno.
-     */
-    public function confirmShift(Request $request, $id): JsonResponse
-    {
-        $tenantId = (int)$request->attributes->get('tenant_id');
-        Shift::where('tenant_id', $tenantId)->where('id', $id)->update(['status' => 'confirmed']);
-        return response()->json(['message' => 'Turno confermato.']);
-    }
-
-    /**
-     * POST /shifts/confirm-all
-     * Conferma tutti i turni 'proposed' del periodo/negozio.
-     */
-    public function confirmAll(Request $request): JsonResponse
-    {
-        $tenantId = (int)$request->attributes->get('tenant_id');
-        $storeId = $request->integer('store_id');
-        $start = $request->input('start_date');
-        $end = $request->input('end_date');
-
-        Shift::where('tenant_id', $tenantId)
-            ->where('store_id', $storeId)
-            ->where('status', 'proposed')
-            ->whereBetween('date', [$start, $end])
-            ->update(['status' => 'confirmed']);
-
-        return response()->json(['message' => 'Tutti i turni proposti sono stati confermati.']);
-    }
 
     /**
      * GET /employee/my-shifts

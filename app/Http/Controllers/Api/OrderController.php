@@ -791,16 +791,8 @@ class OrderController extends Controller
             return $orderId;
         });
 
-        // PDF generato in background (dispatch async) per non bloccare la response
-        try {
-            dispatch(function () use ($orderId, $tenantId, $quote) {
-                $html = "<h1>Ordine Vendita #{$orderId}</h1><p>Totale: EUR " . number_format($quote['totals']['grand_total'], 2) . "</p>";
-                $pdfContent = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->output();
-                $path = "orders/{$tenantId}/{$orderId}.pdf";
-                \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdfContent);
-            })->afterResponse();
-            $pdfUrl = '/storage/orders/' . $tenantId . '/' . $orderId . '.pdf';
-        } catch (\Throwable $e) { $pdfUrl = null; }
+        // La generazione del PDF è stata rimossa perché non utilizzata e causava rallentamenti nella cassa
+        $pdfUrl = null;
 
         AuditLogger::log($request, 'create', 'order', $orderId, 'Ordine #' . $orderId . ' €' . number_format($quote['totals']['grand_total'], 2), null, $pdfUrl);
 
@@ -1144,8 +1136,8 @@ class OrderController extends Controller
         // taxTotal / exciseTotal sono solo per la RENDICONTAZIONE contabile, NON si aggiungono al totale
         $grandTotal = round($subtotal - $discountTotal, 2);
 
-        $earnedLoyaltyPoints = (int) floor($grandTotal / 10);
-        $loyaltyMonetary = round($earnedLoyaltyPoints * 0.05, 2);
+        $earnedLoyaltyPoints = (int) floor($grandTotal);
+        $loyaltyMonetary = round($earnedLoyaltyPoints * 0.01, 2);
 
         $employeeFormula = (string) (DB::table('compensation_rules')
             ->where('active', true)

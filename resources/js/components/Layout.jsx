@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache, cashMovements as cashApi, reports, exports_, employees as employeesApi } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
@@ -19,7 +19,7 @@ import {
 
 
 const allNavigation = [
-  // â”€â”€ Principale â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Principale Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Principale', icon: LayoutDashboard, items: [
     { label: 'POS Cassa',              href: '/',               icon: Monitor,     roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
     { label: 'Report & Analisi',       href: '/reports',        icon: Activity,    roles: ['superadmin','admin_cliente','store_manager'] },
@@ -28,7 +28,7 @@ const allNavigation = [
     { label: 'Clienti',                href: '/customers',      icon: Users,       roles: ['dipendente'] },
   ]},
 
-  // 4. Magazzino â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 4. Magazzino Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Magazzino', icon: Warehouse, items: [
     { label: 'Giacenze & Stock',       href: '/inventory',            icon: Warehouse,      roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Giacenze Locali',        href: '/warehouse/cross-store', icon: MapPin,         roles: ['superadmin','admin_cliente','store_manager'] },
@@ -43,7 +43,7 @@ const allNavigation = [
     { label: 'Consegne Negozi',       href: '/warehouse/store-deliveries', icon: MapPin,         roles: ['superadmin','admin_cliente','store_manager'] },
   ]},
 
-  // 5. Acquisti / Fornitori â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 5. Acquisti / Fornitori Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Acquisti / Fornitori', icon: ShoppingCart, items: [
     { label: 'Ordini Fornitori (PO)',  href: '/purchase-orders',   icon: Receipt,  roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Ricezione Merce',        href: '/store-loading',     icon: Package,  roles: ['superadmin','admin_cliente','store_manager'] },
@@ -52,12 +52,12 @@ const allNavigation = [
   ]},
 
 
-  // 7. Marketing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 7. Marketing Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Marketing', icon: Megaphone, items: [
     { label: 'Promozioni & Bundle',    href: '/promotions',   icon: Gift,        roles: ['superadmin','admin_cliente','store_manager'] },
   ]},
 
-  // 8. Dipendenti â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 8. Dipendenti Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Dipendenti', icon: Users, items: [
     { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin'] },
@@ -67,7 +67,7 @@ const allNavigation = [
     { label: 'Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
   ]},
 
-  // Amministrazione â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Amministrazione Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Amministrazione', icon: Shield, items: [
     { label: 'Tesoreria & Cassa',      href: '/tesoreria',    icon: HandCoins,        roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
     { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,        roles: ['superadmin'] },
@@ -78,17 +78,17 @@ const allNavigation = [
   ]},
 
 
-  // ADM â€” Sezione separata Reportistica Fiscale PLI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ADM Ã¢â‚¬â€ Sezione separata Reportistica Fiscale PLI Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'ADM', icon: FileSpreadsheet, items: [
     { label: 'Report Fiscali PLI',     href: '/adm',          icon: FileSpreadsheet,  roles: ['superadmin','admin_cliente','store_manager'] },
   ]},
 
-  // Automazioni â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Automazioni Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Automazioni', icon: Zap, items: [
     { label: 'Automazioni',           href: '/automazioni',  icon: Zap,             roles: ['superadmin','admin_cliente','store_manager'] },
   ]},
 
-  // 10. Impostazioni â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // 10. Impostazioni Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Impostazioni', icon: Settings, items: [
     { label: 'Configurazione',         href: '/settings',          icon: Settings,      roles: ['superadmin','admin_cliente'] },
     { label: 'Ruoli & Permessi',       href: '/roles-permissions', icon: Shield,        roles: ['superadmin'] },
@@ -150,7 +150,7 @@ export default function Layout({ user, setUser }) {
     try {
       const response = await stores.getStores();
       let slist = response.data?.data || [];
-      // Se Ã¨ un dipendente e ha un negozio assegnato, mostra solo quello
+      // Se ÃƒÂ¨ un dipendente e ha un negozio assegnato, mostra solo quello
       if (user?.roles?.includes('dipendente') && user?.employee_store_id) {
         slist = slist.filter(s => String(s.id) === String(user.employee_store_id));
         if (slist.length > 0 && String(selectedStoreId) !== String(user.employee_store_id)) {
@@ -246,7 +246,7 @@ export default function Layout({ user, setUser }) {
   const [lowStockCount, setLowStockCount] = React.useState(0);
   const [showStoreStats, setShowStoreStats] = React.useState(false);
 
-  // ─── Notifiche cassa ──────────────────────────────────────────
+  // â”€â”€â”€ Notifiche cassa â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const CASH_THRESHOLD = 1000;
   const SNOOZE_MS = 3 * 60 * 60 * 1000; // 3 ore
   const SNOOZE_KEY = 'svapro_notif_snooze_v1';
@@ -257,7 +257,7 @@ export default function Layout({ user, setUser }) {
   const [showMichelePanel, setShowMichelePanel] = React.useState(false);
   const [dailyReportAvailable, setDailyReportAvailable] = React.useState(false);
   const [dailyReportBody, setDailyReportBody] = React.useState('');
-  // ── Notifiche dipendente (pacco monete ecc.) ──
+  // â”€â”€ Notifiche dipendente (pacco monete ecc.) â”€â”€
   const [empNotifs, setEmpNotifs]           = React.useState([]);
   const [unreadEmpNotifs, setUnreadEmpNotifs] = React.useState(0);
   const prevAlertIdsRef = useRef(new Set());
@@ -295,13 +295,13 @@ export default function Layout({ user, setUser }) {
         // Mostra solo allerte non in snooze
         const visibleAlerts = allAlerts.filter(a => !snoozed[String(a.store_id ?? a.id)]);
         setCashAlertStores(visibleAlerts);
-        // Conta solo le nuove allerte visibili (store che non erano già in alert)
+        // Conta solo le nuove allerte visibili (store che non erano giÃ  in alert)
         const newAlerts = visibleAlerts.filter(a => !prevAlertIdsRef.current.has(a.store_id ?? a.id));
         if (newAlerts.length > 0) {
           setUnreadAlerts(prev => prev + newAlerts.length);
           newAlerts.forEach(a => prevAlertIdsRef.current.add(a.store_id ?? a.id));
         }
-        // Rimuovi dalla lista prev gli store che non sono più in allerta
+        // Rimuovi dalla lista prev gli store che non sono piÃ¹ in allerta
         const alertIds = new Set(visibleAlerts.map(a => a.store_id ?? a.id));
         [...prevAlertIdsRef.current].forEach(id => { if (!alertIds.has(id)) prevAlertIdsRef.current.delete(id); });
       } catch { /* silent */ }
@@ -409,7 +409,7 @@ export default function Layout({ user, setUser }) {
         {/* Nav */}
         <nav className="sp-sidebar-nav" style={{ padding: collapsed ? '8px 0' : '12px 10px' }}>
           {filteredNav.map((section) => {
-            // Accordions always closed — navigazione solo via flyout hover
+            // Accordions always closed â€” navigazione solo via flyout hover
             return (
               <div
                 key={section.section}
@@ -439,7 +439,7 @@ export default function Layout({ user, setUser }) {
                   </div>
                 )}
 
-                {/* Items: sempre nascosti — visibili solo nel flyout */}
+                {/* Items: sempre nascosti â€” visibili solo nel flyout */}
                 <div style={{ maxHeight: '0px', overflow: 'hidden' }} />
               </div>
             );
@@ -451,7 +451,7 @@ export default function Layout({ user, setUser }) {
           <div
             className="sp-user-card"
             onClick={handleLogout}
-            title={collapsed ? `${user?.name || 'Utente'} — Logout` : 'Logout'}
+            title={collapsed ? `${user?.name || 'Utente'} â€” Logout` : 'Logout'}
             style={collapsed ? { justifyContent: 'center', padding: '8px 0' } : {}}
           >
             <div className="sp-user-avatar" style={{ flexShrink: 0 }}>
@@ -470,7 +470,7 @@ export default function Layout({ user, setUser }) {
         </div>
       </aside>
 
-      {/* ── FLYOUT HOVER SUBMENU ── */}
+      {/* â”€â”€ FLYOUT HOVER SUBMENU â”€â”€ */}
       {flyout && (
         <div
           onMouseEnter={cancelTimer}
@@ -508,9 +508,10 @@ export default function Layout({ user, setUser }) {
             const Icon = item.icon;
             const active = isActive(item.href, item.activeKey);
             return (
-              <button
+              <a
                 key={item.activeKey ?? item.href}
-                onClick={() => { navigate(item.href); setFlyout(null); }}
+                href={item.href}
+                onClick={e => { e.preventDefault(); navigate(item.href); setFlyout(null); }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -518,7 +519,7 @@ export default function Layout({ user, setUser }) {
                   width: '100%',
                   padding: '12px 18px',
                   background: active ? 'rgba(99,102,241,0.18)' : 'transparent',
-                  border: 'none',
+                  textDecoration: 'none',
                   cursor: 'pointer',
                   color: active ? '#a5b4fc' : 'rgba(255,255,255,0.85)',
                   fontSize: 14,
@@ -526,13 +527,14 @@ export default function Layout({ user, setUser }) {
                   textAlign: 'left',
                   transition: 'background 0.12s',
                   borderLeft: active ? '3px solid #6366f1' : '3px solid transparent',
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? 'rgba(99,102,241,0.18)' : 'transparent'; }}
               >
                 <Icon size={16} style={{ flexShrink: 0, opacity: active ? 1 : 0.6 }} />
                 <span>{item.label}</span>
-              </button>
+              </a>
             );
           })}
         </div>
@@ -594,7 +596,7 @@ export default function Layout({ user, setUser }) {
             {/* Bottone Scheda (VapeCalc) */}
             <button
               onClick={() => setShowMichelePanel(true)}
-              title="Scheda — Tabelle Nicotina"
+              title="Scheda â€” Tabelle Nicotina"
               className="sp-desktop-only"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -607,7 +609,7 @@ export default function Layout({ user, setUser }) {
               onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #d97706, #f59e0b)'; e.currentTarget.style.color = '#fff'; }}
               onMouseLeave={e => { e.currentTarget.style.background = showMichelePanel ? 'linear-gradient(135deg, #d97706, #f59e0b)' : 'rgba(245,158,11,0.12)'; e.currentTarget.style.color = showMichelePanel ? '#fff' : '#f59e0b'; }}
             >
-              📋
+              ðŸ“‹
             </button>
 
             {/* Bottone riepilogo vendite */}
@@ -645,7 +647,7 @@ export default function Layout({ user, setUser }) {
               <RefreshCw size={16} />
             </button>
 
-            {/* ── CAMPANELLA NOTIFICHE ── */}
+            {/* â”€â”€ CAMPANELLA NOTIFICHE â”€â”€ */}
             <div ref={notifPanelRef} style={{ position: 'relative' }}>
               <button
                 className="sp-btn sp-btn-ghost sp-btn-icon"
@@ -682,13 +684,13 @@ export default function Layout({ user, setUser }) {
                 }}>
                   {/* Header */}
                   <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ fontWeight: 800, fontSize: 13, color: '#fff' }}>🔔 Notifiche Cassa</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Soglia: €{CASH_THRESHOLD.toLocaleString()}</div>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: '#fff' }}>ðŸ”” Notifiche Cassa</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Soglia: â‚¬{CASH_THRESHOLD.toLocaleString()}</div>
                   </div>
 
                   {/* Lista allerte */}
                   <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-                    {/* ── Notifiche dipendente (pacco monete) ── */}
+                    {/* â”€â”€ Notifiche dipendente (pacco monete) â”€â”€ */}
                   {empNotifs.length > 0 && empNotifs.map(n => (
                     <div key={n.id} style={{
                       padding: '12px 16px',
@@ -703,7 +705,7 @@ export default function Layout({ user, setUser }) {
                     </div>
                   ))}
 
-                  {/* ── Notifiche cassa (admin) ── */}
+                  {/* â”€â”€ Notifiche cassa (admin) â”€â”€ */}
                   {dailyReportAvailable && (
                       <div style={{
                         padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -713,10 +715,10 @@ export default function Layout({ user, setUser }) {
                       onClick={(e) => {
                         e.stopPropagation();
                         exports_.download(reports.downloadDaily(), 'Report_Serale.pdf');
-                        // Non chiudiamo il pannello così l'utente vede il feedback
+                        // Non chiudiamo il pannello cosÃ¬ l'utente vede il feedback
                       }}>
                         <div>
-                          <div style={{ fontWeight: 800, fontSize: 13, color: '#a5b4fc' }}>📄 Report di Chiusura Pronto</div>
+                          <div style={{ fontWeight: 800, fontSize: 13, color: '#a5b4fc' }}>ðŸ“„ Report di Chiusura Pronto</div>
                           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>{dailyReportBody}</div>
                         </div>
                         <div style={{ textAlign: 'right', color: '#a5b4fc', fontSize: 11, fontWeight: 'bold', minWidth: 60 }}>
@@ -726,7 +728,7 @@ export default function Layout({ user, setUser }) {
                     )}
                     {!dailyReportAvailable && cashAlertStores.length === 0 ? (
                       <div style={{ padding: '24px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>
-                        ✅ Nessuna allerta attiva
+                        âœ… Nessuna allerta attiva
                       </div>
                     ) : (
                       cashAlertStores.map((s, i) => (
@@ -743,7 +745,7 @@ export default function Layout({ user, setUser }) {
                             <div style={{ fontWeight: 900, fontSize: 14, color: '#ef4444' }}>
                               {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(s.balance)}
                             </div>
-                            <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: 8 }}>⚠️ ALLERTA</span>
+                            <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: 8 }}>âš ï¸ ALLERTA</span>
                           </div>
                         </div>
                       ))
@@ -768,9 +770,9 @@ export default function Layout({ user, setUser }) {
                       <button
                         onClick={dismissNotifPanel}
                         style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                        title="Le allerte ricompariranno automaticamente dopo 3 ore se il saldo Ã¨ ancora alto"
+                        title="Le allerte ricompariranno automaticamente dopo 3 ore se il saldo ÃƒÂ¨ ancora alto"
                       >
-                        â° Chiudi & Ricorda tra 3 ore
+                        Ã¢ÂÂ° Chiudi & Ricorda tra 3 ore
                       </button>
                     </div>
                   )}
@@ -811,7 +813,7 @@ export default function Layout({ user, setUser }) {
         }}
       />
 
-      {/* ── MOBILE DRAWER ── */}
+      {/* â”€â”€ MOBILE DRAWER â”€â”€ */}
       {mobileDrawerOpen && (
         <>
           {/* Overlay */}
@@ -894,17 +896,17 @@ export default function Layout({ user, setUser }) {
                 style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 10, border: 'none', background: 'rgba(239,68,68,0.08)', color: '#f87171', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
               >
                 <LogOut size={16} />
-                <span>Esci — {user?.name || 'Utente'}</span>
+                <span>Esci â€” {user?.name || 'Utente'}</span>
               </button>
             </div>
           </div>
         </>
       )}
 
-      {/* ── MOBILE BOTTOM NAV — role-aware ── */}
+      {/* â”€â”€ MOBILE BOTTOM NAV â€” role-aware â”€â”€ */}
       <nav className="sp-mobile-nav" aria-label="Navigazione principale mobile">
         <div className="sp-mobile-nav-inner">
-          {/* POS Cassa — tutti i ruoli */}
+          {/* POS Cassa â€” tutti i ruoli */}
           <button
             className={`sp-mobile-nav-btn ${location.pathname === '/' || location.pathname === '/pos' ? 'active' : ''}`}
             onClick={() => navigate('/')}
@@ -966,7 +968,7 @@ export default function Layout({ user, setUser }) {
           )}
 
 
-          {/* Menu â€” tutti */}
+          {/* Menu Ã¢â‚¬â€ tutti */}
           <button
             className={`sp-mobile-nav-btn ${mobileDrawerOpen ? 'active' : ''}`}
             onClick={() => setMobileDrawerOpen(true)}
