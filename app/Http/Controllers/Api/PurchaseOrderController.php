@@ -491,16 +491,16 @@ class PurchaseOrderController extends Controller
             })
             ->where('p.tenant_id', $tenantId)
             ->where('p.is_active', true)
-            ->whereRaw('COALESCE(si.qty_on_hand, 0) <= COALESCE(pv.reorder_point, p.min_stock, 5)')
+            ->whereRaw('COALESCE(si.qty_on_hand, 0) <= COALESCE(p.min_stock_qty, 5)')
             ->select([
                 'pv.id as variant_id',
                 'p.name as product_name',
                 'pv.flavor',
                 'pv.sku',
                 DB::raw('COALESCE(si.qty_on_hand, 0) as qty_on_hand'),
-                DB::raw('COALESCE(pv.reorder_point, p.min_stock, 5) as reorder_point'),
-                DB::raw('COALESCE(pv.reorder_qty, p.reorder_qty, 10) as suggested_qty'),
-                DB::raw('COALESCE(pv.last_cost, 0) as unit_cost'),
+                DB::raw('COALESCE(p.min_stock_qty, 5) as reorder_point'),
+                DB::raw('GREATEST(COALESCE(p.min_stock_qty, 5) - COALESCE(si.qty_on_hand, 0), 1) as suggested_qty'),
+                DB::raw('COALESCE(pv.cost_price, 0) as unit_cost'),
                 'p.supplier_id',
             ]);
 
