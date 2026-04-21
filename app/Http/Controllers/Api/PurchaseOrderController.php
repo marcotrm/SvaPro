@@ -467,36 +467,48 @@ class PurchaseOrderController extends Controller
         $storeId    = $request->input('store_id');
         $supplierId = $request->input('supplier_id');
 
-        // Trova varianti con stock basso (qty_on_hand <= reorder_point o < min_stock)
+        // Risolve warehouse dal store_id (prova sia store_id che name/id diretto)
+        $warehouseId = null;
+        if ($storeId) {
+            $warehouseId = DB::table('warehouses')
+                ->where('tenant_id', $tenantId)
+                ->where(function ($q) use ($storeId) {
+                    $q->where('store_id', $storeId)
+                      ->orWhere('id', $storeId);
+                })
+                ->value('id');
+        }
+
+        // LEFT JOIN: include anche varianti senza stock_items (qty = 0)
         $q = DB::table('product_variants as pv')
             ->join('products as p', 'p.id', '=', 'pv.product_id')
-            ->join('stock_items as si', function ($j) use ($tenantId) {
+            ->leftJoin('stock_items as si', function ($j) use ($tenantId, $warehouseId) {
                 $j->on('si.product_variant_id', '=', 'pv.id')
                   ->where('si.tenant_id', $tenantId);
+                if ($warehouseId) {
+                    $j->where('si.warehouse_id', $warehouseId);
+                }
             })
             ->where('p.tenant_id', $tenantId)
-            ->where('si.qty_on_hand', '<=', DB::raw('COALESCE(pv.reorder_point, p.min_stock, 5)'))
+            ->where('p.is_active', true)
+            ->whereRaw('COALESCE(si.qty_on_hand, 0) <= COALESCE(pv.reorder_point, p.min_stock, 5)')
             ->select([
                 'pv.id as variant_id',
                 'p.name as product_name',
                 'pv.flavor',
                 'pv.sku',
-                'si.qty_on_hand',
+                DB::raw('COALESCE(si.qty_on_hand, 0) as qty_on_hand'),
                 DB::raw('COALESCE(pv.reorder_point, p.min_stock, 5) as reorder_point'),
                 DB::raw('COALESCE(pv.reorder_qty, p.reorder_qty, 10) as suggested_qty'),
                 DB::raw('COALESCE(pv.last_cost, 0) as unit_cost'),
                 'p.supplier_id',
             ]);
 
-        if ($storeId) {
-            // Trova warehouse del negozio
-            $warehouseId = DB::table('warehouses')
-                ->where('tenant_id', $tenantId)->where('store_id', $storeId)->value('id');
-            if ($warehouseId) $q->where('si.warehouse_id', $warehouseId);
+        if ($supplierId) {
+            $q->where('p.supplier_id', (int) $supplierId);
         }
-        if ($supplierId) $q->where('p.supplier_id', (int) $supplierId);
 
-        $items = $q->orderBy('si.qty_on_hand')->get();
+        $items = $q->orderByRaw('COALESCE(si.qty_on_hand, 0) ASC')->get();
 
         return response()->json(['data' => $items]);
     }
