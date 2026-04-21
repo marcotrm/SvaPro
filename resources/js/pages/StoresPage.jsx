@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { stores as storesApi } from '../api.jsx';
+import { stores as storesApi, employees as employeesApi } from '../api.jsx';
 import {
   Plus, Edit3, Trash2, Store, MapPin, Phone, Mail, Clock,
   CheckCircle, XCircle, AlertTriangle, Loader, X, Users, ChevronDown, ChevronUp,
@@ -459,6 +459,30 @@ function StoreModal({ store, onClose, onSaved }) {
                   placeholder="+39 340 1234567"
                   style={{ maxWidth: 260 }}
                 />
+                {/* Bottone test notifica */}
+                {form.whatsapp_notify_phone && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await employeesApi.testWhatsapp(store.id);
+                        toast.success(res.data.message || '✅ Test inviato!');
+                      } catch (err) {
+                        const msg = err?.response?.data?.message || 'Errore invio test';
+                        toast.error(msg);
+                      }
+                    }}
+                    style={{
+                      marginTop: 8, padding: '8px 18px', borderRadius: 8, border: 'none',
+                      background: 'rgba(37,211,102,0.15)', color: '#25d366',
+                      fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      border: '1px solid rgba(37,211,102,0.3)',
+                    }}
+                  >
+                    📲 Invia messaggio di test
+                  </button>
+                )}
               </div>
 
               <div style={{ padding: '12px 16px', background: 'rgba(155,143,212,0.08)', borderRadius: 10, border: '1px solid rgba(155,143,212,0.2)', fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>

@@ -90,6 +90,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/stores/{storeId}/credentials', [StoreController::class, 'createCredentials']);
         Route::get('/stores/{storeId}/credentials', [StoreController::class, 'getCredentials']);
         Route::post('/stores/{storeId}/notify-managers', [StoreController::class, 'notifyManagers']);
+        Route::post('/stores/{storeId}/test-whatsapp', [StoreController::class, 'testWhatsapp']);
         Route::get('/loyalty/monitoring/push-stats', [LoyaltyController::class, 'pushMonitoringStats']);
 
         // Catalog WRITE - solo admin

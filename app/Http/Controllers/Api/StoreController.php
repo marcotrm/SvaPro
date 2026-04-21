@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\AuditLogger;
+use App\Services\WhatsAppService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -503,6 +504,52 @@ class StoreController extends Controller
         }
 
         return response()->json(['message' => "Notifica inviata a {$inserted} manager.", 'sent' => $inserted]);
+    }
+
+    /**
+     * POST /stores/{storeId}/test-whatsapp
+     * Invia un messaggio WhatsApp di test al numero configurato sullo store.
+     */
+    public function testWhatsapp(Request $request, int $storeId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $store = DB::table('stores')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $storeId)
+            ->first();
+
+        if (!$store) {
+            return response()->json(['message' => 'Negozio non trovato.'], 404);
+        }
+
+        $phone = $store->whatsapp_notify_phone ?? null;
+        if (!$phone) {
+            return response()->json(['message' => 'Nessun numero WhatsApp configurato per questo negozio.'], 422);
+        }
+
+        $body = "✅ *Test notifica SvaPro*\n"
+              . "📍 Negozio: *{$store->name}*\n"
+              . "🕐 " . now()->setTimezone('Europe/Rome')->format('d/m/Y H:i') . "\n\n"
+              . "Le notifiche di ritardo dipendente sono attive su questo numero.";
+
+        $whatsapp = app(WhatsAppService::class);
+        $sent = $whatsapp->send($phone, $body);
+
+        if ($sent) {
+            return response()->json(['message' => "✅ Messaggio di test inviato a {$phone}"]);
+        }
+
+        // Controlla se Twilio è configurato
+        $sid = config('services.twilio.sid');
+        if (empty($sid)) {
+            return response()->json([
+                'message' => '⚠️ Twilio non configurato. Aggiungi TWILIO_SID e TWILIO_TOKEN nelle variabili d\'ambiente Railway.',
+                'configured' => false,
+            ], 503);
+        }
+
+        return response()->json(['message' => '❌ Invio fallito. Controlla i log e le credenziali Twilio.'], 500);
     }
 
     // ─── Helpers ────────────────────────────────────────────────────
