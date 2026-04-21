@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers\Api;
 
@@ -55,6 +55,7 @@ class CustomerController extends Controller
             ->leftJoin('loyalty_cards as lc', function ($join) use ($tenantId) {
                 $join->on('lc.customer_id', '=', 'c.id')
                     ->where('lc.tenant_id', '=', $tenantId);
+            ->leftJoin('loyalty_wallets as lw', function ($join) use ($tenantId) { $join->on('lw.customer_id', '=', 'c.id')->where('lw.tenant_id', '=', $tenantId); });
             })
             ->leftJoin('employees as emp_reg', 'emp_reg.id', '=', 'c.created_by_employee_id')
             ->leftJoin('users as u_creator', function ($join) {
@@ -85,6 +86,7 @@ class CustomerController extends Controller
                 'order_stats.first_purchase_at',
                 'lc.card_code',
                 'lc.status as loyalty_status',
+                'lw.points_balance',
                 'device_stats.loyalty_devices_count',
                 'device_stats.loyalty_last_seen_at',
                 'push_stats.last_push_sent_at',
@@ -601,7 +603,9 @@ class CustomerController extends Controller
                     'country' => $customer->country ?? 'IT',
                     // Loyalty
                     'card_code' => $customer->card_code,
+                    'fidelity_card' => $customer->card_code, // alias usato nel POS barcode search
                     'loyalty_status' => $customer->loyalty_status,
+                    'points_balance' => (int) ($customer->points_balance ?? 0),
                     'loyalty_devices_count' => (int) ($customer->loyalty_devices_count ?? 0),
                     'loyalty_last_seen_at' => $customer->loyalty_last_seen_at ?? null,
                     'last_push_sent_at' => $customer->last_push_sent_at ?? null,
@@ -618,6 +622,10 @@ class CustomerController extends Controller
                     // Operatore registrante
                     'created_by_employee_id' => $customer->created_by_employee_id ?? null,
                     'registered_by_name' => $customer->registered_by_name ?? null,
+                    // Campo sintetico usato dal POS
+                    'name' => $customerType === 'azienda'
+                        ? ($customer->company_name ?? '')
+                        : trim(($customer->first_name ?? '') . ' ' . ($customer->last_name ?? '')),
                 ];
             })
             ->all();
