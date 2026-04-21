@@ -97,40 +97,48 @@ const normalizeProductFlat = (product, storesList, selectedStoreId = '') => {
   const selectedStoreNumericId = selectedStoreId ? Number(selectedStoreId) : null;
   const defaultStoreIds = selectedStoreNumericId ? [selectedStoreNumericId] : storesList.map((s) => Number(s.id));
 
-  const variant = product?.variants?.[0] || {}; // Utilizziamo e manteniamo solo la prima variante "master"
+  const variant = product?.variants?.[0] || {};
 
   return {
-    // Info Base
     name: product?.name || '',
     sku: product?.sku || variant.sku || '',
     barcode: product?.barcode || variant.barcode || '',
     flavor: variant.flavor || '',
-    
     category_id: product?.category_id ?? '',
     subcategory_id: '',
     product_type: product?.product_type || 'other',
     default_supplier_id: product?.default_supplier_id ?? '',
-    
-    // Prezzi
     sale_price: variant.sale_price ?? '',
     cost_price: variant.cost_price ?? '',
     tax_class_id: variant.tax_class_id ?? '',
     qscare_price: product?.qscare_price ?? '',
-
-    // Fisco
     fiscal_group: product?.fiscal_group || 'Altro',
     excise_tax: product?.excise_tax ?? '',
     prevalence: product?.prevalence || '',
-    
-    // Magazzino
     min_stock_qty: product?.min_stock_qty ?? 0,
     reorder_days: product?.reorder_days ?? 30,
     auto_reorder_enabled: product?.auto_reorder_enabled ?? true,
-    
     description: product?.description || '',
     store_ids: storeIds.length > 0 ? storeIds : defaultStoreIds,
-    variant_id: variant.id || null, // teniamo traccia dell'ID variante per l'aggiornamento
+    variant_id: variant.id || null,
   };
+};
+
+const HARDWARE_TYPES = ['device', 'hardware'];
+
+const emptyHwVariant = () => ({ color: '', barcode: '', sku: '', sale_price: '', cost_price: '' });
+
+const normalizeHwVariants = (product) => {
+  if (!product?.variants || product.variants.length <= 1) return [];
+  // Salta la prima variante (è quella master gestita dal form flat)
+  return product.variants.slice(1).map(v => ({
+    id: v.id || null,
+    color: v.color || v.flavor || '',
+    barcode: v.barcode || '',
+    sku: v.sku || '',
+    sale_price: v.sale_price ?? '',
+    cost_price: v.cost_price ?? '',
+  }));
 };
 
 export default function CatalogModal({ product, storesList = [], suppliers = [], categories = [], selectedStoreId = '', onClose, onSave, isDipendente = false }) {
@@ -139,9 +147,14 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [imageFile, setImageFile] = useState(null);
+  // ── Varianti hardware (colore) ──
+  const [hwVariants, setHwVariants] = useState(() => normalizeHwVariants(product));
+  const isHardware = HARDWARE_TYPES.includes(formData.product_type);
 
   useEffect(() => {
-    setFormData(normalizeProductFlat(product, storesList, selectedStoreId));
+    const flat = normalizeProductFlat(product, storesList, selectedStoreId);
+    setFormData(flat);
+    setHwVariants(normalizeHwVariants(product));
   }, [product?.id, selectedStoreId]);
 
   const handleChange = (e) => {
@@ -190,6 +203,19 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
       appendValue(fd, 'variants[0][cost_price]', formData.cost_price);
       appendValue(fd, 'variants[0][tax_class_id]', formData.tax_class_id);
       appendValue(fd, 'variants[0][flavor]', formData.flavor);
+
+      // ── Varianti colore hardware aggiuntive ──
+      hwVariants.forEach((v, i) => {
+        const idx = i + 1; // 0 è la variante master
+        if (v.id) appendValue(fd, `variants[${idx}][id]`, v.id);
+        appendValue(fd, `variants[${idx}][color]`, v.color);
+        appendValue(fd, `variants[${idx}][flavor]`, v.color); // usato come label nel POS
+        appendValue(fd, `variants[${idx}][barcode]`, v.barcode);
+        appendValue(fd, `variants[${idx}][sku]`, v.sku);
+        appendValue(fd, `variants[${idx}][sale_price]`, v.sale_price || formData.sale_price);
+        appendValue(fd, `variants[${idx}][cost_price]`, v.cost_price || formData.cost_price);
+        appendValue(fd, `variants[${idx}][tax_class_id]`, formData.tax_class_id);
+      });
 
       if (imageFile) {
         fd.append('image', imageFile);
@@ -454,6 +480,66 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               </div>
             )}
           </div>
+
+          {/* BOX VARIANTI HARDWARE */}
+          {isHardware && (
+            <div style={{ background:'linear-gradient(135deg,rgba(99,102,241,0.05),rgba(139,92,246,0.03))', padding:20, borderRadius:12, marginBottom:20, border:'1px solid rgba(99,102,241,0.2)' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+                <h3 style={{ fontSize:13, fontWeight:700, margin:0, color:'#6366f1', textTransform:'uppercase', letterSpacing:'0.05em', display:'flex', alignItems:'center', gap:6 }}>
+                  <Settings2 size={15}/> Varianti Colore / Hardware
+                </h3>
+                <button type="button"
+                  onClick={() => setHwVariants(p => [...p, emptyHwVariant()])}
+                  style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:8, border:'1px dashed rgba(99,102,241,0.5)', background:'rgba(99,102,241,0.06)', color:'#6366f1', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                  <Plus size={13}/> Aggiungi Colore
+                </button>
+              </div>
+              {hwVariants.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'20px 0', color:'rgba(99,102,241,0.4)', fontSize:13 }}>
+                  Nessuna variante colore — clicca "Aggiungi Colore" per inserirne una.
+                </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  {hwVariants.map((v, i) => (
+                    <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr auto', gap:10, alignItems:'end', background:'var(--color-bg)', borderRadius:10, padding:'12px 14px', border:'1px solid rgba(99,102,241,0.15)' }}>
+                      <div>
+                        <label className="sp-label" style={{ color:'#6366f1' }}>Colore / Variante *</label>
+                        <input className="sp-input" value={v.color}
+                          onChange={e => { const n=[...hwVariants]; n[i].color=e.target.value; setHwVariants(n); }}
+                          placeholder="Es: Bianco, Nero, Viola..." style={{ borderColor:'rgba(99,102,241,0.3)' }} />
+                      </div>
+                      <div>
+                        <label className="sp-label" style={{ color:'#6366f1' }}>Barcode (EAN)</label>
+                        <input className="sp-input sp-font-mono" value={v.barcode}
+                          onChange={e => { const n=[...hwVariants]; n[i].barcode=e.target.value; setHwVariants(n); }}
+                          placeholder="8001234567890" />
+                      </div>
+                      <div>
+                        <label className="sp-label" style={{ color:'#6366f1' }}>SKU variante</label>
+                        <input className="sp-input sp-font-mono" value={v.sku}
+                          onChange={e => { const n=[...hwVariants]; n[i].sku=e.target.value; setHwVariants(n); }}
+                          placeholder="KIW-WHT" />
+                      </div>
+                      <div>
+                        <label className="sp-label" style={{ color:'#6366f1' }}>Prezzo (€ IVA incl.)</label>
+                        <input className="sp-input" type="number" step="0.01" value={v.sale_price}
+                          onChange={e => { const n=[...hwVariants]; n[i].sale_price=e.target.value; setHwVariants(n); }}
+                          placeholder={formData.sale_price || '0.00'} />
+                      </div>
+                      <button type="button"
+                        onClick={() => setHwVariants(p => p.filter((_,j) => j!==i))}
+                        style={{ padding:'8px', borderRadius:8, border:'none', background:'rgba(239,68,68,0.1)', color:'#ef4444', cursor:'pointer', display:'flex', alignItems:'center' }}>
+                        <Trash2 size={14}/>
+                      </button>
+                    </div>
+                  ))}
+                  <p style={{ margin:'4px 0 0', fontSize:11, color:'rgba(99,102,241,0.6)' }}>
+                    ℹ Ogni colore ha barcode e stock propri. Il prezzo eredita dalla variante master se lasciato vuoto.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
         </form>
 
