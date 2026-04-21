@@ -1254,11 +1254,14 @@ export default function ShiftsPage() {
         try { tplRes = await shiftsApi.getTemplates(); } catch {}
       }
 
-      // Dipendente: vede tutti i dipendenti dello store (non solo se stesso)
-      // In sola lettura sulle righe degli altri — può solo proporre turni su se stesso
-      let empList = empRes?.data?.data || [];
-      if (isDipendente && currentEmployeeId && empList.length === 0 && user) {
-        // Fallback se API fallisce: almeno il dipendente stesso
+      // Normalizza sempre: assicura che ogni employee abbia .name (usato in tutta la UI)
+      let empList = (empRes?.data?.data || []).map(e => ({
+        ...e,
+        name: e.name || `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim() || 'N/A',
+      }));
+
+      // Fallback solo se la lista è vuota e siamo come dipendente
+      if (empList.length === 0 && isDipendente && currentEmployeeId && user) {
         empList = [{
           id:         Number(currentEmployeeId),
           name:       `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Tu',
@@ -1876,7 +1879,7 @@ export default function ShiftsPage() {
                       >
                         {empAbsence
                           ? (empAbsence.type === 'ferie' ? '🌴' : empAbsence.type === 'malattia' ? '🤒' : empAbsence.type === 'permesso' ? '📋' : '⛔')
-                          : emp.name.charAt(0)}
+                          : (emp.name || '?').charAt(0)}
                       </button>
                       <div>
                         <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--color-text)' }}>{emp.name}</div>
@@ -2043,7 +2046,7 @@ export default function ShiftsPage() {
                     <td style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)', background: 'rgba(139,92,246,0.05)', width: 220 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(139,92,246,0.15)', border: '2px solid rgba(139,92,246,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, color: '#8B5CF6', flexShrink: 0 }}>
-                          {emp.name.charAt(0)}
+                          {(emp.name || '?').charAt(0)}
                         </div>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -2199,7 +2202,7 @@ export default function ShiftsPage() {
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(139,92,246,0.15)', border: '2px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: '#8B5CF6', flexShrink: 0 }}>
-                        {name.charAt(0)}
+                        {(name || '?').charAt(0)}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-text)' }}>{name}</div>
