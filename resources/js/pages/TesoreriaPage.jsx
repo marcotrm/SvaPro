@@ -203,7 +203,7 @@ export default function TesoreriaPage() {
   const [coinStore, setCoinStore]   = useState('');
   const [coinAmount, setCoinAmount] = useState('');
   const [coinNotes, setCoinNotes]   = useState('');
-  const [coinBreakdown, setCoinBD]  = useState({ '0.01':0,'0.02':0,'0.05':0,'0.10':0,'0.20':0,'0.50':0,'1.00':0,'2.00':0 });
+  const [coinBreakdown, setCoinBD]  = useState({ '0.50':0,'1.00':0,'2.00':0 });
   const [coinSaving, setCoinSaving] = useState(false);
 
   // ── Modal ──
@@ -319,7 +319,7 @@ export default function TesoreriaPage() {
       toast.success('Pacco monete creato e inviato allo store!');
       setCoinModal(false);
       setCoinStore(''); setCoinNotes('');
-      setCoinBD({ '0.01':0,'0.02':0,'0.05':0,'0.10':0,'0.20':0,'0.50':0,'1.00':0,'2.00':0 });
+      setCoinBD({ '0.50':0,'1.00':0,'2.00':0 });
       fetchCoins();
     } catch (e) { toast.error(e.response?.data?.message || 'Errore'); }
     finally { setCoinSaving(false); }
