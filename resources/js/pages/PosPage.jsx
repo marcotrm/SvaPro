@@ -1775,26 +1775,16 @@ function PointsModal({ customer, pointsRedeemed, pointsDiscountAmt, cartTotal, f
             }}
             style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: '12px 16px', fontSize: 22, fontWeight: 800, color: '#fbbf24', outline: 'none', boxSizing: 'border-box' }}
           />
-          {/* Shortcut: usa tutti */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            {[25, 50, 75, 100].map(pct => {
-              const pts = Math.floor(maxUsable * pct / 100);
-              return (
-                <button key={pct} onClick={() => setInputRaw(String(Math.floor(maxUsable * pct / 100)))}
-                  style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: inputPts === Math.floor(maxUsable * pct / 100) && inputPts > 0 ? '#fbbf24' : 'rgba(255,255,255,0.07)', color: inputPts === Math.floor(maxUsable * pct / 100) && inputPts > 0 ? '#000' : 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
-                  {pct}%
-                </button>
-              );
-            })}
-            <button onClick={() => setInputRaw(String(maxUsable))}
-              style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: inputPts === maxUsable && maxUsable > 0 ? '#fbbf24' : 'rgba(255,255,255,0.07)', color: inputPts === maxUsable && maxUsable > 0 ? '#000' : 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
-              Tutti
-            </button>
-          </div>
+          {inputPts > 0 && inputPts < 100 && (
+            <div style={{ fontSize: 11, color: '#ef4444', marginTop: 8, fontWeight: 600 }}>Minimo 100 punti per transazione.</div>
+          )}
+          {inputPts >= 100 && inputPts % 100 !== 0 && (
+            <div style={{ fontSize: 11, color: '#ef4444', marginTop: 8, fontWeight: 600 }}>Solo multipli di 100 (es. 100, 200, 300...).</div>
+          )}
         </div>
 
         {/* Anteprima sconto */}
-        {inputPts > 0 && (
+        {inputPts >= 100 && inputPts % 100 === 0 && (
           <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '12px 16px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, color: '#86efac', fontWeight: 700 }}>✅ Sconto da {inputPts} punti</span>
             <span style={{ fontSize: 20, fontWeight: 900, color: '#10B981' }}>-{fmt(previewDiscount)}</span>
@@ -1811,9 +1801,9 @@ function PointsModal({ customer, pointsRedeemed, pointsDiscountAmt, cartTotal, f
           )}
           <button
             onClick={() => onApply(inputPts)}
-            disabled={inputPts === 0}
-            style={{ flex: 1, padding: '14px', borderRadius: 12, border: 'none', background: inputPts > 0 ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'rgba(255,255,255,0.06)', color: inputPts > 0 ? '#000' : 'rgba(255,255,255,0.25)', fontSize: 15, fontWeight: 900, cursor: inputPts > 0 ? 'pointer' : 'not-allowed', boxShadow: inputPts > 0 ? '0 6px 20px rgba(251,191,36,0.35)' : 'none', transition: 'all 0.2s' }}>
-            {inputPts > 0 ? `Applica ${inputPts} pt → -${fmt(previewDiscount)}` : 'Seleziona punti da usare'}
+            disabled={inputPts < 100 || inputPts % 100 !== 0}
+            style={{ flex: 1, padding: '14px', borderRadius: 12, border: 'none', background: (inputPts >= 100 && inputPts % 100 === 0) ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'rgba(255,255,255,0.06)', color: (inputPts >= 100 && inputPts % 100 === 0) ? '#000' : 'rgba(255,255,255,0.25)', fontSize: 15, fontWeight: 900, cursor: (inputPts >= 100 && inputPts % 100 === 0) ? 'pointer' : 'not-allowed', boxShadow: (inputPts >= 100 && inputPts % 100 === 0) ? '0 6px 20px rgba(251,191,36,0.35)' : 'none', transition: 'all 0.2s' }}>
+            {(inputPts >= 100 && inputPts % 100 === 0) ? `Applica ${inputPts} pt → -${fmt(previewDiscount)}` : 'Seleziona punti da usare (min. 100)'}
           </button>
         </div>
       </div>
