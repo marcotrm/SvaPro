@@ -366,7 +366,9 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
             </>
           )}
 
-          <div className="flex gap-3 justify-end pt-2">
+          </div>
+
+          <div className="flex gap-3 justify-end pt-6 px-6 pb-6 border-t border-gray-100 shrink-0">
             <button
               type="button"
               onClick={onClose}

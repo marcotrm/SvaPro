@@ -474,7 +474,7 @@ function StoreModal({ store, onClose, onSaved }) {
                       }
                     }}
                     style={{
-                      marginTop: 8, padding: '8px 18px', borderRadius: 8, border: 'none',
+                      marginTop: 8, padding: '8px 18px', borderRadius: 8,
                       background: 'rgba(37,211,102,0.15)', color: '#25d366',
                       fontWeight: 700, fontSize: 13, cursor: 'pointer',
                       display: 'flex', alignItems: 'center', gap: 6,
