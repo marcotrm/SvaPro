@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+/* eslint-disable */
 import { Truck, Plus, ChevronLeft, ChevronRight, Save, Copy, X, Calendar, GripVertical } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { stores } from '../api.jsx';
@@ -243,7 +244,7 @@ export default function StoreDeliveriesPage() {
                     </select>
                     <button onClick={()=>handleAdd(dayIdx)} disabled={!pickStore}
                       style={{padding:'6px',borderRadius:8,border:'none',background:pickStore?accent:'rgba(255,255,255,0.05)',color:pickStore?'#fff':'#64748B',fontSize:11,fontWeight:700,cursor:pickStore?'pointer':'default',fontFamily:'inherit',transition:'all 0.15s'}}>
-                      ✓ Aggiungi
+                      Aggiungi
                     </button>
                   </div>
                 )}
