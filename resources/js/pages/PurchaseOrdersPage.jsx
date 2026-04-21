@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import DatePicker from '../components/DatePicker.jsx';
 import { useOutletContext } from 'react-router-dom';
 import { purchaseOrders, suppliers as suppliersApi, stores as storesApi } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
+import { toast } from 'react-hot-toast';
 
 export default function PurchaseOrdersPage() {
   const { selectedStoreId, selectedStore } = useOutletContext();
@@ -216,14 +217,76 @@ export default function PurchaseOrdersPage() {
     { key: 'scaricato',   label: '📥 Scaricato',   bg: '#dbeafe', color: '#1d4ed8' },
     { key: 'controllato', label: '✅ Controllato',  bg: '#d1fae5', color: '#065f46' },
     { key: 'pagato',      label: '💰 Pagato',       bg: '#fef3c7', color: '#92400e' },
+    { key: 'none',        label: '— Nessuno',      bg: '#f3f4f6', color: '#6b7280' },
   ];
-  const cycleFulfil = (poId) => {
-    setPoFulfillment(prev => {
-      const cur = prev[poId];
-      const keys = FULFIL_OPTS.map(o => o.key);
-      const next = cur ? (keys[(keys.indexOf(cur) + 1) % keys.length]) : keys[0];
-      return { ...prev, [poId]: next };
-    });
+
+  // Inizializza da DB quando la lista cambia
+  useEffect(() => {
+    const init = {};
+    list.forEach(po => { if (po.fulfillment_status && po.fulfillment_status !== 'none') init[po.id] = po.fulfillment_status; });
+    setPoFulfillment(init);
+  }, [list]);
+
+  const cycleFulfil = async (poId) => {
+    const cur  = poFulfillment[poId] || 'none';
+    const keys = FULFIL_OPTS.map(o => o.key);
+    const next = keys[(keys.indexOf(cur) + 1) % keys.length];
+    setPoFulfillment(prev => ({ ...prev, [poId]: next }));
+    try {
+      await purchaseOrders.patchFulfillment(poId, next);
+    } catch {
+      toast.error('Errore nel salvataggio stato lavorazione');
+      setPoFulfillment(prev => ({ ...prev, [poId]: cur }));
+    }
+  };
+
+  // ── Ordine Automatico ──
+  const [autoModal, setAutoModal]   = useState(false);
+  const [autoItems, setAutoItems]   = useState([]);
+  const [autoLoad,  setAutoLoad]    = useState(false);
+  const [autoSelSup, setAutoSelSup] = useState('');
+  const [autoLines, setAutoLines]   = useState([]);
+  const [autoSaving, setAutoSaving] = useState(false);
+
+  const fetchAutoSuggest = async () => {
+    setAutoLoad(true);
+    try {
+      const params = {};
+      if (selectedStoreId) params.store_id = selectedStoreId;
+      if (autoSelSup) params.supplier_id = autoSelSup;
+      const res = await purchaseOrders.autoSuggest(params);
+      const items = res.data?.data || [];
+      setAutoItems(items);
+      setAutoLines(items.map(i => ({
+        variant_id: i.variant_id,
+        product_name: i.product_name,
+        flavor: i.flavor,
+        qty_on_hand: i.qty_on_hand,
+        suggested_qty: i.suggested_qty,
+        unit_cost: i.unit_cost,
+        qty: i.suggested_qty,
+        supplier_id: i.supplier_id,
+      })));
+    } catch { toast.error('Errore caricamento suggerimenti'); }
+    finally { setAutoLoad(false); }
+  };
+
+  const handleCreateAutoOrder = async () => {
+    const lines = autoLines.filter(l => l.qty > 0);
+    if (!autoSelSup) { toast.error('Seleziona il fornitore'); return; }
+    if (!lines.length) { toast.error('Nessun prodotto selezionato'); return; }
+    setAutoSaving(true);
+    try {
+      await purchaseOrders.create({
+        supplier_id: autoSelSup,
+        notes: 'Ordine automatico da stock basso',
+        lines: lines.map(l => ({ product_variant_id: l.variant_id, qty: l.qty, unit_cost: l.unit_cost })),
+      });
+      toast.success('Ordine automatico creato!');
+      setAutoModal(false);
+      fetchAll();
+    } catch (e) { toast.error(e.response?.data?.message || 'Errore'); }
+    finally { setAutoSaving(false); }
   };
 
   if (loading) return <SkeletonTable />;
@@ -236,10 +299,15 @@ export default function PurchaseOrdersPage() {
           <div className="page-head-title">Ordini di Acquisto</div>
           <div className="page-head-sub">{list.length} ordini{selectedStore ? ` — ${selectedStore.name}` : ''}</div>
         </div>
-        <button className="btn btn-gold" onClick={() => setShowForm(true)}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nuovo PO
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={() => { setAutoModal(true); fetchAutoSuggest(); }}>
+            ⚡ Ordine Automatico
+          </button>
+          <button className="btn btn-gold" onClick={() => setShowForm(true)}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nuovo PO
+          </button>
+        </div>
       </div>
 
       {error && <ErrorAlert message={error} onRetry={fetchAll} />}
@@ -500,6 +568,84 @@ export default function PurchaseOrdersPage() {
           </tbody>
         </table>
       </div>
+      {/* ══ MODALE ORDINE AUTOMATICO ══ */}
+      {autoModal && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+          <div style={{ background:'var(--surface, #1a1a2e)', borderRadius:18, width:'100%', maxWidth:740, maxHeight:'90vh', overflow:'auto', padding:0 }}>
+            <div style={{ padding:'20px 24px 16px', borderBottom:'1px solid rgba(255,255,255,0.1)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div style={{ color:'#fff', fontWeight:800, fontSize:18 }}>⚡ Ordine Automatico — Stock Basso</div>
+              <button className="btn btn-ghost" style={{ color:'rgba(255,255,255,0.4)', fontSize:18 }} onClick={() => setAutoModal(false)}>×</button>
+            </div>
+            <div style={{ padding:'16px 24px', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+              <select className="field-input" style={{ minWidth:220 }} value={autoSelSup} onChange={e => setAutoSelSup(e.target.value)}>
+                <option value="">Tutti i fornitori</option>
+                {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <button className="btn btn-ghost" style={{ color:'#a78bfa' }} onClick={fetchAutoSuggest} disabled={autoLoad}>
+                {autoLoad ? 'Caricamento...' : '🔄 Aggiorna'}
+              </button>
+              {!autoSelSup && autoItems.length > 0 && (
+                <span style={{ fontSize:11, color:'rgba(255,255,255,0.35)' }}>Seleziona un fornitore per creare l’ordine</span>
+              )}
+            </div>
+            <div style={{ padding:'16px 24px', maxHeight:420, overflowY:'auto' }}>
+              {autoLoad ? (
+                <div style={{ textAlign:'center', padding:40, color:'rgba(255,255,255,0.3)' }}>Caricamento prodotti sotto-scorta...</div>
+              ) : autoLines.length === 0 ? (
+                <div style={{ textAlign:'center', padding:40, color:'rgba(255,255,255,0.3)' }}>
+                  ✅ Nessun prodotto sotto il punto di riordino. Stock OK!
+                </div>
+              ) : (
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                  <thead>
+                    <tr style={{ color:'rgba(255,255,255,0.4)', fontSize:10, textTransform:'uppercase' }}>
+                      <th style={{ padding:'6px 8px', textAlign:'left' }}>☐</th>
+                      <th style={{ padding:'6px 8px', textAlign:'left' }}>Prodotto</th>
+                      <th style={{ padding:'6px 8px', textAlign:'center' }}>Stock</th>
+                      <th style={{ padding:'6px 8px', textAlign:'center' }}>Riordino</th>
+                      <th style={{ padding:'6px 8px', textAlign:'center' }}>Qtà da ordinare</th>
+                      <th style={{ padding:'6px 8px', textAlign:'right' }}>Costo Unit.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {autoLines.map((l, i) => (
+                      <tr key={l.variant_id} style={{ borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+                        <td style={{ padding:'8px' }}>
+                          <input type="checkbox" checked={l.qty > 0} onChange={e => {
+                            const nl = [...autoLines]; nl[i].qty = e.target.checked ? nl[i].suggested_qty : 0; setAutoLines(nl);
+                          }} />
+                        </td>
+                        <td style={{ padding:'8px', color:'#fff', fontWeight:600 }}>
+                          {l.product_name}{l.flavor ? ` — ${l.flavor}` : ''}
+                        </td>
+                        <td style={{ padding:'8px', textAlign:'center', color:'#ef4444', fontWeight:700 }}>{l.qty_on_hand}</td>
+                        <td style={{ padding:'8px', textAlign:'center', color:'rgba(255,255,255,0.4)' }}>{l.reorder_point ?? '—'}</td>
+                        <td style={{ padding:'8px', textAlign:'center' }}>
+                          <input type="number" min="0" value={l.qty}
+                            onChange={e => { const nl=[...autoLines]; nl[i].qty=parseInt(e.target.value)||0; setAutoLines(nl); }}
+                            style={{ width:70, textAlign:'center', background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, padding:'4px 8px', color:'#fff', fontWeight:700 }} />
+                        </td>
+                        <td style={{ padding:'8px', textAlign:'right', color:'rgba(255,255,255,0.5)' }}>
+                          {new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(l.unit_cost||0)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div style={{ padding:'14px 24px 20px', borderTop:'1px solid rgba(255,255,255,0.1)', display:'flex', gap:10, justifyContent:'flex-end', alignItems:'center' }}>
+              <span style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginRight:'auto' }}>
+                {autoLines.filter(l=>l.qty>0).length} prodotti selezionati · Totale: {new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(autoLines.reduce((s,l)=>s+l.qty*(l.unit_cost||0),0))}
+              </span>
+              <button className="btn btn-ghost" onClick={() => setAutoModal(false)}>Annulla</button>
+              <button className="btn btn-gold" disabled={autoSaving || !autoSelSup || autoLines.filter(l=>l.qty>0).length===0} onClick={handleCreateAutoOrder}>
+                {autoSaving ? 'Creazione...' : '⚡ Crea Ordine Fornitore'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

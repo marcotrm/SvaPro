@@ -666,13 +666,15 @@ export const suppliers = {
 
 // Purchase Order APIs
 export const purchaseOrders = {
-  getAll: (params = {}) => cachedGet('/purchase-orders', params, 15000, 120000),
-  getOne: (id) => api.get(`/purchase-orders/${id}`),
-  create: (data) => api.post('/purchase-orders', data),
-  update: (id, data) => api.put(`/purchase-orders/${id}`, data),
-  send: (id) => api.post(`/purchase-orders/${id}/send`),
-  receive: (id, body = {}) => api.post(`/purchase-orders/${id}/receive`, body),
-  cancel: (id) => api.post(`/purchase-orders/${id}/cancel`),
+  getAll:           (params = {}) => api.get('/purchase-orders', { params }),
+  getOne:           (id) => api.get(`/purchase-orders/${id}`),
+  create:           (data) => api.post('/purchase-orders', data),
+  update:           (id, data) => api.put(`/purchase-orders/${id}`, data),
+  send:             (id) => api.post(`/purchase-orders/${id}/send`),
+  receive:          (id, body = {}) => api.post(`/purchase-orders/${id}/receive`, body),
+  cancel:           (id) => api.post(`/purchase-orders/${id}/cancel`),
+  patchFulfillment: (id, status) => api.patch(`/purchase-orders/${id}/fulfillment`, { fulfillment_status: status }),
+  autoSuggest:      (params = {}) => api.get('/purchase-orders/auto-suggest', { params }),
 };
 
 // Returns APIs

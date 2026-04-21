@@ -139,6 +139,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::delete('/suppliers/{supplierId}', [SupplierController::class, 'destroy'])->middleware('permission:suppliers.manage');
 
         // Purchase Orders
+        Route::get('/purchase-orders/auto-suggest', [PurchaseOrderController::class, 'autoSuggest']);
         Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
         Route::get('/purchase-orders/{poId}', [PurchaseOrderController::class, 'show']);
         Route::post('/purchase-orders', [PurchaseOrderController::class, 'store'])->middleware('permission:purchase_orders.manage');
@@ -146,6 +147,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/purchase-orders/{poId}/send', [PurchaseOrderController::class, 'send'])->middleware('permission:purchase_orders.manage');
         Route::post('/purchase-orders/{poId}/receive', [PurchaseOrderController::class, 'receive'])->middleware('permission:purchase_orders.manage');
         Route::post('/purchase-orders/{poId}/cancel', [PurchaseOrderController::class, 'cancel'])->middleware('permission:purchase_orders.manage');
+        Route::patch('/purchase-orders/{poId}/fulfillment', [PurchaseOrderController::class, 'patchFulfillment'])->middleware('permission:purchase_orders.manage');
 
         Route::get('/shipping/carriers', [ShippingController::class, 'carriers']);
         Route::post('/shipping/carriers', [ShippingController::class, 'storeCarrier'])->middleware('permission:shipping.manage');

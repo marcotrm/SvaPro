@@ -54,6 +54,7 @@ class PurchaseOrderController extends Controller
                 'po.supplier_id',
                 's.name as supplier_name',
                 'po.status',
+                'po.fulfillment_status',
                 'po.expected_at',
                 'po.total_net',
                 'po.created_at',
@@ -427,5 +428,76 @@ class PurchaseOrderController extends Controller
         AuditLogger::log($request, 'cancel', 'purchase_order', $poId, 'PO #' . $poId);
 
         return response()->json(['message' => 'Ordine annullato.']);
+    }
+
+    /**
+     * Aggiorna lo stato di lavorazione (fulfillment_status) senza cambiare lo status principale.
+     * PATCH /purchase-orders/{id}/fulfillment
+     */
+    public function patchFulfillment(Request $request, int $poId): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $allowed  = ['none', 'scaricato', 'controllato', 'pagato'];
+
+        $request->validate([
+            'fulfillment_status' => ['required', 'in:' . implode(',', $allowed)],
+        ]);
+
+        $po = DB::table('purchase_orders')->where('tenant_id', $tenantId)->where('id', $poId)->first();
+        if (!$po) return response()->json(['message' => 'Ordine non trovato.'], 404);
+
+        DB::table('purchase_orders')->where('id', $poId)->update([
+            'fulfillment_status' => $request->input('fulfillment_status'),
+            'updated_at'         => now(),
+        ]);
+
+        AuditLogger::log($request, 'update', 'purchase_order', $poId,
+            "Lavorazione PO #{$poId} → {$request->input('fulfillment_status')}");
+
+        return response()->json(['message' => 'Stato lavorazione aggiornato.']);
+    }
+
+    /**
+     * Suggerisce un ordine automatico basato sui prodotti con stock < reorder_point.
+     * GET /purchase-orders/auto-suggest?store_id=X&supplier_id=Y
+     */
+    public function autoSuggest(Request $request): JsonResponse
+    {
+        $tenantId   = (int) $request->attributes->get('tenant_id');
+        $storeId    = $request->input('store_id');
+        $supplierId = $request->input('supplier_id');
+
+        // Trova varianti con stock basso (qty_on_hand <= reorder_point o < min_stock)
+        $q = DB::table('product_variants as pv')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->join('stock_items as si', function ($j) use ($tenantId) {
+                $j->on('si.product_variant_id', '=', 'pv.id')
+                  ->where('si.tenant_id', $tenantId);
+            })
+            ->where('p.tenant_id', $tenantId)
+            ->where('si.qty_on_hand', '<=', DB::raw('COALESCE(pv.reorder_point, p.min_stock, 5)'))
+            ->select([
+                'pv.id as variant_id',
+                'p.name as product_name',
+                'pv.flavor',
+                'pv.sku',
+                'si.qty_on_hand',
+                DB::raw('COALESCE(pv.reorder_point, p.min_stock, 5) as reorder_point'),
+                DB::raw('COALESCE(pv.reorder_qty, p.reorder_qty, 10) as suggested_qty'),
+                DB::raw('COALESCE(pv.last_cost, 0) as unit_cost'),
+                'p.supplier_id',
+            ]);
+
+        if ($storeId) {
+            // Trova warehouse del negozio
+            $warehouseId = DB::table('warehouses')
+                ->where('tenant_id', $tenantId)->where('store_id', $storeId)->value('id');
+            if ($warehouseId) $q->where('si.warehouse_id', $warehouseId);
+        }
+        if ($supplierId) $q->where('p.supplier_id', (int) $supplierId);
+
+        $items = $q->orderBy('si.qty_on_hand')->get();
+
+        return response()->json(['data' => $items]);
     }
 }
