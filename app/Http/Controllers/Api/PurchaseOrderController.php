@@ -360,7 +360,7 @@ class PurchaseOrderController extends Controller
                     DB::table('stock_items')
                         ->where('id', $existing->id)
                         ->update([
-                            'qty_on_hand' => $existing->qty_on_hand + $qtyReceived,
+                            'on_hand' => $existing->on_hand + $qtyReceived,
                             'updated_at' => $now,
                         ]);
                 } else {
@@ -368,8 +368,8 @@ class PurchaseOrderController extends Controller
                         'tenant_id' => $tenantId,
                         'warehouse_id' => $warehouseId,
                         'product_variant_id' => $poLine->product_variant_id,
-                        'qty_on_hand' => $qtyReceived,
-                        'qty_reserved' => 0,
+                        'on_hand' => $qtyReceived,
+                        'reserved' => 0,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ]);
