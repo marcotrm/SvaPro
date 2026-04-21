@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { orders as ordersApi, catalog, customers as customersApi, inventory, stores, getImageUrl, clearApiCache, promotions as promotionsApi } from '../api.jsx';
 import {
@@ -1159,44 +1159,48 @@ export default function PosPage() {
                 <User size={9} /> Cliente
               </div>
                 {selectedCustomer ? (
-                  <div style={{ background: 'rgba(123,111,208,0.15)', border: '1px solid rgba(123,111,208,0.3)', borderRadius: 8, padding: '8px 10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCustomer.name}</div>
-                        {customerDiscountPct > 0 && (
-                          <div style={{ fontSize: 9, fontWeight: 800, color: '#86efac' }}>🎟️ -{customerDiscountPct}%</div>
-                        )}
+                  <div style={{ background: 'rgba(123,111,208,0.18)', border: '1px solid rgba(123,111,208,0.4)', borderRadius: 12, padding: '10px 12px' }}>
+                    {/* Riga nome + X */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCustomer.name}</div>
+                        {customerDiscountPct > 0 && (<div style={{ fontSize: 10, color: '#86efac', fontWeight: 700, marginTop: 1 }}>🎟️ Sconto {customerDiscountPct}%</div>)}
                       </div>
-                      <button onClick={() => { setSelectedCustomer(null); setPointsRedeemed(0); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', flexShrink: 0 }}>
+                      <button onClick={() => { setSelectedCustomer(null); setPointsRedeemed(0); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 0, flexShrink: 0 }}>
                         <X size={12} />
                       </button>
                     </div>
-                    {/* Badge punti */}
+                    {/* Sezione punti - solo se il cliente ne ha */}
                     {(selectedCustomer.points_balance ?? 0) > 0 && (
-                      <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ fontSize: 14 }}>⭐</span>
-                          <span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24' }}>{selectedCustomer.points_balance} pt</span>
-                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>(≈ €{((selectedCustomer.points_balance ?? 0) * 0.01).toFixed(2)})</span>
+                      <div style={{ marginTop: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: '7px 9px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <span style={{ fontSize: 14, lineHeight: 1 }}>⭐</span>
+                              <span style={{ fontSize: 13, fontWeight: 900, color: '#fbbf24' }}>{selectedCustomer.points_balance}</span>
+                              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>pt</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>vale circa {fmt(selectedCustomer.points_balance * 0.01)}</div>
+                          </div>
+                          {pointsRedeemed === 0 ? (
+                            <button onClick={() => setPointsRedeemed(selectedCustomer.points_balance ?? 0)} style={{ fontSize: 11, fontWeight: 800, padding: '5px 10px', borderRadius: 8, border: 'none', background: '#fbbf24', color: '#000', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              Usa punti
+                            </button>
+                          ) : (
+                            <button onClick={() => setPointsRedeemed(0)} style={{ fontSize: 11, fontWeight: 800, padding: '5px 10px', borderRadius: 8, border: 'none', background: 'rgba(239,68,68,0.8)', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              Annulla
+                            </button>
+                          )}
                         </div>
-                        {pointsRedeemed === 0 ? (
-                          <button
-                            onClick={() => setPointsRedeemed(selectedCustomer.points_balance ?? 0)}
-                            style={{ fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.12)', color: '#fbbf24', cursor: 'pointer' }}
-                          >Usa punti</button>
-                        ) : (
-                          <button
-                            onClick={() => setPointsRedeemed(0)}
-                            style={{ fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.12)', color: '#fc8181', cursor: 'pointer' }}
-                          >✕ Rimuovi</button>
+                        {pointsRedeemed > 0 && (
+                          <div style={{ marginTop: 6, fontSize: 10, fontWeight: 800, color: '#86efac', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span>✅</span> <span>Sconto -{fmt(pointsDiscountAmt)} dal totale</span>
+                          </div>
                         )}
                       </div>
                     )}
-                    {pointsRedeemed > 0 && (
-                      <div style={{ marginTop: 4, fontSize: 9, color: '#86efac', fontWeight: 700 }}>✅ -€{(pointsRedeemed * 0.01).toFixed(2)} sconto punti applicato</div>
-                    )}
                   </div>
-                ) : (
+              ) : (
                 <div style={{ position: 'relative' }}>
                   <User size={11} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }} />
                   <input

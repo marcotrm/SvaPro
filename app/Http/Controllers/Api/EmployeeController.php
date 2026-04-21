@@ -323,7 +323,7 @@ class EmployeeController extends Controller
                 $join->on('sales_stats.employee_id', '=', 'e.id');
             })
             ->where('e.tenant_id', $tenantId)
-            ->when($storeId !== null, fn ($query) => $query->where('e.store_id', $storeId))
+            ->when($storeId !== null, fn ($query) => $query->where('e.store_id', $storeId)->whereNotNull('e.store_id'))
             ->select([
                 'e.*',
                 's.name as store_name',
