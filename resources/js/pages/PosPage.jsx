@@ -1171,36 +1171,11 @@ export default function PosPage() {
                         <X size={12} />
                       </button>
                     </div>
-                    {/* Sezione punti - solo se il cliente ne ha */}
-                    {(selectedCustomer.points_balance ?? 0) > 0 && (
-                      <div style={{ marginTop: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: '7px 9px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                              <span style={{ fontSize: 14, lineHeight: 1 }}>⭐</span>
-                              <span style={{ fontSize: 13, fontWeight: 900, color: '#fbbf24' }}>{selectedCustomer.points_balance}</span>
-                              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>pt</span>
-                            </div>
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>vale circa {fmt(selectedCustomer.points_balance * 0.01)}</div>
-                          </div>
-                          {pointsRedeemed === 0 ? (
-                            <button onClick={() => setPointsRedeemed(selectedCustomer.points_balance ?? 0)} style={{ fontSize: 11, fontWeight: 800, padding: '5px 10px', borderRadius: 8, border: 'none', background: '#fbbf24', color: '#000', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                              Usa punti
-                            </button>
-                          ) : (
-                            <button onClick={() => setPointsRedeemed(0)} style={{ fontSize: 11, fontWeight: 800, padding: '5px 10px', borderRadius: 8, border: 'none', background: 'rgba(239,68,68,0.8)', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                              Annulla
-                            </button>
-                          )}
-                        </div>
-                        {pointsRedeemed > 0 && (
-                          <div style={{ marginTop: 6, fontSize: 10, fontWeight: 800, color: '#86efac', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span>✅</span> <span>Sconto -{fmt(pointsDiscountAmt)} dal totale</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                     {/* Sconto punti attivo - solo indicatore, gestione via popup */}
+                     {pointsRedeemed > 0 && (
+                       <div style={{ marginTop: 6, fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>⭐ -{fmt(pointsDiscountAmt)} punti applicati</div>
+                     )}
+                   </div>
               ) : (
                 <div style={{ position: 'relative' }}>
                   <User size={11} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }} />
@@ -1773,7 +1748,8 @@ function PosResoModal({ storeId, onClose, onDone }) {
 /* ─── Modal Punti Fedeltà POS ─────────────────────────────────────── */
 function PointsModal({ customer, pointsRedeemed, pointsDiscountAmt, cartTotal, fmt, onApply, onClose }) {
   const maxUsable = Math.min(customer.points_balance ?? 0, Math.floor(cartTotal * 100));
-  const [inputPts, setInputPts] = React.useState(pointsRedeemed > 0 ? pointsRedeemed : 0);
+  const [inputRaw, setInputRaw] = React.useState(pointsRedeemed > 0 ? String(pointsRedeemed) : '');
+  const inputPts = Math.min(maxUsable, Math.max(0, parseInt(inputRaw) || 0));
   const previewDiscount = parseFloat(Math.min(inputPts * 0.01, cartTotal).toFixed(2));
 
   return (
@@ -1810,11 +1786,15 @@ function PointsModal({ customer, pointsRedeemed, pointsDiscountAmt, cartTotal, f
             Punti da usare (max {maxUsable})
           </div>
           <input
-            type="number"
-            min={0}
-            max={maxUsable}
-            value={inputPts}
-            onChange={e => setInputPts(Math.min(maxUsable, Math.max(0, parseInt(e.target.value) || 0)))}
+            type="text"
+            inputMode="numeric"
+            placeholder="0"
+            value={inputRaw}
+            onFocus={e => e.target.select()}
+            onChange={e => {
+              const raw = e.target.value.replace(/[^0-9]/g, '');
+              setInputRaw(raw);
+            }}
             style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: '12px 16px', fontSize: 22, fontWeight: 800, color: '#fbbf24', outline: 'none', boxSizing: 'border-box' }}
           />
           {/* Shortcut: usa tutti */}
@@ -1822,13 +1802,13 @@ function PointsModal({ customer, pointsRedeemed, pointsDiscountAmt, cartTotal, f
             {[25, 50, 75, 100].map(pct => {
               const pts = Math.floor(maxUsable * pct / 100);
               return (
-                <button key={pct} onClick={() => setInputPts(pts)}
-                  style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: inputPts === pts ? '#fbbf24' : 'rgba(255,255,255,0.07)', color: inputPts === pts ? '#000' : 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+                <button key={pct} onClick={() => setInputRaw(String(Math.floor(maxUsable * pct / 100)))}
+                  style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: inputPts === Math.floor(maxUsable * pct / 100) && inputPts > 0 ? '#fbbf24' : 'rgba(255,255,255,0.07)', color: inputPts === Math.floor(maxUsable * pct / 100) && inputPts > 0 ? '#000' : 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
                   {pct}%
                 </button>
               );
             })}
-            <button onClick={() => setInputPts(maxUsable)}
+            <button onClick={() => setInputRaw(String(maxUsable))}
               style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: inputPts === maxUsable && maxUsable > 0 ? '#fbbf24' : 'rgba(255,255,255,0.07)', color: inputPts === maxUsable && maxUsable > 0 ? '#000' : 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
               Tutti
             </button>
