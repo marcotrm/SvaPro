@@ -16,7 +16,7 @@ const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency:
 function TabBar({ active, onChange, isDipendente }) {
   const tabs = isDipendente
     ? [
-        { id: 'history', label: '📋 Movimentazioni' },
+        { id: 'live',    label: '🟢 Cassa Live' },
         { id: 'daily',   label: '📈 Incasso Giornaliero' },
         { id: 'coins',   label: '🪙 Pacchi Monete' },
       ]
@@ -697,80 +697,66 @@ export default function TesoreriaPage() {
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-secondary)' }}>Caricamento...</div>
           ) : (
             <>
-              {/* Card preview oggi */}
-              <div style={{ background: 'var(--color-surface)', borderRadius: 18, padding: 24, border: '1px solid var(--color-border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>📈 Incasso di Oggi</h3>
-                    <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                      {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
-                    </p>
-                  </div>
-                  {dailyPreview?.already_submitted && (
-                    <div style={{ padding: '6px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.12)', color: '#10b981', fontWeight: 700, fontSize: 13 }}>
-                      ✓ Già inviato — {dailyPreview.submitted_by_name}
-                    </div>
-                  )}
+              {/* Card principale — solo totale */}
+              <div style={{
+                background: 'var(--color-surface)', borderRadius: 20, padding: 32,
+                border: '1px solid var(--color-border)', textAlign: 'center',
+                boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
+              }}>
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 600, marginBottom: 8 }}>
+                  {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                  Fatturato di Oggi
+                </div>
+                <div style={{
+                  fontSize: 56, fontWeight: 900, letterSpacing: '-0.03em',
+                  background: 'linear-gradient(135deg, #7B6FD0, #6366f1)',
+                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                  marginBottom: 8,
+                }}>
+                  {fmt(dailyPreview?.total || 0)}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 28 }}>
+                  {dailyPreview?.transactions_count || 0} transazioni
                 </div>
 
-                {/* Totali */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
-                  <div style={{ background: 'rgba(16,185,129,0.07)', borderRadius: 14, padding: '16px 18px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: '#10b981', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>💵 Contanti</div>
-                    <div style={{ fontSize: 26, fontWeight: 900, color: '#10b981' }}>{fmt(dailyPreview?.cash_total || 0)}</div>
-                  </div>
-                  <div style={{ background: 'rgba(99,102,241,0.07)', borderRadius: 14, padding: '16px 18px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: '#6366f1', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>💳 POS Carta</div>
-                    <div style={{ fontSize: 26, fontWeight: 900, color: '#6366f1' }}>{fmt(dailyPreview?.pos_total || 0)}</div>
-                  </div>
-                  <div style={{ background: 'linear-gradient(135deg, rgba(123,111,208,0.1), rgba(99,102,241,0.08))', borderRadius: 14, padding: '16px 18px', textAlign: 'center', border: '1px solid rgba(123,111,208,0.2)' }}>
-                    <div style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>🏆 Totale Giornata</div>
-                    <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--color-accent)' }}>{fmt(dailyPreview?.total || 0)}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>{dailyPreview?.transactions_count || 0} transazioni</div>
-                  </div>
-                </div>
-
-                {/* Note + Invio */}
-                {!dailyPreview?.already_submitted ? (
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 6 }}>Note (opzionale)</label>
-                      <input
-                        className="sp-input"
-                        value={dailyNotes}
-                        onChange={e => setDailyNotes(e.target.value)}
-                        placeholder="Es: Cassa regolare, nessuna anomalia..."
-                      />
-                    </div>
-                    <button
-                      onClick={handleSubmitDaily}
-                      disabled={dailySubmitting || (dailyPreview?.total || 0) === 0}
-                      style={{
-                        padding: '10px 28px', borderRadius: 12, border: 'none', cursor: 'pointer',
-                        background: 'linear-gradient(135deg, #7B6FD0, #6366f1)', color: '#fff',
-                        fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap',
-                        opacity: dailySubmitting ? 0.7 : 1, transition: 'all 0.15s',
-                      }}
-                    >
-                      {dailySubmitting ? 'Invio...' : '📤 Invia Riepilogo'}
-                    </button>
+                {dailyPreview?.already_submitted ? (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '12px 24px', borderRadius: 14,
+                    background: 'rgba(16,185,129,0.1)', color: '#10b981',
+                    fontWeight: 700, fontSize: 14,
+                  }}>
+                    ✓ Inviato da {dailyPreview.submitted_by_name} — {new Date(dailyPreview.submitted_at).toLocaleString('it-IT', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 ) : (
-                  <div style={{ padding: '12px 16px', background: 'rgba(16,185,129,0.06)', borderRadius: 10, fontSize: 13, color: '#10b981', fontWeight: 600 }}>
-                    ✓ Riepilogo inviato il {new Date(dailyPreview.submitted_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </div>
+                  <button
+                    onClick={handleSubmitDaily}
+                    disabled={dailySubmitting || (dailyPreview?.total || 0) === 0}
+                    style={{
+                      padding: '14px 48px', borderRadius: 14, border: 'none', cursor: 'pointer',
+                      background: 'linear-gradient(135deg, #7B6FD0, #6366f1)', color: '#fff',
+                      fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em',
+                      opacity: dailySubmitting ? 0.7 : 1,
+                      boxShadow: '0 4px 18px rgba(99,102,241,0.35)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {dailySubmitting ? 'Invio in corso...' : '📤 Invia Incasso'}
+                  </button>
                 )}
               </div>
 
-              {/* Storico report */}
+              {/* Storico report — visibile a tutti */}
               {dailyReports.length > 0 && (
                 <div style={{ background: 'var(--color-surface)', borderRadius: 16, border: '1px solid var(--color-border)', overflow: 'hidden' }}>
-                  <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-border)', fontWeight: 700, fontSize: 14 }}>Storico Report Giornalieri</div>
+                  <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-border)', fontWeight: 700, fontSize: 14 }}>Storico Incassi Inviati</div>
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                       <thead>
                         <tr style={{ background: 'var(--color-bg)' }}>
-                          {['Data', 'Negozio', 'Contanti', 'POS', 'Totale', 'Transaz.', 'Inviato da'].map(h => (
+                          {['Data', 'Negozio', 'Totale', 'Transaz.', 'Inviato da'].map(h => (
                             <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--color-text-secondary)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                           ))}
                         </tr>
@@ -780,8 +766,6 @@ export default function TesoreriaPage() {
                           <tr key={r.id} style={{ borderTop: '1px solid var(--color-border)' }}>
                             <td style={{ padding: '10px 14px', fontWeight: 700 }}>{new Date(r.report_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' })}</td>
                             <td style={{ padding: '10px 14px', color: 'var(--color-text-secondary)' }}>{r.store_name}</td>
-                            <td style={{ padding: '10px 14px', fontWeight: 700, color: '#10b981' }}>{fmt(r.cash_total)}</td>
-                            <td style={{ padding: '10px 14px', fontWeight: 700, color: '#6366f1' }}>{fmt(r.pos_total)}</td>
                             <td style={{ padding: '10px 14px', fontWeight: 900, color: 'var(--color-accent)' }}>{fmt(r.total)}</td>
                             <td style={{ padding: '10px 14px', color: 'var(--color-text-secondary)' }}>{r.transactions_count}</td>
                             <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>{r.submitted_by_name}</td>
