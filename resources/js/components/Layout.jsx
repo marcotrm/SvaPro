@@ -609,7 +609,7 @@ export default function Layout({ user, setUser }) {
               onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #d97706, #f59e0b)'; e.currentTarget.style.color = '#fff'; }}
               onMouseLeave={e => { e.currentTarget.style.background = showMichelePanel ? 'linear-gradient(135deg, #d97706, #f59e0b)' : 'rgba(245,158,11,0.12)'; e.currentTarget.style.color = showMichelePanel ? '#fff' : '#f59e0b'; }}
             >
-              ðŸ“‹
+              Scheda
             </button>
 
             {/* Bottone riepilogo vendite */}
@@ -684,7 +684,7 @@ export default function Layout({ user, setUser }) {
                 }}>
                   {/* Header */}
                   <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ fontWeight: 800, fontSize: 13, color: '#fff' }}>ðŸ”” Notifiche Cassa</div>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: '#fff' }}> Notifiche Cassa</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Soglia: â‚¬{CASH_THRESHOLD.toLocaleString()}</div>
                   </div>
 
@@ -718,7 +718,7 @@ export default function Layout({ user, setUser }) {
                         // Non chiudiamo il pannello cosÃ¬ l'utente vede il feedback
                       }}>
                         <div>
-                          <div style={{ fontWeight: 800, fontSize: 13, color: '#a5b4fc' }}>ðŸ“„ Report di Chiusura Pronto</div>
+                          <div style={{ fontWeight: 800, fontSize: 13, color: '#a5b4fc' }}> Report di Chiusura Pronto</div>
                           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>{dailyReportBody}</div>
                         </div>
                         <div style={{ textAlign: 'right', color: '#a5b4fc', fontSize: 11, fontWeight: 'bold', minWidth: 60 }}>
@@ -745,7 +745,7 @@ export default function Layout({ user, setUser }) {
                             <div style={{ fontWeight: 900, fontSize: 14, color: '#ef4444' }}>
                               {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(s.balance)}
                             </div>
-                            <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: 8 }}>âš ï¸ ALLERTA</span>
+                            <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: 8 }}>âš  ALLERTA</span>
                           </div>
                         </div>
                       ))
