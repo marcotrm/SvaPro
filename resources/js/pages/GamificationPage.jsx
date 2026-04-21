@@ -6,12 +6,13 @@ import { stores as storesApi, gamification as gamApi } from '../api.jsx';
 // ── Badge tiers (dinamiche in base alle regole configurate) ──────────────────
 const DEFAULT_BADGE_THRESHOLDS = { silver: 1000, gold: 5000, diamond: 20000 };
 const getBadgeTiers = (rules = {}) => [
-  { threshold: 0,                                       label: 'Bronzo',   icon: '🥉', color: '#b45309', bg: '#fef3c7' },
+  { threshold: 0,                                       label: 'Novizio',  icon: '🔰', color: '#334155', bg: '#f8fafc' },
+  { threshold: rules.badge_bronze_pts  ?? 100,          label: 'Bronzo',   icon: '🥉', color: '#b45309', bg: '#fef3c7' },
   { threshold: rules.badge_silver_pts  ?? 1000,         label: 'Argento',  icon: '🥈', color: '#64748b', bg: '#f1f5f9' },
   { threshold: rules.badge_gold_pts    ?? 5000,         label: 'Oro',      icon: '🥇', color: '#b45309', bg: '#fffbeb' },
   { threshold: rules.badge_diamond_pts ?? 20000,        label: 'Diamante', icon: '💎', color: '#6d28d9', bg: '#ede9fe' },
 ];
-const getBadge = (pts, tiers) => [...(tiers || getBadgeTiers())].reverse().find(t => pts >= t.threshold) || { label: 'Bronzo', icon: '🥉', color: '#b45309', bg: '#fef3c7', threshold: 0 };
+const getBadge = (pts, tiers) => [...(tiers || getBadgeTiers())].reverse().find(t => pts >= t.threshold) || { label: 'Novizio', icon: '🔰', color: '#334155', bg: '#f8fafc', threshold: 0 };
 
 // ── Regole default ─────────────────────────────────────────────────────────────
 const DEFAULT_RULES = {
@@ -24,6 +25,7 @@ const DEFAULT_RULES = {
   pts_per_qscare:         40,   // R5: punti per ogni vendita con QScare
   pts_per_featured:       15,   // R6: punti per ogni prodotto preferito venduto
   pts_late_penalty:       50,   // R7: punti sottratti per ogni ritardo (valore positivo)
+  badge_bronze_pts:       100,  // Soglia punti TOTALI per badge Bronzo
   badge_silver_pts:       1000, // Soglia punti TOTALI per badge Argento
   badge_gold_pts:         5000, // Soglia punti TOTALI per badge Oro
   badge_diamond_pts:      20000,// Soglia punti TOTALI per badge Diamante
@@ -83,6 +85,7 @@ export default function GamificationPage() {
   const [period, setPeriod]           = useState('month');
   const [customFrom, setCustomFrom]   = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0,10); });
   const [customTo,   setCustomTo]     = useState(() => new Date().toISOString().slice(0,10));
+  const [selectedMonthStr, setSelectedMonthStr] = useState(() => new Date().toISOString().slice(0,7));
 
   const [rules, setRules]           = useState(DEFAULT_RULES);
   const [editRules, setEditRules]   = useState(DEFAULT_RULES);
@@ -172,6 +175,12 @@ export default function GamificationPage() {
       if (period === 'custom') {
         params.date_from = customFrom;
         params.date_to   = customTo;
+      } else if (period === 'specific_month' && selectedMonthStr) {
+        params.period = 'custom';
+        const [y, m] = selectedMonthStr.split('-');
+        const lastDay = new Date(y, parseInt(m), 0).getDate();
+        params.date_from = `${y}-${m}-01`;
+        params.date_to   = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
       }
       if (selectedStoreId) params.store_id = selectedStoreId;
 
@@ -189,7 +198,7 @@ export default function GamificationPage() {
     } catch (err) {
       console.error('Gamification load error:', err);
     } finally { setLoading(false); }
-  }, [selectedStoreId, period, customFrom, customTo]);
+  }, [selectedStoreId, period, customFrom, customTo, selectedMonthStr]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -223,25 +232,22 @@ export default function GamificationPage() {
           <div>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, letterSpacing: '-0.5px' }}>Gamification Dipendenti</h1>
             <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>
-              {selectedStore ? selectedStore.name : 'Tutti i negozi'} · {period === 'month' ? 'Questo mese' : period === 'quarter' ? 'Trimestre' : period === 'year' ? "Quest'anno" : 'Tutto il periodo'}
+              {selectedStore ? selectedStore.name : 'Tutti i negozi'} · {period === 'month' ? 'Questo mese' : period === 'quarter' ? 'Trimestre' : period === 'year' ? "Quest'anno" : period === 'specific_month' ? `Storico: ${selectedMonthStr}` : period === 'custom' ? `Dal ${customFrom} al ${customTo}` : 'Tutto il periodo'}
             </p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-          {[['month','30gg'],['quarter','Trimestre'],['year','Anno'],['all','Tutto'],['custom','📅 Personalizzato']].map(([v,l]) => (
+          {[['month','Questo Mese'],['specific_month','📅 Mese Storico'],['all','Da Sempre']].map(([v,l]) => (
             <button key={v} onClick={() => setPeriod(v)} style={{
               background: period === v ? '#c9a227' : 'rgba(255,255,255,0.1)',
               color: period === v ? '#0e1726' : 'rgba(255,255,255,0.7)',
               border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
             }}>{l}</button>
           ))}
-          {period === 'custom' && (
+          {period === 'specific_month' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '4px 12px' }}>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Dal</span>
-              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, outline: 'none', cursor: 'pointer' }} />
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Al</span>
-              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Mese:</span>
+              <input type="month" value={selectedMonthStr} onChange={e => setSelectedMonthStr(e.target.value)}
                 style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, outline: 'none', cursor: 'pointer' }} />
             </div>
           )}
@@ -298,10 +304,9 @@ export default function GamificationPage() {
             <thead><tr>
               <th style={{ width: 40 }}>#</th>
               <th>Dipendente</th>
-              <th>Negozio</th>
               <th>Badge</th>
-              <th>Punti Totali</th>
-              <th>Periodo</th>
+              <th>Regole Punti</th>
+              <th style={{ textAlign: 'right' }}>Punti Totali</th>
             </tr></thead>
             <tbody>
               {leaderboard.length > 0 ? leaderboard.map((emp, i) => (
@@ -327,18 +332,29 @@ export default function GamificationPage() {
                       </div>
                     </div>
                   </td>
-                  <td style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{emp.store_name || '—'}</td>
                   <td>
-                    <span style={{ background: emp.badge.bg, color: emp.badge.color, padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'inline-block' }}>
-                      {emp.badge.icon} {emp.badge.label}
+                    <span style={{ background: emp.badge.bg, color: emp.badge.color, padding: '4px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <span>{emp.badge.icon}</span> {emp.badge.label}
                     </span>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                      <strong style={{ fontSize: 20, color: '#4f46e5', fontWeight: 900 }}>{fmtPts(emp.points)}</strong>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>pt</span>
+                    {emp.breakdown && Object.keys(emp.breakdown).length > 0 && (
+                        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                            {emp.breakdown.euro > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Fatturato"><span style={{ fontSize: 20 }}>💰</span><span style={{ fontSize: 12, fontWeight: 800, color: '#4f46e5', marginTop: 2 }}>{emp.breakdown.euro}</span></div>}
+                            {emp.breakdown.fidelity > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Nuovi clienti"><span style={{ fontSize: 20 }}>👤</span><span style={{ fontSize: 12, fontWeight: 800, color: '#0891b2', marginTop: 2 }}>{emp.breakdown.fidelity}</span></div>}
+                            {emp.breakdown.discount > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Scontrini alti"><span style={{ fontSize: 20 }}>🏷️</span><span style={{ fontSize: 12, fontWeight: 800, color: '#d97706', marginTop: 2 }}>{emp.breakdown.discount}</span></div>}
+                            {emp.breakdown.big_sale > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Pezzi Multipli"><span style={{ fontSize: 20 }}>📦</span><span style={{ fontSize: 12, fontWeight: 800, color: '#7c3aed', marginTop: 2 }}>{emp.breakdown.big_sale}</span></div>}
+                            {emp.breakdown.qscare > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="QScare"><span style={{ fontSize: 20 }}>🛡</span><span style={{ fontSize: 12, fontWeight: 800, color: '#0d9488', marginTop: 2 }}>{emp.breakdown.qscare}</span></div>}
+                            {emp.breakdown.featured > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Preferiti"><span style={{ fontSize: 20 }}>⭐</span><span style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', marginTop: 2 }}>{emp.breakdown.featured}</span></div>}
+                            {emp.breakdown.late_penalty < 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Penalità ritardo"><span style={{ fontSize: 20 }}>⏰</span><span style={{ fontSize: 12, fontWeight: 800, color: '#ef4444', marginTop: 2 }}>{emp.breakdown.late_penalty}</span></div>}
+                        </div>
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 4 }}>
+                      <strong style={{ fontSize: 24, color: '#0f172a', fontWeight: 900 }}>{fmtPts(emp.points)}</strong>
+                      <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>pt</span>
                     </div>
-                    {/* Progress bar verso prossimo badge */}
                     {(() => { 
                       const tiers = badgeTiers; 
                       const curItem = [...tiers].reverse().find(t => emp.points >= t.threshold) || tiers[0];
@@ -349,18 +365,15 @@ export default function GamificationPage() {
                       const nextMin = next.threshold;
                       const pct = Math.min(100, Math.max(0, ((emp.points - curMin) / (nextMin - curMin)) * 100)); 
                       return (
-                        <div style={{ marginTop: 4, height: 4, background: 'var(--color-border)', borderRadius: 99, overflow: 'hidden', width: 100 }}>
-                          <div style={{ height: '100%', width: `${pct}%`, background: emp.badge.color, borderRadius: 99, transition: 'width 0.5s' }} />
+                        <div style={{ marginTop: 6, height: 6, background: 'var(--color-border)', borderRadius: 99, overflow: 'hidden', width: 120, position: 'relative', marginLeft: 'auto' }}>
+                          <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${pct}%`, background: emp.badge.color, borderRadius: 99, transition: 'width 0.5s' }} />
                         </div>
                       ); 
                     })()}
                   </td>
-                  <td style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>
-                    {period === 'month' ? '📅 Mese' : period === 'quarter' ? '📅 Trimestre' : period === 'year' ? '📅 Anno' : '📅 Tutto'}
-                  </td>
                 </tr>
               )) : (
-                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px' }}>
+                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '48px 20px' }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
                   <div style={{ fontWeight: 700, color: 'var(--color-text)', marginBottom: 6 }}>Nessun punteggio per il periodo selezionato</div>
                   <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', maxWidth: 380, margin: '0 auto', lineHeight: 1.6 }}>
@@ -386,6 +399,7 @@ export default function GamificationPage() {
                   {tier.threshold === 0 ? 'Livello di partenza' : `Raggiunto a ${tier.threshold.toLocaleString('it-IT')} punti`}
                 </div>
                 <div style={{ marginTop: 12, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
+                  {tier.label === 'Novizio'  && 'Benvenuto nel programma!'}
                   {tier.label === 'Bronzo'   && 'Livello iniziale — buon lavoro!'}
                   {tier.label === 'Argento'  && 'Ottima crescita! Continua così.'}
                   {tier.label === 'Oro'      && 'Top performer — eccezionale!'}
@@ -397,8 +411,8 @@ export default function GamificationPage() {
           {isAdmin && (
             <div className="card-v3" style={{ padding: 20, background: 'rgba(99,102,241,0.04)', border: '1.5px solid rgba(99,102,241,0.15)' }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>⚙️ Configura soglie badge (vai su “Configura Regole” per modificarle)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                {[['badge_silver_pts','🥈 Argento'],['badge_gold_pts','🥇 Oro'],['badge_diamond_pts','💎 Diamante']].map(([k, label]) => (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                {[['badge_bronze_pts','🥉 Bronzo'],['badge_silver_pts','🥈 Argento'],['badge_gold_pts','🥇 Oro'],['badge_diamond_pts','💎 Diamante']].map(([k, label]) => (
                   <div key={k} style={{ textAlign: 'center', padding: '14px 10px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
                     <div style={{ fontSize: 18, marginBottom: 4 }}>{label}</div>
                     <div style={{ fontSize: 22, fontWeight: 900, color: '#0f172a' }}>{(rules[k] ?? DEFAULT_RULES[k]).toLocaleString('it-IT')}</div>
@@ -508,10 +522,11 @@ export default function GamificationPage() {
               {/* Soglie Badge */}
               <div style={{ padding: '4px 0 8px' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#6d28d9', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>SOGLIE BADGE · Punti cumulativi per livello</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                  <RuleInput icon="🥈" label="Punti per badge Argento" desc="Punti totali da raggiungere" suffix="pt tot." step={100} color="#64748b" {...ruleInputProps('badge_silver_pts')} />
-                  <RuleInput icon="🥇" label="Punti per badge Oro" desc="Punti totali da raggiungere" suffix="pt tot." step={500} color="#b45309" {...ruleInputProps('badge_gold_pts')} />
-                  <RuleInput icon="💎" label="Punti per badge Diamante" desc="Punti totali da raggiungere" suffix="pt tot." step={1000} color="#6d28d9" {...ruleInputProps('badge_diamond_pts')} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                  <RuleInput icon="🥉" label="Punti Bronzo" desc="Punti da raggiungere" suffix="pt tot." step={50} color="#b45309" {...ruleInputProps('badge_bronze_pts')} />
+                  <RuleInput icon="🥈" label="Punti Argento" desc="Punti da raggiungere" suffix="pt tot." step={100} color="#64748b" {...ruleInputProps('badge_silver_pts')} />
+                  <RuleInput icon="🥇" label="Punti Oro" desc="Punti da raggiungere" suffix="pt tot." step={500} color="#b45309" {...ruleInputProps('badge_gold_pts')} />
+                  <RuleInput icon="💎" label="Punti Diamante" desc="Punti da raggiungere" suffix="pt tot." step={1000} color="#6d28d9" {...ruleInputProps('badge_diamond_pts')} />
                 </div>
               </div>
             </div>

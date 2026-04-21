@@ -702,64 +702,76 @@ class OrderController extends Controller
                         }
                     }
 
-                    // R1 – punti per euro di vendita
-                    $pts = (int) floor($grandTotal * max(0, (int) ($gamRules['pts_per_euro'] ?? 1)));
+                    $ledgerEntries = [];
 
-                    // R2 – punti per nuova card fidelity (cliente creato negli ultimi 5 min = "nuovo")
+                    // R1 – punti per euro di vendita
+                    $ptsEuro = (int) floor($grandTotal * max(0, (int) ($gamRules['pts_per_euro'] ?? 1)));
+                    if ($ptsEuro > 0) $ledgerEntries[] = ['source_type' => 'euro', 'points_delta' => $ptsEuro];
+
+                    // R2 – punti per nuova card fidelity
                     if ($request->filled('customer_id')) {
                         $custCreatedAt = DB::table('customers')
                             ->where('id', (int) $request->input('customer_id'))
                             ->value('created_at');
                         if ($custCreatedAt && now()->diffInMinutes($custCreatedAt) <= 5) {
-                            $pts += (int) ($gamRules['pts_per_fidelity'] ?? 50);
+                            $ptsFidelity = (int) ($gamRules['pts_per_fidelity'] ?? 50);
+                            if ($ptsFidelity > 0) $ledgerEntries[] = ['source_type' => 'fidelity', 'points_delta' => $ptsFidelity];
                         }
                     }
 
-                    // R3 – punti se totale scontrino >= soglia (non più sconto > soglia)
+                    // R3 – punti se totale scontrino >= soglia
                     $receiptThreshold = (float) ($gamRules['pts_receipt_threshold'] ?? $gamRules['pts_discount_threshold'] ?? 25);
                     if ($grandTotal >= $receiptThreshold) {
-                        $pts += (int) ($gamRules['pts_per_discount'] ?? 30);
+                        $ptsDiscount = (int) ($gamRules['pts_per_discount'] ?? 30);
+                        if ($ptsDiscount > 0) $ledgerEntries[] = ['source_type' => 'discount', 'points_delta' => $ptsDiscount];
                     }
 
                     // R4 – punti se numero pezzi ≥ soglia
                     $minItemsQty = (int) ($gamRules['min_items_qty'] ?? 5);
                     if ($lineCount >= $minItemsQty) {
-                        $pts += (int) ($gamRules['pts_per_big_sale'] ?? 20);
+                        $ptsBigSale = (int) ($gamRules['pts_per_big_sale'] ?? 20);
+                        if ($ptsBigSale > 0) $ledgerEntries[] = ['source_type' => 'big_sale', 'points_delta' => $ptsBigSale];
                     }
 
-                    // R5 – punti per QScare presente nell'ordine
+                    // R5 – punti per QScare
                     if ($hasQscare) {
-                        $pts += (int) ($gamRules['pts_per_qscare'] ?? 40);
+                        $ptsQscare = (int) ($gamRules['pts_per_qscare'] ?? 40);
+                        if ($ptsQscare > 0) $ledgerEntries[] = ['source_type' => 'qscare', 'points_delta' => $ptsQscare];
                     }
 
                     // R6 – punti per ogni prodotto preferito
-                    $pts += $featuredCount * (int) ($gamRules['pts_per_featured'] ?? 15);
+                    $ptsFeatured = $featuredCount * (int) ($gamRules['pts_per_featured'] ?? 15);
+                    if ($ptsFeatured > 0) $ledgerEntries[] = ['source_type' => 'featured', 'points_delta' => $ptsFeatured];
 
-                    $pts = max(0, $pts);
+                    $totalPts = array_sum(array_column($ledgerEntries, 'points_delta'));
 
-                    // Aggiorna wallet punti dipendente
-                    DB::table('employee_point_wallets')->updateOrInsert(
-                        ['tenant_id' => $tenantId, 'employee_id' => $sellerId],
-                        ['points_balance' => 0, 'created_at' => $now, 'updated_at' => $now]
-                    );
-                    DB::table('employee_point_wallets')
-                        ->where('tenant_id', $tenantId)
-                        ->where('employee_id', $sellerId)
-                        ->update([
-                            'points_balance' => DB::raw('points_balance + ' . $pts),
-                            'updated_at'     => $now,
-                        ]);
+                    if ($totalPts > 0) {
+                        // Aggiorna wallet punti dipendente
+                        DB::table('employee_point_wallets')->updateOrInsert(
+                            ['tenant_id' => $tenantId, 'employee_id' => $sellerId],
+                            ['points_balance' => 0, 'created_at' => $now, 'updated_at' => $now]
+                        );
+                        DB::table('employee_point_wallets')
+                            ->where('tenant_id', $tenantId)
+                            ->where('employee_id', $sellerId)
+                            ->update([
+                                'points_balance' => DB::raw('points_balance + ' . $totalPts),
+                                'updated_at'     => $now,
+                            ]);
 
-                    // Scrive nel ledger storico punti
-                    DB::table('employee_point_ledger')->insert([
-                        'tenant_id'    => $tenantId,
-                        'employee_id'  => $sellerId,
-                        'source_type'  => 'pos_sale',
-                        'source_id'    => $orderId,
-                        'points_delta' => $pts,
-                        'created_at'   => $now,
-                        'updated_at'   => $now,
-                    ]);
+                        // Scrive nel ledger
+                        foreach ($ledgerEntries as $entry) {
+                            DB::table('employee_point_ledger')->insert([
+                                'tenant_id'    => $tenantId,
+                                'employee_id'  => $sellerId,
+                                'source_type'  => $entry['source_type'],
+                                'source_id'    => $orderId,
+                                'points_delta' => $entry['points_delta'],
+                                'created_at'   => $now,
+                                'updated_at'   => $now,
+                            ]);
+                        }
+                    }
 
                     // Popola employee_sales_facts per KPI dashboard
                     DB::table('employee_sales_facts')->insert([

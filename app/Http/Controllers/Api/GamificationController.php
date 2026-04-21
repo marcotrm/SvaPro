@@ -38,13 +38,33 @@ class GamificationController extends Controller
 
         [$dateStart, $dateEnd] = $this->periodRange($period);
 
-        // Somma punti da ledger per il periodo selezionato
+        // Somma punti da ledger per il periodo selezionato (Totale)
         $pointsSub = DB::table('employee_point_ledger as epl')
             ->where('epl.tenant_id', $tenantId)
             ->when($dateStart, fn ($q) => $q->where('epl.created_at', '>=', $dateStart))
             ->when($dateEnd,   fn ($q) => $q->where('epl.created_at', '<=', $dateEnd))
             ->groupBy('epl.employee_id')
             ->selectRaw('epl.employee_id, COALESCE(SUM(epl.points_delta), 0) as period_points');
+
+        // Sottogruppo per il breakdown dei tipi
+        $ledgers = DB::table('employee_point_ledger as epl')
+            ->where('epl.tenant_id', $tenantId)
+            ->when($dateStart, fn ($q) => $q->where('epl.created_at', '>=', $dateStart))
+            ->when($dateEnd,   fn ($q) => $q->where('epl.created_at', '<=', $dateEnd))
+            ->select('employee_id', 'source_type', DB::raw('SUM(points_delta) as pts'))
+            ->groupBy('employee_id', 'source_type')
+            ->get();
+        
+        $breakdowns = [];
+        foreach($ledgers as $l) {
+            $type = $l->source_type ?? 'other';
+            if ($type === 'pos_sale') $type = 'euro';
+            
+            if (!isset($breakdowns[$l->employee_id][$type])) {
+                $breakdowns[$l->employee_id][$type] = 0;
+            }
+            $breakdowns[$l->employee_id][$type] += (int) $l->pts;
+        }
 
         $employees = DB::table('employees as e')
             ->leftJoin('stores as s', 's.id', '=', 'e.store_id')
@@ -69,6 +89,7 @@ class GamificationController extends Controller
                 'last_name'     => $e->last_name,
                 'store_name'    => $e->store_name,
                 'points'        => max(0, (int) $e->points),
+                'breakdown'     => $breakdowns[$e->id] ?? (object)[],
                 'rank'          => $i + 1,
             ]);
 
