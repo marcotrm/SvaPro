@@ -723,6 +723,12 @@ export const coinShipments = {
   dashboard: (params = {}) => api.get('/coin-shipments/dashboard', { params }),
 };
 
+export const dailyCashReports = {
+  preview: (params = {}) => api.get('/daily-cash-reports/preview', { params }),
+  submit:  (data)        => api.post('/daily-cash-reports/submit', data),
+  list:    (params = {}) => api.get('/daily-cash-reports', { params }),
+};
+
 // Promotion APIs
 export const promotions = {
   getAll: (params = {}) => cachedGet('/promotions', params, 15000, 120000),

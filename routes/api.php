@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\RestockOrderController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\CashMovementController;
 use App\Http\Controllers\Api\CoinShipmentController;
+use App\Http\Controllers\Api\DailyCashReportController;
 use App\Http\Controllers\Api\GamificationController;
 use App\Http\Controllers\Api\PrestashopController;
 use App\Http\Controllers\Api\AdmController;
@@ -334,6 +335,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/coin-shipments/{id}/confirm', [CoinShipmentController::class, 'confirm']);
         Route::post('/coin-shipments/{id}/reject', [CoinShipmentController::class, 'reject']);
         Route::get('/coin-shipments/dashboard', [CoinShipmentController::class, 'dashboardStats']);
+        // Tesoreria - Incasso Giornaliero
+        Route::get('/daily-cash-reports', [DailyCashReportController::class, 'index']);
+        Route::get('/daily-cash-reports/preview', [DailyCashReportController::class, 'preview']);
+        Route::post('/daily-cash-reports/submit', [DailyCashReportController::class, 'submit']);
 
         // Attendance - accessibile anche ai dipendenti (per timbrare se stessi)
         Route::get('/attendance/live', [AttendanceController::class, 'live']);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { cashMovements, coinShipments, employees as employeesApi } from '../api.jsx';
+import { cashMovements, coinShipments, dailyCashReports, employees as employeesApi } from '../api.jsx';
 import {
   Plus, ArrowDownCircle, ArrowUpCircle, Filter, Store,
   TrendingUp, TrendingDown, DollarSign, Clock, RefreshCw,
@@ -12,16 +12,24 @@ import DatePicker from '../components/DatePicker.jsx';
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
-/* ─── Tab Bar ─── */
-function TabBar({ active, onChange }) {
-  return (
-    <div style={{ display: 'flex', gap: 4, background: 'var(--color-bg)', borderRadius: 12, padding: 4, border: '1px solid var(--color-border)', width: 'fit-content' }}>
-      {[
+/* ─── Tab Bar (role-aware) ─── */
+function TabBar({ active, onChange, isDipendente }) {
+  const tabs = isDipendente
+    ? [
+        { id: 'history', label: '📋 Movimentazioni' },
+        { id: 'daily',   label: '📈 Incasso Giornaliero' },
+        { id: 'coins',   label: '🪙 Pacchi Monete' },
+      ]
+    : [
         { id: 'live',    label: '🟢 Cassa Live' },
         { id: 'history', label: '📋 Movimentazioni' },
         { id: 'coins',   label: '🪙 Pacchi Monete' },
         { id: 'summary', label: '🏢 Riepilogo Società' },
-      ].map(t => (
+        { id: 'daily',   label: '📈 Incasso Giornaliero' },
+      ];
+  return (
+    <div style={{ display: 'flex', gap: 4, background: 'var(--color-bg)', borderRadius: 12, padding: 4, border: '1px solid var(--color-border)', width: 'fit-content', flexWrap:'wrap' }}>
+      {tabs.map(t => (
         <button
           key={t.id}
           onClick={() => onChange(t.id)}
@@ -40,14 +48,11 @@ function TabBar({ active, onChange }) {
 
 /* ─── Cassa Live Card ─── */
 function StoreCashCard({ store, onMove }) {
-  const balance = store.balance;
+  const balance    = store.balance;
   const isPositive = balance >= 0;
-  // breakdown
-  const salesCash    = store.sales_cash    || 0;
-  const salesPos     = store.sales_pos     || 0;
-  const manualDep    = store.manual_deposits || 0;
-  const coinAmt      = store.coin_amount   || 0;
-  const withdrawals  = store.total_withdrawals || 0;
+  const coinAmt    = store.coin_amount     || 0;
+  const totalIn    = store.total_deposits  || 0;
+  const totalOut   = store.total_withdrawals || 0;
   return (
     <div style={{
       background: 'var(--color-surface)', borderRadius: 18,
@@ -55,7 +60,7 @@ function StoreCashCard({ store, onMove }) {
       boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
       display: 'flex', flexDirection: 'column', gap: 14,
     }}>
-      {/* Header negozio */}
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(123,111,208,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -76,7 +81,7 @@ function StoreCashCard({ store, onMove }) {
         </div>
       </div>
 
-      {/* Saldo grande */}
+      {/* Saldo */}
       <div style={{ textAlign: 'center', padding: '12px 0' }}>
         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Saldo in Cassa</div>
         <div style={{ fontSize: 32, fontWeight: 900, color: isPositive ? '#10b981' : '#EF4444', letterSpacing: '-0.02em' }}>
@@ -84,23 +89,16 @@ function StoreCashCard({ store, onMove }) {
         </div>
       </div>
 
-      {/* Breakdown 4 voci */}
+      {/* Breakdown 2 colonne: Entrate/Uscite + Monete */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div style={{ background: 'rgba(16,185,129,0.07)', borderRadius: 10, padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: '#10b981', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>💵 Contanti POS</div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#10b981' }}>{fmt(salesCash)}</div>
-        </div>
-        <div style={{ background: 'rgba(99,102,241,0.07)', borderRadius: 10, padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: '#6366f1', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>💳 POS Carta</div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#6366f1' }}>{fmt(salesPos)}</div>
+          <div style={{ fontSize: 10, color: '#10b981', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>↓ Entrate</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#10b981' }}>{fmt(totalIn)}</div>
+          <div style={{ fontSize: 10, color: '#10b981', opacity:0.7, marginTop: 2 }}>↑ Uscite: {fmt(totalOut)}</div>
         </div>
         <div style={{ background: 'rgba(245,158,11,0.07)', borderRadius: 10, padding: '10px 12px' }}>
           <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>🪙 Monete</div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#f59e0b' }}>{fmt(coinAmt)}</div>
-        </div>
-        <div style={{ background: 'rgba(239,68,68,0.07)', borderRadius: 10, padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: '#EF4444', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>↑ Uscite/Prelievi</div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#EF4444' }}>{fmt(withdrawals)}</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#f59e0b' }}>{fmt(coinAmt)}</div>
         </div>
       </div>
 
@@ -182,7 +180,15 @@ export default function TesoreriaPage() {
   const { selectedStoreId, storesList, user } = useOutletContext();
   const isDipendente = (user?.roles || []).includes('dipendente') || user?.role === 'dipendente';
 
-  const [activeTab, setActiveTab] = useState(isDipendente ? 'history' : 'live');
+  const [activeTab, setActiveTab] = useState(isDipendente ? 'daily' : 'live');
+
+  // ── Incasso Giornaliero ──
+  const [dailyPreview, setDailyPreview]   = useState(null);
+  const [dailyLoading, setDailyLoading]   = useState(false);
+  const [dailySubmitting, setDailySub]    = useState(false);
+  const [dailyNotes, setDailyNotes]       = useState('');
+  const [dailyReports, setDailyReports]   = useState([]);
+  const today = new Date().toISOString().slice(0, 10);
 
   // ── Cassa Live ──
   const [balances, setBalances] = useState([]);
@@ -298,6 +304,36 @@ export default function TesoreriaPage() {
 
   useEffect(() => { if (activeTab === 'coins') fetchCoins(); }, [activeTab, fetchCoins]);
 
+  /* fetch incasso giornaliero */
+  const fetchDaily = useCallback(async () => {
+    setDailyLoading(true);
+    try {
+      const params = {};
+      if (selectedStoreId && !isDipendente) params.store_id = selectedStoreId;
+      const [previewRes, listRes] = await Promise.all([
+        dailyCashReports.preview(params),
+        dailyCashReports.list(params),
+      ]);
+      setDailyPreview(previewRes.data);
+      setDailyReports(listRes.data?.data || []);
+    } catch {}
+    finally { setDailyLoading(false); }
+  }, [selectedStoreId, isDipendente]);
+
+  useEffect(() => { if (activeTab === 'daily') fetchDaily(); }, [activeTab, fetchDaily]);
+
+  const handleSubmitDaily = async () => {
+    if (dailyPreview?.already_submitted) return;
+    setDailySub(true);
+    try {
+      await dailyCashReports.submit({ notes: dailyNotes });
+      toast.success('Incasso giornaliero inviato!');
+      setDailyNotes('');
+      fetchDaily();
+    } catch (e) { toast.error(e.response?.data?.message || 'Errore'); }
+    finally { setDailySub(false); }
+  };
+
   const handleConfirmCoin = async (id) => {
     if (!window.confirm('Confermare la ricezione di questo pacco monete?')) return;
     try {
@@ -397,7 +433,7 @@ export default function TesoreriaPage() {
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-text-secondary)' }}>Gestione flusso di cassa, versamenti e prelievi</p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <TabBar active={activeTab} onChange={setActiveTab} />
+          <TabBar active={activeTab} onChange={setActiveTab} isDipendente={isDipendente} />
           <button onClick={() => openModal()} className="sp-button-primary">
             <Plus size={16} /> Registra Movimento
           </button>
@@ -654,6 +690,113 @@ export default function TesoreriaPage() {
           })()}
         </div>
       )}
+      {/* ══ TAB: INCASSO GIORNALIERO ══ */}
+      {activeTab === 'daily' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {dailyLoading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-secondary)' }}>Caricamento...</div>
+          ) : (
+            <>
+              {/* Card preview oggi */}
+              <div style={{ background: 'var(--color-surface)', borderRadius: 18, padding: 24, border: '1px solid var(--color-border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>📈 Incasso di Oggi</h3>
+                    <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                      {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </p>
+                  </div>
+                  {dailyPreview?.already_submitted && (
+                    <div style={{ padding: '6px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.12)', color: '#10b981', fontWeight: 700, fontSize: 13 }}>
+                      ✓ Già inviato — {dailyPreview.submitted_by_name}
+                    </div>
+                  )}
+                </div>
+
+                {/* Totali */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+                  <div style={{ background: 'rgba(16,185,129,0.07)', borderRadius: 14, padding: '16px 18px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: '#10b981', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>💵 Contanti</div>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: '#10b981' }}>{fmt(dailyPreview?.cash_total || 0)}</div>
+                  </div>
+                  <div style={{ background: 'rgba(99,102,241,0.07)', borderRadius: 14, padding: '16px 18px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: '#6366f1', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>💳 POS Carta</div>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: '#6366f1' }}>{fmt(dailyPreview?.pos_total || 0)}</div>
+                  </div>
+                  <div style={{ background: 'linear-gradient(135deg, rgba(123,111,208,0.1), rgba(99,102,241,0.08))', borderRadius: 14, padding: '16px 18px', textAlign: 'center', border: '1px solid rgba(123,111,208,0.2)' }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>🏆 Totale Giornata</div>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--color-accent)' }}>{fmt(dailyPreview?.total || 0)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>{dailyPreview?.transactions_count || 0} transazioni</div>
+                  </div>
+                </div>
+
+                {/* Note + Invio */}
+                {!dailyPreview?.already_submitted ? (
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 6 }}>Note (opzionale)</label>
+                      <input
+                        className="sp-input"
+                        value={dailyNotes}
+                        onChange={e => setDailyNotes(e.target.value)}
+                        placeholder="Es: Cassa regolare, nessuna anomalia..."
+                      />
+                    </div>
+                    <button
+                      onClick={handleSubmitDaily}
+                      disabled={dailySubmitting || (dailyPreview?.total || 0) === 0}
+                      style={{
+                        padding: '10px 28px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                        background: 'linear-gradient(135deg, #7B6FD0, #6366f1)', color: '#fff',
+                        fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap',
+                        opacity: dailySubmitting ? 0.7 : 1, transition: 'all 0.15s',
+                      }}
+                    >
+                      {dailySubmitting ? 'Invio...' : '📤 Invia Riepilogo'}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ padding: '12px 16px', background: 'rgba(16,185,129,0.06)', borderRadius: 10, fontSize: 13, color: '#10b981', fontWeight: 600 }}>
+                    ✓ Riepilogo inviato il {new Date(dailyPreview.submitted_at).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                )}
+              </div>
+
+              {/* Storico report */}
+              {dailyReports.length > 0 && (
+                <div style={{ background: 'var(--color-surface)', borderRadius: 16, border: '1px solid var(--color-border)', overflow: 'hidden' }}>
+                  <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-border)', fontWeight: 700, fontSize: 14 }}>Storico Report Giornalieri</div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: 'var(--color-bg)' }}>
+                          {['Data', 'Negozio', 'Contanti', 'POS', 'Totale', 'Transaz.', 'Inviato da'].map(h => (
+                            <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--color-text-secondary)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dailyReports.map(r => (
+                          <tr key={r.id} style={{ borderTop: '1px solid var(--color-border)' }}>
+                            <td style={{ padding: '10px 14px', fontWeight: 700 }}>{new Date(r.report_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' })}</td>
+                            <td style={{ padding: '10px 14px', color: 'var(--color-text-secondary)' }}>{r.store_name}</td>
+                            <td style={{ padding: '10px 14px', fontWeight: 700, color: '#10b981' }}>{fmt(r.cash_total)}</td>
+                            <td style={{ padding: '10px 14px', fontWeight: 700, color: '#6366f1' }}>{fmt(r.pos_total)}</td>
+                            <td style={{ padding: '10px 14px', fontWeight: 900, color: 'var(--color-accent)' }}>{fmt(r.total)}</td>
+                            <td style={{ padding: '10px 14px', color: 'var(--color-text-secondary)' }}>{r.transactions_count}</td>
+                            <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>{r.submitted_by_name}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {/* ══ TAB: RIEPILOGO SOCIETÀ ══ */}
       {activeTab === 'summary' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
