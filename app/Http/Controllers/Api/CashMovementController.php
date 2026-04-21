@@ -84,30 +84,48 @@ class CashMovementController extends Controller
 
         $storesQuery = DB::table('stores')->where('tenant_id', $tenantId);
         if ($forcedStoreId) {
-            // Dipendente: vede solo il proprio store
             $storesQuery->where('id', $forcedStoreId);
         }
         $stores = $storesQuery->get(['id', 'name']);
 
         $results = [];
         foreach ($stores as $store) {
-            $deposits    = (float) DB::table('cash_movements')
+            // Depositi manuali (escluse monete — le monete hanno note che inizia con 🪙)
+            $manualDeposits = (float) DB::table('cash_movements')
                 ->where('tenant_id', $tenantId)
                 ->where('store_id', $store->id)
                 ->where('type', 'deposit')
+                ->whereRaw("(note NOT LIKE '🪙%' OR note IS NULL)")
                 ->sum('amount');
+
+            // Monete: depositi il cui note inizia con 🪙
+            $coinDeposits = (float) DB::table('cash_movements')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', $store->id)
+                ->where('type', 'deposit')
+                ->whereRaw("note LIKE '🪙%'")
+                ->sum('amount');
+
             $withdrawals = (float) DB::table('cash_movements')
                 ->where('tenant_id', $tenantId)
                 ->where('store_id', $store->id)
                 ->where('type', 'withdrawal')
                 ->sum('amount');
 
-            // Aggiungi vendite POS al saldo cassa (metodo contanti)
-            $salesCash   = (float) DB::table('sales_orders')
+            // Vendite POS — contanti
+            $salesCash = (float) DB::table('sales_orders')
                 ->where('tenant_id', $tenantId)
                 ->where('store_id', $store->id)
                 ->where('status', 'paid')
                 ->where('channel', 'cash')
+                ->sum('grand_total');
+
+            // Vendite POS — carta/pos
+            $salesPos = (float) DB::table('sales_orders')
+                ->where('tenant_id', $tenantId)
+                ->where('store_id', $store->id)
+                ->where('status', 'paid')
+                ->where('channel', 'pos')
                 ->sum('grand_total');
 
             // Ultima movimentazione
@@ -117,12 +135,20 @@ class CashMovementController extends Controller
                 ->orderByDesc('created_at')
                 ->first(['created_at', 'type', 'amount']);
 
+            $totalIn  = round($salesCash + $manualDeposits + $coinDeposits, 2);
+            $balance  = round($totalIn - $withdrawals, 2);
+
             $results[] = [
                 'store_id'          => $store->id,
                 'store_name'        => $store->name,
-                'balance'           => round($salesCash + $deposits - $withdrawals, 2),
-                'total_deposits'    => round($salesCash + $deposits, 2),
+                'balance'           => $balance,
+                'total_deposits'    => $totalIn,
                 'total_withdrawals' => round($withdrawals, 2),
+                // breakdown
+                'sales_cash'        => round($salesCash, 2),
+                'sales_pos'         => round($salesPos, 2),
+                'manual_deposits'   => round($manualDeposits, 2),
+                'coin_amount'       => round($coinDeposits, 2),
                 'last_movement'     => $lastMov,
             ];
         }

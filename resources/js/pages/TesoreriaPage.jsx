@@ -42,6 +42,12 @@ function TabBar({ active, onChange }) {
 function StoreCashCard({ store, onMove }) {
   const balance = store.balance;
   const isPositive = balance >= 0;
+  // breakdown
+  const salesCash    = store.sales_cash    || 0;
+  const salesPos     = store.sales_pos     || 0;
+  const manualDep    = store.manual_deposits || 0;
+  const coinAmt      = store.coin_amount   || 0;
+  const withdrawals  = store.total_withdrawals || 0;
   return (
     <div style={{
       background: 'var(--color-surface)', borderRadius: 18,
@@ -65,7 +71,6 @@ function StoreCashCard({ store, onMove }) {
             )}
           </div>
         </div>
-        {/* Badge status */}
         <div style={{ padding: '4px 10px', borderRadius: 8, background: isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', color: isPositive ? '#10b981' : '#EF4444', fontSize: 11, fontWeight: 700 }}>
           {isPositive ? '✓ Regolare' : '⚠ Negativo'}
         </div>
@@ -79,15 +84,23 @@ function StoreCashCard({ store, onMove }) {
         </div>
       </div>
 
-      {/* Breakdown */}
+      {/* Breakdown 4 voci */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div style={{ background: 'rgba(16,185,129,0.07)', borderRadius: 10, padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: '#10b981', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>Entrate</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#10b981' }}>{fmt(store.total_deposits)}</div>
+          <div style={{ fontSize: 10, color: '#10b981', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>💵 Contanti POS</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#10b981' }}>{fmt(salesCash)}</div>
+        </div>
+        <div style={{ background: 'rgba(99,102,241,0.07)', borderRadius: 10, padding: '10px 12px' }}>
+          <div style={{ fontSize: 10, color: '#6366f1', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>💳 POS Carta</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#6366f1' }}>{fmt(salesPos)}</div>
+        </div>
+        <div style={{ background: 'rgba(245,158,11,0.07)', borderRadius: 10, padding: '10px 12px' }}>
+          <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>🪙 Monete</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#f59e0b' }}>{fmt(coinAmt)}</div>
         </div>
         <div style={{ background: 'rgba(239,68,68,0.07)', borderRadius: 10, padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: '#EF4444', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>Uscite</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#EF4444' }}>{fmt(store.total_withdrawals)}</div>
+          <div style={{ fontSize: 10, color: '#EF4444', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>↑ Uscite/Prelievi</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#EF4444' }}>{fmt(withdrawals)}</div>
         </div>
       </div>
 
@@ -232,6 +245,8 @@ export default function TesoreriaPage() {
     setHistLoading(true);
     try {
       const params = {};
+      // BUG FIX: passa store_id nella request — il backend filtra per store
+      if (selectedStoreId) params.store_id = selectedStoreId;
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo)   params.date_to   = dateTo;
       const res = await cashMovements.get(params);
@@ -246,7 +261,7 @@ export default function TesoreriaPage() {
     try {
       const res = await cashMovements.balances();
       const found = (res.data?.data || []).find(b => String(b.store_id) === String(selectedStoreId));
-      setStoreBalance(found?.balance ?? null);
+      setStoreBalance(found ?? null); // salva l'intero oggetto, non solo balance
     } catch {}
   }, [selectedStoreId]);
 
@@ -476,7 +491,7 @@ export default function TesoreriaPage() {
           {/* Saldo live negozio corrente */}
           {storeBalance !== null && selectedStoreId && (
             <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap:'wrap', gap:10,
               background: 'var(--color-surface)', borderRadius: 14, padding: '14px 20px',
               border: '1px solid var(--color-border)',
             }}>
@@ -484,14 +499,25 @@ export default function TesoreriaPage() {
                 <Store size={15} color="#7B6FD0" />
                 {storesList?.find(s => String(s.id) === String(selectedStoreId))?.name || 'Negozio'}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+                {/* mini breakdown */}
+                {storeBalance?.sales_cash > 0 && (
+                  <span style={{ fontSize:12, fontWeight:700, color:'#10b981' }}>💵 {fmt(storeBalance.sales_cash)}</span>
+                )}
+                {storeBalance?.sales_pos > 0 && (
+                  <span style={{ fontSize:12, fontWeight:700, color:'#6366f1' }}>💳 {fmt(storeBalance.sales_pos)}</span>
+                )}
+                {storeBalance?.coin_amount > 0 && (
+                  <span style={{ fontSize:12, fontWeight:700, color:'#f59e0b' }}>🪙 {fmt(storeBalance.coin_amount)}</span>
+                )}
+                <div style={{ width:1, height:20, background:'var(--color-border)' }} />
                 <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>Saldo Cassa Live:</div>
                 <div style={{
                   fontSize: 22, fontWeight: 900,
-                  color: storeBalance >= 0 ? '#10b981' : '#EF4444',
+                  color: (storeBalance?.balance ?? storeBalance) >= 0 ? '#10b981' : '#EF4444',
                   letterSpacing: '-0.01em',
                 }}>
-                  {fmt(storeBalance)}
+                  {fmt(storeBalance?.balance ?? storeBalance)}
                 </div>
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981', animation: 'spBadgePulse 2s ease-out infinite' }} />
               </div>
