@@ -1410,7 +1410,7 @@ export default function ShiftsPage() {
         const payload = { store_id: storeId, shifts: [], deletions: [] };
         Object.keys(shifts).forEach(key => {
           const [empId, dateStr] = splitShiftKey(key);
-          payload.shifts.push({ employee_id: empId, date: dateStr, start_time: shifts[key].start_time, end_time: shifts[key].end_time, color: shifts[key].color });
+          payload.shifts.push({ employee_id: empId, date: dateStr, start_time: shifts[key].start_time, end_time: shifts[key].end_time, color: shifts[key].color, status: shifts[key].status || 'confirmed' });
         });
         Object.keys(originalShifts).forEach(key => {
           if (!shifts[key]) {
