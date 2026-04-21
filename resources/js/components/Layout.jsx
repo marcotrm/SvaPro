@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache, cashMovements as cashApi, reports, exports_, employees as employeesApi } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
@@ -609,7 +609,7 @@ export default function Layout({ user, setUser }) {
               onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #d97706, #f59e0b)'; e.currentTarget.style.color = '#fff'; }}
               onMouseLeave={e => { e.currentTarget.style.background = showMichelePanel ? 'linear-gradient(135deg, #d97706, #f59e0b)' : 'rgba(245,158,11,0.12)'; e.currentTarget.style.color = showMichelePanel ? '#fff' : '#f59e0b'; }}
             >
-              Scheda
+              <ClipboardList size={17} />
             </button>
 
             {/* Bottone riepilogo vendite */}
