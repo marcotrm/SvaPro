@@ -1566,7 +1566,7 @@ export default function ShiftsPage() {
   const renderActiveCellModal = () => {
     if (!activeCell) return null;
     const { empId, dateStr } = activeCell;
-    const isOwnRow = String(empId) === currentEmployeeId;
+    const isOwnRow = String(empId) === String(currentEmployeeId);
     const canPropose = isDipendente && isOwnRow;
     const title = canPropose ? 'Proponi Turno' : 'Assegna Turno';
     
@@ -1590,11 +1590,22 @@ export default function ShiftsPage() {
             </button>
           </div>
           
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>Modelli disponibili</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>Opzioni Turno</div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
+            {/* Opzione Manuale sempre presente */}
+            <button onClick={() => applyTemplate(empId, dateStr, { start_time: '09:00', end_time: '18:00', name: 'Turno Personalizzato', color: '#14b8a6' })} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(20, 184, 166, 0.08)', border: '1px dashed rgba(20, 184, 166, 0.4)', padding: '12px 14px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', transition: 'all 0.1s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(20, 184, 166, 0.15)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(20, 184, 166, 0.08)'}>
+              <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#14b8a6', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 900 }}>+</div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#0f766e' }}>Inserimento Manuale</div>
+                <div style={{ fontSize: 12, color: '#0d9488', fontWeight: 600 }}>Inserisci orario personalizzato</div>
+              </div>
+            </button>
+
+            {templates.length > 0 && <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />}
+
             {templates.length === 0 ? (
-              <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '20px 0' }}>Nessun template configurato.</div>
+              <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: '10px 0' }}>Nessun modello salvato.</div>
             ) : templates.map(t => (
               <button key={t.id} onClick={() => applyTemplate(empId, dateStr, t)} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--color-bg)', border: '1px solid var(--color-border)', padding: '12px 14px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', transition: 'all 0.1s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg)'}>
                 <div style={{ width: 14, height: 14, borderRadius: '50%', background: t.color || '#10B981', flexShrink: 0 }} />
@@ -1926,7 +1937,7 @@ export default function ShiftsPage() {
                     }
 
                     // ── Cella NORMALE ───────────────────────────────────────
-                    const isOwnCell   = String(emp.id) === currentEmployeeId;
+                    const isOwnCell   = String(emp.id) === String(currentEmployeeId);
                     const canClick    = canEditShifts || (isDipendente && isOwnCell);
                     const isProposed  = hasShift && shift.status === 'proposed';
                     const isConfirmed = hasShift && shift.status === 'confirmed';
