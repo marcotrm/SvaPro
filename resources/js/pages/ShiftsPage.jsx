@@ -1097,22 +1097,6 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
   );
 }
 // ─────────────────────────────────────────────────────────────────────────────
-// Rileva "buchi" di copertura: giorni della settimana in cui nessun dipendente
-// ha un turno confermato (escludi giorni con assenze totali).
-function detectGaps(shifts, weekDays) {
-  const gaps = [];
-  for (const day of weekDays) {
-    const hasCoverage = Object.keys(shifts).some(key => {
-      const [, dateStr] = key.split('_');
-      if (dateStr !== day.dateStr) return false;
-      const s = shifts[key];
-      return s?.start_time && s?.end_time;
-    });
-    if (!hasCoverage) gaps.push(day);
-  }
-  return gaps;
-}
-// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ShiftsPage() {
   const { selectedStoreId, userRoles = [], user } = useOutletContext?.() || {};
