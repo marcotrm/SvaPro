@@ -90,6 +90,32 @@ class CoinShipmentController extends Controller
             "Pacco monete €{$request->input('total_amount')} → store #{$request->input('to_store_id')}"
         );
 
+        // ── Notifica dipendenti del negozio destinatario ──
+        $toStoreId   = $request->input('to_store_id');
+        $amount      = number_format((float) $request->input('total_amount'), 2, ',', '.');
+        $storeName   = DB::table('stores')->where('id', $toStoreId)->value('name') ?? 'il vostro negozio';
+
+        // Trova tutti gli employee_id collegati allo store destinatario
+        $employeeIds = DB::table('employees')
+            ->where('store_id', $toStoreId)
+            ->where('tenant_id', $tenantId)
+            ->pluck('id');
+
+        foreach ($employeeIds as $empId) {
+            DB::table('employee_notifications')->insert([
+                'tenant_id'      => $tenantId,
+                'employee_id'    => $empId,
+                'type'           => 'coin_shipment',
+                'title'          => '🪙 Pacco monete in arrivo',
+                'body'           => "È stato inviato un pacco da €{$amount} per {$storeName}. Conferma la ricezione nella sezione Tesoreria.",
+                'reference_type' => 'coin_shipment',
+                'reference_id'   => $id,
+                'is_read'        => false,
+                'created_at'     => now(),
+                'updated_at'     => now(),
+            ]);
+        }
+
         return response()->json(['message' => 'Pacco monete creato.', 'id' => $id], 201);
     }
 
