@@ -1272,8 +1272,11 @@ export default function ShiftsPage() {
       }
       setEmployees(empList);
 
+      const empIdSet = new Set(empList.map(e => String(e.id)));
       const shiftsMap = {};
       (shRes?.data?.data || []).forEach(s => {
+        // Filtra i turni orfani: solo quelli di dipendenti presenti in questo store
+        if (!empIdSet.has(String(s.employee_id))) return;
         const key = `${s.employee_id}_${s.date}`;
         shiftsMap[key] = {
           id:         s.id,

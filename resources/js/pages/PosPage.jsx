@@ -584,7 +584,7 @@ export default function PosPage() {
     });
   };
 
-  const effectiveQscarePrice = cartQscarePrice; // somma delle QScare attivate per-riga
+  const effectiveQscarePrice = cartQscarePrice;
   const cartTotalWithQscare  = cartTotal + effectiveQscarePrice;
   const promoDiscount        = appliedPromo?.discount_amount || 0;
   const customerDiscountPct  = parseFloat(selectedCustomer?.personal_discount || 0);
@@ -592,7 +592,8 @@ export default function PosPage() {
     ? Math.round(Math.max(0, cartTotalWithQscare - promoDiscount) * customerDiscountPct * 100) / 10000
     : 0;
   const cartTotalFinal       = Math.max(0, cartTotalWithQscare - promoDiscount - customerDiscountAmt);
-
+  const pointsDiscountAmt    = pointsRedeemed > 0 ? Math.min(parseFloat((pointsRedeemed * 0.01).toFixed(2)), cartTotalFinal) : 0;
+  const cartGrandTotal       = Math.max(0, cartTotalFinal - pointsDiscountAmt);
 
   // Sconto totale combinato (promo codice + sconto personale cliente)
   const totalCombinedDiscount = promoDiscount + customerDiscountAmt;
@@ -1135,13 +1136,8 @@ export default function PosPage() {
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                           >
                             <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(123,111,208,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, flexShrink: 0 }}>
-                              {(em.first_name || '?')[0].toUpperCase()}
+</div>
                             </div>
-                            <div>
-                              <div>{em.first_name} {em.last_name}</div>
-                              {em.store_name && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{em.store_name}</div>}
-                            </div>
-                          </div>
                         ))}
                       </div>
                     );
@@ -1157,39 +1153,36 @@ export default function PosPage() {
                 <User size={9} /> Cliente
               </div>
                 {selectedCustomer ? (
-                  <div style={{ background: 'rgba(123,111,208,0.15)', border: '1px solid rgba(123,111,208,0.3)', borderRadius: 8, padding: '8px 10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCustomer.name}</div>
-                        {customerDiscountPct > 0 && (
-                          <div style={{ fontSize: 9, fontWeight: 800, color: '#86efac' }}>🎟️ -{customerDiscountPct}%</div>
-                        )}
-                      </div>
-                      <button onClick={() => { setSelectedCustomer(null); setPointsRedeemed(0); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', flexShrink: 0 }}>
-                        <X size={12} />
-                      </button>
+                <div style={{ background: 'rgba(123,111,208,0.15)', border: '1px solid rgba(123,111,208,0.35)', borderRadius: 10, padding: '8px 10px' }}>
+                  {/* Nome + rimuovi */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (selectedCustomer.points_balance ?? 0) > 0 ? 6 : 0 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCustomer.name}</div>
+                      {customerDiscountPct > 0 && (
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#86efac' }}>🎟️ Sconto personale {customerDiscountPct}%</div>
+                      )}
                     </div>
-                    {/* Badge punti */}
-                    {(selectedCustomer.points_balance ?? 0) > 0 && (
-                      <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ fontSize: 14 }}>⭐</span>
+                    <button onClick={() => { setSelectedCustomer(null); setPointsRedeemed(0); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', flexShrink: 0, marginLeft: 6 }}>
+                      <X size={13} />
+                    </button>
+                  </div>
+                  {/* Sezione punti */}
+                  {(selectedCustomer.points_balance ?? 0) > 0 && (
+                    <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: '6px 8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: pointsRedeemed > 0 ? 4 : 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ fontSize: 13 }}>⭐</span>
                           <span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24' }}>{selectedCustomer.points_balance} pt</span>
-                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>(≈ €{((selectedCustomer.points_balance ?? 0) * 0.01).toFixed(2)})</span>
+                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>≈ {fmt(selectedCustomer.points_balance * 0.01)}</span>
                         </div>
                         {pointsRedeemed === 0 ? (
                           <button
                             onClick={() => setPointsRedeemed(selectedCustomer.points_balance ?? 0)}
-                            style={{ fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.12)', color: '#fbbf24', cursor: 'pointer' }}
+                            style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 6, border: 'none', background: '#fbbf24', color: '#000', cursor: 'pointer', whiteSpace: 'nowrap' }}
                           >Usa punti</button>
                         ) : (
                           <button
                             onClick={() => setPointsRedeemed(0)}
-                            style={{ fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.12)', color: '#fc8181', cursor: 'pointer' }}
-                          >✕ Rimuovi</button>
-                        )}
-                      </div>
-                    )}
                     {pointsRedeemed > 0 && (
                       <div style={{ marginTop: 4, fontSize: 9, color: '#86efac', fontWeight: 700 }}>✅ -€{(pointsRedeemed * 0.01).toFixed(2)} sconto punti applicato</div>
                     )}
@@ -1446,10 +1439,16 @@ export default function PosPage() {
               <span style={{ fontSize: 14, fontWeight: 800, color: '#86efac' }}>-{fmt(customerDiscountAmt)}</span>
             </div>
           )}
+          {pointsDiscountAmt > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24' }}>⭐ Punti fedeltà</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#fbbf24' }}>-{fmt(pointsDiscountAmt)}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Totale</span>
-            <span style={{ fontSize: 28, fontWeight: 900, color: (promoDiscount > 0 || customerDiscountAmt > 0) ? '#86efac' : '#fff', letterSpacing: -1 }}>
-              {fmt(cartTotalFinal)}
+            <span style={{ fontSize: 28, fontWeight: 900, color: (promoDiscount > 0 || customerDiscountAmt > 0 || pointsDiscountAmt > 0) ? '#86efac' : '#fff', letterSpacing: -1 }}>
+              {fmt(cartGrandTotal)}
             </span>
           </div>
 
@@ -1498,7 +1497,7 @@ export default function PosPage() {
       {/* ─── Checkout Modal ─── */}
       {showCheckoutModal && (
         <PosCheckoutModal
-          cartTotal={Math.max(0, cartTotalFinal - (pointsRedeemed * 0.01))}
+          cartTotal={cartGrandTotal}
           cartLines={cartLines}
           qscareTotal={effectiveQscarePrice}
           selectedCustomer={selectedCustomer}
