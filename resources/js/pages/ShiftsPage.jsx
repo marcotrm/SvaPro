@@ -1097,6 +1097,216 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
   );
 }
 // ─────────────────────────────────────────────────────────────────────────────
+// ALL-STORES OVERVIEW — vista quando "Tutti i negozi" è selezionato
+// ─────────────────────────────────────────────────────────────────────────────
+function AllStoresOverview({
+  weekDays, weekStart, setWeekStart,
+  pmStoresList, pmWeekLocks, pmLoading,
+  globalRef, globalSearch, setGlobalSearch,
+  globalResults, globalSearchLoading, showGlobalDrop, setShowGlobalDrop,
+  loadGlobalEmpShifts, globalEmp, setGlobalEmp, setGlobalShifts, globalShifts,
+}) {
+  const DAY_LABELS = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+
+  return (
+    <div style={{ padding: '28px 32px', maxWidth: 1300, margin: '0 auto' }}>
+
+      {/* ── HEADER ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 14 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <CalendarIcon size={22} color="var(--color-accent)" />
+            Riepilogo Turni — Tutti i Negozi
+          </h1>
+          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 3 }}>
+            Settimana {weekDays[0]?.dateStr?.split('-').reverse().slice(0,2).join('/')} – {weekDays[6]?.dateStr?.split('-').reverse().slice(0,2).join('/')}
+          </div>
+        </div>
+        {/* Week nav */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => setWeekStart(w => { const d = new Date(w); d.setDate(d.getDate()-7); return d; })}
+            style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)' }}>
+            <ChevronLeft size={18} />
+          </button>
+          <button onClick={() => setWeekStart(w => { const d = new Date(w); d.setDate(d.getDate()+7); return d; })}
+            style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)' }}>
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── CERCA DIPENDENTE ── */}
+      <div style={{ background: 'var(--color-surface)', borderRadius: 16, border: '1px solid var(--color-border)', padding: '18px 20px', marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <Users size={18} color="var(--color-accent)" />
+          <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--color-text)' }}>Cerca Dipendente</div>
+          <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— visualizza i turni di questa settimana per qualsiasi dipendente</span>
+          {globalEmp && (
+            <button
+              onClick={() => { setGlobalEmp(null); setGlobalShifts([]); setGlobalSearch(''); }}
+              style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 12, cursor: 'pointer', color: 'var(--color-text-secondary)', fontWeight: 600 }}
+            >
+              <X size={12} /> Cancella selezione
+            </button>
+          )}
+        </div>
+
+        <div style={{ position: 'relative', maxWidth: 420 }} ref={globalRef}>
+          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)', zIndex: 1 }} />
+          <input
+            className="sp-input"
+            style={{ paddingLeft: 36, paddingRight: globalEmp ? 36 : undefined }}
+            placeholder="Nome dipendente..."
+            value={globalSearch}
+            onFocus={() => setShowGlobalDrop(true)}
+            onChange={e => { setGlobalSearch(e.target.value); setShowGlobalDrop(true); if (!e.target.value) { setGlobalEmp(null); setGlobalShifts([]); } }}
+          />
+          {showGlobalDrop && (globalResults.length > 0 || globalSearchLoading) && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', overflow: 'hidden', marginTop: 4 }}>
+              {globalSearchLoading && (
+                <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Loader size={12} style={{ animation: 'spin 0.8s linear infinite' }} /> Ricerca...
+                </div>
+              )}
+              {globalResults.map(emp => (
+                <button key={emp.id} onClick={() => loadGlobalEmpShifts(emp)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: 'var(--color-accent)', fontSize: 12 }}>
+                    {(emp.first_name || '?')[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--color-text)', fontSize: 13 }}>{emp.first_name} {emp.last_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{emp.store_name || 'Nessun negozio'} · {emp.role || ''}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Risultato turni dipendente selezionato */}
+        {globalEmp && (
+          <div style={{ marginTop: 18, borderTop: '1px solid var(--color-border)', paddingTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#fff', fontSize: 14 }}>
+                {(globalEmp.first_name || '?')[0].toUpperCase()}
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--color-text)' }}>{globalEmp.first_name} {globalEmp.last_name}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{globalEmp.store_name} · {globalEmp.role}</div>
+              </div>
+              <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 20, background: globalShifts.length > 0 ? 'rgba(16,185,129,0.1)' : 'rgba(148,163,184,0.1)', color: globalShifts.length > 0 ? '#10B981' : 'var(--color-text-tertiary)' }}>
+                {globalShifts.length} turni questa settimana
+              </span>
+            </div>
+            {globalShifts.length > 0 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+                {DAY_LABELS.map((dl, idx) => {
+                  const dayStr = weekDays[idx]?.dateStr;
+                  const dayShifts = globalShifts.filter(s => s.date === dayStr);
+                  const isToday = dayStr === (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+                  return (
+                    <div key={dl} style={{
+                      borderRadius: 12, padding: '10px 8px', textAlign: 'center',
+                      background: dayShifts.length > 0 ? 'rgba(99,102,241,0.08)' : 'var(--color-bg)',
+                      border: `1.5px solid ${isToday ? 'var(--color-accent)' : dayShifts.length > 0 ? 'rgba(99,102,241,0.25)' : 'var(--color-border)'}`,
+                    }}>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: isToday ? 'var(--color-accent)' : 'var(--color-text-tertiary)', textTransform: 'uppercase', marginBottom: 6 }}>{dl}</div>
+                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
+                        {dayStr ? dayStr.slice(8) + '/' + dayStr.slice(5,7) : ''}
+                      </div>
+                      {dayShifts.length > 0 ? dayShifts.map(s => (
+                        <div key={s.id} style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-accent)', background: 'rgba(99,102,241,0.1)', borderRadius: 6, padding: '3px 4px', marginBottom: 3 }}>
+                          {s.start_time?.slice(0,5)}–{s.end_time?.slice(0,5)}
+                        </div>
+                      )) : (
+                        <div style={{ fontSize: 18, opacity: 0.15 }}>—</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
+                Nessun turno assegnato questa settimana per {globalEmp.first_name} {globalEmp.last_name}.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── RIEPILOGO NEGOZI ── */}
+      {!globalEmp && (
+        <>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
+            📋 Stato turni per negozio
+          </div>
+          {pmLoading ? (
+            <div style={{ textAlign: 'center', padding: 48 }}>
+              <Loader size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-text-tertiary)' }} />
+            </div>
+          ) : pmStoresList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-tertiary)', fontSize: 13 }}>
+              Nessun negozio trovato nel tenant.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+              {pmStoresList.map(store => {
+                const lock = pmWeekLocks.find(l => String(l.store_id) === String(store.id));
+                const isLocked = lock?.locked_at && !lock?.confirmed_at;
+                const isConfirmed = !!lock?.confirmed_at;
+                const statusColor = isConfirmed ? '#10B981' : isLocked ? '#F59E0B' : '#94A3B8';
+                const statusLabel = isConfirmed ? '✅ Confermati' : isLocked ? '🔒 In Attesa' : '⏳ Non Inviati';
+                return (
+                  <div key={store.id} style={{
+                    background: 'var(--color-surface)', borderRadius: 16, padding: '18px 20px',
+                    border: `1.5px solid ${isConfirmed ? 'rgba(16,185,129,0.3)' : isLocked ? 'rgba(245,158,11,0.35)' : 'var(--color-border)'}`,
+                    transition: 'box-shadow 0.18s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--color-text)' }}>{store.name}</div>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${statusColor}18`, color: statusColor }}>
+                        {statusLabel}
+                      </span>
+                    </div>
+                    {store.address && (
+                      <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>📍 {store.address}</div>
+                    )}
+                    {/* Giorni della settimana mini-bar */}
+                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                      {DAY_LABELS.map((dl, i) => {
+                        const dayStr = weekDays[i]?.dateStr;
+                        const isToday = dayStr === (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
+                        return (
+                          <div key={dl} style={{ flex: 1, textAlign: 'center' }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: isToday ? 'var(--color-accent)' : 'var(--color-text-tertiary)', marginBottom: 3 }}>{dl}</div>
+                            <div style={{ height: 5, borderRadius: 3, background: isConfirmed ? '#10B98140' : isLocked ? '#F59E0B40' : 'var(--color-border)' }} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {lock?.locked_at && (
+                      <div style={{ marginTop: 10, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                        {isConfirmed
+                          ? `Confermati il ${new Date(lock.confirmed_at).toLocaleDateString('it-IT')}`
+                          : `Bloccati il ${new Date(lock.locked_at).toLocaleDateString('it-IT')}`}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ShiftsPage() {
   const { selectedStoreId, userRoles = [], user } = useOutletContext?.() || {};
@@ -1844,69 +2054,26 @@ export default function ShiftsPage() {
   }
 
   if (!storeId) return (
-    <div style={{ padding: '32px' }}>
-      {/* Global search available even without store selection */}
-      <div style={{ maxWidth: 520, margin: '0 auto 32px', padding: 24, background: 'var(--color-surface)', borderRadius: 20, border: '1px solid var(--color-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <Users size={20} color="var(--color-accent)" />
-          <div>
-            <div style={{ fontWeight: 800, color: 'var(--color-text)' }}>Cerca Dipendente (tutti i negozi)</div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Visualizza i turni di un dipendente indipendentemente dal punto vendita</div>
-          </div>
-        </div>
-        <div style={{ position: 'relative' }} ref={globalRef}>
-          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
-          <input
-            className="sp-input"
-            style={{ paddingLeft: 36 }}
-            placeholder="Nome dipendente..."
-            value={globalSearch}
-            onFocus={() => setShowGlobalDrop(true)}
-            onChange={e => { setGlobalSearch(e.target.value); setShowGlobalDrop(true); }}
-          />
-          {showGlobalDrop && (globalResults.length > 0 || globalSearchLoading) && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', overflow: 'hidden', marginTop: 4 }}>
-              {globalSearchLoading && (
-                <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Loader size={12} style={{ animation: 'spin 0.8s linear infinite' }} /> Ricerca in corso...
-                </div>
-              )}
-              {globalResults.map(emp => (
-                <button key={emp.id} onClick={() => loadGlobalEmpShifts(emp)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(123,111,208,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'var(--color-accent)', fontSize: 12 }}>{(emp.first_name || '?')[0]}</div>
-                  <div>
-                    <div style={{ fontWeight: 700, color: 'var(--color-text)', fontSize: 13 }}>{emp.first_name} {emp.last_name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{emp.store_name || 'N/D'}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-      {globalEmp && globalShifts.length > 0 && (
-        <div style={{ maxWidth: 700, margin: '0 auto', padding: 24, background: 'var(--color-surface)', borderRadius: 20, border: '1px solid var(--color-border)' }}>
-          <div style={{ fontWeight: 800, marginBottom: 14, color: 'var(--color-text)' }}>Turni di {globalEmp.first_name} {globalEmp.last_name} — settimana corrente</div>
-          {globalShifts.map(s => (
-            <div key={s.id} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 12px', background: 'var(--color-bg)', borderRadius: 10, marginBottom: 6 }}>
-              <span style={{ fontWeight: 700, color: 'var(--color-text)', width: 100 }}>{s.date}</span>
-              <span style={{ color: 'var(--color-accent)', fontWeight: 700 }}>{s.start_time} – {s.end_time}</span>
-              {s.store && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.store.name}</span>}
-            </div>
-          ))}
-        </div>
-      )}
-      {globalEmp && globalShifts.length === 0 && (
-        <div style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center', padding: 32, color: 'var(--color-text-tertiary)' }}>
-          Nessun turno trovato per {globalEmp.first_name} {globalEmp.last_name} questa settimana.
-        </div>
-      )}
-      <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', marginTop: 32 }}>
-        <CalendarIcon size={48} style={{ opacity: 0.2, margin: '0 auto 16px' }} />
-        <h2>Seleziona un negozio</h2>
-        <p>Devi selezionare un punto vendita dalla barra in alto per gestire i turni del negozio.</p>
-      </div>
-    </div>
+    <AllStoresOverview
+      weekDays={weekDays}
+      weekStart={weekStart}
+      setWeekStart={setWeekStart}
+      pmStoresList={pmStoresList}
+      pmWeekLocks={pmWeekLocks}
+      pmLoading={pmLoading}
+      globalRef={globalRef}
+      globalSearch={globalSearch}
+      setGlobalSearch={setGlobalSearch}
+      globalResults={globalResults}
+      globalSearchLoading={globalSearchLoading}
+      showGlobalDrop={showGlobalDrop}
+      setShowGlobalDrop={setShowGlobalDrop}
+      loadGlobalEmpShifts={loadGlobalEmpShifts}
+      globalEmp={globalEmp}
+      setGlobalEmp={setGlobalEmp}
+      setGlobalShifts={setGlobalShifts}
+      globalShifts={globalShifts}
+    />
   );
 
 
