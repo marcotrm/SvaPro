@@ -1463,8 +1463,32 @@ export default function ShiftsPage() {
     if (!storeId) return;
     setLockLoading(true);
     try {
+      // STEP 1: salva tutti i turni presenti prima di bloccare
+      const payload = { store_id: storeId, shifts: [], deletions: [] };
+      Object.keys(shifts).forEach(key => {
+        const [empId, dateStr] = splitShiftKey(key);
+        payload.shifts.push({
+          employee_id: empId,
+          date:        dateStr,
+          start_time:  shifts[key].start_time,
+          end_time:    shifts[key].end_time,
+          color:       shifts[key].color,
+          status:      shifts[key].status || (isDipendente ? 'proposed' : 'confirmed'),
+        });
+      });
+      Object.keys(originalShifts).forEach(key => {
+        if (!shifts[key]) {
+          const [empId, dateStr] = splitShiftKey(key);
+          payload.deletions.push({ employee_id: empId, date: dateStr });
+        }
+      });
+      if (payload.shifts.length > 0 || payload.deletions.length > 0) {
+        await shiftsApi.bulkSave(payload);
+        setOriginalShifts(JSON.parse(JSON.stringify(shifts)));
+      }
+      // STEP 2: crea il lock settimanale
       await shiftsApi.lockWeek({ store_id: Number(storeId), week_start: weekStartStr, user_id: user?.id });
-      toast.success('🔒 Turni bloccati! Il Project Manager riceverà una notifica.');
+      toast.success('🔒 Turni salvati e inviati al Project Manager!');
       await loadLockStatus();
     } catch (e) { toast.error('Errore nel blocco dei turni'); }
     finally { setLockLoading(false); }
@@ -2151,6 +2175,8 @@ export default function ShiftsPage() {
       pmShiftCounts={pmShiftCounts}
       pmProposedCounts={pmProposedCounts}
       onConfirmStore={handlePmConfirm}
+      onPmPreview={isShiftManager ? handlePmPreview : undefined}
+      onPmConfirm={isShiftManager ? handlePmConfirm : undefined}
       globalRef={globalRef}
       globalSearch={globalSearch}
       setGlobalSearch={setGlobalSearch}
