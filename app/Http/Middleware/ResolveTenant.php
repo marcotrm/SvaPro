@@ -75,9 +75,12 @@ class ResolveTenant
                 $request->headers->set('X-Store-ID', $assignedStoreId);
                 $request->headers->set('x-store-id', $assignedStoreId);
                 $request->attributes->set('store_id', $assignedStoreId);
-                // Force the query parameter and payload so filters can't be bypassed
-                $request->query->set('store_id', $assignedStoreId);
-                $request->merge(['store_id' => $assignedStoreId]);
+                
+                // For GET requests: force the query parameter so filters can't be bypassed
+                // For POST/PUT/PATCH: do NOT override body store_id — dipendente must save to their intended store
+                if ($request->isMethod('GET')) {
+                    $request->query->set('store_id', $assignedStoreId);
+                }
             }
         }
 

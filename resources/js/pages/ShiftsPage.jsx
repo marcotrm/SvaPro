@@ -2168,15 +2168,33 @@ export default function ShiftsPage() {
                     </span>
                   </div>
 
-                  {isLocked && (
-                    <div style={{ display: 'flex', gap: 8 }}>
+                  {/* Pulsante Apri Griglia — SEMPRE visibile, per ogni store */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: isLocked || isConfirmed ? 8 : 0 }}>
+                    <button
+                      onClick={() => {
+                        setStoreId(String(store.id));
+                        localStorage.setItem('selectedStoreId', String(store.id));
+                      }}
+                      style={{
+                        flex: 1, padding: '10px 16px', borderRadius: 12,
+                        border: '1px solid var(--color-border)',
+                        background: 'var(--color-bg)', color: 'var(--color-text)',
+                        fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      }}
+                    >
+                      📋 Apri Griglia
+                    </button>
+                    {isLocked && (
                       <button onClick={() => handlePmPreview(store)} style={{
                         flex: 1, padding: '10px 16px', borderRadius: 12, border: '1px solid rgba(245,158,11,0.3)',
                         background: 'rgba(245,158,11,0.08)', color: '#D97706', fontSize: 13, fontWeight: 700,
                         cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                       }}>
-                        <CalendarIcon size={14} /> Rivedi Turni
+                        <CalendarIcon size={14} /> Rivedi
                       </button>
+                    )}
+                    {isLocked && (
                       <button onClick={() => handlePmConfirm(store.id)} style={{
                         flex: 1, padding: '10px 16px', borderRadius: 12, border: 'none',
                         background: 'linear-gradient(135deg, #10B981, #059669)', color: '#fff', fontSize: 13, fontWeight: 700,
@@ -2185,18 +2203,24 @@ export default function ShiftsPage() {
                       }}>
                         <CheckCircle size={14} /> Conferma
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {isConfirmed && (
-                    <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.08)', fontSize: 12, color: '#10B981', fontWeight: 600 }}>
+                    <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.08)', fontSize: 12, color: '#10B981', fontWeight: 600, marginTop: 8 }}>
                       Confermati da {lock.confirmed_by_name || 'PM'} il {new Date(lock.confirmed_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </div>
                   )}
 
-                  {!isLocked && !isConfirmed && (
-                    <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(148,163,184,0.08)', fontSize: 12, color: '#94A3B8', fontWeight: 600 }}>
-                      Il responsabile non ha ancora inviato i turni per questa settimana.
+                  {!isLocked && !isConfirmed && pmShiftCounts[store.id] > 0 && (
+                    <div style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(99,102,241,0.08)', fontSize: 12, color: '#6366F1', fontWeight: 600, marginTop: 8 }}>
+                      ⏳ {pmShiftCounts[store.id]} turni proposti — non ancora bloccati
+                    </div>
+                  )}
+
+                  {!isLocked && !isConfirmed && (!pmShiftCounts[store.id] || pmShiftCounts[store.id] === 0) && (
+                    <div style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(148,163,184,0.08)', fontSize: 12, color: '#94A3B8', fontWeight: 600, marginTop: 8 }}>
+                      Nessun turno inserito per questa settimana.
                     </div>
                   )}
                 </div>
