@@ -58,11 +58,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
 
-    // Stores READ — accessibile a tutti i ruoli autenticati (PM, dipendente, ecc.)
-    Route::get('/stores', [StoreController::class, 'index']);
-    Route::get('/stores/{storeId}', [StoreController::class, 'show']);
-
-    Route::middleware('role:superadmin,admin_cliente')->group(function () {
+    Route::middleware('role:superadmin,admin_cliente,project_manager')->group(function () {
         Route::get('/tenants', [StoreController::class, 'tenants']);
         Route::get('/tenants/health', [StoreController::class, 'tenantHealth']);
         Route::get('/audit-logs', [AuditController::class, 'index']);
@@ -87,7 +83,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/roles-permissions/users/revoke', [RolesPermissionsController::class, 'revokeRole']);
         Route::get('/auth/switchable-users', [AuthController::class, 'switchableUsers']);
         Route::post('/auth/impersonate', [AuthController::class, 'impersonate']);
-        // Stores CRUD (write - solo admin)
+        // Stores CRUD
+        Route::get('/stores', [StoreController::class, 'index']);
+        Route::get('/stores/{storeId}', [StoreController::class, 'show']);
         Route::post('/stores', [StoreController::class, 'store']);
         Route::put('/stores/{storeId}', [StoreController::class, 'update']);
         Route::delete('/stores/{storeId}', [StoreController::class, 'destroy']);
@@ -298,7 +296,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/chat/messages/read', [ChatController::class, 'markRead']);
     });
 
-    Route::middleware('role:superadmin,admin_cliente,dipendente,magazziniere')->group(function () {
+    Route::middleware('role:superadmin,admin_cliente,dipendente,magazziniere,project_manager,store_manager')->group(function () {
         // Catalog: accessibile anche ai dipendenti per il POS
         Route::get('/catalog/products', [CatalogController::class, 'index']);
         Route::get('/catalog/brands', [CatalogController::class, 'brands']);
