@@ -1,10 +1,145 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { reports } from '../api.jsx';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { Trophy, TrendingUp, Store, RefreshCw, ChevronUp, ChevronDown, ArrowUpDown, Settings2, X, GripVertical, Trash2, Calendar, ChevronLeft } from 'lucide-react';
+import { Trophy, TrendingUp, Store, RefreshCw, ChevronUp, ChevronDown, ArrowUpDown, Settings2, X, GripVertical, Trash2, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+
+/* ─── CalPicker — date picker dark personalizzato ────────────── */
+const IT_MONTH_NAMES = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+const IT_FULL_MONTHS = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const IT_DOW = ['L','M','M','G','V','S','D'];
+
+function CalPicker({ value, onChange, label, max, min }) {
+  const [open, setOpen]   = useState(false);
+  const ref               = useRef(null);
+  const parsed            = value ? new Date(value + 'T00:00:00') : new Date();
+  const [view, setView]   = useState({ y: parsed.getFullYear(), m: parsed.getMonth() });
+
+  const fmtDisplay = (iso) => {
+    if (!iso) return '—';
+    const [y,mo,d] = iso.split('-');
+    return `${d} ${IT_MONTH_NAMES[parseInt(mo)-1]} ${y}`;
+  };
+
+  useEffect(() => {
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const daysInMonth = (y,m) => new Date(y, m+1, 0).getDate();
+  const firstDow    = (y,m) => { const d = new Date(y,m,1).getDay(); return d===0?6:d-1; }; // Mon=0
+
+  const days = [];
+  const fd = firstDow(view.y, view.m);
+  const nd = daysInMonth(view.y, view.m);
+  for (let i=0; i<fd; i++) days.push(null);
+  for (let i=1; i<=nd; i++) days.push(i);
+
+  const selIso = (d) => {
+    const iso = `${view.y}-${String(view.m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    if (min && iso < min) return;
+    if (max && iso > max) return;
+    onChange(iso);
+    setOpen(false);
+  };
+
+  const isSelected = (d) => {
+    if (!d || !value) return false;
+    return value === `${view.y}-${String(view.m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  };
+  const isToday = (d) => {
+    if (!d) return false;
+    const t = new Date();
+    return d===t.getDate() && view.m===t.getMonth() && view.y===t.getFullYear();
+  };
+  const isDisabled = (d) => {
+    if (!d) return false;
+    const iso = `${view.y}-${String(view.m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    return (min && iso < min) || (max && iso > max);
+  };
+
+  const prevMonth = () => setView(v => v.m===0 ? {y:v.y-1,m:11} : {y:v.y,m:v.m-1});
+  const nextMonth = () => setView(v => v.m===11 ? {y:v.y+1,m:0} : {y:v.y,m:v.m+1});
+
+  return (
+    <div ref={ref} style={{ position:'relative' }}>
+      <div
+        onClick={() => { setOpen(o=>!o); if(!open && value) { const p=new Date(value+'T00:00:00'); setView({y:p.getFullYear(),m:p.getMonth()}); }}}
+        style={{ display:'flex', alignItems:'center', gap:8, background:'#151b2e', border:`1.5px solid ${open?'#6366F1':'rgba(99,102,241,0.35)'}`, borderRadius:12, padding:'8px 14px', cursor:'pointer', userSelect:'none', transition:'border-color 0.15s', minWidth:170 }}
+      >
+        <Calendar size={14} color="#6366F1"/>
+        <span style={{ fontSize:11, fontWeight:700, color:'#6366F1' }}>{label}</span>
+        <span style={{ fontSize:13, fontWeight:800, color:'#e2e8f0', flex:1 }}>{fmtDisplay(value)}</span>
+        <ChevronDown size={13} color="rgba(255,255,255,0.3)" style={{ transform: open?'rotate(180deg)':'none', transition:'transform 0.2s' }}/>
+      </div>
+
+      {open && (
+        <div style={{ position:'absolute', top:'calc(100% + 8px)', left:0, zIndex:500, background:'#0f1729', border:'1.5px solid rgba(99,102,241,0.3)', borderRadius:16, padding:16, width:260, boxShadow:'0 20px 60px rgba(0,0,0,0.6)', animation:'calFadeIn 0.15s ease-out' }}>
+          {/* Header mese */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+            <button onClick={prevMonth} style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#e2e8f0', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <ChevronLeft size={14}/>
+            </button>
+            <span style={{ fontWeight:800, fontSize:14, color:'#e2e8f0', letterSpacing:'-0.3px' }}>
+              {IT_FULL_MONTHS[view.m]} {view.y}
+            </span>
+            <button onClick={nextMonth} style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#e2e8f0', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <ChevronRight size={14}/>
+            </button>
+          </div>
+
+          {/* Giorni settimana */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', marginBottom:6 }}>
+            {IT_DOW.map((d,i) => (
+              <div key={i} style={{ textAlign:'center', fontSize:10, fontWeight:800, color:'rgba(99,102,241,0.7)', padding:'2px 0' }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Griglia giorni */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
+            {days.map((d,i) => {
+              const sel = isSelected(d);
+              const tod = isToday(d);
+              const dis = isDisabled(d);
+              return (
+                <button
+                  key={i}
+                  onClick={() => d && !dis && selIso(d)}
+                  style={{
+                    height:32, width:'100%', borderRadius:8, border: tod && !sel ? '1px solid rgba(99,102,241,0.5)' : 'none',
+                    background: sel ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : 'transparent',
+                    color: !d ? 'transparent' : dis ? 'rgba(255,255,255,0.15)' : sel ? '#fff' : tod ? '#818CF8' : '#cbd5e1',
+                    fontSize:13, fontWeight: sel||tod ? 800 : 500,
+                    cursor: d && !dis ? 'pointer' : 'default',
+                    boxShadow: sel ? '0 2px 8px rgba(99,102,241,0.4)' : 'none',
+                    transition:'background 0.1s',
+                  }}
+                  onMouseEnter={e => { if(d && !sel && !dis) e.currentTarget.style.background='rgba(99,102,241,0.15)'; }}
+                  onMouseLeave={e => { if(!sel) e.currentTarget.style.background='transparent'; }}
+                >
+                  {d || ''}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Oggi */}
+          <div style={{ borderTop:'1px solid rgba(255,255,255,0.06)', marginTop:12, paddingTop:10, textAlign:'center' }}>
+            <button
+              onClick={() => { const t=new Date(); selIso(t.getDate()); setView({y:t.getFullYear(),m:t.getMonth()}); }}
+              style={{ fontSize:11, fontWeight:700, color:'#6366F1', background:'rgba(99,102,241,0.1)', border:'none', borderRadius:8, padding:'5px 16px', cursor:'pointer' }}
+            >
+              Oggi
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ─── costanti ─────────────────────────────────────────────── */
 const STORE_COLORS = ['#7B6FD0','#F59E0B','#10B981','#EF4444','#3B82F6','#A855F7','#EC4899','#14B8A6'];
@@ -240,46 +375,14 @@ export default function StoreRevenuePage() {
           </div>
 
           {/* Filtro periodo — Dal / Al */}
-          {tab === 'ranking' && (() => {
-            const toIta = (iso) => { if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; };
-            const fromIta = (ita) => { const p=ita.replace(/\D/g,''); if(p.length<8) return null; return `${p.slice(4)}-${p.slice(2,4)}-${p.slice(0,2)}`; };
-            const inputStyle = { border:'none', background:'transparent', fontSize:14, fontWeight:800, color:'#c8d6ef', outline:'none', width:90, letterSpacing:'0.5px' };
-            const wrapStyle  = { display:'flex', alignItems:'center', gap:7, background:'#151929', border:'1.5px solid rgba(99,102,241,0.5)', borderRadius:12, padding:'8px 14px', cursor:'text' };
-            return (
-              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                <label style={wrapStyle} title="Data inizio (gg/mm/aaaa)">
-                  <Calendar size={13} color="#6366F1"/>
-                  <span style={{ fontSize:11, fontWeight:700, color:'#6366F1' }}>Dal</span>
-                  <input
-                    type="text"
-                    placeholder="gg/mm/aaaa"
-                    defaultValue={toIta(dateFrom)}
-                    maxLength={10}
-                    onBlur={e => { const iso=fromIta(e.target.value); if(iso) { setDateFrom(iso); if(iso>dateTo) setDateTo(iso); } else e.target.value=toIta(dateFrom); }}
-                    onChange={e => { const v=e.target.value.replace(/[^\d/]/g,''); e.target.value=v; }}
-                    style={inputStyle}
-                  />
-                </label>
-                <span style={{ fontSize:14, color:'rgba(255,255,255,0.25)', fontWeight:700 }}>→</span>
-                <label style={wrapStyle} title="Data fine (gg/mm/aaaa)">
-                  <Calendar size={13} color="#6366F1"/>
-                  <span style={{ fontSize:11, fontWeight:700, color:'#6366F1' }}>Al</span>
-                  <input
-                    type="text"
-                    placeholder="gg/mm/aaaa"
-                    defaultValue={toIta(dateTo)}
-                    maxLength={10}
-                    onBlur={e => { const iso=fromIta(e.target.value); if(iso) { setDateTo(iso); if(iso<dateFrom) setDateFrom(iso); } else e.target.value=toIta(dateTo); }}
-                    onChange={e => { const v=e.target.value.replace(/[^\d/]/g,''); e.target.value=v; }}
-                    style={inputStyle}
-                  />
-                </label>
-                <button onClick={load} style={{ padding:'8px 14px', background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.35)', borderRadius:10, color:'#818CF8', fontSize:12, fontWeight:700, cursor:'pointer' }}>
-                  Applica
-                </button>
-              </div>
-            );
-          })()}
+          {tab === 'ranking' && (
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <CalPicker label="Dal" value={dateFrom} onChange={v => { setDateFrom(v); if(v>dateTo) setDateTo(v); }} max={dateTo} />
+              <span style={{ fontSize:14, color:'rgba(255,255,255,0.25)', fontWeight:700 }}>→</span>
+              <CalPicker label="Al"  value={dateTo}   onChange={v => { setDateTo(v);   if(v<dateFrom) setDateFrom(v); }} min={dateFrom} />
+            </div>
+          )}
+
           {tab === 'history' && (
             <div style={{ display:'flex', gap:4 }}>
               {HISTORY_OPTIONS.map(h => (
@@ -659,6 +762,10 @@ export default function StoreRevenuePage() {
         @keyframes rvFadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        @keyframes calFadeIn {
+          from { opacity: 0; transform: translateY(-6px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
         @keyframes spin {
           from { transform: rotate(0deg); }
