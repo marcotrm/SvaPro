@@ -27,7 +27,7 @@ const catPalette = (catId) => CAT_PALETTES[(catId || 0) % CAT_PALETTES.length];
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
 /* ─── ProductCard ───────────────────────────────── */
-function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode }) {
+function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, isDipendente }) {
   const variant   = product.variants?.[0];
   const price     = parseFloat(variant?.sale_price) || 0;
   const stockInfo = variant ? stockMap[variant.id] : null;
@@ -916,6 +916,7 @@ export default function PosPage() {
                 onNegozi={setInventoryProduct}
                 stockMap={stockMap}
                 displayMode={displayMode}
+                isDipendente={isDipendente}
               />
             ))}
             {filteredProducts.length === 0 && (
