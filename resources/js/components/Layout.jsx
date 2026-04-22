@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { auth, stores, clearApiCache, cashMovements as cashApi, reports, exports_, employees as employeesApi } from '../api.jsx';
+import { auth, stores, clearApiCache, cashMovements as cashApi, reports, exports_, employees as employeesApi, shifts as shiftsApi } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
 import { Toaster } from 'react-hot-toast';
 import ChatWidget, { ChatTopbarButtons } from './ChatWidget.jsx';
@@ -260,8 +260,11 @@ export default function Layout({ user, setUser }) {
   const [dailyReportBody, setDailyReportBody] = React.useState('');
   // â”€â”€ Notifiche dipendente (pacco monete ecc.) â”€â”€
   const [empNotifs, setEmpNotifs]           = React.useState([]);
+  const [empNotifs, setEmpNotifs]           = React.useState([]);
   const [unreadEmpNotifs, setUnreadEmpNotifs] = React.useState(0);
-  const prevAlertIdsRef = useRef(new Set());
+  // -- Notifiche turni proposti (PM/Superadmin) --
+  const [pendingShifts, setPendingShifts]   = React.useState([]);
+  const prevPendingCountRef = useRef(0);
   const notifPanelRef   = useRef();
 
   // Legge le snooze attive dal localStorage
@@ -337,7 +340,8 @@ export default function Layout({ user, setUser }) {
 
   // Poll notifiche dipendente (pacco monete, ecc.) ogni 30s
   useEffect(() => {
-    if (!userRoles.includes('dipendente')) return;
+    const isRealDipendente = userRoles.includes('dipendente') && !userRoles.includes('project_manager') && !userRoles.includes('superadmin') && !userRoles.includes('admin_cliente') && !userRoles.includes('store_manager');
+    if (!isRealDipendente) return;
     const empId = user?.employee_id;
     if (!empId) return;
     const pollEmpNotifs = async () => {
@@ -353,6 +357,32 @@ export default function Layout({ user, setUser }) {
     return () => clearInterval(t3);
   }, [userRoles, user?.employee_id]);
 
+  // Poll turni proposti/in attesa ogni 30s (PM e Superadmin)
+  useEffect(() => {
+    const canSeePending = userRoles.includes('project_manager') || userRoles.includes('superadmin');
+    if (!canSeePending) return;
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - ((today.getDay() || 7) - 1));
+    const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 13); // 2 settimane
+    const pollPendingShifts = async () => {
+      try {
+        const res = await shiftsApi.getAll({ status: 'proposed', start_date: fmt(weekStart), end_date: fmt(weekEnd), limit: 50 });
+        const list = res.data?.data || [];
+        setPendingShifts(list);
+        const count = list.length;
+        if (count > prevPendingCountRef.current) {
+          setUnreadAlerts(prev => prev + (count - prevPendingCountRef.current));
+        }
+        prevPendingCountRef.current = count;
+      } catch { /* silent */ }
+    };
+    pollPendingShifts();
+    const t4 = setInterval(pollPendingShifts, 30000);
+    return () => clearInterval(t4);
+  }, [userRoles]);
+
   // Chiudi pannello notifiche cliccando fuori
   useEffect(() => {
     if (!showNotifPanel) return;
@@ -363,12 +393,14 @@ export default function Layout({ user, setUser }) {
 
   const openNotifPanel = () => {
     setShowNotifPanel(v => !v);
-    setUnreadAlerts(0); // segna come lette
+    setUnreadAlerts(0);
     // Marca come lette le notifiche dipendente
     if (unreadEmpNotifs > 0 && user?.employee_id) {
       employeesApi.markAllNotificationsRead(user.employee_id).catch(() => {});
       setUnreadEmpNotifs(0);
     }
+    // Reset contatore turni proposti
+    prevPendingCountRef.current = pendingShifts.length;
   };
 
   // Chiude il pannello e silenzia le allerte correnti per 3 ore
@@ -705,6 +737,21 @@ export default function Layout({ user, setUser }) {
                       </div>
                     </div>
                   ))}
+
+                  {/* -- Turni proposti in attesa di conferma (PM/Superadmin) -- */
+                  {pendingShifts.length > 0 && (
+                    <div
+                      style={{ padding: "12px 16px", background: "rgba(139,92,246,0.12)", borderBottom: "1px solid rgba(255,255,255,0.05)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+                      onClick={() => { navigate("/shifts"); setShowNotifPanel(false); }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 13, color: "#c4b5fd" }}>Turni in Attesa di Conferma</div>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 2 }}>{pendingShifts.length} turno/i proposto/i dai dipendenti</div>
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 900, background: "rgba(139,92,246,0.3)", color: "#c4b5fd", borderRadius: 8, padding: "2px 10px" }}>{pendingShifts.length}</div>
+                    </div>
+                  )}
+
 
                   {/* â”€â”€ Notifiche cassa (admin) â”€â”€ */}
                   {dailyReportAvailable && (
