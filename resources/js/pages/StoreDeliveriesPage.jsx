@@ -69,7 +69,7 @@ export default function StoreDeliveriesPage() {
   const [pickStore, setPickStore] = useState('');
   const [dragOver, setDragOver] = useState(null);
   const dragRef = useRef(null);
-  const [detailCard, setDetailCard] = useState(null);
+  // detailCard rimosso — nessun popup al click card
 
   // ── Carica negozi ──
   useEffect(() => {
@@ -371,11 +371,10 @@ export default function StoreDeliveriesPage() {
                           border: item.status==='done' ? '1px solid rgba(52,211,153,0.35)' : item.status==='issue' ? '1px solid rgba(248,113,113,0.35)' : `1px solid ${st.color}28`,
                           borderLeft: item.status==='done' ? '3px solid #34D399' : item.status==='issue' ? '3px solid #F87171' : `3px solid ${st.color}`,
                           borderRadius:9,padding:'9px 10px 8px 11px',
-                          cursor:'pointer',userSelect:'none',
+                          userSelect:'none',
                           transition:'box-shadow 0.15s',
                           position:'relative',flexShrink:0,
                         }}
-                        onClick={()=>setDetailCard(item)}
                         onMouseEnter={e=>e.currentTarget.style.boxShadow='0 4px 14px rgba(0,0,0,0.3)'}
                         onMouseLeave={e=>e.currentTarget.style.boxShadow='none'}
                       >
@@ -390,7 +389,7 @@ export default function StoreDeliveriesPage() {
                         </div>
 
                         {/* Data di consegna — sempre dalla colonna */}
-                        <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',marginBottom:8,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+                        <div style={{fontSize:11,color:'#7B8BA5',marginBottom:8,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
                           <Calendar size={10} color="rgba(255,255,255,0.4)"/>
                           <span>{addDays(weekStart, dayIdx).toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'short'})}</span>
                           {item.completed_at && (
