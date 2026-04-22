@@ -2287,14 +2287,14 @@ export default function ShiftsPage() {
             const pendingCount = Object.values(shifts).filter(s => s.status === 'proposed').length;
             return (
               <>
-                {canEditShifts && pendingCount > 0 && (
+                {isShiftManager && canEditShifts && pendingCount > 0 && (
                   <button onClick={confirmAllProposed} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16,185,129,0.3)', position: 'relative' }}>
                     <CheckCircle size={16} /> Conferma tutto
                     <span style={{ position: 'absolute', top: -6, right: -6, background: '#F59E0B', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pendingCount}</span>
                   </button>
                 )}
                 <button onClick={saveChanges} disabled={saving || !hasUnsavedChanges} style={{ display: 'flex', alignItems: 'center', gap: 8, background: hasUnsavedChanges ? 'var(--color-accent)' : '#9ca3af', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 12, fontWeight: 700, cursor: saving || !hasUnsavedChanges ? 'default' : 'pointer', opacity: saving || !hasUnsavedChanges ? 0.7 : 1 }}>
-                  {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} {isDipendente ? 'Invia Conferma Turni' : 'Salva Configurazioni'}
+                  {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />} {isDipendente ? 'Salva Turni' : 'Salva Configurazioni'}
                 </button>
               </>
             );
@@ -2593,7 +2593,7 @@ export default function ShiftsPage() {
                             {isProposed && (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                                 <span style={{ fontSize: 9, fontWeight: 800, color: '#F59E0B', background: 'rgba(245,158,11,0.15)', borderRadius: 4, padding: '2px 6px', letterSpacing: '0.04em' }}>⏳ IN ATTESA</span>
-                                {isShiftManager && (
+                                {(isProjectManager || isSuperAdmin) && (
                                   <button
                                     onClick={e => { e.stopPropagation(); confirmOne(emp.id, day.dateStr); }}
                                     style={{ fontSize: 9, fontWeight: 800, color: '#10B981', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 4, padding: '2px 6px', cursor: 'pointer' }}
