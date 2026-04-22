@@ -34,6 +34,8 @@ class ShiftController extends Controller
             'es.date', 'es.start_time', 'es.end_time', 'es.color',
             'es.created_at', 'es.updated_at',
             'st.name as store_name',
+            // Nome dipendente — utile per il PM quando vede turni proposti
+            \Illuminate\Support\Facades\DB::raw("CONCAT(COALESCE(emp.first_name,''), ' ', COALESCE(emp.last_name,'')) as employee_name"),
         ];
 
         // Aggiungi colonne opzionali se esistono (aggiunte da migrazione successiva)
@@ -46,6 +48,7 @@ class ShiftController extends Controller
 
         $query = DB::table('employee_shifts as es')
             ->leftJoin('stores as st', 'st.id', '=', 'es.store_id')
+            ->leftJoin('employees as emp', 'emp.id', '=', 'es.employee_id')
             ->where('es.tenant_id', $tenantId)
             ->select($selectCols);
 

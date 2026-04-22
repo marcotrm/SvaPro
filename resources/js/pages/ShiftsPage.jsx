@@ -1618,13 +1618,34 @@ export default function ShiftsPage() {
           status:     'assente',
         }];
       }
-      setEmployees(empList);
-
+      // Per i turni il cui dipendente NON è nella lista dello store (es. turni proposti
+      // da dipendenti il cui record non è ancora sincronizzato, o filtro paginazione),
+      // aggiungiamo un record "ghost" nella lista così il turno rimane visibile al PM.
+      const rawShifts = shRes?.data?.data || [];
+      const ghostEmps = [];
       const empIdSet = new Set(empList.map(e => String(e.id)));
+      rawShifts.forEach(s => {
+        if (!empIdSet.has(String(s.employee_id))) {
+          // Crea un dipendente ghost con i dati disponibili nel turno
+          const ghostName = s.employee_name || `Dipendente #${s.employee_id}`;
+          ghostEmps.push({
+            id:         Number(s.employee_id),
+            name:       ghostName,
+            first_name: ghostName,
+            last_name:  '',
+            store_id:   Number(storeId),
+            _ghost:     true, // flag per stile visuale opzionale
+          });
+          empIdSet.add(String(s.employee_id));
+        }
+      });
+      // Aggiungi i ghost (dipendenti con turni ma non nella lista store) alla lista finale
+      const finalEmpList = ghostEmps.length > 0 ? [...empList, ...ghostEmps] : empList;
+      setEmployees(finalEmpList);
+
       const shiftsMap = {};
-      (shRes?.data?.data || []).forEach(s => {
-        // Mostra tutti i turni dello store (dipendenti vedono tutto, possono proporre solo i propri)
-        // Filtra solo i turni orfani (dipendenti non più nello store)
+      rawShifts.forEach(s => {
+        // Ora empIdSet include anche i ghost, quindi tutti i turni dello store sono visibili
         if (!empIdSet.has(String(s.employee_id))) return;
         const key = `${s.employee_id}_${s.date}`;
         shiftsMap[key] = {
