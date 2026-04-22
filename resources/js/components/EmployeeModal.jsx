@@ -158,13 +158,6 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
               {activeTab === 'profilo' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full" />}
             </button>
             <button
-              onClick={() => setActiveTab('acquisti')}
-              className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'acquisti' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              Impostazioni Acquisti
-              {activeTab === 'acquisti' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full" />}
-            </button>
-            <button
               onClick={() => setActiveTab('account')}
               className={`pb-3 text-sm font-bold transition-colors relative flex items-center gap-1.5 ${activeTab === 'account' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
             >
@@ -469,52 +462,6 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
             );
           })()}
 
-          {activeTab === 'acquisti' && (
-            <>
-              <div>
-                <label className={labelClass}>Codice Acquisto Operatore</label>
-                <input
-                  type="text"
-                  name="employee_code"
-                  value={formData.employee_code}
-                  onChange={handleChange}
-                  placeholder="Codice utilizzato in cassa"
-                  className={`${inputClass} font-mono tracking-widest ${fe('employee_code') ? 'border-red-400' : ''}`}
-                />
-                {fe('employee_code') && <p className="mt-1 text-xs text-red-500">{fe('employee_code')}</p>}
-                <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Un codice supplementare, utile per abilitare l'operatore agli acquisti a costo.</p>
-              </div>
-
-              <div>
-                <label className={labelClass}>Limite di Spesa Massimo (€)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  name="max_spending_limit"
-                  value={formData.max_spending_limit}
-                  onChange={handleChange}
-                  placeholder="Es. 150.00"
-                  className={`${inputClass} ${fe('max_spending_limit') ? 'border-red-400' : ''}`}
-                />
-                {fe('max_spending_limit') && <p className="mt-1 text-xs text-red-500">{fe('max_spending_limit')}</p>}
-              </div>
-
-              <div>
-                <label className={labelClass}>Listino Dipendenti</label>
-                <input
-                  type="number"
-                  name="price_list_id"
-                  value={formData.price_list_id}
-                  onChange={handleChange}
-                  placeholder="ID listino"
-                  className={`${inputClass} ${fe('price_list_id') ? 'border-red-400' : ''}`}
-                />
-                {fe('price_list_id') && <p className="mt-1 text-xs text-red-500">{fe('price_list_id')}</p>}
-                <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Specifica l'ID del listino prezzi decurtato da applicare.</p>
-              </div>
-            </>
-          )}
 
           </div>
 
