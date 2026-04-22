@@ -1101,7 +1101,7 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function AllStoresOverview({
   weekDays, weekStart, setWeekStart,
-  pmStoresList, pmWeekLocks, pmLoading,
+  pmStoresList, pmWeekLocks, pmLoading, pmShiftCounts = {},
   globalRef, globalSearch, setGlobalSearch,
   globalResults, globalSearchLoading, showGlobalDrop, setShowGlobalDrop,
   loadGlobalEmpShifts, globalEmp, setGlobalEmp, setGlobalShifts, globalShifts,
@@ -1274,8 +1274,17 @@ function AllStoresOverview({
                       </span>
                     </div>
                     {store.address && (
-                      <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>📍 {store.address}</div>
+                      <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>📍 {store.address}</div>
                     )}
+                    {/* Conteggio turni questa settimana */}
+                    <div style={{ marginBottom: 10 }}>
+                      {(() => {
+                        const cnt = pmShiftCounts[store.id];
+                        if (cnt === undefined) return <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>⏳ Caricamento...</div>;
+                        if (cnt === 0) return <div style={{ fontSize: 12, color: '#EF4444', fontWeight: 700 }}>❌ Nessun turno questa settimana</div>;
+                        return <div style={{ fontSize: 12, color: '#10B981', fontWeight: 700 }}>✅ {cnt} turni questa settimana</div>;
+                      })()}
+                    </div>
                     {/* Giorni della settimana mini-bar */}
                     <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                       {DAY_LABELS.map((dl, i) => {
@@ -1384,6 +1393,7 @@ export default function ShiftsPage() {
   const [pmPreviewShifts, setPmPreviewShifts] = useState([]);
   const [pmPreviewEmps, setPmPreviewEmps]   = useState([]);
   const [pmPreviewLoading, setPmPreviewLoading] = useState(false);
+  const [pmShiftCounts, setPmShiftCounts]   = useState({});   // { storeId: count }
 
   const isWeekLocked = weekLockStatus?.locked_at && !weekLockStatus?.confirmed_at;
   const isWeekConfirmed = !!weekLockStatus?.confirmed_at;
@@ -1453,18 +1463,30 @@ export default function ShiftsPage() {
 
   // ── Project Manager: carica tutti gli store + lock status ──
   const loadPmDashboard = useCallback(async () => {
-    if (!isProjectManager) return;
+    if (!isShiftManager) return;  // accessibile a PM, superadmin, admin
     setPmLoading(true);
     try {
       const [storesRes, locksRes] = await Promise.all([
         stores.getStores(),
         shiftsApi.getWeekLocks({ week_start: weekStartStr }),
       ]);
-      setPmStoresList(storesRes.data?.data || storesRes.data || []);
+      const storeList = storesRes.data?.data || storesRes.data || [];
+      setPmStoresList(storeList);
       setPmWeekLocks(locksRes.data?.data || []);
+
+      // Carica count turni per ogni store
+      const endDate = (() => { const d = new Date(weekStartStr); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+      const counts = {};
+      await Promise.all(storeList.map(async (store) => {
+        try {
+          const res = await shiftsApi.getAll({ store_id: store.id, start_date: weekStartStr, end_date: endDate });
+          counts[store.id] = (res.data?.data || []).length;
+        } catch { counts[store.id] = 0; }
+      }));
+      setPmShiftCounts(counts);
     } catch {}
     finally { setPmLoading(false); }
-  }, [isProjectManager, weekStartStr]);
+  }, [isShiftManager, weekStartStr]);
 
   useEffect(() => { loadPmDashboard(); }, [loadPmDashboard]);
 
@@ -2061,6 +2083,7 @@ export default function ShiftsPage() {
       pmStoresList={pmStoresList}
       pmWeekLocks={pmWeekLocks}
       pmLoading={pmLoading}
+      pmShiftCounts={pmShiftCounts}
       globalRef={globalRef}
       globalSearch={globalSearch}
       setGlobalSearch={setGlobalSearch}
