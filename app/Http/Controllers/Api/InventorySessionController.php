@@ -59,17 +59,18 @@ class InventorySessionController extends Controller
             ->join('products as p','p.id','=','pv.product_id')
             ->leftJoin('brands as br','br.id','=','p.brand_id')
             ->leftJoin('categories as cat','cat.id','=','p.category_id')
-            ->where('p.tenant_id',$tid)->where('p.is_active',true)->where('pv.is_active',true)
+            ->where('p.tenant_id',$tid)->where('p.is_active',true)
             ->select('pv.id','p.name as product_name','br.name as brand_name','cat.name as category_name',
-                     'pv.barcode','pv.sku','pv.flavor','pv.cost_price','p.image_url','p.product_type');
+                     'pv.barcode','p.sku as sku','pv.flavor','pv.cost_price','p.image_url','p.product_type');
         if (!empty($filters['brand_id']))      $pq->where('p.brand_id', (int)$filters['brand_id']);
         if (!empty($filters['category_id']))   $pq->where('p.category_id', (int)$filters['category_id']);
         if (!empty($filters['product_type']))  $pq->where('p.product_type', $filters['product_type']);
         if (!empty($filters['product_variant_id'])) $pq->where('pv.id', (int)$filters['product_variant_id']);
         if (!empty($filters['name']))          $pq->where(function($q) use($filters) {
             $q->where('p.name','ilike','%'.$filters['name'].'%')
-              ->orWhere('pv.sku','ilike','%'.$filters['name'].'%')
-              ->orWhere('pv.barcode','ilike','%'.$filters['name'].'%');
+              ->orWhere('p.sku','ilike','%'.$filters['name'].'%')
+              ->orWhere('pv.barcode','ilike','%'.$filters['name'].'%')
+              ->orWhere('p.barcode','ilike','%'.$filters['name'].'%');
         });
         $variants = $pq->get();
         // Stock teorico per ogni variante
@@ -115,7 +116,7 @@ class InventorySessionController extends Controller
             ->leftJoin('categories as cat','cat.id','=','p.category_id')
             ->where('ii.inventory_session_id',$id)
             ->select('ii.*','p.name as product_name','br.name as brand_name','cat.name as category_name',
-                     'pv.cost_price','pv.barcode','pv.sku','pv.flavor','p.image_url','p.product_type')
+                     'pv.cost_price','pv.barcode','p.sku as sku','pv.flavor','p.image_url','p.product_type')
             ->orderBy('ii.status')->orderBy('p.name')->get()
             ->map(function($i) {
                 $i->difference = $i->counted_quantity - $i->theoretical_quantity;
@@ -198,7 +199,7 @@ class InventorySessionController extends Controller
             // IMPORTANTE: theoretical_quantity NON incluso — store non deve vederlo
             ->select('ii.id','ii.counted_quantity','ii.status','ii.store_note','ii.last_counted_at',
                      'p.name as product_name','br.name as brand_name','cat.name as category_name',
-                     'p.image_url','p.product_type','pv.barcode','pv.sku','pv.flavor')
+                     'p.image_url','p.product_type','pv.barcode','p.sku as sku','pv.flavor')
             ->orderBy('ii.status')->orderBy('p.name')->get();
         // Risposta senza theoretical_quantity, cost_price, difference
         $resp = (object)['id'=>$session->id,'inventory_number'=>$session->inventory_number,'title'=>$session->title,'status'=>$session->status,'due_date'=>$session->due_date,'notes_store'=>$session->notes_store];
