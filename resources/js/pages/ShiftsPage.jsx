@@ -1917,9 +1917,13 @@ export default function ShiftsPage() {
   const renderActiveCellModal = () => {
     if (!activeCell) return null;
     const { empId, dateStr } = activeCell;
-    const isOwnRow = String(empId) === String(currentEmployeeId);
+    // Se il dipendente non ha employee_id, assume che stia cliccando sulla propria riga
+    // (può cliccare qualsiasi riga) — lo identifichiamo come quell'employee
+    const effectiveEmpId = (!currentEmployeeId && isDipendente) ? empId : currentEmployeeId;
+    const isOwnRow = String(empId) === String(effectiveEmpId);
     const canPropose = isDipendente && isOwnRow;
     const title = canPropose ? 'Proponi Turno' : 'Assegna Turno';
+
     
     return (
       <div 
@@ -2365,11 +2369,25 @@ export default function ShiftsPage() {
         </div>
       )}
       {/* Banner info per dipendenti */}
-      {isDipendente && (
-        <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 12, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#F59E0B', fontWeight: 600 }}>
-          <User size={16} /> Puoi proporre i tuoi turni cliccando sulle celle — i responsabili li confermeranno.
+      {isDipendente && !isWeekLocked && !isWeekConfirmed && (
+        <div style={{ marginBottom: 16 }}>
+          {!currentEmployeeId ? (
+            // Dipendente non identificato — deve scegliere chi è tra i dipendenti in griglia
+            <div style={{ background: 'rgba(99,102,241,0.08)', border: '1.5px solid rgba(99,102,241,0.3)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, fontSize: 13, color: '#4338CA', fontWeight: 700 }}>
+              <User size={18} />
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 4 }}>👆 Clicca sulla cella del tuo nome per proporre un turno</div>
+                <div style={{ fontWeight: 500, color: '#6366F1', fontSize: 12 }}>Seleziona la riga corrispondente al tuo nome nella tabella. Se non vedi il tuo nome, contatta il responsabile.</div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#F59E0B', fontWeight: 600 }}>
+              <User size={16} /> Puoi proporre i tuoi turni cliccando sulle celle della tua riga — i responsabili li confermeranno.
+            </div>
+          )}
         </div>
       )}
+
 
       {/* ── Ricerca globale dipendente (cross-store) — solo per admin ── */}
       {!isDipendente && <div style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -2584,9 +2602,11 @@ export default function ShiftsPage() {
                     }
 
                     // ── Cella NORMALE ───────────────────────────────────────
-                    const isOwnCell   = String(emp.id) === String(currentEmployeeId);
+                    const isOwnCell   = currentEmployeeId ? String(emp.id) === String(currentEmployeeId) : false;
                     // Dipendenti: no click se settimana bloccata o confermata
-                    const canClick    = isGridReadOnly ? false : (canEditShifts || (isDipendente && isOwnCell));
+                    // Se non ha employee_id riconosciuto, può cliccare qualsiasi cella (sarà chiesto di identificarsi)
+                    const canClickDip = isDipendente && (!currentEmployeeId || isOwnCell);
+                    const canClick    = isGridReadOnly ? false : (canEditShifts || canClickDip);
                     const isProposed  = hasShift && shift.status === 'proposed';
                     const isConfirmed = hasShift && shift.status === 'confirmed';
 
