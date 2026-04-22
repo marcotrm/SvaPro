@@ -563,7 +563,7 @@ export default function Layout({ user, setUser }) {
             </div>
           </div>
           <div className="sp-topbar-actions">
-            {storesList.length > 1 && (
+            {storesList.length > 0 && (
               <select 
                 className="sp-select sp-desktop-only" 
                 style={{ width: 200 }}
