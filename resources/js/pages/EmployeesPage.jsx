@@ -199,12 +199,12 @@ export default function EmployeesPage() {
         <div className="kpi-grid">
           <div className="kpi-card">
             <div className="kpi-label">Dipendenti Totali</div>
-            <div className="kpi-value">{analytics.overview?.total_employees ?? 0}</div>
+            <div className="kpi-value">{employeesList.length}</div>
             <div className="kpi-delta up">Anagrafica team</div>
           </div>
           <div className="kpi-card">
             <div className="kpi-label">Dipendenti Attivi</div>
-            <div className="kpi-value gold">{analytics.overview?.active_employees ?? 0}</div>
+            <div className="kpi-value gold">{employeesList.filter(e => e.status === 'active' && !suspendedIds.has(e.id)).length}</div>
             <div className="kpi-delta up">Presidio operativo</div>
           </div>
           <div className="kpi-card">

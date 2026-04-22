@@ -138,108 +138,221 @@ function DDTDetailModal({ transfer, onClose }) {
     if (!transfer) return null;
     const st = STATUS_LABELS[transfer.status] || { label: transfer.status, cls: '' };
 
+    const statusStyles = {
+        draft:      { gradient: 'linear-gradient(135deg, #6366F1, #818CF8)', iconBg: 'rgba(99,102,241,0.12)', color: '#6366F1' },
+        in_transit: { gradient: 'linear-gradient(135deg, #F59E0B, #FBBF24)', iconBg: 'rgba(245,158,11,0.12)', color: '#F59E0B' },
+        received:   { gradient: 'linear-gradient(135deg, #10B981, #34D399)', iconBg: 'rgba(16,185,129,0.12)', color: '#10B981' },
+        cancelled:  { gradient: 'linear-gradient(135deg, #6B7280, #9CA3AF)', iconBg: 'rgba(107,114,128,0.12)', color: '#6B7280' },
+    };
+    const stStyle = statusStyles[transfer.status] || statusStyles.draft;
+
+    const totalSent = (transfer.items || []).reduce((s, i) => s + (i.quantity_sent || 0), 0);
+    const totalReceived = (transfer.items || []).reduce((s, i) => s + (i.quantity_received || 0), 0);
+
     return (
         <div
             onClick={onClose}
             style={{
                 position: 'fixed', inset: 0, zIndex: 10000,
-                background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+                background: 'rgba(10,15,30,0.6)', backdropFilter: 'blur(8px)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+                animation: 'fadeIn 0.2s ease-out',
             }}
         >
+            <style>{`
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes slideUp { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+                .ddt-modal-body::-webkit-scrollbar { width: 6px; }
+                .ddt-modal-body::-webkit-scrollbar-track { background: transparent; }
+                .ddt-modal-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+                .ddt-item-row:hover { background: var(--color-surface) !important; }
+            `}</style>
             <div
                 onClick={e => e.stopPropagation()}
                 style={{
-                    background: 'var(--color-card)', borderRadius: 16,
-                    width: '100%', maxWidth: 680, maxHeight: '85vh',
+                    background: 'var(--color-card, #fff)', borderRadius: 20,
+                    width: '100%', maxWidth: 620, maxHeight: '88vh',
                     display: 'flex', flexDirection: 'column',
-                    boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
-                    border: '1px solid var(--color-border)',
+                    boxShadow: '0 25px 80px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05)',
+                    overflow: 'hidden',
+                    animation: 'slideUp 0.3s ease-out',
                 }}
             >
-                {/* Header modal */}
-                <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                    <div>
-                        <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--color-text)' }}>
-                            DDT {transfer.ddt_number}
-                        </div>
-                        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                            Creato il {fmtDT(transfer.created_at)}
+                {/* ── Accent bar top ── */}
+                <div style={{ height: 4, background: stStyle.gradient, flexShrink: 0 }} />
+
+                {/* ── Header ── */}
+                <div style={{
+                    padding: '20px 28px 18px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0,
+                    borderBottom: '1px solid var(--color-border, #E5E7EB)',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div style={{
+                            width: 44, height: 44, borderRadius: 12, background: stStyle.iconBg,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0,
+                        }}>📄</div>
+                        <div>
+                            <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--color-text, #111827)', letterSpacing: '-0.01em' }}>
+                                DDT {transfer.ddt_number}
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary, #9CA3AF)', marginTop: 2 }}>
+                                Creato il {fmtDT(transfer.created_at)}
+                            </div>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span className={`badge ${st.cls}`}><span className="badge-dot"/>{st.label}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
+                        <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            background: stStyle.iconBg, color: stStyle.color,
+                            borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 700,
+                            border: `1px solid ${stStyle.color}22`,
+                        }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: stStyle.color }} />
+                            {st.label}
+                        </span>
                         <button
                             onClick={onClose}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'var(--color-text-secondary)', lineHeight: 1 }}
-                        >×</button>
+                            style={{
+                                width: 32, height: 32, borderRadius: 8, border: '1px solid var(--color-border, #E5E7EB)',
+                                background: 'var(--color-surface, #F9FAFB)', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 16, color: 'var(--color-text-tertiary, #9CA3AF)', lineHeight: 1,
+                                transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border, #E5E7EB)'; e.currentTarget.style.color = 'var(--color-text, #111)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-surface, #F9FAFB)'; e.currentTarget.style.color = 'var(--color-text-tertiary, #9CA3AF)'; }}
+                        >✕</button>
                     </div>
                 </div>
 
-                {/* Body */}
-                <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
-                    {/* Info grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                {/* ── Body ── */}
+                <div className="ddt-modal-body" style={{ padding: '24px 28px 28px', overflowY: 'auto', flex: 1 }}>
+
+                    {/* Info cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
                         {[
-                            ['📤 Mittente',    transfer.from_store_name || '–'],
-                            ['📥 Destinatario',transfer.to_store_name   || '–'],
-                            ['📅 Data Invio',  fmtDT(transfer.sent_at)],
-                            ['✅ Data Ricezione', fmtDT(transfer.received_at)],
-                        ].map(([label, val]) => (
-                            <div key={label} style={{ background: 'var(--color-surface)', borderRadius: 10, padding: '12px 14px', border: '1px solid var(--color-border)' }}>
-                                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>{label}</div>
-                                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text)' }}>{val}</div>
+                            { icon: '📤', label: 'MITTENTE', value: transfer.from_store_name || '–', accent: '#6366F1' },
+                            { icon: '📥', label: 'DESTINATARIO', value: transfer.to_store_name || '–', accent: '#8B5CF6' },
+                            { icon: '📅', label: 'DATA INVIO', value: fmtDT(transfer.sent_at), accent: '#3B82F6' },
+                            { icon: '✅', label: 'DATA RICEZIONE', value: fmtDT(transfer.received_at), accent: '#10B981' },
+                        ].map(({ icon, label, value, accent }) => (
+                            <div key={label} style={{
+                                background: 'var(--color-surface, #F9FAFB)', borderRadius: 12, padding: '14px 16px',
+                                border: '1px solid var(--color-border, #E5E7EB)',
+                                transition: 'box-shadow 0.15s',
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                    <span style={{ fontSize: 13 }}>{icon}</span>
+                                    <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-tertiary, #9CA3AF)' }}>{label}</span>
+                                </div>
+                                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--color-text, #111827)' }}>{value}</div>
                             </div>
                         ))}
                         {transfer.notes && (
-                            <div style={{ gridColumn: 'span 2', background: 'var(--color-surface)', borderRadius: 10, padding: '12px 14px', border: '1px solid var(--color-border)' }}>
-                                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>📝 Note</div>
-                                <div style={{ fontSize: 13, color: 'var(--color-text)' }}>{transfer.notes}</div>
+                            <div style={{ gridColumn: 'span 2', background: 'var(--color-surface, #F9FAFB)', borderRadius: 12, padding: '14px 16px', border: '1px solid var(--color-border, #E5E7EB)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                    <span style={{ fontSize: 13 }}>📝</span>
+                                    <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-tertiary, #9CA3AF)' }}>NOTE</span>
+                                </div>
+                                <div style={{ fontSize: 13, color: 'var(--color-text, #111827)', lineHeight: 1.5 }}>{transfer.notes}</div>
                             </div>
                         )}
                     </div>
 
-                    {/* Articoli */}
-                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: 'var(--color-text)' }}>
-                        Articoli ({(transfer.items || []).length})
-                    </div>
-                    <div style={{ border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr style={{ background: 'var(--color-surface)' }}>
-                                    {['Prodotto', 'Qtà Inviata', 'Qtà Ricevuta'].map(h => (
-                                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)' }}>{h}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(transfer.items || []).length === 0 ? (
-                                    <tr><td colSpan="3" style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-tertiary)', fontSize: 13 }}>Nessun articolo</td></tr>
-                                ) : (transfer.items || []).map((item, i) => (
-                                    <tr key={i} style={{ borderTop: '1px solid var(--color-border)' }}>
-                                        <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
-                                            {item.product_name || '–'}
-                                            {item.flavor ? <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 400 }}> — {item.flavor}</span> : ''}
-                                            {item.resistance_ohm ? <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 400 }}> {item.resistance_ohm}Ω</span> : ''}
-                                        </td>
-                                        <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: 'var(--color-accent)' }}>{item.quantity_sent}</td>
-                                        <td style={{ padding: '12px 14px', fontSize: 13, color: item.quantity_received != null ? 'var(--color-success)' : 'var(--color-text-tertiary)', fontWeight: item.quantity_received != null ? 700 : 400 }}>
-                                            {item.quantity_received ?? '—'}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    {/* Articoli header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--color-text, #111827)' }}>Articoli</span>
+                            <span style={{
+                                background: 'var(--color-accent, #6366F1)', color: '#fff',
+                                borderRadius: 10, padding: '2px 9px', fontSize: 11, fontWeight: 800,
+                            }}>{(transfer.items || []).length}</span>
+                        </div>
                     </div>
 
-                    {/* Totale */}
-                    <div style={{ marginTop: 14, display: 'flex', gap: 12 }}>
-                        <div style={{ background: 'rgba(99,102,241,0.08)', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, color: 'var(--color-accent)' }}>
-                            Totale pezzi inviati: {(transfer.items || []).reduce((s, i) => s + (i.quantity_sent || 0), 0)}
+                    {/* Items table */}
+                    <div style={{ border: '1px solid var(--color-border, #E5E7EB)', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
+                        {/* Table header */}
+                        <div style={{
+                            display: 'grid', gridTemplateColumns: '1fr 110px 110px',
+                            padding: '10px 16px', background: 'var(--color-surface, #F9FAFB)',
+                            borderBottom: '1px solid var(--color-border, #E5E7EB)',
+                        }}>
+                            {['Prodotto', 'Qtà Inviata', 'Qtà Ricevuta'].map(h => (
+                                <div key={h} style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-tertiary, #9CA3AF)' }}>{h}</div>
+                            ))}
+                        </div>
+                        {/* Rows */}
+                        {(transfer.items || []).length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '28px 16px', color: 'var(--color-text-tertiary, #9CA3AF)', fontSize: 13 }}>
+                                Nessun articolo in questo DDT
+                            </div>
+                        ) : (transfer.items || []).map((item, i) => (
+                            <div
+                                key={i}
+                                className="ddt-item-row"
+                                style={{
+                                    display: 'grid', gridTemplateColumns: '1fr 110px 110px',
+                                    padding: '12px 16px', alignItems: 'center',
+                                    borderBottom: i < (transfer.items || []).length - 1 ? '1px solid var(--color-border, #E5E7EB)' : 'none',
+                                    transition: 'background 0.12s',
+                                }}
+                            >
+                                <div>
+                                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text, #111827)', lineHeight: 1.4 }}>
+                                        {item.product_name || '–'}
+                                    </div>
+                                    {(item.flavor || item.resistance_ohm) && (
+                                        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary, #9CA3AF)', marginTop: 1 }}>
+                                            {item.flavor && <span>{item.flavor}</span>}
+                                            {item.resistance_ohm && <span> {item.resistance_ohm}Ω</span>}
+                                        </div>
+                                    )}
+                                </div>
+                                <div style={{
+                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                    fontWeight: 800, fontSize: 14, color: 'var(--color-accent, #6366F1)',
+                                    background: 'rgba(99,102,241,0.08)', borderRadius: 8,
+                                    padding: '4px 0', width: 48,
+                                }}>{item.quantity_sent}</div>
+                                <div>
+                                    {item.quantity_received != null ? (
+                                        <span style={{
+                                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                            fontWeight: 800, fontSize: 14, color: '#10B981',
+                                            background: 'rgba(16,185,129,0.08)', borderRadius: 8,
+                                            padding: '4px 0', width: 48,
+                                        }}>{item.quantity_received}</span>
+                                    ) : (
+                                        <span style={{ color: 'var(--color-text-tertiary, #9CA3AF)', fontSize: 13 }}>—</span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Totali footer */}
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <div style={{
+                            background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(99,102,241,0.04))',
+                            borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700,
+                            color: 'var(--color-accent, #6366F1)',
+                            border: '1px solid rgba(99,102,241,0.12)',
+                            display: 'flex', alignItems: 'center', gap: 6,
+                        }}>
+                            <span style={{ fontSize: 15 }}>📦</span>
+                            Totale pezzi inviati: <span style={{ fontWeight: 900, fontSize: 16 }}>{totalSent}</span>
                         </div>
                         {transfer.status === 'received' && (
-                            <div style={{ background: 'rgba(34,197,94,0.08)', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, color: 'var(--color-success)' }}>
-                                Totale pezzi ricevuti: {(transfer.items || []).reduce((s, i) => s + (i.quantity_received || 0), 0)}
+                            <div style={{
+                                background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(16,185,129,0.04))',
+                                borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700,
+                                color: '#10B981',
+                                border: '1px solid rgba(16,185,129,0.12)',
+                                display: 'flex', alignItems: 'center', gap: 6,
+                            }}>
+                                <span style={{ fontSize: 15 }}>✅</span>
+                                Totale pezzi ricevuti: <span style={{ fontWeight: 900, fontSize: 16 }}>{totalReceived}</span>
                             </div>
                         )}
                     </div>

@@ -159,7 +159,7 @@ export default function DeliveryNotesPage() {
                           {n.tracking_number ? (
                             <div>
                               <div style={{ color: '#7c3aed', fontWeight: 600 }}>{n.tracking_number}</div>
-                              <div style={{ color: '#9ca3af', fontSize: 11 }}>{n.carrier_status}</div>
+                              <div style={{ color: '#9ca3af', fontSize: 11 }}>{['received','completed','verified'].includes(n.status) ? 'Consegnato ✓' : n.carrier_status}</div>
                             </div>
                           ) : <span style={{ color: '#d1d5db' }}>–</span>}
                         </td>
@@ -268,7 +268,7 @@ function NoteDetail({ noteId, onClose, onRefresh, onScanMode }) {
           ['👤 Creato da', note.created_by_name],
           ['🕐 Creato il', fmtDT(note.created_at)],
           note.tracking_number && ['📦 Tracking BRT', note.tracking_number],
-          note.carrier_status  && ['🚛 Stato BRT', note.carrier_status],
+          note.carrier_status  && ['🚛 Stato BRT', ['received','completed','verified'].includes(note.status) ? 'Consegnato ✓' : note.carrier_status],
           note.verification_duration_minutes != null && ['⏱ Tempo verifica', `${note.verification_duration_minutes} min`],
         ].filter(Boolean).map(([l, v]) => (
           <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderBottom: '1px solid #f3f4f6', paddingBottom: 5 }}>
