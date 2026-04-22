@@ -11,6 +11,10 @@ Artisan::command('inspire', function () {
 Schedule::command('loyalty:dispatch-push --limit=200')->everyMinute();
 Schedule::command('loyalty:process-firebase-deliveries --limit=50')->everyMinute();
 Schedule::command('inventory:auto-reorder --all --central')->dailyAt('04:10');
+Schedule::command('replenishment:run')->dailyAt('02:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/replenishment.log'));
+
 Schedule::command('ops:backup-database --keep=14')->dailyAt('03:40');
 Schedule::command('woocommerce:sync')->hourly();
 Schedule::command('app:daily-report')->dailyAt('22:15');

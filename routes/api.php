@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\StockTransferController;
 use App\Http\Controllers\Api\DeliveryNoteController;
 use App\Http\Controllers\Api\RestockOrderController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\ReplenishmentController;
 use App\Http\Controllers\Api\CashMovementController;
 use App\Http\Controllers\Api\CoinShipmentController;
 use App\Http\Controllers\Api\DailyCashReportController;
@@ -187,6 +188,11 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/inventory/smart-reorder/export-pdf', [SmartInventoryController::class, 'exportPdf']);
         Route::post('/inventory/smart-reorder/email-supplier', [SmartInventoryController::class, 'emailSupplier']);
         Route::get('/inventory/forecast', [SmartInventoryController::class, 'forecast']);
+
+        // ── ReplenishmentEngine (DRP + MRP) ──────────────────────────────
+        Route::get('/trigger-replenishment/preview', [ReplenishmentController::class, 'preview']);
+        Route::post('/trigger-replenishment', [ReplenishmentController::class, 'trigger'])
+            ->middleware('permission:inventory.manage');
 
         // Health Scan
         Route::get('/health-scan', [HealthScanController::class, 'index']);
