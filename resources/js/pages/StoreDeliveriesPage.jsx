@@ -1,46 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 /* eslint-disable */
-import { Truck, Plus, ChevronLeft, ChevronRight, Save, Copy, X, Calendar, GripVertical, ExternalLink } from 'lucide-react';
+import { Truck, Plus, ChevronLeft, ChevronRight, Save, Copy, X, Calendar, GripVertical, ExternalLink, Loader } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { stores } from '../api.jsx';
-import { useNavigate } from 'react-router-dom';
+import { stores, storeDeliveries } from '../api.jsx';
+import { useOutletContext } from 'react-router-dom';
 
-const LS_TPL     = 'svapro_del_tpl_v4';
-const LS_DATA    = 'svapro_del_data_v4';
-const SHARED_KEY = 'svapro_deliveries_shared'; // condiviso con DriverDeliveriesPage
+const LS_TPL  = 'svapro_del_tpl_v4';
 const DAYS    = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
 const DAYS_SH = ['LUN','MAR','MER','GIO','VEN','SAB','DOM'];
-
-// Sync: kanban → flat list letto dal corriere
-function syncToShared(days, weekKey) {
-  const flat = [];
-  Object.entries(days).forEach(([di, items]) => {
-    (items || []).forEach(item => {
-      flat.push({ ...item, weekKey, dayIdx: Number(di) });
-    });
-  });
-  const existing = loadShared();
-  // mantieni voci di altre settimane
-  const others = existing.filter(x => x.weekKey !== weekKey);
-  localStorage.setItem(SHARED_KEY, JSON.stringify([...others, ...flat]));
-}
-// Leggi lista condivisa
-function loadShared() {
-  try { return JSON.parse(localStorage.getItem(SHARED_KEY) || '[]'); } catch { return []; }
-}
-// Applica aggiornamenti driver su days
-function applyDriverUpdates(days, weekKey) {
-  const shared = loadShared().filter(x => x.weekKey === weekKey);
-  if (!shared.length) return days;
-  const next = { ...days };
-  Object.keys(next).forEach(di => {
-    next[di] = (next[di] || []).map(item => {
-      const upd = shared.find(s => s.id === item.id);
-      return upd ? { ...item, status: upd.status, driver_note: upd.driver_note, completed_at: upd.completed_at } : item;
-    });
-  });
-  return next;
-}
 
 function getMonday(d) {
   const dt = new Date(d); const day = dt.getDay();
@@ -50,23 +17,38 @@ function getMonday(d) {
 function addDays(d,n){ const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt; }
 function toISO(d){ const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
 function fmtDay(d){ return d.toLocaleDateString('it-IT',{day:'2-digit',month:'short'}); }
-function uid(){ return `d_${Date.now()}_${Math.random().toString(36).slice(2,6)}`; }
-function loadData(){ try{ return JSON.parse(localStorage.getItem(LS_DATA)||'{}'); }catch{ return {}; } }
-function saveData(d){ localStorage.setItem(LS_DATA,JSON.stringify(d)); }
+function emptyWeek(){ return Object.fromEntries(DAYS.map((_,i)=>[i,[]])); }
 function loadTpl(){ try{ return JSON.parse(localStorage.getItem(LS_TPL)||'null'); }catch{ return null; } }
 function saveTpl(t){ localStorage.setItem(LS_TPL,JSON.stringify(t)); }
-function emptyWeek(){ return Object.fromEntries(DAYS.map((_,i)=>[i,[]])); }
-function applyTpl(tpl){
-  if(!tpl) return emptyWeek();
-  const w=emptyWeek();
-  DAYS.forEach((_,i)=>{ w[i]=(tpl[i]||[]).map(s=>({...s,id:uid(),status:'pending'})); });
-  return w;
+
+// Trasforma lista API → {dayIdx: [items]}
+function apiListToDays(list, weekStart) {
+  const days = emptyWeek();
+  (list || []).forEach(item => {
+    const d = new Date(item.scheduled_date + 'T00:00:00');
+    const ms = getMonday(weekStart);
+    const diff = Math.round((d - ms) / 86400000);
+    if (diff >= 0 && diff <= 6) {
+      days[diff] = [...(days[diff] || []), {
+        id: item.id,
+        storeId: String(item.store_id || ''),
+        storeName: item.store_name,
+        status: item.status || 'pending',
+        priority: item.priority || 'normal',
+        items: item.items || '',
+        notes: item.notes || '',
+        driver_note: item.driver_note || '',
+        completed_at: item.completed_at || null,
+      }];
+    }
+  });
+  return days;
 }
 
 const ST = {
   pending:    { label:'In attesa',   color:'#F59E0B', bg:'rgba(245,158,11,0.15)' },
   confirmed:  { label:'Confermato',  color:'#60A5FA', bg:'rgba(96,165,250,0.15)' },
-  delivering: { label:'In consegna', color:'#A78BFA', bg:'rgba(167,139,250,0.15)' },
+  in_progress:{ label:'In consegna', color:'#A78BFA', bg:'rgba(167,139,250,0.15)' },
   done:       { label:'Consegnato',  color:'#34D399', bg:'rgba(52,211,153,0.15)' },
   issue:      { label:'Problema',    color:'#F87171', bg:'rgba(248,113,113,0.15)' },
 };
@@ -74,118 +56,172 @@ const SK = Object.keys(ST);
 const ACCENTS = ['#6366F1','#8B5CF6','#EC4899','#06B6D4','#10B981','#3B82F6','#EF4444'];
 
 export default function StoreDeliveriesPage() {
-  const navigate = useNavigate();
+  const { user } = useOutletContext?.() || {};
+  const tenantCode = user?.tenant_code || '';
+
   const [storeList, setStoreList] = useState([]);
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
-  const weekKey = toISO(weekStart);
-  const [allData, setAllData] = useState(loadData);
+  const [days, setDays] = useState(emptyWeek);
+  const [loading, setLoading] = useState(false);
   const [template, setTemplate] = useState(loadTpl);
-  const [days, setDays] = useState(() => { const d=loadData(); const k=toISO(getMonday(new Date())); return d[k]||applyTpl(loadTpl()); });
   const [addingDay, setAddingDay] = useState(null);
   const [pickStore, setPickStore] = useState('');
   const [dragOver, setDragOver] = useState(null);
   const dragRef = useRef(null);
-  const [detailCard, setDetailCard] = useState(null); // popup dettagli
+  const [detailCard, setDetailCard] = useState(null);
 
+  // ── Carica negozi ──
   useEffect(() => {
-    stores.getAll?.().then(r=>setStoreList(r.data?.data||r.data||[])).catch(()=>{});
+    stores.getAll?.().then(r => setStoreList(r.data?.data || r.data || [])).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    const saved = allData[weekKey];
-    setDays(saved || applyTpl(template));
-  }, [weekKey]);
+  // ── Carica consegne dalla settimana (auto-applica template se vuota) ──
+  const loadWeek = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await storeDeliveries.getAll({ date: toISO(weekStart) });
+      const list = res.data?.data || [];
+      // Filtra solo le consegne di questa settimana
+      const mon = toISO(weekStart);
+      const sun = toISO(addDays(weekStart, 6));
+      const weekList = list.filter(x => x.scheduled_date >= mon && x.scheduled_date <= sun);
+      if (weekList.length === 0) {
+        // Settimana vuota → auto-applica template principale
+        const tpl = loadTpl();
+        if (tpl) {
+          const created = [];
+          for (let i = 0; i < 7; i++) {
+            for (const s of (tpl[i] || [])) {
+              try {
+                const r = await storeDeliveries.create({
+                  store_id: Number(s.storeId) || null,
+                  store_name: s.storeName,
+                  scheduled_date: toISO(addDays(weekStart, i)),
+                  priority: 'normal',
+                });
+                created.push(r.data?.data);
+              } catch {}
+            }
+          }
+          if (created.length > 0) {
+            // Ricarica dopo creazione
+            const res2 = await storeDeliveries.getAll({ date: toISO(weekStart) });
+            const list2 = (res2.data?.data || []).filter(x => x.scheduled_date >= mon && x.scheduled_date <= sun);
+            setDays(apiListToDays(list2, weekStart));
+            return;
+          }
+        }
+      }
+      setDays(apiListToDays(weekList, weekStart));
+    } catch { toast.error('Errore caricamento consegne'); }
+    finally { setLoading(false); }
+  }, [weekStart]);
 
-  useEffect(() => {
-    const updated = {...allData,[weekKey]:days};
-    setAllData(updated); saveData(updated);
-    syncToShared(days, weekKey);
-  }, [days]);
+  useEffect(() => { loadWeek(); }, [loadWeek]);
 
-  // Ascolta aggiornamenti dal corriere (altra tab/finestra)
+  // Polling ogni 15s per aggiornamenti driver
   useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key !== SHARED_KEY) return;
-      setDays(prev => applyDriverUpdates(prev, weekKey));
-    };
-    window.addEventListener('storage', onStorage);
-    // polling ogni 10s (stessa tab non riceve eventi storage propri)
-    const t = setInterval(() => setDays(prev => applyDriverUpdates(prev, weekKey)), 10000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(t); };
-  }, [weekKey]);
+    const t = setInterval(loadWeek, 15000);
+    return () => clearInterval(t);
+  }, [loadWeek]);
 
-  const handleAdd = (dayIdx) => {
+  // ── Aggiungi consegna ──
+  const handleAdd = async (dayIdx) => {
     if (!pickStore) return;
-    const s = storeList.find(x=>String(x.id)===pickStore);
-    setDays(prev=>({...prev,[dayIdx]:[...(prev[dayIdx]||[]),{id:uid(),storeId:pickStore,storeName:s?.name||`Store ${pickStore}`,status:'pending'}]}));
-    setAddingDay(null); setPickStore('');
-    toast.success(`${s?.name||'Negozio'} aggiunto`);
+    const s = storeList.find(x => String(x.id) === pickStore);
+    const scheduledDate = toISO(addDays(weekStart, dayIdx));
+    try {
+      await storeDeliveries.create({
+        store_id: Number(pickStore),
+        store_name: s?.name || `Store ${pickStore}`,
+        scheduled_date: scheduledDate,
+        priority: 'normal',
+      });
+      toast.success(`${s?.name || 'Negozio'} aggiunto`);
+      setAddingDay(null); setPickStore('');
+      loadWeek();
+    } catch { toast.error('Errore aggiunta consegna'); }
   };
 
-  const handleRemove = (dayIdx,id) =>
-    setDays(prev=>({...prev,[dayIdx]:prev[dayIdx].filter(x=>x.id!==id)}));
-
-  const cycleStatus = (dayIdx,id) =>
-    setDays(prev=>({...prev,[dayIdx]:prev[dayIdx].map(x=>x.id!==id?x:{...x,status:SK[(SK.indexOf(x.status)+1)%SK.length]})}));
-
-  // ── HTML5 DnD (stesso sistema originale che funzionava) ──
-  const onDragStart = (e,dayIdx,idx,item) => {
-    dragRef.current={item,fromDay:dayIdx,fromIdx:idx};
-    e.dataTransfer.effectAllowed='move';
+  // ── Rimuovi consegna ──
+  const handleRemove = async (id) => {
+    try {
+      await storeDeliveries.destroy(id);
+      loadWeek();
+    } catch { toast.error('Errore eliminazione'); }
   };
-  const onDragOver = (e,dayIdx,idx) => {
+
+  // ── Cicla stato (click) ──
+  const cycleStatus = async (id, currentStatus) => {
+    const next = SK[(SK.indexOf(currentStatus) + 1) % SK.length];
+    try {
+      await storeDeliveries.updateStatus(id, { status: next });
+      setDays(prev => {
+        const n = { ...prev };
+        Object.keys(n).forEach(di => {
+          n[di] = (n[di] || []).map(x => x.id === id ? { ...x, status: next } : x);
+        });
+        return n;
+      });
+    } catch { toast.error('Errore aggiornamento stato'); }
+  };
+
+  // ── DnD: sposta tra giorni ──
+  const onDragStart = (e, dayIdx, idx, item) => {
+    dragRef.current = { item, fromDay: dayIdx, fromIdx: idx };
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  const onDragOver = (e, dayIdx, idx) => {
     e.preventDefault(); e.stopPropagation();
-    e.dataTransfer.dropEffect='move';
-    setDragOver({dayIdx,idx:idx??-1});
+    e.dataTransfer.dropEffect = 'move';
+    setDragOver({ dayIdx, idx: idx ?? -1 });
   };
   const onDragLeave = () => setDragOver(null);
-  const onDragEnd   = () => { dragRef.current=null; setDragOver(null); };
+  const onDragEnd   = () => { dragRef.current = null; setDragOver(null); };
 
-  const onDropItem = (e,toDayIdx,toIdx) => {
-    e.preventDefault(); e.stopPropagation();
-    const {item,fromDay,fromIdx} = dragRef.current||{};
-    if(!item) return;
-    setDays(prev=>{
-      const from=[...(prev[fromDay]||[])];
-      const to  = fromDay===toDayIdx ? from : [...(prev[toDayIdx]||[])];
-      from.splice(fromIdx,1);
-      if(fromDay===toDayIdx){ from.splice(toIdx,0,item); return {...prev,[fromDay]:from}; }
-      to.splice(toIdx,0,{...item,status:'pending'});
-      return {...prev,[fromDay]:from,[toDayIdx]:to};
-    });
-    dragRef.current=null; setDragOver(null);
-  };
-
-  const onDropDay = (e,toDayIdx) => {
+  const onDropDay = async (e, toDayIdx) => {
     e.preventDefault();
-    const {item,fromDay} = dragRef.current||{};
-    if(!item||fromDay===toDayIdx) return;
-    setDays(prev=>{
-      const from=[...(prev[fromDay]||[])];
-      const idx=from.findIndex(x=>x.id===item.id);
-      if(idx<0) return prev;
-      from.splice(idx,1);
-      return {...prev,[fromDay]:from,[toDayIdx]:[...(prev[toDayIdx]||[]),{...item,status:'pending'}]};
-    });
-    dragRef.current=null; setDragOver(null);
+    const { item, fromDay } = dragRef.current || {};
+    if (!item || fromDay === toDayIdx) return;
+    dragRef.current = null; setDragOver(null);
+    const newDate = toISO(addDays(weekStart, toDayIdx));
+    try {
+      await storeDeliveries.updateStatus(item.id, { status: 'pending', scheduled_date: newDate });
+      loadWeek();
+    } catch { toast.error('Errore spostamento'); }
   };
 
-  const saveTplNow = () => {
-    const tpl={};
-    DAYS.forEach((_,i)=>{ tpl[i]=(days[i]||[]).map(s=>({storeId:s.storeId,storeName:s.storeName})); });
-    setTemplate(tpl); saveTpl(tpl); toast.success('Template salvato!');
+  const onDropItem = async (e, toDayIdx) => {
+    e.preventDefault(); e.stopPropagation();
+    const { item, fromDay } = dragRef.current || {};
+    if (!item) return;
+    dragRef.current = null; setDragOver(null);
+    if (fromDay === toDayIdx) return;
+    const newDate = toISO(addDays(weekStart, toDayIdx));
+    try {
+      await storeDeliveries.updateStatus(item.id, { status: 'pending', scheduled_date: newDate });
+      loadWeek();
+    } catch { toast.error('Errore spostamento'); }
   };
-  const applyTplNow = () => {
-    if(!template||!confirm('Sovrascrivere questa settimana col template?')) return;
-    setDays(applyTpl(template)); toast.success('Template applicato');
+
+  // ── Template principale (locale) ──
+  const saveTplNow = () => {
+    const tpl = {};
+    DAYS.forEach((_, i) => {
+      tpl[i] = (days[i] || []).map(s => ({ storeId: s.storeId, storeName: s.storeName }));
+    });
+    setTemplate(tpl); saveTpl(tpl);
+    toast.success('✅ Template principale salvato! Verrà applicato a tutte le settimane senza consegne.');
   };
 
   const todayStr = toISO(new Date());
   const weekLabel = (() => {
-    const f=weekStart.toLocaleDateString('it-IT',{day:'2-digit',month:'long'});
-    const t=addDays(weekStart,6).toLocaleDateString('it-IT',{day:'2-digit',month:'long',year:'numeric'});
+    const f = weekStart.toLocaleDateString('it-IT', { day:'2-digit', month:'long' });
+    const t = addDays(weekStart,6).toLocaleDateString('it-IT', { day:'2-digit', month:'long', year:'numeric' });
     return `${f} – ${t}`;
   })();
+
+  const driverUrl = `${window.location.origin}/deliveries/driver${tenantCode ? `?tk=${encodeURIComponent(tenantCode)}` : ''}`;
 
   return (
     <div style={{minHeight:'100vh',background:'var(--color-bg,#0B0D12)',fontFamily:"'Inter',system-ui,sans-serif",display:'flex',flexDirection:'column'}}>
@@ -202,17 +238,17 @@ export default function StoreDeliveriesPage() {
               <p style={{margin:'2px 0 0',fontSize:11,color:'#64748B'}}>Kanban settimanale · trascina per spostare · clic status per aggiornare</p>
             </div>
           </div>
-          <div style={{display:'flex',gap:8}}>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            {loading && <Loader size={14} style={{animation:'spin 1s linear infinite',color:'#6366F1'}} />}
             <button
-              onClick={() => window.open('/deliveries/driver', '_blank')}
+              onClick={() => window.open(driverUrl, '_blank')}
               style={topBtn('#10B981')}
               title="Apri la vista mobile per il corriere in una nuova scheda"
             >
               <Truck size={12}/> Vista Corriere
               <ExternalLink size={10} style={{opacity:0.7}}/>
             </button>
-            <button onClick={saveTplNow} style={topBtn('#6366F1')}><Save size={12}/> Salva template</button>
-            {template && <button onClick={applyTplNow} style={topBtn('#8B5CF6')}><Copy size={12}/> Applica template</button>}
+            <button onClick={saveTplNow} style={topBtn('#6366F1')}><Save size={12}/> Salva template principale</button>
           </div>
         </div>
 
@@ -282,14 +318,12 @@ export default function StoreDeliveriesPage() {
                   </div>
                 </div>
 
-                {/* Progress bar */}
                 {items.length>0&&(
                   <div style={{marginTop:8,height:3,borderRadius:2,background:'rgba(255,255,255,0.08)'}}>
                     <div style={{height:'100%',borderRadius:2,width:`${pct}%`,background:pct===100?'#10B981':accent,transition:'width 0.35s'}}/>
                   </div>
                 )}
 
-                {/* Picker aggiungi */}
                 {addingDay===dayIdx&&(
                   <div style={{marginTop:9,display:'flex',flexDirection:'column',gap:5}}>
                     <select autoFocus value={pickStore} onChange={e=>setPickStore(e.target.value)}
@@ -318,7 +352,6 @@ export default function StoreDeliveriesPage() {
                 {items.map((item,idx)=>{
                   const st = ST[item.status]||ST.pending;
                   const isDrop = dragOver?.dayIdx===dayIdx && dragOver?.idx===idx;
-
                   return (
                     <React.Fragment key={item.id}>
                       {isDrop&&<div style={{height:2,borderRadius:1,background:accent,margin:'0 4px',boxShadow:`0 0 6px ${accent}`}}/>}
@@ -327,7 +360,7 @@ export default function StoreDeliveriesPage() {
                         onDragStart={e=>onDragStart(e,dayIdx,idx,item)}
                         onDragEnd={onDragEnd}
                         onDragOver={e=>onDragOver(e,dayIdx,idx)}
-                        onDrop={e=>onDropItem(e,dayIdx,idx)}
+                        onDrop={e=>onDropItem(e,dayIdx)}
                         style={{
                           background: item.status==='done' ? 'rgba(52,211,153,0.1)' : item.status==='issue' ? 'rgba(248,113,113,0.1)' : `${st.color}12`,
                           border: item.status==='done' ? '1px solid rgba(52,211,153,0.35)' : item.status==='issue' ? '1px solid rgba(248,113,113,0.35)' : `1px solid ${st.color}28`,
@@ -353,12 +386,12 @@ export default function StoreDeliveriesPage() {
                         </div>
 
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                          <button onClick={e=>{e.stopPropagation();cycleStatus(dayIdx,item.id);}}
+                          <button onClick={e=>{e.stopPropagation();cycleStatus(item.id,item.status);}}
                             title="Clicca per cambiare stato"
                             style={{display:'flex',alignItems:'center',gap:4,padding:'3px 8px',borderRadius:20,border:`1px solid ${st.color}35`,background:`${st.color}18`,color:st.color,fontSize:9,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
                             <div style={{width:5,height:5,borderRadius:'50%',background:st.color}}/>{st.label}
                           </button>
-                          <button onClick={e=>{e.stopPropagation();handleRemove(dayIdx,item.id);}}
+                          <button onClick={e=>{e.stopPropagation();handleRemove(item.id);}}
                             style={{background:'none',border:'none',cursor:'pointer',padding:'2px',color:'rgba(255,255,255,0.18)',lineHeight:1,borderRadius:4}}
                             onMouseEnter={e=>e.currentTarget.style.color='#F87171'}
                             onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.18)'}>
@@ -370,12 +403,10 @@ export default function StoreDeliveriesPage() {
                   );
                 })}
 
-                {/* Drop finale colonna */}
                 {dragOver?.dayIdx===dayIdx&&dragOver?.idx===items.length&&(
                   <div style={{height:2,borderRadius:1,background:accent,margin:'0 4px',boxShadow:`0 0 6px ${accent}`}}/>
                 )}
 
-                {/* Empty state */}
                 {items.length===0&&(
                   <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:7,color:'rgba(255,255,255,0.1)',minHeight:100}}>
                     <div style={{width:34,height:34,borderRadius:9,border:'1.5px dashed rgba(255,255,255,0.1)',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -389,7 +420,8 @@ export default function StoreDeliveriesPage() {
           );
         })}
       </div>
-      {/* ── POPUP DETTAGLI CARD ── */}
+
+      {/* POPUP DETTAGLI */}
       {detailCard && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
           onClick={()=>setDetailCard(null)}>
@@ -401,13 +433,13 @@ export default function StoreDeliveriesPage() {
             </button>
             <div style={{fontWeight:900,fontSize:18,color:'#fff',marginBottom:18}}>{detailCard.storeName}</div>
             <div style={{display:'flex',flexDirection:'column',gap:12,fontSize:13}}>
-              {[['Stato', ST[detailCard.status]?.label || detailCard.status],
+              {[
+                ['Stato', ST[detailCard.status]?.label || detailCard.status],
                 ['Priorità', detailCard.priority==='high'?'🔴 Urgente':detailCard.priority==='low'?'🟢 Bassa':'🟡 Normale'],
                 detailCard.items && ['Articoli', detailCard.items],
                 detailCard.notes && ['Note', detailCard.notes],
                 detailCard.driver_note && ['Nota Corriere', detailCard.driver_note],
                 detailCard.completed_at && ['Consegnato il', new Date(detailCard.completed_at).toLocaleString('it-IT')],
-                detailCard.created_at && ['Creato il', new Date(detailCard.created_at).toLocaleString('it-IT')],
               ].filter(Boolean).map(([label,value])=>(
                 <div key={label} style={{display:'flex',gap:10,padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:10}}>
                   <span style={{color:'rgba(255,255,255,0.4)',fontWeight:700,minWidth:100}}>{label}</span>

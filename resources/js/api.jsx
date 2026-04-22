@@ -1,4 +1,3 @@
-import axios from 'axios';
 
 // API configuration
 const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
@@ -875,4 +874,22 @@ export const chat = {
   getConversations: ()            => api.get('/chat/conversations'),
 };
 
+// ── Store Deliveries Kanban ──────────────────────────────────────
+export const storeDeliveries = {
+  getAll:        (params = {}) => api.get('/store-deliveries', { params }),
+  create:        (data)        => api.post('/store-deliveries', data),
+  updateStatus:  (id, data)    => api.patch(`/store-deliveries/${id}/status`, data),
+  destroy:       (id)          => api.delete(`/store-deliveries/${id}`),
+};
+
+// ── Driver Deliveries (pubbliche, no Sanctum) ────────────────────
+// Il corriere accede tramite ?tk=TENANT_CODE nel URL
+const driverApi = axios.create({
+  baseURL: API_URL,
+  headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+});
+export const driverDeliveries = {
+  getAll:       (tenantCode)         => driverApi.get(`/driver/deliveries?tk=${encodeURIComponent(tenantCode)}`),
+  updateStatus: (id, tenantCode, data) => driverApi.patch(`/driver/deliveries/${id}/status?tk=${encodeURIComponent(tenantCode)}`, data),
+};
 
