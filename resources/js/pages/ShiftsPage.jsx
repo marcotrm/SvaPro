@@ -1333,6 +1333,100 @@ function AllStoresOverview({
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CUSTOM TIME OPTION — espandibile inline nel modal turno
+// ─────────────────────────────────────────────────────────────────────────────
+function CustomTimeOption({ onApply }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [startTime, setStartTime] = React.useState('09:00');
+  const [endTime, setEndTime]     = React.useState('18:00');
+
+  const handleConfirm = () => {
+    if (!startTime || !endTime) return;
+    onApply(startTime, endTime);
+  };
+
+  return (
+    <div style={{
+      background: expanded ? 'rgba(20,184,166,0.06)' : 'rgba(20,184,166,0.06)',
+      border: `1px ${expanded ? 'solid' : 'dashed'} rgba(20,184,166,0.4)`,
+      borderRadius: 12, overflow: 'hidden', transition: 'all 0.2s',
+    }}>
+      {/* Header — sempre visibile */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(20,184,166,0.08)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+      >
+        <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(20,184,166,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span style={{ fontSize: 14 }}>✏️</span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#0f766e' }}>Orario Personalizzato</div>
+          <div style={{ fontSize: 12, color: '#0d9488', fontWeight: 600 }}>
+            {expanded ? 'Scegli inizio e fine turno' : 'Usa e getta — non salvato come template'}
+          </div>
+        </div>
+        <span style={{ fontSize: 16, color: '#0d9488', transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
+      </button>
+
+      {/* Body espandibile */}
+      {expanded && (
+        <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#0d9488', marginBottom: 4, textTransform: 'uppercase' }}>Inizio</label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={e => setStartTime(e.target.value)}
+                style={{
+                  width: '100%', padding: '9px 10px', borderRadius: 8,
+                  border: '1px solid rgba(20,184,166,0.4)', background: 'var(--color-bg)',
+                  color: 'var(--color-text)', fontSize: 14, fontWeight: 700,
+                  outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#0d9488', marginBottom: 4, textTransform: 'uppercase' }}>Fine</label>
+              <input
+                type="time"
+                value={endTime}
+                onChange={e => setEndTime(e.target.value)}
+                style={{
+                  width: '100%', padding: '9px 10px', borderRadius: 8,
+                  border: '1px solid rgba(20,184,166,0.4)', background: 'var(--color-bg)',
+                  color: 'var(--color-text)', fontSize: 14, fontWeight: 700,
+                  outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+          </div>
+          {startTime && endTime && (
+            <div style={{ fontSize: 12, color: '#0d9488', fontWeight: 600, textAlign: 'center' }}>
+              ⏱ {startTime} → {endTime}
+            </div>
+          )}
+          <button
+            onClick={handleConfirm}
+            style={{
+              padding: '10px', borderRadius: 10, border: 'none',
+              background: 'linear-gradient(135deg, #14b8a6, #0d9488)',
+              color: '#fff', fontSize: 13, fontWeight: 800,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              boxShadow: '0 3px 10px rgba(20,184,166,0.3)',
+            }}
+          >
+            ✓ Applica orario
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ShiftsPage() {
   const { selectedStoreId, userRoles = [], user } = useOutletContext?.() || {};
 
@@ -1997,20 +2091,17 @@ export default function ShiftsPage() {
   const renderActiveCellModal = () => {
     if (!activeCell) return null;
     const { empId, dateStr } = activeCell;
-    // Se il dipendente non ha employee_id, assume che stia cliccando sulla propria riga
-    // (può cliccare qualsiasi riga) — lo identifichiamo come quell'employee
     const effectiveEmpId = (!currentEmployeeId && isDipendente) ? empId : currentEmployeeId;
     const isOwnRow = String(empId) === String(effectiveEmpId);
     const canPropose = isDipendente && isOwnRow;
     const title = canPropose ? 'Proponi Turno' : 'Assegna Turno';
 
-    
     return (
-      <div 
+      <div
         style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
         onClick={() => setActiveCell(null)}
       >
-        <div 
+        <div
           style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, padding: 20, boxShadow: '0 20px 40px rgba(0,0,0,0.4)', width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column' }}
           onClick={e => e.stopPropagation()}
         >
@@ -2024,18 +2115,19 @@ export default function ShiftsPage() {
               <X size={16} />
             </button>
           </div>
-          
+
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>Opzioni Turno</div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
-            {/* Opzione Manuale sempre presente */}
-            <button onClick={() => applyTemplate(empId, dateStr, { start_time: '09:00', end_time: '18:00', name: 'Turno Personalizzato', color: '#14b8a6' })} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(20, 184, 166, 0.08)', border: '1px dashed rgba(20, 184, 166, 0.4)', padding: '12px 14px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', transition: 'all 0.1s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(20, 184, 166, 0.15)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(20, 184, 166, 0.08)'}>
-              <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#14b8a6', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 900 }}>+</div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#0f766e' }}>Inserimento Manuale</div>
-                <div style={{ fontSize: 12, color: '#0d9488', fontWeight: 600 }}>Inserisci orario personalizzato</div>
-              </div>
-            </button>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto', paddingRight: 4 }}>
+
+            {/* ── PERSONALIZZATO ── */}
+            <CustomTimeOption
+              empId={empId}
+              dateStr={dateStr}
+              onApply={(start, end) => {
+                applyTemplate(empId, dateStr, { start_time: start, end_time: end, name: 'Personalizzato', color: '#14b8a6' });
+              }}
+            />
 
             {templates.length > 0 && <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />}
 
@@ -2059,6 +2151,7 @@ export default function ShiftsPage() {
       </div>
     );
   };
+
 
   // Dipendente senza employee_id collegato: mostra selettore identità
   if (isDipendente && !currentEmployeeId) {
