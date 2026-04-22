@@ -259,8 +259,8 @@ export default function StoreDeliveriesPage() {
               <div style={{
                 padding:'11px 13px 10px',
                 borderRadius:'13px 13px 0 0',
-                background:isToday?`${accent}1A`:'rgba(255,255,255,0.04)',
-                border:`1.5px solid ${colDragOver?accent+'55':isToday?accent+'45':'rgba(255,255,255,0.08)'}`,
+                background:isToday?`${accent}26`:`${accent}0F`,
+                border:`1.5px solid ${colDragOver?accent+'55':isToday?accent+'55':accent+'28'}`,
                 borderBottom:'none',
                 transition:'border-color 0.15s',
               }}>
@@ -268,7 +268,7 @@ export default function StoreDeliveriesPage() {
                   <div>
                     <div style={{display:'flex',alignItems:'center',gap:6}}>
                       <div style={{width:3,height:15,borderRadius:2,background:accent}}/>
-                      <span style={{fontWeight:900,fontSize:11,color:isToday?accent:'var(--color-text,#F1F5F9)',letterSpacing:'0.8px'}}>{DAYS_SH[dayIdx]}</span>
+                      <span style={{fontWeight:900,fontSize:11,color:accent,letterSpacing:'0.8px'}}>{DAYS_SH[dayIdx]}</span>
                     </div>
                     <div style={{fontSize:10,color:'#64748B',marginTop:1,paddingLeft:9}}>{fmtDay(dayDate)}</div>
                   </div>
@@ -309,8 +309,8 @@ export default function StoreDeliveriesPage() {
               {/* Colonna body */}
               <div style={{
                 flex:1,minHeight:280,padding:'6px',
-                background:colDragOver?`${accent}0A`:'rgba(255,255,255,0.025)',
-                border:`1.5px solid ${colDragOver?accent+'55':'rgba(255,255,255,0.07)'}`,
+                background:colDragOver?`${accent}14`:`${accent}07`,
+                border:`1.5px solid ${colDragOver?accent+'55':accent+'28'}`,
                 borderTop:'none',borderRadius:'0 0 13px 13px',
                 display:'flex',flexDirection:'column',gap:5,
                 overflowY:'auto',transition:'background 0.15s,border-color 0.15s',
