@@ -2468,7 +2468,7 @@ export default function ShiftsPage() {
 
 
       {/* ── Lock Status Banner ── */}
-      {(isDipendente || isSuperAdmin) && isWeekLocked && !isWeekConfirmed && (
+      {(isDipendente || isSuperAdmin || isProjectManager) && isWeekLocked && !isWeekConfirmed && (
         <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 12, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#D97706', fontWeight: 700 }}>
             <span style={{ fontSize: 18 }}>🔒</span> Turni bloccati — in attesa di conferma dal Project Manager.
@@ -2481,14 +2481,14 @@ export default function ShiftsPage() {
         </div>
       )}
 
-      {(isDipendente || isSuperAdmin) && isWeekConfirmed && (
+      {(isDipendente || isSuperAdmin || isProjectManager) && isWeekConfirmed && (
         <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#10B981', fontWeight: 700 }}>
           <span style={{ fontSize: 18 }}>✅</span> Turni confermati dal Project Manager. Settimana definitiva.
         </div>
       )}
 
       {/* ── Bottone Blocca/Invia Turni — per dipendenti e superadmin ── */}
-      {(isDipendente || isSuperAdmin) && !isWeekLocked && !isWeekConfirmed && (
+      {(isDipendente || isSuperAdmin || isProjectManager) && !isWeekLocked && !isWeekConfirmed && (
         <div style={{ marginBottom: 16 }}>
           <button onClick={handleLockWeek} disabled={lockLoading} style={{
             display: 'flex', alignItems: 'center', gap: 10, padding: '14px 24px', borderRadius: 14,
