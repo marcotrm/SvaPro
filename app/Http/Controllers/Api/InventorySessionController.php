@@ -327,12 +327,39 @@ class InventorySessionController extends Controller
     // --- FILTRI disponibili per il form creazione bolla ---
     public function filterOptions(Request $request) {
         $tid = (int)$request->attributes->get('tenant_id');
-        $brands = DB::table('brands')->where('tenant_id',$tid)->orderBy('name')->select('id','name')->get();
-        $categories = DB::table('categories')->where('tenant_id',$tid)->orderBy('name')->select('id','name')->get();
-        $productTypes = DB::table('products')->where('tenant_id',$tid)->where('is_active',true)
-            ->distinct()->pluck('product_type')->filter()->values();
-        $stores = DB::table('stores')->where('tenant_id',$tid)->where('is_active',true)->orderBy('name')->select('id','name')->get();
-        return response()->json(['brands'=>$brands,'categories'=>$categories,'product_types'=>$productTypes,'stores'=>$stores]);
+
+        // Stores — tabella senza is_active, filtra solo per tenant
+        try { $stores = DB::table('stores')->where('tenant_id',$tid)->orderBy('name')->select('id','name')->get(); }
+        catch (\Exception $e) { $stores = collect(); }
+
+        // Brands — tabella separata
+        try { $brands = DB::table('brands')->where('tenant_id',$tid)->orderBy('name')->select('id','name')->get(); }
+        catch (\Exception $e) { $brands = collect(); }
+
+        // Categories — tabella separata
+        try { $categories = DB::table('categories')->where('tenant_id',$tid)->orderBy('name')->select('id','name')->get(); }
+        catch (\Exception $e) { $categories = collect(); }
+
+        // Product types — distinct dalla colonna reale product_type
+        try {
+            $productTypes = DB::table('products')->where('tenant_id',$tid)->where('is_active',true)
+                ->distinct()->pluck('product_type')->filter()->values();
+        } catch (\Exception $e) { $productTypes = collect(); }
+
+        \Log::info('InventorySessionController@filterOptions', [
+            'tenant_id' => $tid,
+            'stores' => $stores->count(),
+            'brands' => $brands->count(),
+            'categories' => $categories->count(),
+            'product_types' => $productTypes->count(),
+        ]);
+
+        return response()->json([
+            'stores'        => $stores,
+            'brands'        => $brands,
+            'categories'    => $categories,
+            'product_types' => $productTypes,
+        ]);
     }
 
     // --- KPI DASHBOARD ---

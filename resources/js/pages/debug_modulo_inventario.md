@@ -1,310 +1,236 @@
-Agisci come senior full stack developer esperto Laravel/PostgreSQL + frontend.
+Devi correggere il problema dei dropdown vuoti nella modale "Crea Bolla Inventario".
 
-Sto sviluppando il modulo Inventario del mio gestionale. Il modulo è stato generato seguendo una specifica, ma adesso devo fare un controllo completo perché ci sono errori.
+Situazione attuale:
+- La modale si apre correttamente.
+- I campi sono cliccabili.
+- Però i menu a tendina sono vuoti:
+  - Negozio
+  - Marca
+  - Categoria
+  - Tipo prodotto
+- Nel form appare errore "Seleziona un negozio".
+- Il frontend mostra le voci, ma non riceve dati reali da backend.
 
-Errore già rilevato:
-SQLSTATE[42703]: Undefined column: 7 ERROR: column p.brand does not exist
+Obiettivo:
+Popolare correttamente i dropdown della modale Crea Bolla Inventario usando i dati reali già presenti nel database.
 
-La query cercava colonne non esistenti tipo:
-- p.brand
-- p.category
-- p.cost_price
+Prima di modificare il codice, fai debug completo.
 
-Devi fare un check completo di tutto il modulo inventario e correggere tutti i possibili errori simili.
+1. Trova il componente frontend della modale:
+   - Crea Bolla Inventario
+   - CreateInventoryModal
+   - InventoryCreateModal
+   - InventorySessionCreate
+   - o nome equivalente
+
+2. Trova dove vengono caricati:
+   - stores / negozi
+   - brands / marche
+   - categories / categorie
+   - product types / tipi prodotto
+
+3. Controlla nel frontend:
+   - quali endpoint vengono chiamati
+   - se la chiamata parte davvero quando la modale si apre
+   - se viene usato useEffect/onMounted correttamente
+   - se la response viene salvata nello state
+   - se lo state viene passato alle select
+   - se le select usano value e onChange correttamente
+   - se ci sono errori console
+   - se ci sono 404/500 nel Network
+   - se i nomi dei campi response coincidono con quelli usati nel frontend
+
+4. Controlla nel backend:
+   - se esistono endpoint per inventory filters/options
+   - se esiste un endpoint tipo:
+     GET /api/inventory/options
+     GET /api/inventory/filters
+     GET /api/stores
+     GET /api/products/filters
+   - se gli endpoint sono registrati nelle routes
+   - se sono protetti da auth corretta
+   - se rispettano tenant_id
+   - se restituiscono dati nel formato corretto
+
+5. Se gli endpoint non esistono, creali.
+
+Crea un endpoint unico consigliato:
+
+GET /api/inventory/options
+
+Deve restituire:
+
+{
+  "stores": [
+    {
+      "id": 1,
+      "name": "Negozio Caserta"
+    }
+  ],
+  "brands": [
+    {
+      "value": "Brand A",
+      "label": "Brand A"
+    }
+  ],
+  "categories": [
+    {
+      "value": "Categoria A",
+      "label": "Categoria A"
+    }
+  ],
+  "types": [
+    {
+      "value": "Tipo A",
+      "label": "Tipo A"
+    }
+  ]
+}
 
 IMPORTANTE:
-Non devi inventare colonne.
-Non devi usare campi ipotetici.
-Devi adattare tutto allo schema reale già presente nel progetto.
+Non inventare colonne.
+Prima controlla lo schema reale del database.
 
-Prima fase: analisi
-1. Analizza le migration esistenti.
-2. Analizza i model esistenti.
-3. Analizza le relazioni tra:
-   - products
-   - product_variants
-   - brands, se esiste
-   - categories, se esiste
-   - suppliers, se esiste
-   - stores
-   - warehouses
-   - stock
-   - stock_levels
-   - inventory tables
-   - users
-   - tenants
-4. Trova tutte le query del modulo inventario.
-5. Trova tutti i controller, service, request, resource e componenti frontend relativi all’inventario.
-6. Dimmi prima quali problemi hai trovato, poi correggili.
+Per stores/negozi:
+- cerca tabella stores
+- oppure warehouses
+- oppure locations
+- oppure shops
+- oppure punti vendita
+- usa la tabella reale già presente
+- filtra per tenant_id se esiste
+- filtra per is_active se esiste
 
-Problemi da controllare e correggere:
+Per brands/marche:
+- se esiste una tabella brands, usa quella
+- se non esiste, recupera distinct brand dai prodotti o varianti solo se la colonna esiste
+- se non esiste nessuna colonna brand, non rompere il codice: restituisci array vuoto e nascondi o disabilita il filtro marca nel frontend
 
-BACKEND
+Per categories/categorie:
+- se esiste una tabella categories, usa quella
+- se non esiste, recupera distinct category dai prodotti o varianti solo se la colonna esiste
+- se non esiste nessuna colonna category, restituisci array vuoto e nascondi o disabilita il filtro categoria
 
-1. Query con colonne inesistenti
-Controlla tutte le query che fanno select su colonne tipo:
-- p.brand
-- p.category
-- p.cost_price
-- p.supplier
-- p.type
-- pv.brand
-- pv.category
-- pv.cost_price
-- stock.quantity
-- store.name
+Per types/tipi prodotto:
+- controlla se esiste type, product_type, category_type, family o simile
+- se esiste, usa quella colonna reale
+- se non esiste, restituisci array vuoto e nascondi o disabilita il filtro tipo
 
-Verifica che queste colonne esistano davvero.
-Se non esistono:
-- usa la relazione corretta;
-- usa join corrette;
-- oppure rimuovi il campo se non indispensabile.
+6. Correggi il frontend.
 
-2. Filtri inventario
-Nel frontend vedo le voci per filtrare, ma non sono cliccabili o non funzionano.
+Quando la modale si apre deve chiamare:
 
-Devi controllare:
-- se i filtri sono popolati dal backend;
-- se esistono endpoint per recuperare marche, categorie, tipologie, fornitori;
-- se i select/dropdown ricevono dati;
-- se i select/dropdown hanno onChange funzionante;
-- se lo stato React/Vue/JS viene aggiornato;
-- se il bottone “applica filtri” usa davvero i valori scelti;
-- se i filtri vengono inviati nella request di creazione bolla;
-- se il backend legge davvero i filtri;
-- se la query backend applica davvero i filtri.
+GET /api/inventory/options
 
-3. Creazione bolla inventario
-Controlla che:
-- la bolla venga creata correttamente;
-- venga assegnata allo store giusto;
-- venga generato un numero bolla;
-- vengano create le righe prodotto;
-- venga salvata la giacenza teorica al momento della creazione;
-- la giacenza teorica non venga ricalcolata dopo;
-- non vengano create righe duplicate;
-- vengano considerati solo prodotti attivi;
-- venga rispettato tenant_id;
-- venga rispettato lo store selezionato.
+Poi deve valorizzare:
 
-4. Giacenze
-Controlla da quale tabella reale viene presa la giacenza.
+storesOptions
+brandOptions
+categoryOptions
+typeOptions
 
-Non dare per scontato che esista stock_levels.
+Le select devono mostrare:
+- "— Seleziona negozio —" se stores è vuoto o nessuno selezionato
+- "Tutte le marche" se brands è disponibile
+- "Tutte le categorie" se categories è disponibile
+- "Tutti i tipi" se types è disponibile
 
-Cerca nel progetto:
-- stock
-- stocks
-- stock_levels
-- warehouse_stock
-- store_stock
-- inventories
-- movements
-- product_variant_id
-- store_id
-- warehouse_id
+Se un filtro opzionale ha array vuoto:
+- non mostrare errore
+- disabilitalo oppure nascondilo temporaneamente
+- mostra eventualmente "Nessuna marca disponibile"
 
-Adatta il modulo inventario alla struttura reale.
+Il campo negozio invece è obbligatorio:
+- se stores è vuoto, mostra alert:
+  "Nessun negozio disponibile. Controlla configurazione store/magazzini."
+- il pulsante crea bolla deve restare disabilitato finché non viene scelto un negozio
 
-5. Product variants
-Nel progetto esiste product_variants.
+7. Controlla il formato dati.
 
-Controlla se l’inventario deve lavorare su:
-- product_id
-oppure
-- product_variant_id
+Se il backend restituisce:
 
-Se i barcode stanno su product_variants, la bolla deve probabilmente usare product_variant_id, non solo product_id.
+stores: [{ id, name }]
 
-Controlla bene:
-- barcode;
-- sku;
-- flavor;
-- variante;
-- prezzo;
-- giacenza.
+il frontend deve usare:
+- value = store.id
+- label = store.name
 
-6. API store
-Regola fondamentale:
-Le API lato store non devono mai restituire la giacenza teorica.
+Se il backend restituisce:
+brands: [{ value, label }]
 
-Controlla tutte queste API:
-- lista bolle store;
-- dettaglio bolla store;
-- scansione barcode;
-- aggiornamento quantità manuale;
-- chiusura bolla.
+il frontend deve usare:
+- value = option.value
+- label = option.label
 
-Assicurati che non restituiscano:
-- theoretical_quantity;
-- cost_price;
-- difference;
-- valore stock;
-- dati riservati del deposito.
+8. Aggiungi logging temporaneo per debug.
 
-7. Scansione barcode
-Controlla che:
-- il barcode venga cercato nella tabella corretta;
-- se il barcode è in product_variants, cerca lì;
-- se viene trovato, incrementa counted_quantity;
-- se non viene trovato nella bolla, registra anomalia;
-- non crea duplicati;
-- registra ogni scansione;
-- aggiorna lo stato della riga;
-- mantiene la bolla in stato IN_PROGRESS.
+Nel frontend aggiungi temporaneamente:
 
-8. Chiusura bolla
-Controlla che:
-- lo store possa chiudere solo le proprie bolle;
-- dopo la chiusura non possa più modificare;
-- il sistema calcoli differenze;
-- imposti MATCHED se differenza = 0;
-- imposti MISMATCHED se differenza diversa da 0;
-- notifichi o renda visibile la bolla al deposito.
+console.log("Inventory options loaded:", data);
 
-9. Permessi
-Controlla che:
-- deposito/admin vedano tutto;
-- store veda solo le sue bolle;
-- store non possa vedere altri store;
-- store non possa approvare;
-- store non possa riaprire;
-- solo admin/deposito possa approvare o riaprire.
+Nel backend puoi loggare:
+- tenant_id
+- numero stores trovati
+- numero brands trovati
+- numero categories trovate
+- numero types trovati
 
-10. Tenant
-Se il progetto usa tenant_id:
-- ogni query deve filtrare per tenant_id;
-- evitare dati incrociati tra tenant diversi;
-- products, stores, bolle e stock devono essere coerenti con lo stesso tenant.
+Poi, dopo la correzione, rimuovi o lascia solo log non invasivi.
 
-FRONTEND
+9. Verifica anche la preview prodotti.
 
-11. Filtri non cliccabili
-Problema attuale:
-Nel frontend c’è la voce filtro, ma non è cliccabile.
+Dopo che seleziono negozio e filtri, il sistema deve poter caricare l’anteprima prodotti.
 
-Controlla:
-- se è un select disabilitato;
-- se manca il valore options;
-- se manca lo stato locale;
-- se manca onChange;
-- se il componente è coperto da un overlay invisibile;
-- se c’è z-index sbagliato;
-- se il dropdown è dentro un contenitore con overflow hidden;
-- se manca import del componente Select;
-- se il componente è renderizzato ma non interattivo;
-- se c’è pointer-events: none;
-- se il bottone o input è disabled;
-- se manca type="button" e il form si resetta;
-- se ci sono errori console JavaScript;
-- se il componente controllato ha value ma non onChange.
+Se non esiste, crea endpoint:
 
-Correggi il problema.
+POST /api/inventory/preview
 
-12. Dropdown filtri
-I filtri devono funzionare per:
-- store;
-- marca;
-- categoria;
-- tipologia;
-- fornitore;
-- solo prodotti con giacenza > 0;
-- prodotti attivi;
-- ricerca per nome, sku o barcode.
+Body:
+{
+  "store_id": 1,
+  "filters": {
+    "brand": null,
+    "category": null,
+    "type": null,
+    "search": "12345",
+    "only_positive_stock": false
+  }
+}
 
-Se alcuni dati non esistono nel database, nascondi temporaneamente il filtro oppure popolalo dai dati reali disponibili.
+Response:
+{
+  "total": 25,
+  "items": [
+    {
+      "id": 1,
+      "product_id": 10,
+      "product_variant_id": 22,
+      "name": "Prodotto esempio",
+      "sku": "SKU001",
+      "barcode": "805...",
+      "brand": null,
+      "category": null,
+      "type": null,
+      "theoretical_quantity": 5
+    }
+  ]
+}
 
-13. Creazione bolla lato frontend
-Controlla che:
-- i campi siano compilabili;
-- il pulsante crea bolla funzioni;
-- venga mostrata anteprima prodotti;
-- venga mostrato errore se nessun prodotto trovato;
-- venga mostrato loading;
-- venga mostrato successo;
-- dopo la creazione porti al dettaglio bolla o lista bolle.
+ATTENZIONE:
+La preview deposito può vedere theoretical_quantity.
+La pagina store invece NON deve mai vedere theoretical_quantity.
 
-14. Pagina store
-Controlla che:
-- lo store veda le bolle assegnate;
-- possa aprire la bolla;
-- il campo barcode sia attivo;
-- dopo una scansione il campo barcode resti in focus;
-- si veda la quantità contata;
-- non si veda la quantità teorica;
-- il pulsante chiudi inventario funzioni.
+10. Alla fine controlla:
 
-15. Stato visivo
-Controlla che:
-- verde = allineato;
-- rosso = differenza;
-- giallo = da verificare;
-- grigio = non contato.
+- il menu negozio mostra almeno i negozi reali
+- marca/categoria/tipo si popolano solo se i dati esistono
+- se marca/categoria/tipo non esistono nel database non mandano in errore la modale
+- selezionando un negozio sparisce l’errore "Seleziona un negozio"
+- il pulsante crea bolla funziona
+- i filtri vengono inviati davvero al backend
+- il backend non usa colonne inesistenti tipo p.brand se non esistono
+- il tenant_id viene rispettato
+- non vengono mostrati dati di altri tenant
 
-Verifica che i badge/stati non vadano in errore se lo stato è null o non previsto.
-
-16. Error handling
-Aggiungi gestione errori chiara:
-- prodotto non trovato;
-- barcode non presente nella bolla;
-- bolla già chiusa;
-- permesso negato;
-- nessun prodotto trovato dai filtri;
-- errore backend;
-- errore database.
-
-17. Console e network
-Controlla eventuali errori:
-- console browser;
-- chiamate API fallite;
-- 404 endpoint;
-- 500 backend;
-- payload sbagliato;
-- CSRF/token;
-- auth;
-- CORS, se applicabile.
-
-OBIETTIVO FINALE
-
-Alla fine voglio che il modulo Inventario funzioni così:
-
-Deposito:
-1. apre sezione Inventario;
-2. clicca Crea bolla;
-3. seleziona store;
-4. seleziona marca/categoria/tipologia o altri filtri disponibili;
-5. vede anteprima prodotti;
-6. crea bolla;
-7. la bolla appare allo store.
-
-Store:
-1. apre sezione Inventario;
-2. vede la bolla assegnata;
-3. apre bolla;
-4. vede prodotti ma NON vede giacenza teorica;
-5. spara barcode;
-6. il sistema conta automaticamente;
-7. chiude la bolla.
-
-Deposito:
-1. vede il riscontro;
-2. vede teorico, contato e differenza;
-3. vede pallino verde se allineato;
-4. vede pallino rosso se non allineato;
-5. può chiedere chiarimenti;
-6. può approvare.
-
-Prima di modificare il codice:
-- fammi un elenco dei file coinvolti;
-- fammi un elenco dei problemi trovati;
-- poi correggi in modo ordinato.
-
-Quando correggi:
-- non rompere le funzionalità esistenti;
-- usa lo schema reale del database;
-- non inventare colonne;
-- non duplicare logiche;
-- mantieni codice pulito e modulare;
-- aggiungi commenti dove serve;
-- aggiungi controlli di sicurezza;
-- aggiungi test base se possibile.
+Prima fammi un report dei file coinvolti e del motivo per cui i dropdown erano vuoti.
+Poi applica le modifiche.
