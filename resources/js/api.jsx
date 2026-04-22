@@ -723,6 +723,7 @@ export const pos = {
 
 export const cashMovements = {
   get:      (params = {}) => api.get('/cash-movements', { params }),
+  getAll:   (params = {}) => api.get('/cash-movements', { params }), // alias usato da AdminPanelPage
   balances: (params = {}) => api.get('/cash-movements/balances', { params }),
   summary:  (params = {}) => api.get('/cash-movements/summary', { params }),
   create:   (data) => api.post('/cash-movements', data),
