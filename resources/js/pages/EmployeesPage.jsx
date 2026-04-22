@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { employees } from '../api.jsx';
+import { employees, clearApiCache } from '../api.jsx';
 import { EmployeesSkeleton } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
 import EmployeeModal from '../components/EmployeeModal.jsx';
@@ -93,7 +93,10 @@ export default function EmployeesPage() {
 
     window.dispatchEvent(new CustomEvent('employeeUpdated'));
 
-    // Refresh in background — preserva la foto ottimistica se il server è ancora in sync
+    // Svuota cache prima del refresh — altrimenti cachedGet ritorna i dati vecchi
+    clearApiCache();
+
+    // Refresh completo dal server
     try {
       const [empRes, anaRes] = await Promise.all([
         employees.getEmployees(selectedStoreId ? { store_id: selectedStoreId, limit: 60 } : { limit: 60 }),

@@ -68,25 +68,25 @@ function CalPicker({ value, onChange, label, max, min }) {
     <div ref={ref} style={{ position:'relative' }}>
       <div
         onClick={() => { setOpen(o=>!o); if(!open && value) { const p=new Date(value+'T00:00:00'); setView({y:p.getFullYear(),m:p.getMonth()}); }}}
-        style={{ display:'flex', alignItems:'center', gap:8, background:'#151b2e', border:`1.5px solid ${open?'#6366F1':'rgba(99,102,241,0.35)'}`, borderRadius:12, padding:'8px 14px', cursor:'pointer', userSelect:'none', transition:'border-color 0.15s', minWidth:170 }}
+        style={{ display:'flex', alignItems:'center', gap:8, background:'#fff', border:`1.5px solid ${open?'#6366F1':'#e2e8f0'}`, borderRadius:12, padding:'8px 14px', cursor:'pointer', userSelect:'none', transition:'all 0.15s', minWidth:170, boxShadow: open ? '0 0 0 3px rgba(99,102,241,0.12)' : '0 1px 4px rgba(0,0,0,0.07)' }}
       >
         <Calendar size={14} color="#6366F1"/>
         <span style={{ fontSize:11, fontWeight:700, color:'#6366F1' }}>{label}</span>
-        <span style={{ fontSize:13, fontWeight:800, color:'#e2e8f0', flex:1 }}>{fmtDisplay(value)}</span>
-        <ChevronDown size={13} color="rgba(255,255,255,0.3)" style={{ transform: open?'rotate(180deg)':'none', transition:'transform 0.2s' }}/>
+        <span style={{ fontSize:13, fontWeight:800, color:'#1e293b', flex:1 }}>{fmtDisplay(value)}</span>
+        <ChevronDown size={13} color="#94a3b8" style={{ transform: open?'rotate(180deg)':'none', transition:'transform 0.2s' }}/>
       </div>
 
       {open && (
-        <div style={{ position:'absolute', top:'calc(100% + 8px)', left:0, zIndex:500, background:'#0f1729', border:'1.5px solid rgba(99,102,241,0.3)', borderRadius:16, padding:16, width:260, boxShadow:'0 20px 60px rgba(0,0,0,0.6)', animation:'calFadeIn 0.15s ease-out' }}>
+        <div style={{ position:'absolute', top:'calc(100% + 8px)', left:0, zIndex:500, background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:16, padding:16, width:260, boxShadow:'0 12px 40px rgba(0,0,0,0.12)', animation:'calFadeIn 0.15s ease-out' }}>
           {/* Header mese */}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-            <button onClick={prevMonth} style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#e2e8f0', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <button onClick={prevMonth} style={{ width:28, height:28, borderRadius:8, border:'1px solid #e2e8f0', background:'#f8fafc', color:'#475569', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <ChevronLeft size={14}/>
             </button>
-            <span style={{ fontWeight:800, fontSize:14, color:'#e2e8f0', letterSpacing:'-0.3px' }}>
+            <span style={{ fontWeight:800, fontSize:14, color:'#1e293b', letterSpacing:'-0.3px' }}>
               {IT_FULL_MONTHS[view.m]} {view.y}
             </span>
-            <button onClick={nextMonth} style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#e2e8f0', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <button onClick={nextMonth} style={{ width:28, height:28, borderRadius:8, border:'1px solid #e2e8f0', background:'#f8fafc', color:'#475569', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <ChevronRight size={14}/>
             </button>
           </div>
@@ -94,7 +94,7 @@ function CalPicker({ value, onChange, label, max, min }) {
           {/* Giorni settimana */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', marginBottom:6 }}>
             {IT_DOW.map((d,i) => (
-              <div key={i} style={{ textAlign:'center', fontSize:10, fontWeight:800, color:'rgba(99,102,241,0.7)', padding:'2px 0' }}>{d}</div>
+              <div key={i} style={{ textAlign:'center', fontSize:10, fontWeight:800, color:'#6366F1', padding:'2px 0' }}>{d}</div>
             ))}
           </div>
 
@@ -109,15 +109,15 @@ function CalPicker({ value, onChange, label, max, min }) {
                   key={i}
                   onClick={() => d && !dis && selIso(d)}
                   style={{
-                    height:32, width:'100%', borderRadius:8, border: tod && !sel ? '1px solid rgba(99,102,241,0.5)' : 'none',
+                    height:32, width:'100%', borderRadius:8, border: tod && !sel ? '1.5px solid #6366F1' : 'none',
                     background: sel ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : 'transparent',
-                    color: !d ? 'transparent' : dis ? 'rgba(255,255,255,0.15)' : sel ? '#fff' : tod ? '#818CF8' : '#cbd5e1',
+                    color: !d ? 'transparent' : dis ? '#cbd5e1' : sel ? '#fff' : tod ? '#6366F1' : '#334155',
                     fontSize:13, fontWeight: sel||tod ? 800 : 500,
                     cursor: d && !dis ? 'pointer' : 'default',
-                    boxShadow: sel ? '0 2px 8px rgba(99,102,241,0.4)' : 'none',
+                    boxShadow: sel ? '0 2px 8px rgba(99,102,241,0.35)' : 'none',
                     transition:'background 0.1s',
                   }}
-                  onMouseEnter={e => { if(d && !sel && !dis) e.currentTarget.style.background='rgba(99,102,241,0.15)'; }}
+                  onMouseEnter={e => { if(d && !sel && !dis) e.currentTarget.style.background='#f1f5f9'; }}
                   onMouseLeave={e => { if(!sel) e.currentTarget.style.background='transparent'; }}
                 >
                   {d || ''}
@@ -127,7 +127,7 @@ function CalPicker({ value, onChange, label, max, min }) {
           </div>
 
           {/* Oggi */}
-          <div style={{ borderTop:'1px solid rgba(255,255,255,0.06)', marginTop:12, paddingTop:10, textAlign:'center' }}>
+          <div style={{ borderTop:'1px solid #f1f5f9', marginTop:12, paddingTop:10, textAlign:'center' }}>
             <button
               onClick={() => { const t=new Date(); selIso(t.getDate()); setView({y:t.getFullYear(),m:t.getMonth()}); }}
               style={{ fontSize:11, fontWeight:700, color:'#6366F1', background:'rgba(99,102,241,0.1)', border:'none', borderRadius:8, padding:'5px 16px', cursor:'pointer' }}
