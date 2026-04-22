@@ -390,6 +390,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'saveTemplate'])->middleware('permission:employees.manage');
         Route::delete('/shifts/templates/{id}', [\App\Http\Controllers\Api\ShiftController::class, 'deleteTemplate'])->middleware('permission:employees.manage');
 
+        // Shift week lock/confirm workflow
+        Route::post('/shifts/lock-week', [\App\Http\Controllers\Api\ShiftController::class, 'lockWeek']);
+        Route::post('/shifts/unlock-week', [\App\Http\Controllers\Api\ShiftController::class, 'unlockWeek']);
+        Route::get('/shifts/week-locks', [\App\Http\Controllers\Api\ShiftController::class, 'getWeekLocks']);
+        Route::post('/shifts/confirm-week', [\App\Http\Controllers\Api\ShiftController::class, 'confirmWeek']);
+
         // Reports — accessibili anche ai dipendenti (filtrati automaticamente al proprio store)
         Route::get('/reports/summary', [ReportController::class, 'summary']);
         Route::get('/reports/revenue-trend', [ReportController::class, 'revenueTrend']);

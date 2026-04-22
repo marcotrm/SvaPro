@@ -254,4 +254,163 @@ class ShiftController extends Controller
 
         return response()->json(['message' => "{$count} turni confermati.", 'confirmed' => $count]);
     }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // LOCK / CONFIRM WEEK — workflow Store Manager → Project Manager
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * POST /shifts/lock-week
+     * Store Manager blocca i turni di una settimana per uno store.
+     */
+    public function lockWeek(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $request->validate([
+            'store_id'   => 'required|integer',
+            'week_start' => 'required|date',
+        ]);
+
+        $lock = DB::table('shift_week_locks')->updateOrInsert(
+            [
+                'tenant_id'  => $tenantId,
+                'store_id'   => $request->integer('store_id'),
+                'week_start' => $request->input('week_start'),
+            ],
+            [
+                'locked_by'    => $request->user()?->id ?? $request->integer('user_id', 0),
+                'locked_at'    => now(),
+                'confirmed_by' => null,
+                'confirmed_at' => null,
+                'updated_at'   => now(),
+            ]
+        );
+
+        // Crea notifica per project_manager
+        $storeName = DB::table('stores')->where('id', $request->integer('store_id'))->value('name') ?? 'Store';
+        $weekLabel = Carbon::parse($request->input('week_start'))->format('d/m/Y');
+        
+        // Trova tutti gli utenti con ruolo project_manager nel tenant
+        $pmUsers = DB::table('users')
+            ->where('tenant_id', $tenantId)
+            ->whereJsonContains('roles', 'project_manager')
+            ->pluck('id');
+
+        foreach ($pmUsers as $pmId) {
+            if (Schema::hasTable('employee_notifications')) {
+                DB::table('employee_notifications')->insert([
+                    'tenant_id'  => $tenantId,
+                    'user_id'    => $pmId,
+                    'title'      => "🔒 Turni bloccati — {$storeName}",
+                    'body'       => "I turni della settimana {$weekLabel} sono stati bloccati e sono in attesa di conferma.",
+                    'read'       => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
+        return response()->json(['message' => 'Turni bloccati con successo.']);
+    }
+
+    /**
+     * POST /shifts/unlock-week
+     * Store Manager o superadmin sblocca i turni.
+     */
+    public function unlockWeek(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $request->validate([
+            'store_id'   => 'required|integer',
+            'week_start' => 'required|date',
+        ]);
+
+        DB::table('shift_week_locks')
+            ->where('tenant_id', $tenantId)
+            ->where('store_id', $request->integer('store_id'))
+            ->where('week_start', $request->input('week_start'))
+            ->delete();
+
+        return response()->json(['message' => 'Turni sbloccati.']);
+    }
+
+    /**
+     * GET /shifts/week-locks
+     * Ritorna lo stato di lock/conferma per tutti gli store di una settimana.
+     */
+    public function getWeekLocks(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $weekStart = $request->input('week_start');
+
+        $query = DB::table('shift_week_locks as swl')
+            ->leftJoin('stores as st', 'st.id', '=', 'swl.store_id')
+            ->leftJoin('users as u_lock', 'u_lock.id', '=', 'swl.locked_by')
+            ->leftJoin('users as u_conf', 'u_conf.id', '=', 'swl.confirmed_by')
+            ->where('swl.tenant_id', $tenantId)
+            ->select(
+                'swl.*',
+                'st.name as store_name',
+                'u_lock.name as locked_by_name',
+                'u_conf.name as confirmed_by_name'
+            );
+
+        if ($weekStart) {
+            $query->where('swl.week_start', $weekStart);
+        }
+
+        return response()->json(['data' => $query->get()]);
+    }
+
+    /**
+     * POST /shifts/confirm-week
+     * Project Manager conferma i turni bloccati di uno store.
+     */
+    public function confirmWeek(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $request->validate([
+            'store_id'   => 'required|integer',
+            'week_start' => 'required|date',
+        ]);
+
+        $updated = DB::table('shift_week_locks')
+            ->where('tenant_id', $tenantId)
+            ->where('store_id', $request->integer('store_id'))
+            ->where('week_start', $request->input('week_start'))
+            ->whereNotNull('locked_at')
+            ->update([
+                'confirmed_by' => $request->user()?->id ?? $request->integer('user_id', 0),
+                'confirmed_at' => now(),
+                'updated_at'   => now(),
+            ]);
+
+        if (!$updated) {
+            return response()->json(['message' => 'Nessun blocco trovato da confermare.'], 404);
+        }
+
+        // Notifica allo store manager che ha bloccato
+        $lock = DB::table('shift_week_locks')
+            ->where('tenant_id', $tenantId)
+            ->where('store_id', $request->integer('store_id'))
+            ->where('week_start', $request->input('week_start'))
+            ->first();
+
+        if ($lock && $lock->locked_by && Schema::hasTable('employee_notifications')) {
+            $storeName = DB::table('stores')->where('id', $request->integer('store_id'))->value('name') ?? 'Store';
+            $weekLabel = Carbon::parse($request->input('week_start'))->format('d/m/Y');
+            
+            DB::table('employee_notifications')->insert([
+                'tenant_id'  => $tenantId,
+                'user_id'    => $lock->locked_by,
+                'title'      => "✅ Turni confermati — {$storeName}",
+                'body'       => "I turni della settimana {$weekLabel} sono stati confermati dal Project Manager.",
+                'read'       => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return response()->json(['message' => 'Turni confermati con successo.']);
+    }
 }

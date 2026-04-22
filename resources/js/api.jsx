@@ -800,6 +800,11 @@ export const shifts = {
   getTemplates:   ()            => api.get('/shifts/templates'),
   saveTemplate:   (data)        => api.post('/shifts/templates', data),
   deleteTemplate: (id)          => api.delete(`/shifts/templates/${id}`),
+  // Week lock/confirm workflow
+  lockWeek:       (data)        => api.post('/shifts/lock-week', data),
+  unlockWeek:     (data)        => api.post('/shifts/unlock-week', data),
+  getWeekLocks:   (params = {}) => api.get('/shifts/week-locks', { params }),
+  confirmWeek:    (data)        => api.post('/shifts/confirm-week', data),
 };
 
 // ── Gamification ──────────────────────────────────────────────────────
