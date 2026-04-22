@@ -28,16 +28,26 @@ class ShiftController extends Controller
         $startDate = $request->input('start_date');
         $endDate   = $request->input('end_date');
 
+        // Colonne base sempre presenti
+        $selectCols = [
+            'es.id', 'es.tenant_id', 'es.store_id', 'es.employee_id',
+            'es.date', 'es.start_time', 'es.end_time', 'es.color',
+            'es.created_at', 'es.updated_at',
+            'st.name as store_name',
+        ];
+
+        // Aggiungi colonne opzionali se esistono (aggiunte da migrazione successiva)
+        if (Schema::hasColumn('employee_shifts', 'status')) {
+            $selectCols[] = 'es.status';
+        }
+        if (Schema::hasColumn('employee_shifts', 'proposed_by')) {
+            $selectCols[] = 'es.proposed_by';
+        }
+
         $query = DB::table('employee_shifts as es')
             ->leftJoin('stores as st', 'st.id', '=', 'es.store_id')
             ->where('es.tenant_id', $tenantId)
-            ->select(
-                'es.id', 'es.tenant_id', 'es.store_id', 'es.employee_id',
-                'es.date', 'es.start_time', 'es.end_time', 'es.color',
-                'es.status', 'es.proposed_by',
-                'es.created_at', 'es.updated_at',
-                'st.name as store_name'
-            );
+            ->select($selectCols);
 
         // Filtro per negozio (opzionale se usiamo la ricerca globale per dipendente)
         if ($storeId) {
@@ -161,18 +171,21 @@ class ShiftController extends Controller
         // Identificare employee (dal token API in futuro, per ora mock via employee_id)
         $employeeId = $request->input('employee_id');
 
+        $selectCols2 = [
+            'es.id', 'es.tenant_id', 'es.store_id', 'es.employee_id',
+            'es.date', 'es.start_time', 'es.end_time', 'es.color',
+            'es.created_at', 'es.updated_at',
+            'st.name as store_name',
+        ];
+        if (Schema::hasColumn('employee_shifts', 'status'))      $selectCols2[] = 'es.status';
+        if (Schema::hasColumn('employee_shifts', 'proposed_by')) $selectCols2[] = 'es.proposed_by';
+
         $shifts = DB::table('employee_shifts as es')
             ->leftJoin('stores as st', 'st.id', '=', 'es.store_id')
             ->where('es.tenant_id', $tenantId)
             ->where('es.employee_id', $employeeId)
             ->where('es.date', '>=', now()->subDays(7)->toDateString())
-            ->select(
-                'es.id', 'es.tenant_id', 'es.store_id', 'es.employee_id',
-                'es.date', 'es.start_time', 'es.end_time', 'es.color',
-                'es.status', 'es.proposed_by',
-                'es.created_at', 'es.updated_at',
-                'st.name as store_name'
-            )
+            ->select($selectCols2)
             ->orderBy('es.date', 'asc')
             ->get();
 
