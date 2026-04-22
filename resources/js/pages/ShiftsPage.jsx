@@ -1397,7 +1397,10 @@ export default function ShiftsPage() {
 
   const isWeekLocked = weekLockStatus?.locked_at && !weekLockStatus?.confirmed_at;
   const isWeekConfirmed = !!weekLockStatus?.confirmed_at;
-  const canEditGrid = isShiftManager && !isWeekLocked && !isWeekConfirmed && !isDipendente;
+  // Dipendenti: possono editare solo se NON bloccati e NON confermati
+  // PM/Superadmin: possono editare sempre (anche se bloccati)
+  const isGridReadOnly = isDipendente && (isWeekLocked || isWeekConfirmed);
+  const canEditGrid = !isGridReadOnly;
 
   useEffect(() => {
     if (isDipendente) { setAllEmployeesGlobal([]); return; } setAllEmpLoading(true); employeesApi.getAllEmployees()
@@ -2293,12 +2296,12 @@ export default function ShiftsPage() {
           })()}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {canEditShifts ? (
+          {canEditGrid && canEditShifts ? (
             <button onClick={() => setShowTemplatesModal(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'var(--color-surface)', color:'var(--color-text)', border:'1px solid var(--color-border)', padding:'10px 16px', borderRadius:12, fontWeight:600, cursor:'pointer' }}>
               <Clock size={16} /> Modelli Orari
             </button>
           ) : null}
-          {canEditShifts && (
+          {canEditGrid && canEditShifts && (
             <button onClick={() => setShowImport(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'linear-gradient(135deg,#10B981,#059669)', color:'#fff', border:'none', padding:'10px 16px', borderRadius:12, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 12px rgba(16,185,129,0.3)' }}>
               <Upload size={16} /> Importa Excel
             </button>
@@ -2306,7 +2309,7 @@ export default function ShiftsPage() {
           <button onClick={() => setShowExport(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'#6366F1', color:'#fff', border:'none', padding:'10px 16px', borderRadius:12, fontWeight:700, cursor:'pointer' }}>
             <Download size={16} /> Esporta Excel
           </button>
-          {canSaveShifts && (() => {
+          {canSaveShifts && canEditGrid && (() => {
             const pendingCount = Object.values(shifts).filter(s => s.status === 'proposed').length;
             return (
               <>
@@ -2582,7 +2585,8 @@ export default function ShiftsPage() {
 
                     // ── Cella NORMALE ───────────────────────────────────────
                     const isOwnCell   = String(emp.id) === String(currentEmployeeId);
-                    const canClick    = canEditShifts || (isDipendente && isOwnCell);
+                    // Dipendenti: no click se settimana bloccata o confermata
+                    const canClick    = isGridReadOnly ? false : (canEditShifts || (isDipendente && isOwnCell));
                     const isProposed  = hasShift && shift.status === 'proposed';
                     const isConfirmed = hasShift && shift.status === 'confirmed';
 
@@ -2630,9 +2634,9 @@ export default function ShiftsPage() {
                               </div>
                             )}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: isProposed ? 0 : 4 }}>
-                              <input type="time" value={shift.start_time || ''} readOnly={isDipendente && !isOwnCell} onChange={e => { e.stopPropagation(); if (canEditShifts || isOwnCell) onCellChange(emp.id, day.dateStr, { start_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '4px', fontSize: 12, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
+                              <input type="time" value={shift.start_time || ''} readOnly={isGridReadOnly || (isDipendente && !isOwnCell)} onChange={e => { e.stopPropagation(); if (!isGridReadOnly && (canEditShifts || isOwnCell)) onCellChange(emp.id, day.dateStr, { start_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '4px', fontSize: 12, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
                               <span style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>-</span>
-                              <input type="time" value={shift.end_time || ''} readOnly={isDipendente && !isOwnCell} onChange={e => { e.stopPropagation(); if (canEditShifts || isOwnCell) onCellChange(emp.id, day.dateStr, { end_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '4px', fontSize: 12, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
+                              <input type="time" value={shift.end_time || ''} readOnly={isGridReadOnly || (isDipendente && !isOwnCell)} onChange={e => { e.stopPropagation(); if (!isGridReadOnly && (canEditShifts || isOwnCell)) onCellChange(emp.id, day.dateStr, { end_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '4px', fontSize: 12, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
                             </div>
                             {!isProposed && <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', textAlign: 'center', fontWeight: 600 }}>click p. opzioni</div>}
                           </div>
