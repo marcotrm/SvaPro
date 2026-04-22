@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\GamificationController;
 use App\Http\Controllers\Api\PrestashopController;
 use App\Http\Controllers\Api\AdmController;
 use App\Http\Controllers\Api\StoreDeliveryController;
+use App\Http\Controllers\Api\InventorySessionController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -256,6 +257,24 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/inventory-counts', [InventoryCountController::class, 'createSession'])->middleware('permission:inventory.manage');
         Route::post('/inventory-counts/{sessionId}/count', [InventoryCountController::class, 'addCount'])->middleware('permission:inventory.manage');
         Route::post('/inventory-counts/{sessionId}/finalize', [InventoryCountController::class, 'finalize'])->middleware('permission:inventory.manage');
+
+        // ── Inventory Sessions (Bolla Inventario) — Admin ──
+        Route::get('/inventory-sessions/kpi', [InventorySessionController::class, 'kpi']);
+        Route::get('/inventory-sessions/preview', [InventorySessionController::class, 'preview']);
+        Route::get('/inventory-sessions', [InventorySessionController::class, 'index']);
+        Route::post('/inventory-sessions', [InventorySessionController::class, 'store']);
+        Route::get('/inventory-sessions/{id}', [InventorySessionController::class, 'show']);
+        Route::patch('/inventory-sessions/{id}/status', [InventorySessionController::class, 'updateStatus']);
+        Route::post('/inventory-sessions/{id}/approve', [InventorySessionController::class, 'approve']);
+        Route::get('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'comments']);
+        Route::post('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'addComment']);
+
+        // ── Inventory Sessions — Store (senza dati riservati) ──
+        Route::get('/store/inventory-sessions', [InventorySessionController::class, 'storeIndex']);
+        Route::get('/store/inventory-sessions/{id}', [InventorySessionController::class, 'storeShow']);
+        Route::post('/store/inventory-sessions/{id}/scan', [InventorySessionController::class, 'scan']);
+        Route::post('/store/inventory-sessions/{id}/close', [InventorySessionController::class, 'close']);
+        Route::patch('/store/inventory-items/{itemId}/count', [InventorySessionController::class, 'updateCount']);
 
         // Loyalty Tiers & Redemptions (admin)
         Route::get('/loyalty/tiers', [LoyaltyController::class, 'tiers']);

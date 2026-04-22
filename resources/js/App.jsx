@@ -55,6 +55,8 @@ const AutomazioniPage      = lazy(() => import('./pages/AutomazioniPage.jsx'));
 const StoreRevenuePage     = lazy(() => import('./pages/StoreRevenuePage.jsx'));
 const StoreDeliveriesPage  = lazy(() => import('./pages/StoreDeliveriesPage.jsx'));
 const DriverDeliveriesPage = lazy(() => import('./pages/DriverDeliveriesPage.jsx'));
+const InventoryBollePage   = lazy(() => import('./pages/InventoryBollePage.jsx'));
+const InventoryBollaDetailPage = lazy(() => import('./pages/InventoryBollaDetailPage.jsx'));
 
 
 // Components
@@ -149,6 +151,8 @@ export default function App() {
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/orders/stock-alerts" element={<StockAlertsPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
+              <Route path="/inventory/bolle" element={<InventoryBollePage />} />
+              <Route path="/inventory/bolle/:id" element={<InventoryBollaDetailPage />} />
               <Route path="/warehouse/cross-store" element={<CrossStoreInventoryPage />} />
               <Route path="/inventory/smart-reorder" element={<SmartReorderPage />} />
               <Route path="/customers" element={<CustomersPage />} />

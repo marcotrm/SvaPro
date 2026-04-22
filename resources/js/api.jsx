@@ -764,6 +764,26 @@ export const inventoryCount = {
   finalize: (sessionId, data = {}) => api.post(`/inventory-counts/${sessionId}/finalize`, data),
 };
 
+// Inventory Sessions (Bolla Inventario) APIs
+export const inventorySessions = {
+  // Admin
+  getKpi: () => api.get('/inventory-sessions/kpi'),
+  getPreview: (params) => api.get('/inventory-sessions/preview', { params }),
+  getAll: (params = {}) => api.get('/inventory-sessions', { params }),
+  create: (data) => api.post('/inventory-sessions', data),
+  getOne: (id) => api.get(`/inventory-sessions/${id}`),
+  updateStatus: (id, status) => api.patch(`/inventory-sessions/${id}/status`, { status }),
+  approve: (id, applyStock = false) => api.post(`/inventory-sessions/${id}/approve`, { apply_stock_adjustments: applyStock }),
+  getComments: (id) => api.get(`/inventory-sessions/${id}/comments`),
+  addComment: (id, data) => api.post(`/inventory-sessions/${id}/comments`, data),
+  // Store
+  storeGetAll: () => api.get('/store/inventory-sessions'),
+  storeGetOne: (id) => api.get(`/store/inventory-sessions/${id}`),
+  storeScan: (id, barcode) => api.post(`/store/inventory-sessions/${id}/scan`, { barcode }),
+  storeClose: (id) => api.post(`/store/inventory-sessions/${id}/close`),
+  storeUpdateCount: (itemId, data) => api.patch(`/store/inventory-items/${itemId}/count`, data),
+};
+
 // Report APIs - NO cache: i report sono sempre date-filtered e devono essere freschi
 export const reports = {
   revenueTrend:        (params = {}) => api.get('/reports/revenue-trend', { params }),

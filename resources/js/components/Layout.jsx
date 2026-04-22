@@ -41,6 +41,7 @@ const allNavigation = [
     { label: 'Ordini Riassortimento', href: '/warehouse/restock',          icon: ClipboardList,  roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Bolle di Scarico',      href: '/warehouse/delivery-notes',   icon: Truck,          roles: ['superadmin','admin_cliente','store_manager','dipendente','magazziniere'] },
     { label: 'Consegne Negozi',       href: '/warehouse/store-deliveries', icon: MapPin,         roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Bolle Inventario',      href: '/inventory/bolle',            icon: ClipboardList,  roles: ['superadmin','admin_cliente','store_manager','magazziniere','dipendente'] },
   ]},
 
   // 5. Acquisti / Fornitori Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
