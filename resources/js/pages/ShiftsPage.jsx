@@ -2033,35 +2033,35 @@ export default function ShiftsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto', paddingRight: 4 }}>
 
             {/* ── ORARIO PERSONALIZZATO ── */}
-            <div style={{ border: '2px solid #14b8a6', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ borderRadius: 12, overflow: 'hidden', background: 'linear-gradient(135deg, #0d9488, #14b8a6)', marginBottom: 2 }}>
               <button
                 onClick={() => { setCustOpen(o => !o); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 14px', background: '#f0fdfa', border: 'none', cursor: 'pointer' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer' }}
               >
-                <span style={{ fontSize: 18 }}>✏️</span>
+                <span style={{ fontSize: 20 }}>✏️</span>
                 <div style={{ flex: 1, textAlign: 'left' }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#0f766e' }}>Orario Personalizzato</div>
-                  <div style={{ fontSize: 12, color: '#0d9488' }}>{custOpen ? 'Scegli orario' : 'Usa e getta — non salvato'}</div>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>Orario Personalizzato</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>{custOpen ? 'Scegli orario inizio e fine' : 'Usa e getta — non salvato nei template'}</div>
                 </div>
-                <span style={{ color: '#14b8a6', fontWeight: 900 }}>{custOpen ? '▲' : '▼'}</span>
+                <span style={{ color: '#fff', fontWeight: 900, fontSize: 16 }}>{custOpen ? '▲' : '▼'}</span>
               </button>
               {custOpen && (
-                <div style={{ padding: '12px 14px', background: '#f0fdfa', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(0,0,0,0.08)' }}>
                   <div style={{ display: 'flex', gap: 10 }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', display: 'block', marginBottom: 4 }}>INIZIO</label>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', display: 'block', marginBottom: 4 }}>INIZIO</label>
                       <input type="time" value={custStart} onChange={e => setCustStart(e.target.value)}
-                        style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid #14b8a6', fontSize: 15, fontWeight: 700, color: '#0f766e', background: '#fff', boxSizing: 'border-box' }} />
+                        style={{ width: '100%', padding: '9px', borderRadius: 8, border: '2px solid rgba(255,255,255,0.4)', fontSize: 15, fontWeight: 700, color: '#0f766e', background: '#fff', boxSizing: 'border-box' }} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', display: 'block', marginBottom: 4 }}>FINE</label>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', display: 'block', marginBottom: 4 }}>FINE</label>
                       <input type="time" value={custEnd} onChange={e => setCustEnd(e.target.value)}
-                        style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid #14b8a6', fontSize: 15, fontWeight: 700, color: '#0f766e', background: '#fff', boxSizing: 'border-box' }} />
+                        style={{ width: '100%', padding: '9px', borderRadius: 8, border: '2px solid rgba(255,255,255,0.4)', fontSize: 15, fontWeight: 700, color: '#0f766e', background: '#fff', boxSizing: 'border-box' }} />
                     </div>
                   </div>
                   <button
                     onClick={() => applyTemplate(empId, dateStr, { start_time: custStart, end_time: custEnd, name: 'Personalizzato', color: '#14b8a6' })}
-                    style={{ padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#14b8a6,#0d9488)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}
+                    style={{ padding: '11px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 14, fontWeight: 900, cursor: 'pointer' }}
                   >
                     ✓ Applica {custStart} → {custEnd}
                   </button>
