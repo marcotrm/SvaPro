@@ -2251,24 +2251,38 @@ export default function ShiftsPage() {
       </div>}
 
       {/* ── Warning buca copertura (non invasivo) ── */}
-      {!isDipendente && !loading && gapAlerts.length > 0 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          background: 'rgba(245,158,11,0.07)',
-          border: '1px solid rgba(245,158,11,0.22)',
-          borderRadius: 12, padding: '8px 14px',
-          marginBottom: 12, fontSize: 13,
-          color: '#b45309', fontWeight: 600,
-        }}>
-          <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
-          <span>
-            {gapAlerts.length === 1
-              ? <>Giorno senza copertura: <strong>{gapAlerts[0].day}</strong></>
-              : <>Giorni senza copertura: <strong>{gapAlerts.map(d => d.day.split(' ')[0]).join(', ')}</strong></>
-            }
-          </span>
-        </div>
-      )}
+      {!isDipendente && !loading && gapAlerts.length > 0 && (() => {
+        // Raggruppa i buchi per giorno
+        const byDay = {};
+        gapAlerts.forEach(g => {
+          if (!byDay[g.day]) byDay[g.day] = [];
+          byDay[g.day].push(`${g.from}–${g.to}`);
+        });
+        const days = Object.entries(byDay);
+        return (
+          <div style={{
+            background: 'rgba(245,158,11,0.07)',
+            border: '1px solid rgba(245,158,11,0.22)',
+            borderRadius: 12, padding: '10px 16px',
+            marginBottom: 12,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: days.length > 1 ? 8 : 0 }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#b45309' }}>
+                {days.length === 1 ? 'Buco di copertura rilevato' : `${days.length} giorni con buchi di copertura`}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 24 }}>
+              {days.map(([dayLabel, ranges]) => (
+                <div key={dayLabel} style={{ fontSize: 12, color: '#92400e', display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                  <strong style={{ minWidth: 160 }}>{dayLabel}</strong>
+                  <span>nessun dipendente nelle fasce: {ranges.join(' e ')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Navigazione settimana */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface)', padding: '16px 24px', borderRadius: '16px 16px 0 0', border: '1px solid var(--color-border)', borderBottom: 'none' }}>
