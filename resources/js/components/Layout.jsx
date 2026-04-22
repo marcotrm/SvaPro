@@ -60,7 +60,6 @@ const allNavigation = [
   // 8. Dipendenti Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Dipendenti', icon: Users, items: [
     { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente','store_manager','project_manager'] },
-    { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin','project_manager'] },
     { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin'] },
     { label: 'Timbra Entrata/Uscita',  href: '/clock-in',     icon: Fingerprint, roles: ['dipendente'] },
     { label: 'Pianificazione Turni',   href: '/shifts',       icon: Calendar,    roles: ['superadmin','admin_cliente','store_manager','dipendente','project_manager'] },
