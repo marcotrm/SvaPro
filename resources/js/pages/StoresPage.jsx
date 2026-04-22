@@ -63,6 +63,9 @@ const emptyStore = () => ({
   numero_ordinale: '',
   parent_store_id: '',
   company_group: '',
+  auto_reorder_enabled: true,
+  smart_reorder_threshold: 3,
+  smart_reorder_max_qty: 0,
 });
 
 // ─── Griglia orari con supporto pausa pranzo ──────────────────────
@@ -225,6 +228,9 @@ function StoreModal({ store, onClose, onSaved }) {
     numero_ordinale: store.numero_ordinale || '',
     parent_store_id: store.parent_store_id || '',
     company_group: store.company_group || '',
+    auto_reorder_enabled: store.auto_reorder_enabled ?? true,
+    smart_reorder_threshold: store.smart_reorder_threshold ?? 3,
+    smart_reorder_max_qty: store.smart_reorder_max_qty ?? 0,
   } : emptyStore());
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -266,10 +272,11 @@ function StoreModal({ store, onClose, onSaved }) {
   };
 
   const TABS = [
-    { id: 'info',       label: '📋 Informazioni' },
-    { id: 'hours',      label: '🕐 Orari apertura' },
-    { id: 'attendance', label: '⏱ Timbrature' },
-    { id: 'access',     label: '🔑 Ruoli e Accessi' },
+    { id: 'info',      label: '📋 Informazioni' },
+    { id: 'hours',     label: '🕐 Orari apertura' },
+    { id: 'inventory', label: '📦 Riordino' },
+    { id: 'attendance',label: '⏱ Timbrature' },
+    { id: 'access',    label: '🔑 Ruoli e Accessi' },
   ];
 
   return (
@@ -410,6 +417,62 @@ function StoreModal({ store, onClose, onSaved }) {
                 value={form.opening_hours}
                 onChange={(oh) => set('opening_hours', oh)}
               />
+            </div>
+          )}
+
+          {/* TAB RIORDINO */}
+          {tab === 'inventory' && (
+            <div style={{ display: 'grid', gap: 20 }}>
+              <div style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 16, border: '1px solid var(--color-border)' }}>
+                <h4 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>⚙️ Riordino Automatico (DRP)</h4>
+                <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 16 }}>
+                  Configura i parametri usati dal motore DRP per generare automaticamente le richieste di trasferimento dal magazzino centrale verso questo negozio.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label className="sp-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={form.auto_reorder_enabled}
+                        onChange={e => set('auto_reorder_enabled', e.target.checked)}
+                        style={{ width: 15, height: 15, accentColor: 'var(--color-accent)' }}
+                      />
+                      Abilita riordino automatico DRP per questo negozio
+                    </label>
+                  </div>
+                  <div>
+                    <label className="sp-label">Soglia di Riordino (pezzi)</label>
+                    <input
+                      type="number" min={0} className="sp-input"
+                      value={form.smart_reorder_threshold}
+                      onChange={e => set('smart_reorder_threshold', parseInt(e.target.value) || 0)}
+                      disabled={!form.auto_reorder_enabled}
+                    />
+                    <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 3 }}>
+                      Se la disponibilità scende a ≤ questo valore, viene generata una richiesta di trasferimento.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="sp-label">Quantità Massima per Riga (0 = illimitata)</label>
+                    <input
+                      type="number" min={0} className="sp-input"
+                      value={form.smart_reorder_max_qty}
+                      onChange={e => set('smart_reorder_max_qty', parseInt(e.target.value) || 0)}
+                      disabled={!form.auto_reorder_enabled}
+                    />
+                    <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 3 }}>
+                      Limite massimo per singola riga di riordino (0 = nessun limite).
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: '12px 16px', background: 'rgba(99,102,241,0.06)', borderRadius: 10, border: '1px solid rgba(99,102,241,0.15)', fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+                <strong>ℹ️ Come funziona il DRP:</strong><br />
+                1. Il cron giornaliero (ore 02:00) esegue il motore ReplenishmentEngine<br />
+                2. Per ogni variante con disponibilità ≤ soglia, controlla se ci sono trasferimenti già in transito<br />
+                3. Se non coperti, genera un ordine di trasferimento dal magazzino principale<br />
+                4. Il Lead Time fornitore si imposta nella scheda <strong>Fornitori</strong>
+              </div>
             </div>
           )}
 

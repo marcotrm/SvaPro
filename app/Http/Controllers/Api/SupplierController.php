@@ -79,13 +79,14 @@ class SupplierController extends Controller
         $now = now();
 
         $supplierId = DB::table('suppliers')->insertGetId([
-            'tenant_id' => $tenantId,
-            'name' => (string) $request->input('name'),
-            'vat_number' => $request->input('vat_number'),
-            'email' => $request->input('email'),
-            'phone' => $request->input('phone'),
-            'created_at' => $now,
-            'updated_at' => $now,
+            'tenant_id'      => $tenantId,
+            'name'           => (string) $request->input('name'),
+            'vat_number'     => $request->input('vat_number'),
+            'email'          => $request->input('email'),
+            'phone'          => $request->input('phone'),
+            'lead_time_days' => (int) ($request->input('lead_time_days', 7)),
+            'created_at'     => $now,
+            'updated_at'     => $now,
         ]);
 
         AuditLogger::log($request, 'create', 'supplier', $supplierId, $request->input('name'));
@@ -119,11 +120,12 @@ class SupplierController extends Controller
             ->where('tenant_id', $tenantId)
             ->where('id', $supplierId)
             ->update([
-                'name' => (string) $request->input('name'),
-                'vat_number' => $request->input('vat_number'),
-                'email' => $request->input('email'),
-                'phone' => $request->input('phone'),
-                'updated_at' => now(),
+                'name'           => (string) $request->input('name'),
+                'vat_number'     => $request->input('vat_number'),
+                'email'          => $request->input('email'),
+                'phone'          => $request->input('phone'),
+                'lead_time_days' => (int) ($request->input('lead_time_days', 7)),
+                'updated_at'     => now(),
             ]);
 
         AuditLogger::log($request, 'update', 'supplier', $supplierId, $request->input('name'));
@@ -170,10 +172,11 @@ class SupplierController extends Controller
     private function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'vat_number' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'name'           => ['required', 'string', 'max:255'],
+            'vat_number'     => ['nullable', 'string', 'max:50'],
+            'email'          => ['nullable', 'email', 'max:255'],
+            'phone'          => ['nullable', 'string', 'max:50'],
+            'lead_time_days' => ['nullable', 'integer', 'min:1', 'max:365'],
         ];
     }
 }

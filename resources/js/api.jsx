@@ -678,6 +678,14 @@ export const suppliers = {
   remove: (id) => api.delete(`/suppliers/${id}`),
 };
 
+// Replenishment Engine (DRP + MRP)
+export const replenishment = {
+  preview: ()      => api.get('/trigger-replenishment/preview'),
+  trigger: ()      => api.post('/trigger-replenishment'),
+  triggerDrp: ()   => api.post('/trigger-replenishment', { mode: 'drp' }),
+  triggerMrp: ()   => api.post('/trigger-replenishment', { mode: 'mrp' }),
+};
+
 // Purchase Order APIs
 export const purchaseOrders = {
   getAll:           (params = {}) => api.get('/purchase-orders', { params }),
