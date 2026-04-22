@@ -2473,7 +2473,7 @@ export default function ShiftsPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#D97706', fontWeight: 700 }}>
             <span style={{ fontSize: 18 }}>🔒</span> Turni bloccati — in attesa di conferma dal Project Manager.
           </div>
-          {(isSuperAdmin) && (
+          {(isSuperAdmin || isProjectManager) && (
             <button onClick={handleUnlockWeek} disabled={lockLoading} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.12)', color: '#D97706', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
               {lockLoading ? 'Sblocco...' : '🔓 Sblocca'}
             </button>
