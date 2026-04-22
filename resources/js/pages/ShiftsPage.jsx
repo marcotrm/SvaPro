@@ -1101,7 +1101,8 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function AllStoresOverview({
   weekDays, weekStart, setWeekStart,
-  pmStoresList, pmWeekLocks, pmLoading, pmShiftCounts = {},
+  pmStoresList, pmWeekLocks, pmLoading, pmShiftCounts = {}, pmProposedCounts = {},
+  onConfirmStore,
   globalRef, globalSearch, setGlobalSearch,
   globalResults, globalSearchLoading, showGlobalDrop, setShowGlobalDrop,
   loadGlobalEmpShifts, globalEmp, setGlobalEmp, setGlobalShifts, globalShifts,
@@ -1255,55 +1256,70 @@ function AllStoresOverview({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
               {pmStoresList.map(store => {
                 const lock = pmWeekLocks.find(l => String(l.store_id) === String(store.id));
-                const isLocked = lock?.locked_at && !lock?.confirmed_at;
+                const isLocked    = lock?.locked_at && !lock?.confirmed_at;
                 const isConfirmed = !!lock?.confirmed_at;
-                const statusColor = isConfirmed ? '#10B981' : isLocked ? '#F59E0B' : '#94A3B8';
-                const statusLabel = isConfirmed ? '✅ Confermati' : isLocked ? '🔒 In Attesa' : '⏳ Non Inviati';
+                const proposed    = pmProposedCounts[store.id] || 0;
+                const total       = pmShiftCounts[store.id];
+                const statusColor = isConfirmed ? '#10B981' : isLocked ? '#F59E0B' : proposed > 0 ? '#6366F1' : '#94A3B8';
+                const statusLabel = isConfirmed ? '✅ Confermati' : isLocked ? '🔒 In Attesa' : proposed > 0 ? '📋 Turni Proposti' : '⏳ Non Inviati';
+                const cardBorder  = isLocked ? 'rgba(245,158,11,0.35)' : proposed > 0 ? 'rgba(99,102,241,0.3)' : 'var(--color-border)';
                 return (
                   <div key={store.id} style={{
                     background: 'var(--color-surface)', borderRadius: 16, padding: '18px 20px',
-                    border: `1.5px solid ${isConfirmed ? 'rgba(16,185,129,0.3)' : isLocked ? 'rgba(245,158,11,0.35)' : 'var(--color-border)'}`,
+                    border: `1.5px solid ${cardBorder}`,
+                    boxShadow: isLocked ? '0 0 0 2px rgba(245,158,11,0.1)' : proposed > 0 ? '0 0 0 2px rgba(99,102,241,0.08)' : 'none',
                     transition: 'box-shadow 0.18s',
                   }}
                   onMouseEnter={e => e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)'}
-                  onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
+                  onMouseLeave={e => e.currentTarget.style.boxShadow = isLocked ? '0 0 0 2px rgba(245,158,11,0.1)' : proposed > 0 ? '0 0 0 2px rgba(99,102,241,0.08)' : 'none'}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
                       <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--color-text)' }}>{store.name}</div>
-                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${statusColor}18`, color: statusColor }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${statusColor}18`, color: statusColor, whiteSpace: 'nowrap', marginLeft: 8 }}>
                         {statusLabel}
                       </span>
                     </div>
                     {store.address && (
                       <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>📍 {store.address}</div>
                     )}
-                    {/* Conteggio turni questa settimana */}
+                    {/* Conteggio turni */}
                     <div style={{ marginBottom: 10 }}>
-                      {(() => {
-                        const cnt = pmShiftCounts[store.id];
-                        if (cnt === undefined) return <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>⏳ Caricamento...</div>;
-                        if (cnt === 0) return <div style={{ fontSize: 12, color: '#EF4444', fontWeight: 700 }}>❌ Nessun turno questa settimana</div>;
-                        return <div style={{ fontSize: 12, color: '#10B981', fontWeight: 700 }}>✅ {cnt} turni questa settimana</div>;
-                      })()}
+                      {total === undefined
+                        ? <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>⏳ Caricamento...</div>
+                        : total === 0
+                          ? <div style={{ fontSize: 12, color: '#EF4444', fontWeight: 700 }}>❌ Nessun turno questa settimana</div>
+                          : <div style={{ fontSize: 12, color: proposed > 0 ? '#D97706' : '#10B981', fontWeight: 700 }}>
+                              {proposed > 0 ? `🔔 ${proposed} da approvare · ${total} totali` : `✅ ${total} turni questa settimana`}
+                            </div>
+                      }
                     </div>
-                    {/* Giorni della settimana mini-bar */}
-                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                    {/* Mini giorni */}
+                    <div style={{ display: 'flex', gap: 4, marginTop: 4, marginBottom: (isLocked && onConfirmStore) ? 12 : 0 }}>
                       {DAY_LABELS.map((dl, i) => {
                         const dayStr = weekDays[i]?.dateStr;
                         const isToday = dayStr === (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
                         return (
                           <div key={dl} style={{ flex: 1, textAlign: 'center' }}>
                             <div style={{ fontSize: 9, fontWeight: 700, color: isToday ? 'var(--color-accent)' : 'var(--color-text-tertiary)', marginBottom: 3 }}>{dl}</div>
-                            <div style={{ height: 5, borderRadius: 3, background: isConfirmed ? '#10B98140' : isLocked ? '#F59E0B40' : 'var(--color-border)' }} />
+                            <div style={{ height: 5, borderRadius: 3, background: isConfirmed ? '#10B98140' : isLocked ? '#F59E0B40' : proposed > 0 ? '#6366F140' : 'var(--color-border)' }} />
                           </div>
                         );
                       })}
                     </div>
                     {lock?.locked_at && (
-                      <div style={{ marginTop: 10, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                         {isConfirmed
                           ? `Confermati il ${new Date(lock.confirmed_at).toLocaleDateString('it-IT')}`
                           : `Bloccati il ${new Date(lock.locked_at).toLocaleDateString('it-IT')}`}
                       </div>
+                    )}
+                    {/* Pulsante conferma rapida — solo se bloccati */}
+                    {isLocked && onConfirmStore && (
+                      <button
+                        onClick={() => onConfirmStore(store.id)}
+                        style={{ marginTop: 10, width: '100%', padding: '9px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 3px 10px rgba(16,185,129,0.25)' }}
+                      >
+                        <CheckCircle size={13} /> Approva turni di {store.name}
+                      </button>
                     )}
                   </div>
                 );
@@ -1393,7 +1409,8 @@ export default function ShiftsPage() {
   const [pmPreviewShifts, setPmPreviewShifts] = useState([]);
   const [pmPreviewEmps, setPmPreviewEmps]   = useState([]);
   const [pmPreviewLoading, setPmPreviewLoading] = useState(false);
-  const [pmShiftCounts, setPmShiftCounts]   = useState({});   // { storeId: count }
+  const [pmShiftCounts, setPmShiftCounts]       = useState({});   // { storeId: count }
+  const [pmProposedCounts, setPmProposedCounts] = useState({});   // { storeId: proposed_count }
 
   const isWeekLocked = weekLockStatus?.locked_at && !weekLockStatus?.confirmed_at;
   const isWeekConfirmed = !!weekLockStatus?.confirmed_at;
@@ -1464,10 +1481,10 @@ export default function ShiftsPage() {
     finally { setLockLoading(false); }
   };
 
-  // ── Project Manager: carica tutti gli store + lock status ──
-  const loadPmDashboard = useCallback(async () => {
-    if (!isShiftManager) return;  // accessibile a PM, superadmin, admin
-    setPmLoading(true);
+  // ── Project Manager: carica tutti gli store + lock status + proposed counts ──
+  const loadPmDashboard = useCallback(async (silent = false) => {
+    if (!isShiftManager) return;
+    if (!silent) setPmLoading(true);
     try {
       const [storesRes, locksRes] = await Promise.all([
         stores.getStores(),
@@ -1475,23 +1492,43 @@ export default function ShiftsPage() {
       ]);
       const storeList = storesRes.data?.data || storesRes.data || [];
       setPmStoresList(storeList);
-      setPmWeekLocks(locksRes.data?.data || []);
+      const newLocks = locksRes.data?.data || [];
+      setPmWeekLocks(newLocks);
 
-      // Carica count turni per ogni store
+      // Carica turni per ogni store — conta totali E proposed
       const endDate = (() => { const d = new Date(weekStartStr); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
       const counts = {};
+      const proposedCounts = {};
       await Promise.all(storeList.map(async (store) => {
         try {
           const res = await shiftsApi.getAll({ store_id: store.id, start_date: weekStartStr, end_date: endDate });
-          counts[store.id] = (res.data?.data || []).length;
-        } catch { counts[store.id] = 0; }
+          const data = res.data?.data || [];
+          counts[store.id] = data.length;
+          proposedCounts[store.id] = data.filter(s => s.status === 'proposed').length;
+        } catch { counts[store.id] = 0; proposedCounts[store.id] = 0; }
       }));
       setPmShiftCounts(counts);
-    } catch {}
-    finally { setPmLoading(false); }
-  }, [isShiftManager, weekStartStr]);
+      setPmProposedCounts(proposedCounts);
 
+      // Notifica toast se ci sono nuovi lock rispetto a prima
+      const prevLocked = pmWeekLocks.filter(l => l.locked_at && !l.confirmed_at).length;
+      const newLocked  = newLocks.filter(l => l.locked_at && !l.confirmed_at).length;
+      if (silent && newLocked > prevLocked) {
+        toast('🔔 Nuovi turni in attesa di approvazione!', { icon: '📅', duration: 5000 });
+      }
+    } catch {}
+    finally { if (!silent) setPmLoading(false); }
+  }, [isShiftManager, weekStartStr]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Caricamento iniziale
   useEffect(() => { loadPmDashboard(); }, [loadPmDashboard]);
+
+  // ── Polling real-time ogni 30s (solo PM/superadmin) ──
+  useEffect(() => {
+    if (!isShiftManager) return;
+    const timer = setInterval(() => loadPmDashboard(true), 30000);
+    return () => clearInterval(timer);
+  }, [isShiftManager, loadPmDashboard]);
 
   // PM: conferma turni di uno store
   const handlePmConfirm = async (sid) => {
@@ -2112,6 +2149,8 @@ export default function ShiftsPage() {
       pmWeekLocks={pmWeekLocks}
       pmLoading={pmLoading}
       pmShiftCounts={pmShiftCounts}
+      pmProposedCounts={pmProposedCounts}
+      onConfirmStore={handlePmConfirm}
       globalRef={globalRef}
       globalSearch={globalSearch}
       setGlobalSearch={setGlobalSearch}
@@ -2132,10 +2171,12 @@ export default function ShiftsPage() {
   // PROJECT MANAGER VIEW — Dashboard con lista store e conferma turni
   // ══════════════════════════════════════════════════════════════════════════
   if (isProjectManager && !storeId) {
+    const totalPending  = pmWeekLocks.filter(l => l.locked_at && !l.confirmed_at).length;
+    const totalProposed = Object.values(pmProposedCounts).reduce((s, n) => s + n, 0);
     return (
       <div style={{ padding: '24px 32px', maxWidth: 1200, margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <CalendarIcon size={24} color="var(--color-accent)" /> Conferma Turni Settimanali
@@ -2144,7 +2185,36 @@ export default function ShiftsPage() {
               Rivedi e conferma i turni bloccati dai responsabili di negozio.
             </div>
           </div>
+          {/* Live indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', background: 'var(--color-surface)', padding: '6px 12px', borderRadius: 20, border: '1px solid var(--color-border)' }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block', boxShadow: '0 0 0 2px rgba(16,185,129,0.3)', animation: 'pulse 2s ease-in-out infinite' }} />
+            Aggiornamento automatico ogni 30s
+          </div>
         </div>
+
+        {/* Banner turni in attesa */}
+        {(totalPending > 0 || totalProposed > 0) && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20,
+            padding: '14px 20px', borderRadius: 14,
+            background: totalPending > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(99,102,241,0.07)',
+            border: `1px solid ${totalPending > 0 ? 'rgba(245,158,11,0.3)' : 'rgba(99,102,241,0.2)'}`,
+          }}>
+            <span style={{ fontSize: 22 }}>{totalPending > 0 ? '🔒' : '📋'}</span>
+            <div>
+              {totalPending > 0 && (
+                <div style={{ fontWeight: 800, fontSize: 15, color: '#D97706' }}>
+                  {totalPending} negozio{totalPending > 1 ? 'i' : ''} in attesa di conferma
+                </div>
+              )}
+              {totalProposed > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: totalPending > 0 ? 2 : 0 }}>
+                  {totalProposed} turni proposti in totale — scorri le card per approvare
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Week navigator */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24, background: 'var(--color-surface)', padding: '12px 20px', borderRadius: 16, border: '1px solid var(--color-border)', width: 'fit-content' }}>
@@ -2166,82 +2236,77 @@ export default function ShiftsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
             {pmStoresList.map(store => {
               const lock = pmWeekLocks.find(l => String(l.store_id) === String(store.id));
-              const isLocked = lock?.locked_at && !lock?.confirmed_at;
+              const isLocked    = lock?.locked_at && !lock?.confirmed_at;
               const isConfirmed = !!lock?.confirmed_at;
-              const statusColor = isConfirmed ? '#10B981' : isLocked ? '#F59E0B' : '#94A3B8';
-              const statusLabel = isConfirmed ? 'Confermati' : isLocked ? 'In Attesa di Conferma' : 'Non Inviati';
-              const statusIcon = isConfirmed ? '✅' : isLocked ? '🔒' : '⏳';
+              const proposed    = pmProposedCounts[store.id] || 0;
+              const total       = pmShiftCounts[store.id] || 0;
+              const statusColor = isConfirmed ? '#10B981' : isLocked ? '#F59E0B' : proposed > 0 ? '#6366F1' : '#94A3B8';
+              const statusLabel = isConfirmed ? 'Confermati' : isLocked ? 'In Attesa di Conferma' : proposed > 0 ? 'Turni Proposti' : 'Non Inviati';
+              const statusIcon  = isConfirmed ? '✅' : isLocked ? '🔒' : proposed > 0 ? '📋' : '⏳';
+              const cardBorder  = isLocked ? 'rgba(245,158,11,0.4)' : proposed > 0 ? 'rgba(99,102,241,0.3)' : 'var(--color-border)';
+              const cardShadow  = isLocked ? '0 0 0 2px rgba(245,158,11,0.12)' : proposed > 0 ? '0 0 0 2px rgba(99,102,241,0.08)' : 'none';
 
               return (
                 <div key={store.id} style={{
-                  background: 'var(--color-surface)', border: `1px solid ${isLocked ? 'rgba(245,158,11,0.4)' : 'var(--color-border)'}`,
+                  background: 'var(--color-surface)', border: `1px solid ${cardBorder}`,
                   borderRadius: 16, padding: 24, transition: 'all 0.2s',
-                  boxShadow: isLocked ? '0 0 0 2px rgba(245,158,11,0.15)' : 'none',
+                  boxShadow: cardShadow,
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                    <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-text)' }}>{store.name}</div>
                       {lock?.locked_by_name && <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Bloccato da: {lock.locked_by_name}</div>}
                       {lock?.locked_at && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>il {new Date(lock.locked_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 20, background: `${statusColor}18`, color: statusColor }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 20, background: `${statusColor}18`, color: statusColor, whiteSpace: 'nowrap', marginLeft: 8 }}>
                       {statusIcon} {statusLabel}
                     </span>
                   </div>
 
-                  {/* Pulsante Apri Griglia — SEMPRE visibile, per ogni store */}
-                  <div style={{ display: 'flex', gap: 8, marginTop: isLocked || isConfirmed ? 8 : 0 }}>
+                  {/* Riepilogo numerico */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                    <div style={{ flex: 1, textAlign: 'center', padding: '8px 6px', borderRadius: 10, background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--color-text)' }}>{total}</div>
+                      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>Totali</div>
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'center', padding: '8px 6px', borderRadius: 10, background: proposed > 0 ? 'rgba(245,158,11,0.07)' : 'var(--color-bg)', border: `1px solid ${proposed > 0 ? 'rgba(245,158,11,0.3)' : 'var(--color-border)'}` }}>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: proposed > 0 ? '#D97706' : 'var(--color-text-tertiary)' }}>{proposed}</div>
+                      <div style={{ fontSize: 10, color: proposed > 0 ? '#D97706' : 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>Da approvare</div>
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'center', padding: '8px 6px', borderRadius: 10, background: isConfirmed ? 'rgba(16,185,129,0.07)' : 'var(--color-bg)', border: `1px solid ${isConfirmed ? 'rgba(16,185,129,0.3)' : 'var(--color-border)'}` }}>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: isConfirmed ? '#10B981' : 'var(--color-text-tertiary)' }}>{isConfirmed ? total - proposed : 0}</div>
+                      <div style={{ fontSize: 10, color: isConfirmed ? '#10B981' : 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>Confermati</div>
+                    </div>
+                  </div>
+
+                  {/* Azioni */}
+                  <div style={{ display: 'flex', gap: 8 }}>
                     <button
-                      onClick={() => {
-                        setStoreId(String(store.id));
-                        localStorage.setItem('selectedStoreId', String(store.id));
-                      }}
-                      style={{
-                        flex: 1, padding: '10px 16px', borderRadius: 12,
-                        border: '1px solid var(--color-border)',
-                        background: 'var(--color-bg)', color: 'var(--color-text)',
-                        fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                      }}
+                      onClick={() => { setStoreId(String(store.id)); localStorage.setItem('selectedStoreId', String(store.id)); }}
+                      style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
                     >
-                      📋 Apri Griglia
+                      📋 Griglia
                     </button>
                     {isLocked && (
-                      <button onClick={() => handlePmPreview(store)} style={{
-                        flex: 1, padding: '10px 16px', borderRadius: 12, border: '1px solid rgba(245,158,11,0.3)',
-                        background: 'rgba(245,158,11,0.08)', color: '#D97706', fontSize: 13, fontWeight: 700,
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                      }}>
-                        <CalendarIcon size={14} /> Rivedi
+                      <button onClick={() => handlePmPreview(store)} style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.08)', color: '#D97706', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                        <CalendarIcon size={13} /> Rivedi
                       </button>
                     )}
                     {isLocked && (
-                      <button onClick={() => handlePmConfirm(store.id)} style={{
-                        flex: 1, padding: '10px 16px', borderRadius: 12, border: 'none',
-                        background: 'linear-gradient(135deg, #10B981, #059669)', color: '#fff', fontSize: 13, fontWeight: 700,
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        boxShadow: '0 4px 12px rgba(16,185,129,0.3)',
-                      }}>
-                        <CheckCircle size={14} /> Conferma
+                      <button onClick={() => handlePmConfirm(store.id)} style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, boxShadow: '0 3px 10px rgba(16,185,129,0.3)' }}>
+                        <CheckCircle size={13} /> Conferma
+                      </button>
+                    )}
+                    {!isLocked && !isConfirmed && proposed > 0 && (
+                      <button onClick={() => { setStoreId(String(store.id)); localStorage.setItem('selectedStoreId', String(store.id)); }} style={{ flex: 2, padding: '9px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, boxShadow: '0 3px 10px rgba(99,102,241,0.3)' }}>
+                        <CheckCircle size={13} /> Vedi {proposed} proposte
                       </button>
                     )}
                   </div>
 
                   {isConfirmed && (
-                    <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.08)', fontSize: 12, color: '#10B981', fontWeight: 600, marginTop: 8 }}>
-                      Confermati da {lock.confirmed_by_name || 'PM'} il {new Date(lock.confirmed_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  )}
-
-                  {!isLocked && !isConfirmed && pmShiftCounts[store.id] > 0 && (
-                    <div style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(99,102,241,0.08)', fontSize: 12, color: '#6366F1', fontWeight: 600, marginTop: 8 }}>
-                      ⏳ {pmShiftCounts[store.id]} turni proposti — non ancora bloccati
-                    </div>
-                  )}
-
-                  {!isLocked && !isConfirmed && (!pmShiftCounts[store.id] || pmShiftCounts[store.id] === 0) && (
-                    <div style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(148,163,184,0.08)', fontSize: 12, color: '#94A3B8', fontWeight: 600, marginTop: 8 }}>
-                      Nessun turno inserito per questa settimana.
+                    <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(16,185,129,0.08)', fontSize: 11, color: '#10B981', fontWeight: 600, marginTop: 10 }}>
+                      ✅ Confermati da {lock.confirmed_by_name || 'PM'} il {new Date(lock.confirmed_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </div>
                   )}
                 </div>
