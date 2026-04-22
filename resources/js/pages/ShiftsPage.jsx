@@ -1816,7 +1816,7 @@ export default function ShiftsPage() {
           start_time:  shifts[key].start_time,
           end_time:    shifts[key].end_time,
           color:       shifts[key].color,
-          status:      shifts[key].status || 'confirmed',
+          status:      shifts[key].status || (isDipendente ? 'proposed' : 'confirmed'),
         });
       });
       Object.keys(originalShifts).forEach(key => {
@@ -2454,7 +2454,7 @@ export default function ShiftsPage() {
       </div>}
 
       {/* ── Warning buca copertura (non invasivo) ── */}
-      {!isDipendente && !loading && gapAlerts.length > 0 && (() => {
+      {!loading && gapAlerts.length > 0 && (() => {
         // Raggruppa i buchi per giorno
         const byDay = {};
         gapAlerts.forEach(g => {
