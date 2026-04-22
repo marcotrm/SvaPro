@@ -1605,6 +1605,9 @@ export default function ShiftsPage() {
     finally { setLockLoading(false); }
   };
 
+  // Ref per tracciare il count lock precedente tra i render (evita stale closure)
+  const prevLockedCountRef = React.useRef(0);
+
   // ── Project Manager: carica tutti gli store + lock status + proposed counts ──
   const loadPmDashboard = useCallback(async (silent = false) => {
     if (!isShiftManager) return;
@@ -1634,15 +1637,15 @@ export default function ShiftsPage() {
       setPmShiftCounts(counts);
       setPmProposedCounts(proposedCounts);
 
-      // Notifica toast se ci sono nuovi lock rispetto a prima
-      const prevLocked = pmWeekLocks.filter(l => l.locked_at && !l.confirmed_at).length;
-      const newLocked  = newLocks.filter(l => l.locked_at && !l.confirmed_at).length;
-      if (silent && newLocked > prevLocked) {
-        toast('🔔 Nuovi turni in attesa di approvazione!', { icon: '📅', duration: 5000 });
+      // Notifica toast SOLO se arrivano nuovi negozi bloccati rispetto al giro precedente
+      const newLocked = newLocks.filter(l => l.locked_at && !l.confirmed_at).length;
+      if (silent && newLocked > prevLockedCountRef.current) {
+        toast('🔔 Nuovi turni proposti in attesa di approvazione!', { duration: 5000 });
       }
+      prevLockedCountRef.current = newLocked;
     } catch {}
     finally { if (!silent) setPmLoading(false); }
-  }, [isShiftManager, weekStartStr]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isShiftManager, weekStartStr]);
 
   // Caricamento iniziale
   useEffect(() => { loadPmDashboard(); }, [loadPmDashboard]);
@@ -2285,7 +2288,7 @@ export default function ShiftsPage() {
 
 
   // ══════════════════════════════════════════════════════════════════════════
-  // PROJECT MANAGER VIEW — Dashboard con lista store e conferma turni
+  // PROJECT MANAGER / SUPERADMIN VIEW — Dashboard con lista store e conferma turni
   // ══════════════════════════════════════════════════════════════════════════
   if (isProjectManager && !storeId) {
     const totalPending  = pmWeekLocks.filter(l => l.locked_at && !l.confirmed_at).length;
