@@ -1333,62 +1333,6 @@ function AllStoresOverview({
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-      {/* Body espandibile */}
-      {expanded && (
-        <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#0d9488', marginBottom: 4, textTransform: 'uppercase' }}>Inizio</label>
-              <input
-                type="time"
-                value={startTime}
-                onChange={e => setStartTime(e.target.value)}
-                style={{
-                  width: '100%', padding: '9px 10px', borderRadius: 8,
-                  border: '1px solid rgba(20,184,166,0.4)', background: 'var(--color-bg)',
-                  color: 'var(--color-text)', fontSize: 14, fontWeight: 700,
-                  outline: 'none', boxSizing: 'border-box',
-                }}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#0d9488', marginBottom: 4, textTransform: 'uppercase' }}>Fine</label>
-              <input
-                type="time"
-                value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-                style={{
-                  width: '100%', padding: '9px 10px', borderRadius: 8,
-                  border: '1px solid rgba(20,184,166,0.4)', background: 'var(--color-bg)',
-                  color: 'var(--color-text)', fontSize: 14, fontWeight: 700,
-                  outline: 'none', boxSizing: 'border-box',
-                }}
-              />
-            </div>
-          </div>
-          {startTime && endTime && (
-            <div style={{ fontSize: 12, color: '#0d9488', fontWeight: 600, textAlign: 'center' }}>
-              ⏱ {startTime} → {endTime}
-            </div>
-          )}
-          <button
-            onClick={handleConfirm}
-            style={{
-              padding: '10px', borderRadius: 10, border: 'none',
-              background: 'linear-gradient(135deg, #14b8a6, #0d9488)',
-              color: '#fff', fontSize: 13, fontWeight: 800,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              boxShadow: '0 3px 10px rgba(20,184,166,0.3)',
-            }}
-          >
-            ✓ Applica orario
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function ShiftsPage() {
   const { selectedStoreId, userRoles = [], user } = useOutletContext?.() || {};
 
