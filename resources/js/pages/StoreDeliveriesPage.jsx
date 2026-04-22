@@ -437,36 +437,6 @@ export default function StoreDeliveriesPage() {
           );
         })}
       </div>
-
-      {/* POPUP DETTAGLI */}
-      {detailCard && (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
-          onClick={()=>setDetailCard(null)}>
-          <div style={{background:'#1a1a2e',border:'1px solid rgba(255,255,255,0.1)',borderRadius:20,padding:28,maxWidth:420,width:'100%',position:'relative'}}
-            onClick={e=>e.stopPropagation()}>
-            <button onClick={()=>setDetailCard(null)}
-              style={{position:'absolute',top:14,right:14,background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)'}}>
-              <X size={18}/>
-            </button>
-            <div style={{fontWeight:900,fontSize:18,color:'#fff',marginBottom:18}}>{detailCard.storeName}</div>
-            <div style={{display:'flex',flexDirection:'column',gap:12,fontSize:13}}>
-              {[
-                ['Stato', ST[detailCard.status]?.label || detailCard.status],
-                ['Priorità', detailCard.priority==='high'?'🔴 Urgente':detailCard.priority==='low'?'🟢 Bassa':'🟡 Normale'],
-                detailCard.items && ['Articoli', detailCard.items],
-                detailCard.notes && ['Note', detailCard.notes],
-                detailCard.driver_note && ['Nota Corriere', detailCard.driver_note],
-                detailCard.completed_at && ['Consegnato il', new Date(detailCard.completed_at).toLocaleString('it-IT')],
-              ].filter(Boolean).map(([label,value])=>(
-                <div key={label} style={{display:'flex',gap:10,padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:10}}>
-                  <span style={{color:'rgba(255,255,255,0.4)',fontWeight:700,minWidth:100}}>{label}</span>
-                  <span style={{color:'#fff',fontWeight:600}}>{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
