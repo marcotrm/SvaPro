@@ -261,7 +261,7 @@ class ShiftController extends Controller
 
     /**
      * POST /shifts/lock-week
-     * Store Manager blocca i turni di una settimana per uno store.
+     * Dipendente (Store Manager) blocca i turni di una settimana per uno store.
      */
     public function lockWeek(Request $request): JsonResponse
     {
@@ -271,43 +271,71 @@ class ShiftController extends Controller
             'week_start' => 'required|date',
         ]);
 
-        $lock = DB::table('shift_week_locks')->updateOrInsert(
-            [
-                'tenant_id'  => $tenantId,
-                'store_id'   => $request->integer('store_id'),
-                'week_start' => $request->input('week_start'),
-            ],
-            [
-                'locked_by'    => $request->user()?->id ?? $request->integer('user_id', 0),
-                'locked_at'    => now(),
-                'confirmed_by' => null,
-                'confirmed_at' => null,
-                'updated_at'   => now(),
-            ]
-        );
+        // Crea la tabella al volo se non esiste (safety net per deploy)
+        if (!Schema::hasTable('shift_week_locks')) {
+            Schema::create('shift_week_locks', function ($table) {
+                $table->id();
+                $table->unsignedBigInteger('tenant_id');
+                $table->unsignedBigInteger('store_id');
+                $table->date('week_start');
+                $table->unsignedBigInteger('locked_by')->nullable();
+                $table->timestamp('locked_at')->nullable();
+                $table->unsignedBigInteger('confirmed_by')->nullable();
+                $table->timestamp('confirmed_at')->nullable();
+                $table->timestamps();
+                $table->unique(['tenant_id', 'store_id', 'week_start'], 'swl_unique');
+            });
+        }
+
+        try {
+            DB::table('shift_week_locks')->updateOrInsert(
+                [
+                    'tenant_id'  => $tenantId,
+                    'store_id'   => $request->integer('store_id'),
+                    'week_start' => $request->input('week_start'),
+                ],
+                [
+                    'locked_by'    => $request->user()?->id ?? $request->integer('user_id', 0),
+                    'locked_at'    => now(),
+                    'confirmed_by' => null,
+                    'confirmed_at' => null,
+                    'updated_at'   => now(),
+                ]
+            );
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Errore nel blocco turni.', 'error' => $e->getMessage()], 500);
+        }
 
         // Crea notifica per project_manager
-        $storeName = DB::table('stores')->where('id', $request->integer('store_id'))->value('name') ?? 'Store';
-        $weekLabel = Carbon::parse($request->input('week_start'))->format('d/m/Y');
-        
-        // Trova tutti gli utenti con ruolo project_manager nel tenant
-        $pmUsers = DB::table('users')
-            ->where('tenant_id', $tenantId)
-            ->whereJsonContains('roles', 'project_manager')
-            ->pluck('id');
+        try {
+            $storeName = DB::table('stores')->where('id', $request->integer('store_id'))->value('name') ?? 'Store';
+            $weekLabel = Carbon::parse($request->input('week_start'))->format('d/m/Y');
+            
+            // Trova tutti gli utenti con ruolo project_manager nel tenant (supporta sia JSON array che stringa)
+            $pmUsers = DB::table('users')
+                ->where('tenant_id', $tenantId)
+                ->where(function ($q) {
+                    $q->where('roles', 'like', '%project_manager%')
+                      ->orWhere('roles', 'like', '%"project_manager"%');
+                })
+                ->pluck('id');
 
-        foreach ($pmUsers as $pmId) {
             if (Schema::hasTable('employee_notifications')) {
-                DB::table('employee_notifications')->insert([
-                    'tenant_id'  => $tenantId,
-                    'user_id'    => $pmId,
-                    'title'      => "🔒 Turni bloccati — {$storeName}",
-                    'body'       => "I turni della settimana {$weekLabel} sono stati bloccati e sono in attesa di conferma.",
-                    'read'       => false,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                foreach ($pmUsers as $pmId) {
+                    DB::table('employee_notifications')->insert([
+                        'tenant_id'  => $tenantId,
+                        'user_id'    => $pmId,
+                        'title'      => "🔒 Turni bloccati — {$storeName}",
+                        'body'       => "I turni della settimana {$weekLabel} sono stati bloccati e sono in attesa di conferma.",
+                        'read'       => false,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
             }
+        } catch (\Exception $e) {
+            // Non bloccare l'operazione per un errore di notifica
+            \Log::warning('Shift lock notification error: ' . $e->getMessage());
         }
 
         return response()->json(['message' => 'Turni bloccati con successo.']);
@@ -325,6 +353,10 @@ class ShiftController extends Controller
             'week_start' => 'required|date',
         ]);
 
+        if (!Schema::hasTable('shift_week_locks')) {
+            return response()->json(['message' => 'Nessun blocco trovato.']);
+        }
+
         DB::table('shift_week_locks')
             ->where('tenant_id', $tenantId)
             ->where('store_id', $request->integer('store_id'))
@@ -341,6 +373,11 @@ class ShiftController extends Controller
     public function getWeekLocks(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
+
+        if (!Schema::hasTable('shift_week_locks')) {
+            return response()->json(['data' => []]);
+        }
+
         $weekStart = $request->input('week_start');
 
         $query = DB::table('shift_week_locks as swl')
@@ -373,6 +410,10 @@ class ShiftController extends Controller
             'store_id'   => 'required|integer',
             'week_start' => 'required|date',
         ]);
+
+        if (!Schema::hasTable('shift_week_locks')) {
+            return response()->json(['message' => 'Tabella lock non trovata.'], 404);
+        }
 
         $updated = DB::table('shift_week_locks')
             ->where('tenant_id', $tenantId)
