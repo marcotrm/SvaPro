@@ -1105,6 +1105,7 @@ function AllStoresOverview({
   globalRef, globalSearch, setGlobalSearch,
   globalResults, globalSearchLoading, showGlobalDrop, setShowGlobalDrop,
   loadGlobalEmpShifts, globalEmp, setGlobalEmp, setGlobalShifts, globalShifts,
+  onPmPreview, onPmConfirm,
 }) {
   const DAY_LABELS = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
 
@@ -1276,7 +1277,7 @@ function AllStoresOverview({
                     {store.address && (
                       <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>📍 {store.address}</div>
                     )}
-                    {/* Conteggio turni questa settimana */}
+                    {/* Conteggio turni */}
                     <div style={{ marginBottom: 10 }}>
                       {(() => {
                         const cnt = pmShiftCounts[store.id];
@@ -1285,8 +1286,8 @@ function AllStoresOverview({
                         return <div style={{ fontSize: 12, color: '#10B981', fontWeight: 700 }}>✅ {cnt} turni questa settimana</div>;
                       })()}
                     </div>
-                    {/* Giorni della settimana mini-bar */}
-                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                    {/* Giorni mini-bar */}
+                    <div style={{ display: 'flex', gap: 4, marginTop: 4, marginBottom: isLocked ? 12 : 4 }}>
                       {DAY_LABELS.map((dl, i) => {
                         const dayStr = weekDays[i]?.dateStr;
                         const isToday = dayStr === (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
@@ -1298,11 +1299,28 @@ function AllStoresOverview({
                         );
                       })}
                     </div>
+                    {/* PM: bottoni Rivedi + Conferma se bloccato */}
+                    {isLocked && onPmPreview && (
+                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                        <button
+                          onClick={() => onPmPreview(store)}
+                          style={{ flex: 1, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', color: '#D97706', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                        >
+                          📋 Rivedi Turni
+                        </button>
+                        <button
+                          onClick={() => onPmConfirm && onPmConfirm(store.id)}
+                          style={{ flex: 1, padding: '8px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, boxShadow: '0 3px 10px rgba(16,185,129,0.3)' }}
+                        >
+                          ✅ Conferma
+                        </button>
+                      </div>
+                    )}
                     {lock?.locked_at && (
-                      <div style={{ marginTop: 10, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                         {isConfirmed
-                          ? `Confermati il ${new Date(lock.confirmed_at).toLocaleDateString('it-IT')}`
-                          : `Bloccati il ${new Date(lock.locked_at).toLocaleDateString('it-IT')}`}
+                          ? `✓ Confermati il ${new Date(lock.confirmed_at).toLocaleDateString('it-IT')}`
+                          : `🔒 Bloccati il ${new Date(lock.locked_at).toLocaleDateString('it-IT')}`}
                       </div>
                     )}
                   </div>
@@ -1446,8 +1464,32 @@ export default function ShiftsPage() {
     if (!storeId) return;
     setLockLoading(true);
     try {
+      // STEP 1: persiste i turni nel DB prima di bloccare
+      const payload = { store_id: storeId, shifts: [], deletions: [] };
+      Object.keys(shifts).forEach(key => {
+        const [empId, dateStr] = splitShiftKey(key);
+        payload.shifts.push({
+          employee_id: empId,
+          date:        dateStr,
+          start_time:  shifts[key].start_time,
+          end_time:    shifts[key].end_time,
+          color:       shifts[key].color,
+          status:      shifts[key].status || (isDipendente ? 'proposed' : 'confirmed'),
+        });
+      });
+      Object.keys(originalShifts).forEach(key => {
+        if (!shifts[key]) {
+          const [empId, dateStr] = splitShiftKey(key);
+          payload.deletions.push({ employee_id: empId, date: dateStr });
+        }
+      });
+      if (payload.shifts.length > 0 || payload.deletions.length > 0) {
+        await shiftsApi.bulkSave(payload);
+        setOriginalShifts(JSON.parse(JSON.stringify(shifts)));
+      }
+      // STEP 2: crea il lock
       await shiftsApi.lockWeek({ store_id: Number(storeId), week_start: weekStartStr, user_id: user?.id });
-      toast.success('🔒 Turni bloccati! Il Project Manager riceverà una notifica.');
+      toast.success('🔒 Turni salvati e inviati al Project Manager!');
       await loadLockStatus();
     } catch (e) { toast.error('Errore nel blocco dei turni'); }
     finally { setLockLoading(false); }
@@ -2118,6 +2160,8 @@ export default function ShiftsPage() {
       globalResults={globalResults}
       globalSearchLoading={globalSearchLoading}
       showGlobalDrop={showGlobalDrop}
+      onPmPreview={isShiftManager ? handlePmPreview : undefined}
+      onPmConfirm={isShiftManager ? handlePmConfirm : undefined}
       setShowGlobalDrop={setShowGlobalDrop}
       loadGlobalEmpShifts={loadGlobalEmpShifts}
       globalEmp={globalEmp}

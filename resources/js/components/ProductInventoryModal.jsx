@@ -11,19 +11,29 @@ export default function ProductInventoryModal({ product, onClose }) {
 
   useEffect(() => {
     const params = product.id ? { product_id: product.id } : { product_variant_id: product.variant_id };
-    Promise.all([
+    Promise.allSettled([
       inventory.getCrossStore(params),
       storesApi.getStores()
     ])
-      .then(([invRes, stRes]) => {
-        const payload = invRes.data?.data || invRes.data || [];
-        if (payload.length > 0 && payload[0].stores) {
-          const flatData = payload.flatMap(v => v.stores.map(s => ({ ...s, flavor: v.flavor, sku: v.sku })));
-          setData(flatData);
+      .then(([invResult, stResult]) => {
+        // Gestisce il caso in cui getCrossStore fallisce (es. 403 per dipendente)
+        if (invResult.status === 'fulfilled') {
+          const payload = invResult.value?.data?.data || invResult.value?.data || [];
+          if (payload.length > 0 && payload[0].stores) {
+            const flatData = payload.flatMap(v => v.stores.map(s => ({ ...s, flavor: v.flavor, sku: v.sku })));
+            setData(flatData);
+          } else {
+            setData(Array.isArray(payload) ? payload : []);
+          }
         } else {
-          setData(Array.isArray(payload) ? payload : []);
+          setData([]);
         }
-        setStoresList(stRes.data?.data || []);
+        // getStores può fallire senza bloccare la modal
+        if (stResult.status === 'fulfilled') {
+          setStoresList(stResult.value?.data?.data || []);
+        } else {
+          setStoresList([]);
+        }
         setLoading(false);
       })
       .catch(() => {

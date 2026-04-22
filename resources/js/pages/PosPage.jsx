@@ -27,7 +27,7 @@ const catPalette = (catId) => CAT_PALETTES[(catId || 0) % CAT_PALETTES.length];
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
 /* ─── ProductCard ───────────────────────────────── */
-function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode }) {
+function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, isDipendente }) {
   const variant   = product.variants?.[0];
   const price     = parseFloat(variant?.sale_price) || 0;
   const stockInfo = variant ? stockMap[variant.id] : null;
@@ -92,17 +92,26 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode }
           <Package size={32} color="rgba(255,255,255,0.5)" />
         </div>
 
-        {/* Stock badge */}
-        <div style={{
-          position: 'absolute', top: 7, left: 7,
-          background: inStock ? 'rgba(16,185,129,0.92)' : 'rgba(239,68,68,0.92)',
-          color: '#fff', borderRadius: 8, padding: '2px 8px', fontSize: 10, fontWeight: 800,
-          backdropFilter: 'blur(6px)',
-          boxShadow: inStock ? '0 2px 8px rgba(16,185,129,0.4)' : '0 2px 8px rgba(239,68,68,0.4)',
-          letterSpacing: '0.02em',
-        }}>
-          {inStock ? onHand : '×'}
-        </div>
+        {/* Stock badge — numero per admin, pallino colorato per dipendente */}
+        {isDipendente ? (
+          <div style={{
+            position: 'absolute', top: 7, left: 7,
+            width: 12, height: 12, borderRadius: '50%',
+            background: onHand === 0 ? '#EF4444' : onHand <= 5 ? '#F59E0B' : '#10B981',
+            boxShadow: `0 0 0 2px rgba(255,255,255,0.7), 0 2px 6px rgba(0,0,0,0.25)`,
+          }} title={onHand === 0 ? 'Esaurito' : onHand <= 5 ? 'Scorte basse' : 'Disponibile'} />
+        ) : (
+          <div style={{
+            position: 'absolute', top: 7, left: 7,
+            background: inStock ? 'rgba(16,185,129,0.92)' : 'rgba(239,68,68,0.92)',
+            color: '#fff', borderRadius: 8, padding: '2px 8px', fontSize: 10, fontWeight: 800,
+            backdropFilter: 'blur(6px)',
+            boxShadow: inStock ? '0 2px 8px rgba(16,185,129,0.4)' : '0 2px 8px rgba(239,68,68,0.4)',
+            letterSpacing: '0.02em',
+          }}>
+            {inStock ? onHand : '×'}
+          </div>
+        )}
 
         {/* QScare badge — visibile solo per hardware con prezzo configurato */}
         {qscarePrice > 0 && (
@@ -914,6 +923,7 @@ export default function PosPage() {
                 onNegozi={setInventoryProduct}
                 stockMap={stockMap}
                 displayMode={displayMode}
+                isDipendente={isDipendente}
               />
             ))}
             {filteredProducts.length === 0 && (
