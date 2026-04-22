@@ -1458,6 +1458,12 @@ export default function ShiftsPage() {
 
   useEffect(() => { loadLockStatus(); }, [loadLockStatus]);
 
+  // Helper: split key "empId_YYYY-MM-DD" → ['empId', 'YYYY-MM-DD']
+  const splitShiftKey = (key) => {
+    const idx = key.indexOf('_');
+    return [key.slice(0, idx), key.slice(idx + 1)];
+  };
+
   // ── Lock / Unlock ──
   const handleLockWeek = async () => {
     if (!storeId) return;
@@ -1876,14 +1882,6 @@ export default function ShiftsPage() {
     const key = `${empId}_${dateStr}`;
     setShifts(prev => { const copy = { ...prev }; delete copy[key]; return copy; });
     setActiveCell(null);
-  };
-
-  // Helper: split key "123_2026-04-17" → ['123', '2026-04-17']
-  // Non possiamo usare split('_') perché la data contiene underscore nelle versioni precedenti
-  // ma la chiave è sempre `${empId}_${YYYY-MM-DD}`, quindi usiamo la prima occorrenza di '_'
-  const splitShiftKey = (key) => {
-    const idx = key.indexOf('_');
-    return [key.slice(0, idx), key.slice(idx + 1)];
   };
 
   const saveChanges = async () => {
