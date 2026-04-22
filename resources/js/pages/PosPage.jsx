@@ -50,7 +50,7 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
       className={popped ? 'sp-pos-card-added' : ''}
       style={{
         background: 'white',
-        borderRadius: 16,
+        borderRadius: 12,
         overflow: 'hidden',
         cursor: 'pointer',
         border: qscarePrice > 0 ? '1px solid rgba(99,102,241,0.25)' : '1px solid #eee',
@@ -71,7 +71,7 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
       }}
     >
       {/* Immagine o gradient placeholder */}
-      <div style={{ height: 88, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ height: 60, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
         {imgUrl ? (
           <img
             src={imgUrl}
@@ -89,7 +89,7 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
           position: imgUrl ? 'absolute' : 'relative',
           inset: 0,
         }}>
-          <Package size={32} color="rgba(255,255,255,0.5)" />
+          <Package size={24} color="rgba(255,255,255,0.5)" />
         </div>
 
         {/* Stock badge */}
@@ -134,8 +134,8 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
       </div>
 
       {/* Info */}
-      <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.35, color: '#1a1a2e', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+      <div style={{ padding: '7px 9px', flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.25, color: '#1a1a2e', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {displayMode === 'sku' ? (product.sku || product.name) : product.name}
         </div>
         {variant?.flavor && (
@@ -143,8 +143,8 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
             <Cherry size={9} style={{ display: 'inline', marginRight: 3 }} />{variant.flavor}
           </div>
         )}
-        <div style={{ marginTop: 'auto', paddingTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 17, fontWeight: 800, color: palette.accent }}>
+        <div style={{ marginTop: 'auto', paddingTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: palette.accent }}>
             {fmt(price)}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -203,8 +203,8 @@ function CartItem({ line, onUpdateQty, onRemove }) {
   return (
     <div style={{
       display: 'grid', gridTemplateColumns: '1fr auto auto',
-      gap: 10, alignItems: 'center',
-      padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.07)',
+      gap: 8, alignItems: 'center',
+      padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,0.07)',
     }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -904,8 +904,8 @@ export default function PosPage() {
         <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 20 }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: 12,
+            gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))',
+            gap: 8,
           }}>
             {filteredProducts.map(p => (
               <ProductCard
