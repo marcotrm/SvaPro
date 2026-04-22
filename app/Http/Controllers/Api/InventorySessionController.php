@@ -56,8 +56,9 @@ class InventorySessionController extends Controller
         $filters = $request->input('filters',[]);
         $pq = DB::table('product_variants as pv')
             ->join('products as p','p.id','=','pv.product_id')
-            ->where('p.tenant_id',$tid)->where('p.is_active',true)->select('pv.id','p.name','p.brand','p.category','pv.barcode','pv.sku','pv.flavor','p.cost_price');
-        if(!empty($filters['brand'])) $pq->whereIn('p.brand',(array)$filters['brand']);
+            ->leftJoin('brands as b','b.id','=','p.brand_id')
+            ->where('p.tenant_id',$tid)->where('p.is_active',true)->select('pv.id','p.name',DB::raw('b.name as brand'),'p.category','pv.barcode','pv.sku','pv.flavor','p.cost_price');
+        if(!empty($filters['brand'])) $pq->whereIn('b.name',(array)$filters['brand']);
         if(!empty($filters['category'])) $pq->whereIn('p.category',(array)$filters['category']);
         if(!empty($filters['type'])) $pq->whereIn('p.type',(array)$filters['type']);
         if(!empty($filters['supplier_id'])) $pq->where('p.supplier_id',$filters['supplier_id']);
@@ -102,8 +103,9 @@ class InventorySessionController extends Controller
         $items = DB::table('inventory_items as ii')
             ->join('product_variants as pv','pv.id','=','ii.product_variant_id')
             ->join('products as p','p.id','=','pv.product_id')
+            ->leftJoin('brands as b','b.id','=','p.brand_id')
             ->where('ii.inventory_session_id',$id)
-            ->select('ii.*','p.name as product_name','p.brand','p.category','p.cost_price','pv.barcode','pv.sku','pv.flavor','p.image_url')
+            ->select('ii.*','p.name as product_name',DB::raw('b.name as brand'),'p.category','p.cost_price','pv.barcode','pv.sku','pv.flavor','p.image_url')
             ->orderBy('ii.status')->orderBy('p.name')->get()
             ->map(function($i){ $i->difference=$i->counted_quantity-$i->theoretical_quantity; $i->value_difference=$i->difference*($i->cost_price??0); return $i; });
         $total=$items->count(); $matched=$items->where('status','MATCHED')->count(); $mismatched=$items->where('status','MISMATCHED')->count();
@@ -176,8 +178,9 @@ class InventorySessionController extends Controller
         $items = DB::table('inventory_items as ii')
             ->join('product_variants as pv','pv.id','=','ii.product_variant_id')
             ->join('products as p','p.id','=','pv.product_id')
+            ->leftJoin('brands as b','b.id','=','p.brand_id')
             ->where('ii.inventory_session_id',$id)
-            ->select('ii.id','ii.counted_quantity','ii.status','ii.store_note','ii.last_counted_at','p.name as product_name','p.brand','p.category','p.image_url','pv.barcode','pv.sku','pv.flavor')
+            ->select('ii.id','ii.counted_quantity','ii.status','ii.store_note','ii.last_counted_at','p.name as product_name',DB::raw('b.name as brand'),'p.category','p.image_url','pv.barcode','pv.sku','pv.flavor')
             ->orderBy('ii.status')->orderBy('p.name')->get();
         // Risposta senza theoretical_quantity
         $resp = (object)['id'=>$session->id,'inventory_number'=>$session->inventory_number,'title'=>$session->title,'status'=>$session->status,'due_date'=>$session->due_date,'notes_store'=>$session->notes_store];
@@ -284,8 +287,8 @@ class InventorySessionController extends Controller
         $storeId = $request->integer('store_id');
         $filters = $request->input('filters',[]);
         $whId = DB::table('warehouses')->where('tenant_id',$tid)->where('store_id',$storeId)->value('id');
-        $pq = DB::table('product_variants as pv')->join('products as p','p.id','=','pv.product_id')->where('p.tenant_id',$tid)->where('p.is_active',true)->select('pv.id');
-        if(!empty($filters['brand'])) $pq->whereIn('p.brand',(array)$filters['brand']);
+        $pq = DB::table('product_variants as pv')->join('products as p','p.id','=','pv.product_id')->leftJoin('brands as b','b.id','=','p.brand_id')->where('p.tenant_id',$tid)->where('p.is_active',true)->select('pv.id');
+        if(!empty($filters['brand'])) $pq->whereIn('b.name',(array)$filters['brand']);
         if(!empty($filters['category'])) $pq->whereIn('p.category',(array)$filters['category']);
         $count = $pq->count();
         return response()->json(['count'=>$count,'store_id'=>$storeId,'warehouse_id'=>$whId]);
