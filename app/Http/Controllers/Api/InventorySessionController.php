@@ -164,9 +164,9 @@ class InventorySessionController extends Controller
 
     // --- STORE: lista bolle assegnate ---
     public function storeIndex(Request $request) {
-        $tid = (int)$request->attributes->get('tenant_id');
-        $storeId = $request->user()->store_id;
-        if(!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
+        $tid     = (int)$request->attributes->get('tenant_id');
+        $storeId = (int)$request->attributes->get('store_id');
+        if (!$storeId) return response()->json(['message'=>'Nessun negozio associato a questo account'],403);
         $sessions = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('store_id',$storeId)->whereNotIn('status',['DRAFT','CANCELLED'])->orderByDesc('id')->get();
         $ids = $sessions->pluck('id')->toArray();
         $counts = DB::table('inventory_items')->whereIn('inventory_session_id',$ids)
@@ -183,8 +183,9 @@ class InventorySessionController extends Controller
 
     // --- STORE: dettaglio bolla (SENZA teorico) ---
     public function storeShow(Request $request, int $id) {
-        $tid = (int)$request->attributes->get('tenant_id');
-        $storeId = $request->user()->store_id;
+        $tid     = (int)$request->attributes->get('tenant_id');
+        $storeId = (int)$request->attributes->get('store_id');
+        if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->where('store_id',$storeId)->first();
         if(!$session) return response()->json(['message'=>'Non trovata'],404);
         if(in_array($session->status,['DRAFT','CANCELLED'])) return response()->json(['message'=>'Non disponibile'],403);
@@ -208,9 +209,10 @@ class InventorySessionController extends Controller
 
     // --- STORE: scansione barcode ---
     public function scan(Request $request, int $id) {
-        $tid = (int)$request->attributes->get('tenant_id');
-        $storeId = $request->user()->store_id;
-        $userId = $request->user()->id;
+        $tid     = (int)$request->attributes->get('tenant_id');
+        $storeId = (int)$request->attributes->get('store_id');
+        $userId  = $request->user()->id;
+        if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
         $request->validate(['barcode'=>'required|string|max:150']);
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->where('store_id',$storeId)->first();
         if(!$session) return response()->json(['message'=>'Bolla non trovata'],404);
@@ -237,9 +239,10 @@ class InventorySessionController extends Controller
 
     // --- STORE: aggiornamento manuale quantità ---
     public function updateCount(Request $request, int $itemId) {
-        $tid = (int)$request->attributes->get('tenant_id');
-        $userId = $request->user()->id;
-        $storeId = $request->user()->store_id;
+        $tid     = (int)$request->attributes->get('tenant_id');
+        $userId  = $request->user()->id;
+        $storeId = (int)$request->attributes->get('store_id');
+        if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
         $request->validate(['counted_quantity'=>'required|integer|min:0']);
         $item = DB::table('inventory_items as ii')->join('inventory_sessions as s','s.id','=','ii.inventory_session_id')->where('ii.id',$itemId)->where('s.tenant_id',$tid)->where('s.store_id',$storeId)->select('ii.*','s.status as session_status','s.id as session_id')->first();
         if(!$item) return response()->json(['message'=>'Riga non trovata'],404);
@@ -253,9 +256,10 @@ class InventorySessionController extends Controller
 
     // --- STORE: chiusura bolla ---
     public function close(Request $request, int $id) {
-        $tid = (int)$request->attributes->get('tenant_id');
-        $storeId = $request->user()->store_id;
-        $userId = $request->user()->id;
+        $tid     = (int)$request->attributes->get('tenant_id');
+        $storeId = (int)$request->attributes->get('store_id');
+        $userId  = $request->user()->id;
+        if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->where('store_id',$storeId)->first();
         if(!$session) return response()->json(['message'=>'Non trovata'],404);
         if(!in_array($session->status,['IN_PROGRESS','SENT_TO_STORE','REOPENED'])) return response()->json(['message'=>'Non chiudibile'],422);
