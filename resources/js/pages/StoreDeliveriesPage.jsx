@@ -39,6 +39,7 @@ function apiListToDays(list, weekStart) {
         notes: item.notes || '',
         driver_note: item.driver_note || '',
         completed_at: item.completed_at || null,
+        scheduled_date: item.scheduled_date || null,
       }];
     }
   });
@@ -383,25 +384,34 @@ export default function StoreDeliveriesPage() {
                           <GripVertical size={10} color={`${st.color}40`}/>
                         </div>
 
-                        <div style={{fontWeight:700,fontSize:12,color:'var(--color-text,#F1F5F9)',paddingRight:28,lineHeight:1.35,marginBottom:7}}>
+                        {/* Nome negozio — senza label duplicata */}
+                        <div style={{fontWeight:700,fontSize:12,color:'var(--color-text,#F1F5F9)',paddingRight:28,lineHeight:1.35,marginBottom:4}}>
                           {item.storeName}
-                          {item.status==='done'&&<span style={{marginLeft:5,fontSize:10,color:'#34D399'}}>✓ Consegnato</span>}
-                          {item.status==='issue'&&<span style={{marginLeft:5,fontSize:10,color:'#F87171'}}>⚠ Problema</span>}
                         </div>
 
-                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                        {/* Data di consegna */}
+                        <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',marginBottom:7,display:'flex',alignItems:'center',gap:3}}>
+                          <Calendar size={9} color="rgba(255,255,255,0.3)"/>
+                          {new Date(item.scheduled_date || addDays(weekStart,dayIdx)).toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'short'})}
+                          {item.completed_at && <span style={{marginLeft:4,color:'#34D399'}}>· consegnato {new Date(item.completed_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}</span>}
+                        </div>
+
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:4}}>
                           <button onClick={e=>{e.stopPropagation();cycleStatus(item.id,item.status);}}
                             title="Clicca per cambiare stato"
-                            style={{display:'flex',alignItems:'center',gap:4,padding:'3px 8px',borderRadius:20,border:`1px solid ${st.color}35`,background:`${st.color}18`,color:st.color,fontSize:9,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+                            style={{flex:1,display:'flex',alignItems:'center',gap:4,padding:'3px 8px',borderRadius:20,border:`1px solid ${st.color}35`,background:`${st.color}18`,color:st.color,fontSize:9,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
                             <div style={{width:5,height:5,borderRadius:'50%',background:st.color}}/>{st.label}
                           </button>
-                          <button onClick={e=>{e.stopPropagation();handleRemove(item.id);}}
-                            style={{background:'none',border:'none',cursor:'pointer',padding:'2px',color:'rgba(255,255,255,0.18)',lineHeight:1,borderRadius:4}}
-                            onMouseEnter={e=>e.currentTarget.style.color='#F87171'}
-                            onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.18)'}>
-                            <X size={11}/>
+                          <button
+                            onClick={e=>{e.stopPropagation(); if(confirm(`Eliminare la consegna a ${item.storeName}?`)) handleRemove(item.id);}}
+                            title="Elimina"
+                            style={{display:'flex',alignItems:'center',gap:3,padding:'3px 7px',borderRadius:20,border:'1px solid rgba(248,113,113,0.3)',background:'rgba(248,113,113,0.08)',color:'#F87171',fontSize:9,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}
+                            onMouseEnter={e=>e.currentTarget.style.background='rgba(248,113,113,0.2)'}
+                            onMouseLeave={e=>e.currentTarget.style.background='rgba(248,113,113,0.08)'}>
+                            <X size={9}/> Elimina
                           </button>
                         </div>
+
                       </div>
                     </React.Fragment>
                   );
