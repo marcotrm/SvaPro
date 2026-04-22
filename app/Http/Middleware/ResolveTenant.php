@@ -50,15 +50,25 @@ class ResolveTenant
         $request->attributes->set('tenant_id', $tenantId);
 
         // Security check for store_manager and dipendente: force store_id
+        // BUT skip if user is also a project_manager (they need to switch stores freely)
         $isStoreManager = in_array('store_manager', $roleCodes, true);
         $isDipendente = in_array('dipendente', $roleCodes, true);
+        $isProjectManager = in_array('project_manager', $roleCodes, true);
         
-        if ($isStoreManager || $isDipendente) {
+        if (($isStoreManager || $isDipendente) && !$isProjectManager && !$isSuperAdmin) {
             // Find the assigned store_id
             $assignedStoreId = DB::table('user_roles')
                 ->where('user_id', $user->id)
                 ->whereNotNull('store_id')
                 ->value('store_id');
+            
+            // Fallback: get store from employee record
+            if (!$assignedStoreId) {
+                $assignedStoreId = DB::table('employees')
+                    ->where('user_id', $user->id)
+                    ->where('tenant_id', $tenantId)
+                    ->value('store_id');
+            }
             
             if ($assignedStoreId) {
                 // Force X-Store-ID attribute on request so controllers use it
