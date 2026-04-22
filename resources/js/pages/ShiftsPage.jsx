@@ -1104,7 +1104,19 @@ export default function ShiftsPage() {
   // Ruoli turni
   const isDipendente   = userRoles.includes('dipendente');
   const isShiftManager = userRoles.includes('admin') || userRoles.includes('shift_manager') || !isDipendente;
-  const currentEmployeeId = user?.employee_id ? String(user.employee_id) : null;
+  // Dipendente: legge employee_id dall'account oppure dalla scelta manuale in sessione
+  const sessionKey = `svapro_self_emp_${user?.id || 'anon'}`;
+  const [sessionSelfEmpId, setSessionSelfEmpIdRaw] = useState(
+    () => sessionStorage.getItem(sessionKey) || null
+  );
+  const setSessionSelfEmpId = (id) => {
+    if (id) sessionStorage.setItem(sessionKey, String(id));
+    else sessionStorage.removeItem(sessionKey);
+    setSessionSelfEmpIdRaw(id ? String(id) : null);
+  };
+  const currentEmployeeId = user?.employee_id
+    ? String(user.employee_id)
+    : sessionSelfEmpId || null;
 
   // Solo admin/shift_manager possono modificare turni altrui. Il dipendente può modificare solo la propria riga
   const canEditShifts = isShiftManager;
@@ -1637,17 +1649,107 @@ export default function ShiftsPage() {
     );
   };
 
-  // Dipendente senza employee_id collegato: mostra avviso amministratore
-  if (isDipendente && !currentEmployeeId) return (
-    <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)' }}>Profilo dipendente non collegato</div>
-      <div style={{ fontSize: 13, marginTop: 8, maxWidth: 400, margin: '8px auto 0' }}>
-        Il tuo account utente non è ancora collegato all'anagrafica dipendenti.
-        Contatta un amministratore per associare il tuo profilo al negozio.
+  // Dipendente senza employee_id collegato: mostra selettore identità
+  if (isDipendente && !currentEmployeeId) {
+    // Mostra la schermata solo quando abbiamo già caricato la lista dipendenti
+    const storeEmps = employees; // già filtrati per store
+
+    return (
+      <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 24,
+          padding: 36,
+          maxWidth: 480,
+          width: '100%',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
+        }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%', margin: '0 auto 16px',
+              background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 8px 24px rgba(99,102,241,0.35)',
+            }}>
+              <User size={30} color="#fff" />
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--color-text)', marginBottom: 8 }}>Chi sei?</div>
+            <div style={{ fontSize: 14, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              Seleziona il tuo nome per accedere alla pianificazione turni e proporre i tuoi orari.
+            </div>
+          </div>
+
+          {/* Lista dipendenti del negozio */}
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-tertiary)' }}>
+              <Loader size={24} style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }} />
+            </div>
+          ) : storeEmps.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
+              Nessun dipendente trovato per questo negozio.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {storeEmps.map(emp => {
+                const initials = `${emp.first_name?.[0] || ''}${emp.last_name?.[0] || ''}`.toUpperCase() || '?';
+                return (
+                  <button
+                    key={emp.id}
+                    onClick={() => setSessionSelfEmpId(String(emp.id))}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 14,
+                      padding: '14px 18px', borderRadius: 16, border: '2px solid var(--color-border)',
+                      background: 'var(--color-bg)', cursor: 'pointer', textAlign: 'left',
+                      transition: 'all 0.15s', width: '100%',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = '#6366F1';
+                      e.currentTarget.style.background = 'rgba(99,102,241,0.06)';
+                      e.currentTarget.style.transform = 'translateX(4px)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = 'var(--color-border)';
+                      e.currentTarget.style.background = 'var(--color-bg)';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                  >
+                    <div style={{
+                      width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+                      background: emp.photo_url ? 'transparent' : 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      overflow: 'hidden', boxShadow: '0 4px 12px rgba(99,102,241,0.25)',
+                    }}>
+                      {emp.photo_url
+                        ? <img src={emp.photo_url} alt={emp.first_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <span style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>{initials}</span>
+                      }
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-text)' }}>
+                        {emp.first_name} {emp.last_name}
+                      </div>
+                      {emp.employee_code && (
+                        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                          Cod. {emp.employee_code}
+                        </div>
+                      )}
+                    </div>
+                    <ChevronRight size={18} color="var(--color-text-tertiary)" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{ marginTop: 20, padding: '12px 16px', background: 'rgba(99,102,241,0.06)', borderRadius: 12, border: '1px solid rgba(99,102,241,0.15)', fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+            💡 La tua scelta rimane attiva per questa sessione. Potrai proporre i tuoi turni e il responsabile li confermerà.
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   if (!storeId) return (
     <div style={{ padding: '32px' }}>
@@ -1727,6 +1829,20 @@ export default function ShiftsPage() {
           <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>
             Clicca sull&apos;avatar di un dipendente per impostare ferie/malattia. Clicca su una cella giorno per assegnare il turno.
           </div>
+          {/* Badge identità sessione */}
+          {isDipendente && sessionSelfEmpId && (() => {
+            const selfEmp = employees.find(e => String(e.id) === sessionSelfEmpId);
+            if (!selfEmp) return null;
+            return (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 8, padding: '6px 12px 6px 8px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 20 }}>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff' }}>
+                  {(selfEmp.first_name?.[0] || '?').toUpperCase()}
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#4338CA' }}>Sei: {selfEmp.first_name} {selfEmp.last_name}</span>
+                <button onClick={() => setSessionSelfEmpId(null)} style={{ fontSize: 11, fontWeight: 700, color: '#6366F1', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', textDecoration: 'underline' }}>Cambia</button>
+              </div>
+            );
+          })()}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {canEditShifts ? (
