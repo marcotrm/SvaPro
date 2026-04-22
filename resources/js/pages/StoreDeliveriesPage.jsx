@@ -379,36 +379,40 @@ export default function StoreDeliveriesPage() {
                         onMouseEnter={e=>e.currentTarget.style.boxShadow='0 4px 14px rgba(0,0,0,0.3)'}
                         onMouseLeave={e=>e.currentTarget.style.boxShadow='none'}
                       >
-                        <div style={{position:'absolute',top:5,right:5,display:'flex',alignItems:'center',gap:2}}>
-                          <span style={{fontSize:9,fontWeight:800,color: item.status==='done'?'#34D399':item.status==='issue'?'#F87171':`${st.color}55`}}>#{idx+1}</span>
-                          <GripVertical size={10} color={`${st.color}40`}/>
+                        <div style={{position:'absolute',top:6,right:6,display:'flex',alignItems:'center',gap:2}}>
+                          <span style={{fontSize:10,fontWeight:800,color: item.status==='done'?'#34D399':item.status==='issue'?'#F87171':`${st.color}55`}}>#{idx+1}</span>
+                          <GripVertical size={11} color={`${st.color}40`}/>
                         </div>
 
-                        {/* Nome negozio — senza label duplicata */}
-                        <div style={{fontWeight:700,fontSize:12,color:'var(--color-text,#F1F5F9)',paddingRight:28,lineHeight:1.35,marginBottom:4}}>
+                        {/* Nome negozio */}
+                        <div style={{fontWeight:800,fontSize:13,color:'var(--color-text,#F1F5F9)',paddingRight:32,lineHeight:1.3,marginBottom:5}}>
                           {item.storeName}
                         </div>
 
-                        {/* Data di consegna */}
-                        <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',marginBottom:7,display:'flex',alignItems:'center',gap:3}}>
-                          <Calendar size={9} color="rgba(255,255,255,0.3)"/>
-                          {new Date(item.scheduled_date || addDays(weekStart,dayIdx)).toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'short'})}
-                          {item.completed_at && <span style={{marginLeft:4,color:'#34D399'}}>· consegnato {new Date(item.completed_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}</span>}
+                        {/* Data di consegna — sempre dalla colonna */}
+                        <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',marginBottom:8,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+                          <Calendar size={10} color="rgba(255,255,255,0.4)"/>
+                          <span>{addDays(weekStart, dayIdx).toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'short'})}</span>
+                          {item.completed_at && (
+                            <span style={{color:'#34D399',fontWeight:700}}>
+                              · ✓ {new Date(item.completed_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
+                            </span>
+                          )}
                         </div>
 
-                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:4}}>
+                        <div style={{display:'flex',alignItems:'center',gap:5}}>
                           <button onClick={e=>{e.stopPropagation();cycleStatus(item.id,item.status);}}
                             title="Clicca per cambiare stato"
-                            style={{flex:1,display:'flex',alignItems:'center',gap:4,padding:'3px 8px',borderRadius:20,border:`1px solid ${st.color}35`,background:`${st.color}18`,color:st.color,fontSize:9,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
-                            <div style={{width:5,height:5,borderRadius:'50%',background:st.color}}/>{st.label}
+                            style={{flex:1,display:'flex',alignItems:'center',gap:5,padding:'5px 10px',borderRadius:20,border:`1px solid ${st.color}40`,background:`${st.color}20`,color:st.color,fontSize:11,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+                            <div style={{width:6,height:6,borderRadius:'50%',background:st.color,flexShrink:0}}/>{st.label}
                           </button>
                           <button
                             onClick={e=>{e.stopPropagation(); if(confirm(`Eliminare la consegna a ${item.storeName}?`)) handleRemove(item.id);}}
                             title="Elimina"
-                            style={{display:'flex',alignItems:'center',gap:3,padding:'3px 7px',borderRadius:20,border:'1px solid rgba(248,113,113,0.3)',background:'rgba(248,113,113,0.08)',color:'#F87171',fontSize:9,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}
-                            onMouseEnter={e=>e.currentTarget.style.background='rgba(248,113,113,0.2)'}
-                            onMouseLeave={e=>e.currentTarget.style.background='rgba(248,113,113,0.08)'}>
-                            <X size={9}/> Elimina
+                            style={{display:'flex',alignItems:'center',gap:3,padding:'5px 9px',borderRadius:20,border:'1px solid rgba(248,113,113,0.35)',background:'rgba(248,113,113,0.1)',color:'#F87171',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}
+                            onMouseEnter={e=>e.currentTarget.style.background='rgba(248,113,113,0.25)'}
+                            onMouseLeave={e=>e.currentTarget.style.background='rgba(248,113,113,0.1)'}>
+                            <X size={10}/> Elimina
                           </button>
                         </div>
 
