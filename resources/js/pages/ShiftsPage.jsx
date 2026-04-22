@@ -1845,8 +1845,8 @@ export default function ShiftsPage() {
           <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
           <span>
             {gapAlerts.length === 1
-              ? <>Giorno senza copertura: <strong>{gapAlerts[0].label}</strong></>
-              : <>Giorni senza copertura: <strong>{gapAlerts.map(d => d.label.split(' ')[0]).join(', ')}</strong></>
+              ? <>Giorno senza copertura: <strong>{gapAlerts[0].day}</strong></>
+              : <>Giorni senza copertura: <strong>{gapAlerts.map(d => d.day.split(' ')[0]).join(', ')}</strong></>
             }
           </span>
         </div>
