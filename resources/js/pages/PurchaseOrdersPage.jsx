@@ -568,64 +568,94 @@ export default function PurchaseOrdersPage() {
           </tbody>
         </table>
       </div>
+
       {/* ══ MODALE ORDINE AUTOMATICO ══ */}
       {autoModal && (
-        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-          <div style={{ background:'var(--surface, #1a1a2e)', borderRadius:18, width:'100%', maxWidth:740, maxHeight:'90vh', overflow:'auto', padding:0 }}>
-            <div style={{ padding:'20px 24px 16px', borderBottom:'1px solid rgba(255,255,255,0.1)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-              <div style={{ color:'#fff', fontWeight:800, fontSize:18 }}>⚡ Ordine Automatico — Stock Basso</div>
-              <button className="btn btn-ghost" style={{ color:'rgba(255,255,255,0.4)', fontSize:18 }} onClick={() => setAutoModal(false)}>×</button>
+        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+          <div style={{ background:'var(--color-surface)', borderRadius:20, width:'100%', maxWidth:760, maxHeight:'92vh', overflow:'hidden', display:'flex', flexDirection:'column', boxShadow:'0 32px 80px rgba(0,0,0,0.3)', border:'1px solid var(--color-border)' }}>
+
+            {/* Header */}
+            <div style={{ padding:'22px 28px 18px', borderBottom:'1px solid var(--color-border)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+                <div style={{ width:44, height:44, borderRadius:14, background:'linear-gradient(135deg,#F59E0B,#D97706)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 4px 14px rgba(245,158,11,0.35)', flexShrink:0 }}>
+                  <span style={{ fontSize:22 }}>⚡</span>
+                </div>
+                <div>
+                  <div style={{ fontSize:18, fontWeight:900, color:'var(--color-text)' }}>Ordine Automatico</div>
+                  <div style={{ fontSize:12, color:'var(--color-text-tertiary)', marginTop:2 }}>Prodotti sotto il punto di riordino</div>
+                </div>
+              </div>
+              <button onClick={() => setAutoModal(false)} style={{ background:'var(--color-bg)', border:'1px solid var(--color-border)', borderRadius:10, width:36, height:36, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--color-text-secondary)', fontSize:18 }}>×</button>
             </div>
-            <div style={{ padding:'16px 24px', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
-              <select className="field-input" style={{ minWidth:220 }} value={autoSelSup} onChange={e => setAutoSelSup(e.target.value)}>
+
+            {/* Filtro fornitore */}
+            <div style={{ padding:'16px 28px', borderBottom:'1px solid var(--color-border)', display:'flex', gap:12, alignItems:'center', flexWrap:'wrap', background:'var(--color-bg)', flexShrink:0 }}>
+              <select
+                style={{ minWidth:240, padding:'9px 14px', borderRadius:10, border:'1.5px solid var(--color-border)', background:'var(--color-surface)', color:'var(--color-text)', fontSize:13, fontWeight:600, cursor:'pointer', outline:'none' }}
+                value={autoSelSup} onChange={e => setAutoSelSup(e.target.value)}
+              >
                 <option value="">Tutti i fornitori</option>
                 {suppliersList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-              <button className="btn btn-ghost" style={{ color:'#a78bfa' }} onClick={fetchAutoSuggest} disabled={autoLoad}>
-                {autoLoad ? 'Caricamento...' : '🔄 Aggiorna'}
+              <button
+                onClick={fetchAutoSuggest} disabled={autoLoad}
+                style={{ padding:'9px 16px', borderRadius:10, border:'1.5px solid var(--color-border)', background:'var(--color-surface)', color:'var(--color-accent)', fontSize:13, fontWeight:700, cursor:autoLoad?'default':'pointer', display:'flex', alignItems:'center', gap:6, opacity:autoLoad?0.6:1 }}
+              >
+                {autoLoad ? '⟳ Caricamento...' : '🔄 Aggiorna'}
               </button>
               {!autoSelSup && autoItems.length > 0 && (
-                <span style={{ fontSize:11, color:'rgba(255,255,255,0.35)' }}>Seleziona un fornitore per creare l’ordine</span>
+                <span style={{ fontSize:12, color:'var(--color-text-tertiary)', fontStyle:'italic' }}>Seleziona un fornitore per creare l'ordine</span>
               )}
             </div>
-            <div style={{ padding:'16px 24px', maxHeight:420, overflowY:'auto' }}>
+
+            {/* Corpo tabella */}
+            <div style={{ flex:1, overflowY:'auto', padding:'8px 0' }}>
               {autoLoad ? (
-                <div style={{ textAlign:'center', padding:40, color:'rgba(255,255,255,0.3)' }}>Caricamento prodotti sotto-scorta...</div>
+                <div style={{ textAlign:'center', padding:'60px 20px', color:'var(--color-text-tertiary)', fontSize:14 }}>Caricamento prodotti sotto-scorta...</div>
               ) : autoLines.length === 0 ? (
-                <div style={{ textAlign:'center', padding:40, color:'rgba(255,255,255,0.3)' }}>
-                  ✅ Nessun prodotto sotto il punto di riordino. Stock OK!
+                <div style={{ textAlign:'center', padding:'60px 20px' }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>✅</div>
+                  <div style={{ fontSize:15, fontWeight:700, color:'var(--color-text)' }}>Stock OK!</div>
+                  <div style={{ fontSize:13, color:'var(--color-text-tertiary)', marginTop:4 }}>Nessun prodotto sotto il punto di riordino.</div>
                 </div>
               ) : (
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-                  <thead>
-                    <tr style={{ color:'rgba(255,255,255,0.4)', fontSize:10, textTransform:'uppercase' }}>
-                      <th style={{ padding:'6px 8px', textAlign:'left' }}>☐</th>
-                      <th style={{ padding:'6px 8px', textAlign:'left' }}>Prodotto</th>
-                      <th style={{ padding:'6px 8px', textAlign:'center' }}>Stock</th>
-                      <th style={{ padding:'6px 8px', textAlign:'center' }}>Riordino</th>
-                      <th style={{ padding:'6px 8px', textAlign:'center' }}>Qtà da ordinare</th>
-                      <th style={{ padding:'6px 8px', textAlign:'right' }}>Costo Unit.</th>
+                  <thead style={{ position:'sticky', top:0, zIndex:1 }}>
+                    <tr style={{ background:'var(--color-bg)', borderBottom:'2px solid var(--color-border)' }}>
+                      <th style={{ padding:'10px 14px 10px 20px', textAlign:'left', fontSize:10, fontWeight:800, color:'var(--color-text-tertiary)', textTransform:'uppercase', letterSpacing:'0.07em', width:36 }}>☐</th>
+                      <th style={{ padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:800, color:'var(--color-text-tertiary)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Prodotto</th>
+                      <th style={{ padding:'10px 14px', textAlign:'center', fontSize:10, fontWeight:800, color:'var(--color-text-tertiary)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Stock</th>
+                      <th style={{ padding:'10px 14px', textAlign:'center', fontSize:10, fontWeight:800, color:'var(--color-text-tertiary)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Riordino</th>
+                      <th style={{ padding:'10px 14px', textAlign:'center', fontSize:10, fontWeight:800, color:'var(--color-text-tertiary)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Qtà da ordinare</th>
+                      <th style={{ padding:'10px 20px 10px 14px', textAlign:'right', fontSize:10, fontWeight:800, color:'var(--color-text-tertiary)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Costo Unit.</th>
                     </tr>
                   </thead>
                   <tbody>
                     {autoLines.map((l, i) => (
-                      <tr key={l.variant_id} style={{ borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
-                        <td style={{ padding:'8px' }}>
+                      <tr key={l.variant_id} style={{ borderBottom:'1px solid var(--color-border)', transition:'background 0.12s' }}
+                        onMouseEnter={e => e.currentTarget.style.background='var(--color-bg)'}
+                        onMouseLeave={e => e.currentTarget.style.background='transparent'}
+                      >
+                        <td style={{ padding:'10px 8px 10px 20px' }}>
                           <input type="checkbox" checked={l.qty > 0} onChange={e => {
                             const nl = [...autoLines]; nl[i].qty = e.target.checked ? nl[i].suggested_qty : 0; setAutoLines(nl);
-                          }} />
+                          }} style={{ width:16, height:16, cursor:'pointer', accentColor:'var(--color-accent)' }} />
                         </td>
-                        <td style={{ padding:'8px', color:'#fff', fontWeight:600 }}>
-                          {l.product_name}{l.flavor ? ` — ${l.flavor}` : ''}
+                        <td style={{ padding:'10px 14px', fontWeight:700, color:'var(--color-text)' }}>
+                          {l.product_name}{l.flavor ? <span style={{ color:'var(--color-text-tertiary)', fontWeight:500 }}> — {l.flavor}</span> : ''}
                         </td>
-                        <td style={{ padding:'8px', textAlign:'center', color:'#ef4444', fontWeight:700 }}>{l.qty_on_hand}</td>
-                        <td style={{ padding:'8px', textAlign:'center', color:'rgba(255,255,255,0.4)' }}>{l.reorder_point ?? '—'}</td>
-                        <td style={{ padding:'8px', textAlign:'center' }}>
+                        <td style={{ padding:'10px 14px', textAlign:'center' }}>
+                          <span style={{ fontWeight:800, fontSize:13, color: l.qty_on_hand < 0 ? '#EF4444' : l.qty_on_hand === 0 ? '#F59E0B' : '#10B981', background: l.qty_on_hand < 0 ? 'rgba(239,68,68,0.1)' : l.qty_on_hand === 0 ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)', padding:'3px 10px', borderRadius:20 }}>
+                            {l.qty_on_hand}
+                          </span>
+                        </td>
+                        <td style={{ padding:'10px 14px', textAlign:'center', color:'var(--color-text-secondary)', fontWeight:600 }}>{l.reorder_point ?? '—'}</td>
+                        <td style={{ padding:'10px 14px', textAlign:'center' }}>
                           <input type="number" min="0" value={l.qty}
                             onChange={e => { const nl=[...autoLines]; nl[i].qty=parseInt(e.target.value)||0; setAutoLines(nl); }}
-                            style={{ width:70, textAlign:'center', background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, padding:'4px 8px', color:'#fff', fontWeight:700 }} />
+                            style={{ width:70, textAlign:'center', background:'var(--color-bg)', border:'1.5px solid var(--color-border)', borderRadius:8, padding:'6px 8px', color:'var(--color-text)', fontWeight:800, fontSize:14, outline:'none' }} />
                         </td>
-                        <td style={{ padding:'8px', textAlign:'right', color:'rgba(255,255,255,0.5)' }}>
+                        <td style={{ padding:'10px 20px 10px 14px', textAlign:'right', color:'var(--color-text-secondary)', fontWeight:600 }}>
                           {new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(l.unit_cost||0)}
                         </td>
                       </tr>
@@ -634,13 +664,19 @@ export default function PurchaseOrdersPage() {
                 </table>
               )}
             </div>
-            <div style={{ padding:'14px 24px 20px', borderTop:'1px solid rgba(255,255,255,0.1)', display:'flex', gap:10, justifyContent:'flex-end', alignItems:'center' }}>
-              <span style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginRight:'auto' }}>
-                {autoLines.filter(l=>l.qty>0).length} prodotti selezionati · Totale: {new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(autoLines.reduce((s,l)=>s+l.qty*(l.unit_cost||0),0))}
+
+            {/* Footer */}
+            <div style={{ padding:'16px 28px', borderTop:'1px solid var(--color-border)', display:'flex', gap:10, justifyContent:'flex-end', alignItems:'center', background:'var(--color-bg)', flexShrink:0 }}>
+              <span style={{ fontSize:13, color:'var(--color-text-secondary)', marginRight:'auto', fontWeight:600 }}>
+                <strong style={{ color:'var(--color-text)' }}>{autoLines.filter(l=>l.qty>0).length}</strong> prodotti selezionati &nbsp;·&nbsp; Totale: <strong style={{ color:'var(--color-accent)' }}>{new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(autoLines.reduce((s,l)=>s+l.qty*(l.unit_cost||0),0))}</strong>
               </span>
-              <button className="btn btn-ghost" onClick={() => setAutoModal(false)}>Annulla</button>
-              <button className="btn btn-gold" disabled={autoSaving || !autoSelSup || autoLines.filter(l=>l.qty>0).length===0} onClick={handleCreateAutoOrder}>
-                {autoSaving ? 'Creazione...' : '⚡ Crea Ordine Fornitore'}
+              <button onClick={() => setAutoModal(false)} style={{ padding:'10px 20px', borderRadius:10, border:'1.5px solid var(--color-border)', background:'var(--color-surface)', color:'var(--color-text-secondary)', fontSize:13, fontWeight:700, cursor:'pointer' }}>Annulla</button>
+              <button
+                disabled={autoSaving || !autoSelSup || autoLines.filter(l=>l.qty>0).length===0}
+                onClick={handleCreateAutoOrder}
+                style={{ padding:'10px 22px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#F59E0B,#D97706)', color:'#fff', fontSize:13, fontWeight:800, cursor:(autoSaving||!autoSelSup||autoLines.filter(l=>l.qty>0).length===0)?'default':'pointer', opacity:(autoSaving||!autoSelSup||autoLines.filter(l=>l.qty>0).length===0)?0.6:1, boxShadow:'0 4px 14px rgba(245,158,11,0.35)', display:'flex', alignItems:'center', gap:8 }}
+              >
+                <span>⚡</span> {autoSaving ? 'Creazione...' : 'Crea Ordine Fornitore'}
               </button>
             </div>
           </div>

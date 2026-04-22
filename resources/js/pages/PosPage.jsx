@@ -148,18 +148,20 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode }
             {fmt(price)}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button
-              onClick={e => { e.stopPropagation(); onNegozi(product); }}
-              style={{
-                background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-                borderRadius: 8, padding: '4px 8px', fontSize: 11, fontWeight: 700,
-                display: 'flex', alignItems: 'center', gap: 4,
-                cursor: 'pointer', color: 'var(--color-text-secondary)'
-              }}
-              title="Giacenze Locali"
-            >
-              <MapPin size={12} color="#10B981" /> Store
-            </button>
+            {!isDipendente && (
+              <button
+                onClick={e => { e.stopPropagation(); onNegozi(product); }}
+                style={{
+                  background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                  borderRadius: 8, padding: '4px 8px', fontSize: 11, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  cursor: 'pointer', color: 'var(--color-text-secondary)'
+                }}
+                title="Giacenze Locali"
+              >
+                <MapPin size={12} color="#10B981" /> Store
+              </button>
+            )}
             <button
               onClick={e => { e.stopPropagation(); onInfo(product); }}
               style={{
