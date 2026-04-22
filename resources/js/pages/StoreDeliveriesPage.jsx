@@ -48,7 +48,7 @@ function getMonday(d) {
   dt.setHours(0,0,0,0); return dt;
 }
 function addDays(d,n){ const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt; }
-function toISO(d){ return d.toISOString().slice(0,10); }
+function toISO(d){ const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
 function fmtDay(d){ return d.toLocaleDateString('it-IT',{day:'2-digit',month:'short'}); }
 function uid(){ return `d_${Date.now()}_${Math.random().toString(36).slice(2,6)}`; }
 function loadData(){ try{ return JSON.parse(localStorage.getItem(LS_DATA)||'{}'); }catch{ return {}; } }
