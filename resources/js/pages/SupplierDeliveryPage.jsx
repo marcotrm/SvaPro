@@ -15,6 +15,7 @@ import { suppliers as suppliersApi, inventory, stores } from '../api.jsx';
  */
 export default function SupplierDeliveryPage() {
   const { selectedStoreId, user } = useOutletContext();
+  const isMag = user?.roles?.includes('magazziniere') && !user?.roles?.includes('superadmin') && !user?.roles?.includes('admin_cliente');
 
   // Lists
   const [suppliersList, setSuppliersList] = useState([]);
@@ -249,18 +250,18 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
   const warehouse = storesList.find(s => String(s.id) === String(warehouseId));
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', paddingBottom: 48 }}>
+    <div style={{ maxWidth: isMag ? 600 : 900, margin: '0 auto', paddingBottom: 48, padding: isMag ? '12px 12px 100px' : undefined }}>
 
       {/* Header */}
-      <div className="page-head">
+      <div className="page-head" style={isMag ? {flexDirection:'column',gap:6} : undefined}>
         <div>
-          <div className="page-head-title">🚛 DDT Fornitore / Movimentazione</div>
-          <div className="page-head-sub">Carico, Scarico Vendita e Conto Visione</div>
+          <div className="page-head-title">{isMag ? 'Bolle in Arrivo' : '🚛 DDT Fornitore / Movimentazione'}</div>
+          <div className="page-head-sub">{isMag ? 'Carico merce da fornitore' : 'Carico, Scarico Vendita e Conto Visione'}</div>
         </div>
       </div>
 
       {/* ── Tipo DDT selector ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMag ? '1fr' : 'repeat(3,1fr)', gap: 10, marginBottom: 20 }}>
         {DDT_TYPES.map(t => (
           <button key={t.id} onClick={() => { setDdtType(t.id); setStep(1); setSuccess(null); }}
             style={{
@@ -275,7 +276,7 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
       </div>
 
       {/* Step indicator */}
-      <div style={{ display: 'flex', gap: 0, marginBottom: 24, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+      <div style={{ display: 'flex', gap: 0, marginBottom: 24, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-border)', flexDirection: isMag ? 'column' : 'row' }}>
         {[
           ['1', 'Fornitore & Magazzino'],
           ['2', 'Prodotti Ricevuti'],
@@ -301,7 +302,7 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
       {/* ── STEP 1: Fornitore & Magazzino ── */}
       {step === 1 && (
         <div className="table-card" style={{ padding: 24 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMag ? '1fr' : '1fr 1fr', gap: isMag ? 12 : 20 }}>
             <div>
               <label className="field-label">Fornitore *</label>
               <select className="field-input" value={supplierId} onChange={e => setSupplierId(e.target.value)}>
@@ -366,7 +367,7 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
 
 
           {lines.map((line, i) => (
-            <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 10, marginBottom: 10, alignItems: 'center' }}>
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: isMag ? '1fr' : '2fr 1fr 1fr auto', gap: 10, marginBottom: 10, alignItems: 'center' }}>
               <div>
                 {i === 0 && <label className="field-label">Prodotto (ID Variante / Barcode / SKU)</label>}
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -435,7 +436,7 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
           </div>
 
           {/* Summary */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMag ? '1fr' : 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
             {[
               { label: 'Numero DDT', value: success.ddtNumber },
               { label: 'Fornitore', value: success.supplierName },
@@ -483,6 +484,27 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
 
       {/* ── Storico DDT ── */}
       {history.length > 0 && step !== 3 && (
+        isMag ? (
+          /* Mobile history cards */
+          <div style={{marginTop:24}}>
+            <div style={{fontSize:14,fontWeight:800,color:'var(--color-text)',marginBottom:12}}>Storico DDT ({history.length})</div>
+            {history.slice(0,10).map(ddt => (
+              <div key={ddt.id} className="mag-card" style={{padding:14,marginBottom:8}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                  <div>
+                    <div style={{fontWeight:800,fontFamily:'monospace',fontSize:13}}>{ddt.ddtNumber}</div>
+                    <div style={{fontSize:12,color:'var(--color-text-secondary)',marginTop:2}}>{ddt.supplierName} → {ddt.warehouseName}</div>
+                    <div style={{fontSize:11,color:'var(--color-text-tertiary)',marginTop:2}}>{new Date(ddt.deliveryDate).toLocaleDateString('it-IT')} · {ddt.lines?.length||0} art.</div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontWeight:800,fontSize:14}}>{fmt(ddt.totalValue)}</div>
+                    <button className="mag-btn mag-btn-ghost" style={{fontSize:11,padding:'4px 8px',marginTop:4}} onClick={()=>printDDT(ddt)}>Stampa</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="table-card" style={{ marginTop: 24 }}>
           <div className="table-toolbar"><div className="section-title">Storico DDT Fornitore ({history.length})</div></div>
           <table>
@@ -506,6 +528,7 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
             </tbody>
           </table>
         </div>
+        )
       )}
     </div>
   );

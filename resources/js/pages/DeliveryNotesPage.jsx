@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import DatePicker from '../components/DatePicker.jsx';
 import { deliveryNotes, stores as storesApi, catalog } from '../api.jsx';
 import { toast } from 'react-hot-toast';
-import { Package, X, CheckCircle, AlertTriangle, Truck, RefreshCw, Edit3, Search } from 'lucide-react';
+import { Package, X, CheckCircle, AlertTriangle, Truck, RefreshCw, Edit3, Search, ChevronDown, ChevronUp, Scan } from 'lucide-react';
 
 /* ─── Costanti ─────────────────────────────────────────── */
 const STATUS = {
@@ -31,6 +32,9 @@ const getScanColor = (item) => {
 
 /* ─── Componente principale ─────────────────────────────── */
 export default function DeliveryNotesPage() {
+  const { user } = useOutletContext?.() || {};
+  const isMag = user?.roles?.includes('magazziniere') && !user?.roles?.includes('superadmin') && !user?.roles?.includes('admin_cliente');
+
   const [notes, setNotes]         = useState([]);
   const [loading, setLoading]     = useState(true);
   const [tab, setTab]             = useState('notes'); // notes | discrepancies
@@ -78,13 +82,13 @@ export default function DeliveryNotesPage() {
   };
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 60 }}>
-      <div className="page-head">
+    <div style={{ maxWidth: isMag ? 600 : 1100, margin: '0 auto', paddingBottom: 60, padding: isMag ? '12px 12px 100px' : undefined }}>
+      <div className="page-head" style={isMag ? {flexDirection:'column',alignItems:'stretch',gap:8} : undefined}>
         <div>
-          <div className="page-head-title">📄 Bolle di Scarico</div>
-          <div className="page-head-sub">Merce in transito verso i negozi — riscontro via barcode</div>
+          <div className="page-head-title">{isMag ? 'Bolle di Scarico' : '📄 Bolle di Scarico'}</div>
+          <div className="page-head-sub">{isMag ? 'Riscontro merce in arrivo' : 'Merce in transito verso i negozi — riscontro via barcode'}</div>
         </div>
-        <button className="btn btn-gold" onClick={() => setShowCreate(true)}>+ Nuova Bolla Manuale</button>
+        {!isMag && <button className="btn btn-gold" onClick={() => setShowCreate(true)}>+ Nuova Bolla Manuale</button>}
       </div>
 
       {/* Tabs */}
@@ -113,6 +117,48 @@ export default function DeliveryNotesPage() {
 
       {/* CONTENUTO TAB BOLLE */}
       {tab === 'notes' && !scanMode && (
+        isMag ? (
+          /* ── MOBILE CARD VIEW (Magazziniere) ── */
+          <div>
+            {loading ? (
+              <div className="mag-empty">Caricamento...</div>
+            ) : notes.length === 0 ? (
+              <div className="mag-empty"><Package size={40} /><div style={{marginTop:8}}>Nessuna bolla trovata</div></div>
+            ) : notes.map(n => {
+              const st = STATUS[n.status] || STATUS.pending;
+              const hasDisc = n.has_discrepancy || n.open_discrepancies > 0;
+              const isOpen = selectedNote === n.id;
+              return (
+                <div key={n.id} className="mag-card">
+                  <div className="mag-card-head" onClick={() => setSelected(isOpen?null:n.id)}>
+                    <div style={{flex:1}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                        <span className="mag-ddt-num">{n.note_number}</span>
+                        <span style={{background:st.bg,color:st.color,borderRadius:8,padding:'3px 8px',fontSize:11,fontWeight:700}}>{st.label}</span>
+                        {hasDisc && <span style={{width:8,height:8,borderRadius:'50%',background:'#dc2626',display:'inline-block'}} />}
+                      </div>
+                      <div style={{fontSize:13,color:'var(--color-text-secondary)'}}>{n.store_name}</div>
+                      <div className="mag-meta">{n.items_count} articoli - {fmtDate(n.created_at)}</div>
+                    </div>
+                    {isOpen ? <ChevronUp size={18} color="var(--color-text-tertiary)" /> : <ChevronDown size={18} color="var(--color-text-tertiary)" />}
+                  </div>
+                  {isOpen && (
+                    <div className="mag-detail">
+                      {n.tracking_number && <div style={{fontSize:12,color:'var(--color-text-secondary)',marginBottom:8}}>Tracking: <strong style={{color:'#7c3aed'}}>{n.tracking_number}</strong> {n.carrier_status&&`(${n.carrier_status})`}</div>}
+                      <div className="mag-actions">
+                        {['pending','in_progress'].includes(n.status) && (
+                          <button className="mag-btn mag-btn-primary" style={{flex:1,justifyContent:'center'}} onClick={()=>setScanMode(n.id)}><Scan size={14}/>Riscontro Merce</button>
+                        )}
+                        <button className="mag-btn mag-btn-ghost" onClick={()=>handleBrtSync(n.id)}><RefreshCw size={14}/>Sync BRT</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+        /* ── DESKTOP TABLE VIEW (Admin) ── */
         <div style={{ display: 'grid', gridTemplateColumns: selectedNote ? '1fr 460px' : '1fr', gap: 20 }}>
           {/* Tabella bolle */}
           <div className="table-card" style={{ padding: 0 }}>
@@ -205,6 +251,7 @@ export default function DeliveryNotesPage() {
             />
           )}
         </div>
+        )
       )}
 
       {/* MODALITÀ RISCONTRO (scan kiosk) */}

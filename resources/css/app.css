@@ -3419,3 +3419,8 @@ a { text-decoration: none; color: inherit; }
    DRAWER open state (controlled via JS class)
    ══════════════════════════════════════════════ */
 .sp-drawer-open .sp-mobile-drawer-overlay { display: block; }
+
+/* ══════════════════════════════════════════════
+   MAGAZZINIERE MOBILE VIEW
+   ══════════════════════════════════════════════ */
+@import './magazziniere.css';
