@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache, cashMovements as cashApi, reports, exports_, employees as employeesApi, shifts as shiftsApi } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
@@ -738,7 +738,7 @@ export default function Layout({ user, setUser }) {
                     </div>
                   ))}
 
-                  {/* -- Turni proposti in attesa di conferma (PM/Superadmin) -- */
+                  {/* -- Turni proposti in attesa di conferma (PM/Superadmin) -- */}
                   {pendingShifts.length > 0 && (
                     <div
                       style={{ padding: "12px 16px", background: "rgba(139,92,246,0.12)", borderBottom: "1px solid rgba(255,255,255,0.05)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
