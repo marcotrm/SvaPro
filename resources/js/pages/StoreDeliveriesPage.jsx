@@ -113,7 +113,11 @@ export default function StoreDeliveriesPage() {
         }
       }
       setDays(apiListToDays(weekList, weekStart));
-    } catch { toast.error('Errore caricamento consegne'); }
+    } catch (e) {
+      const status = e?.response?.status;
+      const msg = e?.response?.data?.message || e?.message || '';
+      toast.error(`Errore consegne${status ? ` (${status})` : ''}: ${msg || 'server error'}`);
+    }
     finally { setLoading(false); }
   }, [weekStart]);
 
