@@ -768,7 +768,8 @@ export const inventoryCount = {
 export const inventorySessions = {
   // Admin
   getKpi: () => api.get('/inventory-sessions/kpi'),
-  getPreview: (params) => api.get('/inventory-sessions/preview', { params }),
+  getFilterOptions: () => api.get('/inventory-sessions/filter-options'),
+  getPreview: (storeId, filters) => api.get('/inventory-sessions/preview', { params: { store_id: storeId, filters } }),
   getAll: (params = {}) => api.get('/inventory-sessions', { params }),
   create: (data) => api.post('/inventory-sessions', data),
   getOne: (id) => api.get(`/inventory-sessions/${id}`),

@@ -261,6 +261,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // ── Inventory Sessions (Bolla Inventario) — Admin ──
         Route::get('/inventory-sessions/kpi', [InventorySessionController::class, 'kpi']);
         Route::get('/inventory-sessions/preview', [InventorySessionController::class, 'preview']);
+        Route::get('/inventory-sessions/filter-options', [InventorySessionController::class, 'filterOptions']);
         Route::get('/inventory-sessions', [InventorySessionController::class, 'index']);
         Route::post('/inventory-sessions', [InventorySessionController::class, 'store']);
         Route::get('/inventory-sessions/{id}', [InventorySessionController::class, 'show']);
