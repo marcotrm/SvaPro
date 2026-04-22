@@ -240,37 +240,46 @@ export default function StoreRevenuePage() {
           </div>
 
           {/* Filtro periodo — Dal / Al */}
-          {tab === 'ranking' && (
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              {/* DAL */}
-              <label style={{ display:'flex', alignItems:'center', gap:7, background:'#1e2235', border:'1.5px solid rgba(123,111,208,0.4)', borderRadius:12, padding:'7px 13px', cursor:'pointer' }}>
-                <Calendar size={13} color="#7B6FD0"/>
-                <span style={{ fontSize:11, fontWeight:700, color:'#7B6FD0' }}>Dal</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  max={dateTo}
-                  onChange={e => setDateFrom(e.target.value)}
-                  style={{ border:'none', background:'transparent', fontSize:13, fontWeight:700, color:'#E2E8F0', outline:'none', cursor:'pointer', colorScheme:'dark' }}
-                />
-              </label>
-
-              <span style={{ fontSize:14, color:'rgba(255,255,255,0.3)', fontWeight:700 }}>→</span>
-
-              {/* AL */}
-              <label style={{ display:'flex', alignItems:'center', gap:7, background:'#1e2235', border:'1.5px solid rgba(123,111,208,0.4)', borderRadius:12, padding:'7px 13px', cursor:'pointer' }}>
-                <Calendar size={13} color="#7B6FD0"/>
-                <span style={{ fontSize:11, fontWeight:700, color:'#7B6FD0' }}>Al</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  min={dateFrom}
-                  onChange={e => setDateTo(e.target.value)}
-                  style={{ border:'none', background:'transparent', fontSize:13, fontWeight:700, color:'#E2E8F0', outline:'none', cursor:'pointer', colorScheme:'dark' }}
-                />
-              </label>
-            </div>
-          )}
+          {tab === 'ranking' && (() => {
+            const toIta = (iso) => { if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; };
+            const fromIta = (ita) => { const p=ita.replace(/\D/g,''); if(p.length<8) return null; return `${p.slice(4)}-${p.slice(2,4)}-${p.slice(0,2)}`; };
+            const inputStyle = { border:'none', background:'transparent', fontSize:14, fontWeight:800, color:'#c8d6ef', outline:'none', width:90, letterSpacing:'0.5px' };
+            const wrapStyle  = { display:'flex', alignItems:'center', gap:7, background:'#151929', border:'1.5px solid rgba(99,102,241,0.5)', borderRadius:12, padding:'8px 14px', cursor:'text' };
+            return (
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <label style={wrapStyle} title="Data inizio (gg/mm/aaaa)">
+                  <Calendar size={13} color="#6366F1"/>
+                  <span style={{ fontSize:11, fontWeight:700, color:'#6366F1' }}>Dal</span>
+                  <input
+                    type="text"
+                    placeholder="gg/mm/aaaa"
+                    defaultValue={toIta(dateFrom)}
+                    maxLength={10}
+                    onBlur={e => { const iso=fromIta(e.target.value); if(iso) { setDateFrom(iso); if(iso>dateTo) setDateTo(iso); } else e.target.value=toIta(dateFrom); }}
+                    onChange={e => { const v=e.target.value.replace(/[^\d/]/g,''); e.target.value=v; }}
+                    style={inputStyle}
+                  />
+                </label>
+                <span style={{ fontSize:14, color:'rgba(255,255,255,0.25)', fontWeight:700 }}>→</span>
+                <label style={wrapStyle} title="Data fine (gg/mm/aaaa)">
+                  <Calendar size={13} color="#6366F1"/>
+                  <span style={{ fontSize:11, fontWeight:700, color:'#6366F1' }}>Al</span>
+                  <input
+                    type="text"
+                    placeholder="gg/mm/aaaa"
+                    defaultValue={toIta(dateTo)}
+                    maxLength={10}
+                    onBlur={e => { const iso=fromIta(e.target.value); if(iso) { setDateTo(iso); if(iso<dateFrom) setDateFrom(iso); } else e.target.value=toIta(dateTo); }}
+                    onChange={e => { const v=e.target.value.replace(/[^\d/]/g,''); e.target.value=v; }}
+                    style={inputStyle}
+                  />
+                </label>
+                <button onClick={load} style={{ padding:'8px 14px', background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.35)', borderRadius:10, color:'#818CF8', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                  Applica
+                </button>
+              </div>
+            );
+          })()}
           {tab === 'history' && (
             <div style={{ display:'flex', gap:4 }}>
               {HISTORY_OPTIONS.map(h => (
