@@ -310,7 +310,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/chat/messages/read', [ChatController::class, 'markRead']);
     });
 
-    Route::middleware('role:superadmin,admin_cliente,dipendente,magazziniere')->group(function () {
+    Route::middleware('role:superadmin,admin_cliente,dipendente,magazziniere,project_manager,store_manager')->group(function () {
         // Catalog: accessibile anche ai dipendenti per il POS
         Route::get('/catalog/products', [CatalogController::class, 'index']);
         Route::get('/catalog/brands', [CatalogController::class, 'brands']);
