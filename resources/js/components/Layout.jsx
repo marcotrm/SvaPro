@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache, cashMovements as cashApi, reports, exports_, employees as employeesApi, shifts as shiftsApi } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
@@ -260,10 +260,10 @@ export default function Layout({ user, setUser }) {
   const [dailyReportBody, setDailyReportBody] = React.useState('');
   // â”€â”€ Notifiche dipendente (pacco monete ecc.) â”€â”€
   const [empNotifs, setEmpNotifs]           = React.useState([]);
-  const [empNotifs, setEmpNotifs]           = React.useState([]);
   const [unreadEmpNotifs, setUnreadEmpNotifs] = React.useState(0);
   // -- Notifiche turni proposti (PM/Superadmin) --
   const [pendingShifts, setPendingShifts]   = React.useState([]);
+  const prevAlertIdsRef = useRef(new Set());
   const prevPendingCountRef = useRef(0);
   const notifPanelRef   = useRef();
 
