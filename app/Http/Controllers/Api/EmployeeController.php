@@ -282,22 +282,30 @@ class EmployeeController extends Controller
 
         $old = DB::table('employees')->where('tenant_id', $tenantId)->where('id', $employeeId)->first();
 
+        $updateData = [
+            'store_id'   => $request->input('store_id') ? (int) $request->input('store_id') : DB::raw('store_id'),
+            'first_name' => $request->input('first_name'),
+            'last_name'  => $request->input('last_name'),
+            'photo_url'  => $request->input('photo_url'),
+            'barcode'    => $request->input('barcode') ?: null,
+            'employee_code' => $request->input('employee_code') ?: null,
+            'max_spending_limit' => $request->input('max_spending_limit') !== null ? (float) $request->input('max_spending_limit') : null,
+            'price_list_id' => $request->input('price_list_id') ? (int) $request->input('price_list_id') : null,
+            'status'     => $request->input('status', 'active'),
+            'hire_date'  => $request->input('hire_date'),
+            'updated_at' => now(),
+        ];
+
+        // Collega/scollega account utente se esplicitamente inviato nel payload
+        if ($request->has('user_id')) {
+            $userId = $request->input('user_id');
+            $updateData['user_id'] = $userId ? (int) $userId : null;
+        }
+
         $updated = DB::table('employees')
             ->where('tenant_id', $tenantId)
             ->where('id', $employeeId)
-            ->update([
-                'store_id'   => $request->input('store_id') ? (int) $request->input('store_id') : DB::raw('store_id'),
-                'first_name' => $request->input('first_name'),
-                'last_name'  => $request->input('last_name'),
-                'photo_url'  => $request->input('photo_url'),
-                'barcode'    => $request->input('barcode') ?: null,
-                'employee_code' => $request->input('employee_code') ?: null,
-                'max_spending_limit' => $request->input('max_spending_limit') !== null ? (float) $request->input('max_spending_limit') : null,
-                'price_list_id' => $request->input('price_list_id') ? (int) $request->input('price_list_id') : null,
-                'status'     => $request->input('status', 'active'),
-                'hire_date'  => $request->input('hire_date'),
-                'updated_at' => now(),
-            ]);
+            ->update($updateData);
 
         if (! $updated) {
             return response()->json(['message' => 'Dipendente non trovato.'], 404);

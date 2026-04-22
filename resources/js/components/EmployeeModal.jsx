@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Loader, Shield, ScanBarcode, Camera, Upload } from 'lucide-react';
-import { employees } from '../api.jsx';
+import { X, Loader, Shield, ScanBarcode, Camera, Upload, Link, UserCheck, Search } from 'lucide-react';
+import { employees, rolesPermissions } from '../api.jsx';
 import DatePicker from './DatePicker.jsx';
 
 const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition";
@@ -18,7 +18,11 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
     hire_date: employee?.hire_date || '',
     status: employee?.status || 'active',
     photo_url: employee?.photo_url || '',
+    user_id: employee?.user_id || '',
   });
+  const [usersList, setUsersList]     = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch, setUserSearch]   = useState('');
   const [activeTab, setActiveTab] = useState('profilo');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -38,11 +42,22 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
       hire_date: employee?.hire_date || '',
       status: employee?.status || 'active',
       photo_url: employee?.photo_url || '',
+      user_id: employee?.user_id || '',
     });
     setPhotoPreview(employee?.photo_url || null);
     setFieldErrors({});
     setError('');
+    setUserSearch('');
   }, [employee, selectedStoreId]);
+
+  // Carica lista utenti del tenant per il collegamento account
+  useEffect(() => {
+    setUsersLoading(true);
+    rolesPermissions.listUsers()
+      .then(res => setUsersList(res.data?.data || res.data || []))
+      .catch(() => {})
+      .finally(() => setUsersLoading(false));
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -93,6 +108,8 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
 
       const isNew = !employee?.id;
       const payload = { ...formData }; // photo_url base64 incluso
+      // Normalizza user_id: stringa vuota → null, stringa numerica → intero
+      payload.user_id = formData.user_id ? Number(formData.user_id) : null;
 
       if (employee?.id) {
         await employees.updateEmployee(employee.id, payload);
@@ -146,6 +163,15 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
             >
               Impostazioni Acquisti
               {activeTab === 'acquisti' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full" />}
+            </button>
+            <button
+              onClick={() => setActiveTab('account')}
+              className={`pb-3 text-sm font-bold transition-colors relative flex items-center gap-1.5 ${activeTab === 'account' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              <Link size={12} />
+              Account
+              {formData.user_id && <span style={{ width:7, height:7, borderRadius:'50%', background:'#10B981', display:'inline-block', marginLeft:2 }} />}
+              {activeTab === 'account' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full" />}
             </button>
           </div>
 
@@ -318,6 +344,130 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
           </div>
             </>
           )}
+
+          {activeTab === 'account' && (() => {
+            const linkedUser = usersList.find(u => String(u.id) === String(formData.user_id));
+            const filtered = usersList.filter(u => {
+              const q = userSearch.toLowerCase();
+              return !q || u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
+            });
+            return (
+              <>
+                {/* Banner stato collegamento */}
+                <div style={{
+                  padding: '14px 16px', borderRadius: 14, marginBottom: 16,
+                  background: linkedUser ? 'rgba(16,185,129,0.07)' : 'rgba(99,102,241,0.06)',
+                  border: `1px solid ${linkedUser ? 'rgba(16,185,129,0.25)' : 'rgba(99,102,241,0.18)'}`,
+                  display: 'flex', alignItems: 'center', gap: 12,
+                }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                    background: linkedUser ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.12)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <UserCheck size={20} color={linkedUser ? '#10B981' : '#6366F1'} />
+                  </div>
+                  <div>
+                    {linkedUser ? (
+                      <>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#065F46' }}>Account collegato ✓</div>
+                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{linkedUser.name} — {linkedUser.email}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#4338CA' }}>Nessun account collegato</div>
+                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>Collega un account per abilitare il login come questo dipendente.</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Search + Select utente */}
+                <div className="space-y-3">
+                  <label className={labelClass} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <Link size={12} /> Collega Account di Accesso
+                  </label>
+
+                  {/* Campo ricerca */}
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:'#9ca3af', pointerEvents:'none' }} />
+                    <input
+                      type="text"
+                      value={userSearch}
+                      onChange={e => setUserSearch(e.target.value)}
+                      placeholder="Cerca per nome o email..."
+                      className={inputClass}
+                      style={{ paddingLeft: 34 }}
+                    />
+                  </div>
+
+                  {usersLoading ? (
+                    <div style={{ textAlign:'center', padding: '16px 0', color:'#9ca3af', fontSize:13 }}>
+                      <Loader size={18} style={{ display:'inline', animation:'spin 1s linear infinite', marginRight:6 }} />
+                      Caricamento utenti...
+                    </div>
+                  ) : (
+                    <div style={{ maxHeight: 220, overflowY:'auto', border:'1px solid #e5e7eb', borderRadius:10, background:'#fafafa' }}>
+                      {/* Opzione "Nessuno" */}
+                      <button
+                        type="button"
+                        onClick={() => setFormData(p => ({ ...p, user_id: '' }))}
+                        style={{
+                          width:'100%', padding:'10px 14px', textAlign:'left', display:'flex',
+                          alignItems:'center', gap:10, background: !formData.user_id ? '#EEF2FF' : 'transparent',
+                          border:'none', borderBottom:'1px solid #f3f4f6', cursor:'pointer',
+                          color: !formData.user_id ? '#4338CA' : '#6B7280', fontWeight: !formData.user_id ? 700 : 400, fontSize:13,
+                        }}
+                      >
+                        <span style={{ width:28, height:28, borderRadius:'50%', background:'#f3f4f6', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>—</span>
+                        <span>Nessun account (non collegato)</span>
+                        {!formData.user_id && <span style={{ marginLeft:'auto', fontSize:11, color:'#6366F1' }}>✓ selezionato</span>}
+                      </button>
+
+                      {filtered.map(u => {
+                        const isSelected = String(u.id) === String(formData.user_id);
+                        const initials = (u.name || u.email || '?').slice(0, 2).toUpperCase();
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => setFormData(p => ({ ...p, user_id: String(u.id) }))}
+                            style={{
+                              width:'100%', padding:'10px 14px', textAlign:'left', display:'flex',
+                              alignItems:'center', gap:10, background: isSelected ? '#EEF2FF' : 'transparent',
+                              border:'none', borderBottom:'1px solid #f9fafb', cursor:'pointer',
+                              transition:'background 0.1s',
+                            }}
+                            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background='#f5f3ff'; }}
+                            onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background='transparent'; }}
+                          >
+                            <div style={{
+                              width:28, height:28, borderRadius:'50%', background: isSelected ? '#6366F1' : '#e5e7eb',
+                              display:'flex', alignItems:'center', justifyContent:'center',
+                              fontSize:11, fontWeight:800, color: isSelected ? '#fff' : '#6B7280', flexShrink:0,
+                            }}>{initials}</div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:13, fontWeight:700, color: isSelected ? '#4338CA' : '#374151', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{u.name}</div>
+                              <div style={{ fontSize:11, color:'#9ca3af', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{u.email}</div>
+                              {u.roles && <div style={{ fontSize:10, color:'#c4b5fd', marginTop:1 }}>{Array.isArray(u.roles) ? u.roles.map(r=>r.code||r.name||r).join(', ') : u.roles}</div>}
+                            </div>
+                            {isSelected && <span style={{ fontSize:11, color:'#6366F1', fontWeight:700, flexShrink:0 }}>✓</span>}
+                          </button>
+                        );
+                      })}
+                      {filtered.length === 0 && !usersLoading && (
+                        <div style={{ padding:'16px', textAlign:'center', fontSize:13, color:'#9ca3af' }}>Nessun utente trovato</div>
+                      )}
+                    </div>
+                  )}
+
+                  <p style={{ fontSize: 11, color: '#9ca3af' }}>
+                    💡 Collega l'account di login del dipendente per abilitare il riconoscimento automatico nel POS e nella pianificazione turni.
+                  </p>
+                </div>
+              </>
+            );
+          })()}
 
           {activeTab === 'acquisti' && (
             <>
