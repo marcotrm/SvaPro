@@ -5,10 +5,42 @@ import { toast } from 'react-hot-toast';
 import { stores } from '../api.jsx';
 import { useNavigate } from 'react-router-dom';
 
-const LS_TPL  = 'svapro_del_tpl_v4';
-const LS_DATA = 'svapro_del_data_v4';
+const LS_TPL     = 'svapro_del_tpl_v4';
+const LS_DATA    = 'svapro_del_data_v4';
+const SHARED_KEY = 'svapro_deliveries_shared'; // condiviso con DriverDeliveriesPage
 const DAYS    = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
 const DAYS_SH = ['LUN','MAR','MER','GIO','VEN','SAB','DOM'];
+
+// Sync: kanban → flat list letto dal corriere
+function syncToShared(days, weekKey) {
+  const flat = [];
+  Object.entries(days).forEach(([di, items]) => {
+    (items || []).forEach(item => {
+      flat.push({ ...item, weekKey, dayIdx: Number(di) });
+    });
+  });
+  const existing = loadShared();
+  // mantieni voci di altre settimane
+  const others = existing.filter(x => x.weekKey !== weekKey);
+  localStorage.setItem(SHARED_KEY, JSON.stringify([...others, ...flat]));
+}
+// Leggi lista condivisa
+function loadShared() {
+  try { return JSON.parse(localStorage.getItem(SHARED_KEY) || '[]'); } catch { return []; }
+}
+// Applica aggiornamenti driver su days
+function applyDriverUpdates(days, weekKey) {
+  const shared = loadShared().filter(x => x.weekKey === weekKey);
+  if (!shared.length) return days;
+  const next = { ...days };
+  Object.keys(next).forEach(di => {
+    next[di] = (next[di] || []).map(item => {
+      const upd = shared.find(s => s.id === item.id);
+      return upd ? { ...item, status: upd.status, driver_note: upd.driver_note, completed_at: upd.completed_at } : item;
+    });
+  });
+  return next;
+}
 
 function getMonday(d) {
   const dt = new Date(d); const day = dt.getDay();
@@ -39,7 +71,7 @@ const ST = {
   issue:      { label:'Problema',    color:'#F87171', bg:'rgba(248,113,113,0.15)' },
 };
 const SK = Object.keys(ST);
-const ACCENTS = ['#6366F1','#8B5CF6','#EC4899','#F59E0B','#10B981','#3B82F6','#EF4444'];
+const ACCENTS = ['#6366F1','#8B5CF6','#EC4899','#06B6D4','#10B981','#3B82F6','#EF4444'];
 
 export default function StoreDeliveriesPage() {
   const navigate = useNavigate();
@@ -53,6 +85,7 @@ export default function StoreDeliveriesPage() {
   const [pickStore, setPickStore] = useState('');
   const [dragOver, setDragOver] = useState(null);
   const dragRef = useRef(null);
+  const [detailCard, setDetailCard] = useState(null); // popup dettagli
 
   useEffect(() => {
     stores.getAll?.().then(r=>setStoreList(r.data?.data||r.data||[])).catch(()=>{});
@@ -66,7 +99,20 @@ export default function StoreDeliveriesPage() {
   useEffect(() => {
     const updated = {...allData,[weekKey]:days};
     setAllData(updated); saveData(updated);
+    syncToShared(days, weekKey);
   }, [days]);
+
+  // Ascolta aggiornamenti dal corriere (altra tab/finestra)
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== SHARED_KEY) return;
+      setDays(prev => applyDriverUpdates(prev, weekKey));
+    };
+    window.addEventListener('storage', onStorage);
+    // polling ogni 10s (stessa tab non riceve eventi storage propri)
+    const t = setInterval(() => setDays(prev => applyDriverUpdates(prev, weekKey)), 10000);
+    return () => { window.removeEventListener('storage', onStorage); clearInterval(t); };
+  }, [weekKey]);
 
   const handleAdd = (dayIdx) => {
     if (!pickStore) return;
@@ -283,33 +329,36 @@ export default function StoreDeliveriesPage() {
                         onDragOver={e=>onDragOver(e,dayIdx,idx)}
                         onDrop={e=>onDropItem(e,dayIdx,idx)}
                         style={{
-                          background:`${st.color}12`,
-                          border:`1px solid ${st.color}28`,
-                          borderLeft:`3px solid ${st.color}`,
+                          background: item.status==='done' ? 'rgba(52,211,153,0.1)' : item.status==='issue' ? 'rgba(248,113,113,0.1)' : `${st.color}12`,
+                          border: item.status==='done' ? '1px solid rgba(52,211,153,0.35)' : item.status==='issue' ? '1px solid rgba(248,113,113,0.35)' : `1px solid ${st.color}28`,
+                          borderLeft: item.status==='done' ? '3px solid #34D399' : item.status==='issue' ? '3px solid #F87171' : `3px solid ${st.color}`,
                           borderRadius:9,padding:'9px 10px 8px 11px',
-                          cursor:'grab',userSelect:'none',
+                          cursor:'pointer',userSelect:'none',
                           transition:'box-shadow 0.15s',
                           position:'relative',flexShrink:0,
                         }}
+                        onClick={()=>setDetailCard(item)}
                         onMouseEnter={e=>e.currentTarget.style.boxShadow='0 4px 14px rgba(0,0,0,0.3)'}
                         onMouseLeave={e=>e.currentTarget.style.boxShadow='none'}
                       >
                         <div style={{position:'absolute',top:5,right:5,display:'flex',alignItems:'center',gap:2}}>
-                          <span style={{fontSize:9,fontWeight:800,color:`${st.color}55`}}>#{idx+1}</span>
+                          <span style={{fontSize:9,fontWeight:800,color: item.status==='done'?'#34D399':item.status==='issue'?'#F87171':`${st.color}55`}}>#{idx+1}</span>
                           <GripVertical size={10} color={`${st.color}40`}/>
                         </div>
 
                         <div style={{fontWeight:700,fontSize:12,color:'var(--color-text,#F1F5F9)',paddingRight:28,lineHeight:1.35,marginBottom:7}}>
                           {item.storeName}
+                          {item.status==='done'&&<span style={{marginLeft:5,fontSize:10,color:'#34D399'}}>✓ Consegnato</span>}
+                          {item.status==='issue'&&<span style={{marginLeft:5,fontSize:10,color:'#F87171'}}>⚠ Problema</span>}
                         </div>
 
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                          <button onClick={()=>cycleStatus(dayIdx,item.id)}
+                          <button onClick={e=>{e.stopPropagation();cycleStatus(dayIdx,item.id);}}
                             title="Clicca per cambiare stato"
                             style={{display:'flex',alignItems:'center',gap:4,padding:'3px 8px',borderRadius:20,border:`1px solid ${st.color}35`,background:`${st.color}18`,color:st.color,fontSize:9,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
                             <div style={{width:5,height:5,borderRadius:'50%',background:st.color}}/>{st.label}
                           </button>
-                          <button onClick={()=>handleRemove(dayIdx,item.id)}
+                          <button onClick={e=>{e.stopPropagation();handleRemove(dayIdx,item.id);}}
                             style={{background:'none',border:'none',cursor:'pointer',padding:'2px',color:'rgba(255,255,255,0.18)',lineHeight:1,borderRadius:4}}
                             onMouseEnter={e=>e.currentTarget.style.color='#F87171'}
                             onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,0.18)'}>
@@ -340,6 +389,35 @@ export default function StoreDeliveriesPage() {
           );
         })}
       </div>
+      {/* ── POPUP DETTAGLI CARD ── */}
+      {detailCard && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
+          onClick={()=>setDetailCard(null)}>
+          <div style={{background:'#1a1a2e',border:'1px solid rgba(255,255,255,0.1)',borderRadius:20,padding:28,maxWidth:420,width:'100%',position:'relative'}}
+            onClick={e=>e.stopPropagation()}>
+            <button onClick={()=>setDetailCard(null)}
+              style={{position:'absolute',top:14,right:14,background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.4)'}}>
+              <X size={18}/>
+            </button>
+            <div style={{fontWeight:900,fontSize:18,color:'#fff',marginBottom:18}}>{detailCard.storeName}</div>
+            <div style={{display:'flex',flexDirection:'column',gap:12,fontSize:13}}>
+              {[['Stato', ST[detailCard.status]?.label || detailCard.status],
+                ['Priorità', detailCard.priority==='high'?'🔴 Urgente':detailCard.priority==='low'?'🟢 Bassa':'🟡 Normale'],
+                detailCard.items && ['Articoli', detailCard.items],
+                detailCard.notes && ['Note', detailCard.notes],
+                detailCard.driver_note && ['Nota Corriere', detailCard.driver_note],
+                detailCard.completed_at && ['Consegnato il', new Date(detailCard.completed_at).toLocaleString('it-IT')],
+                detailCard.created_at && ['Creato il', new Date(detailCard.created_at).toLocaleString('it-IT')],
+              ].filter(Boolean).map(([label,value])=>(
+                <div key={label} style={{display:'flex',gap:10,padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:10}}>
+                  <span style={{color:'rgba(255,255,255,0.4)',fontWeight:700,minWidth:100}}>{label}</span>
+                  <span style={{color:'#fff',fontWeight:600}}>{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

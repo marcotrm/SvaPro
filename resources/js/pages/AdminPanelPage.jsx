@@ -1226,7 +1226,7 @@ export default function AdminPanelPage() {
       case 'documenti':        return <SectionDocumenti />;
       default:                 return null;
     }
-  }, [active]);
+  }, [active, selectedStoreId]);
 
   const current = SECTIONS.find(s => s.id === active);
   const navigate = useNavigate();

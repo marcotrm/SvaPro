@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle2, Circle, Truck, MapPin, Package, Clock, AlertCircle, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-const STORAGE_KEY = 'svapro_store_deliveries';
+const STORAGE_KEY = 'svapro_deliveries_shared'; // condiviso con StoreDeliveriesPage
 
 const loadDeliveries = () => {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
