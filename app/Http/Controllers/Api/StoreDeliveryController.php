@@ -18,7 +18,7 @@ class StoreDeliveryController extends Controller
         $q = DB::table('store_deliveries')
             ->where('tenant_id', $tenantId)
             ->orderBy('scheduled_date')
-            ->orderByRaw("FIELD(priority,'high','normal','low')")
+            ->orderByRaw("CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END")
             ->orderBy('id');
 
         if ($date) {
@@ -152,7 +152,7 @@ class StoreDeliveryController extends Controller
             ->where('tenant_id', $tenant->id)
             ->whereIn('status', ['pending', 'in_progress'])
             ->whereDate('scheduled_date', $today)   // solo oggi
-            ->orderByRaw("FIELD(priority,'high','normal','low')")
+            ->orderByRaw("CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END")
             ->orderBy('id')
             ->get();
 
