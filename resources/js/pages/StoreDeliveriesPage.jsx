@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 /* eslint-disable */
-import { Truck, Plus, ChevronLeft, ChevronRight, Save, Copy, X, Calendar, GripVertical } from 'lucide-react';
+import { Truck, Plus, ChevronLeft, ChevronRight, Save, Copy, X, Calendar, GripVertical, ExternalLink } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { stores } from '../api.jsx';
+import { useNavigate } from 'react-router-dom';
 
 const LS_TPL  = 'svapro_del_tpl_v4';
 const LS_DATA = 'svapro_del_data_v4';
@@ -41,6 +42,7 @@ const SK = Object.keys(ST);
 const ACCENTS = ['#6366F1','#8B5CF6','#EC4899','#F59E0B','#10B981','#3B82F6','#EF4444'];
 
 export default function StoreDeliveriesPage() {
+  const navigate = useNavigate();
   const [storeList, setStoreList] = useState([]);
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const weekKey = toISO(weekStart);
@@ -155,6 +157,14 @@ export default function StoreDeliveriesPage() {
             </div>
           </div>
           <div style={{display:'flex',gap:8}}>
+            <button
+              onClick={() => window.open('/deliveries/driver', '_blank')}
+              style={topBtn('#10B981')}
+              title="Apri la vista mobile per il corriere in una nuova scheda"
+            >
+              <Truck size={12}/> Vista Corriere
+              <ExternalLink size={10} style={{opacity:0.7}}/>
+            </button>
             <button onClick={saveTplNow} style={topBtn('#6366F1')}><Save size={12}/> Salva template</button>
             {template && <button onClick={applyTplNow} style={topBtn('#8B5CF6')}><Copy size={12}/> Applica template</button>}
           </div>
