@@ -1333,44 +1333,6 @@ function AllStoresOverview({
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CUSTOM TIME OPTION — espandibile inline nel modal turno
-// ─────────────────────────────────────────────────────────────────────────────
-function CustomTimeOption({ onApply }) {
-  const [expanded, setExpanded] = React.useState(false);
-  const [startTime, setStartTime] = React.useState('09:00');
-  const [endTime, setEndTime]     = React.useState('18:00');
-
-  const handleConfirm = () => {
-    if (!startTime || !endTime) return;
-    onApply(startTime, endTime);
-  };
-
-  return (
-    <div style={{
-      background: expanded ? 'rgba(20,184,166,0.06)' : 'rgba(20,184,166,0.06)',
-      border: `1px ${expanded ? 'solid' : 'dashed'} rgba(20,184,166,0.4)`,
-      borderRadius: 12, overflow: 'hidden', transition: 'all 0.2s',
-    }}>
-      {/* Header — sempre visibile */}
-      <button
-        onClick={() => setExpanded(e => !e)}
-        style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-        onMouseEnter={e => e.currentTarget.style.background = 'rgba(20,184,166,0.08)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-      >
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(20,184,166,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <span style={{ fontSize: 14 }}>✏️</span>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#0f766e' }}>Orario Personalizzato</div>
-          <div style={{ fontSize: 12, color: '#0d9488', fontWeight: 600 }}>
-            {expanded ? 'Scegli inizio e fine turno' : 'Usa e getta — non salvato come template'}
-          </div>
-        </div>
-        <span style={{ fontSize: 16, color: '#0d9488', transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}>▾</span>
-      </button>
-
       {/* Body espandibile */}
       {expanded && (
         <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1471,6 +1433,9 @@ export default function ShiftsPage() {
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [activeCell, setActiveCell] = useState(null);
   const [showExport, setShowExport]   = useState(false);
+  const [custOpen,   setCustOpen]     = useState(false);
+  const [custStart,  setCustStart]    = useState('09:00');
+  const [custEnd,    setCustEnd]      = useState('18:00');
   const [showImport, setShowImport]   = useState(false);
 
   // ── Ricerca globale dipendente (cross-store) ──────────────────────────
@@ -2123,14 +2088,42 @@ export default function ShiftsPage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto', paddingRight: 4 }}>
 
-            {/* ── PERSONALIZZATO ── */}
-            <CustomTimeOption
-              empId={empId}
-              dateStr={dateStr}
-              onApply={(start, end) => {
-                applyTemplate(empId, dateStr, { start_time: start, end_time: end, name: 'Personalizzato', color: '#14b8a6' });
-              }}
-            />
+            {/* ── ORARIO PERSONALIZZATO ── */}
+            <div style={{ border: '2px solid #14b8a6', borderRadius: 12, overflow: 'hidden' }}>
+              <button
+                onClick={() => { setCustOpen(o => !o); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 14px', background: '#f0fdfa', border: 'none', cursor: 'pointer' }}
+              >
+                <span style={{ fontSize: 18 }}>✏️</span>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#0f766e' }}>Orario Personalizzato</div>
+                  <div style={{ fontSize: 12, color: '#0d9488' }}>{custOpen ? 'Scegli orario' : 'Usa e getta — non salvato'}</div>
+                </div>
+                <span style={{ color: '#14b8a6', fontWeight: 900 }}>{custOpen ? '▲' : '▼'}</span>
+              </button>
+              {custOpen && (
+                <div style={{ padding: '12px 14px', background: '#f0fdfa', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', display: 'block', marginBottom: 4 }}>INIZIO</label>
+                      <input type="time" value={custStart} onChange={e => setCustStart(e.target.value)}
+                        style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid #14b8a6', fontSize: 15, fontWeight: 700, color: '#0f766e', background: '#fff', boxSizing: 'border-box' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', display: 'block', marginBottom: 4 }}>FINE</label>
+                      <input type="time" value={custEnd} onChange={e => setCustEnd(e.target.value)}
+                        style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid #14b8a6', fontSize: 15, fontWeight: 700, color: '#0f766e', background: '#fff', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => applyTemplate(empId, dateStr, { start_time: custStart, end_time: custEnd, name: 'Personalizzato', color: '#14b8a6' })}
+                    style={{ padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#14b8a6,#0d9488)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    ✓ Applica {custStart} → {custEnd}
+                  </button>
+                </div>
+              )}
+            </div>
 
             {templates.length > 0 && <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />}
 
