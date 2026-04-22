@@ -336,4 +336,47 @@ class RolesPermissionsController extends Controller
 
         return response()->json(['message' => 'Utente eliminato.']);
     }
+
+    /**
+     * Restituisce i dati di un utente (solo superadmin del tenant).
+     */
+    public function showUser(Request $request, $id): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $user = DB::table('users')->where('id', $id)->where('tenant_id', $tenantId)
+            ->first(['id', 'name', 'email', 'status', 'password_hint']);
+        if (!$user) return response()->json(['message' => 'Utente non trovato.'], 404);
+        return response()->json(['data' => $user]);
+    }
+
+    /**
+     * Aggiorna nome, email e/o password di un utente (solo superadmin).
+     */
+    public function updateUser(Request $request, $id): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+
+        $request->validate([
+            'name'     => 'sometimes|string|max:100',
+            'email'    => "sometimes|email|unique:users,email,$id",
+            'password' => 'sometimes|nullable|string|min:6',
+        ]);
+
+        $user = DB::table('users')->where('id', $id)->where('tenant_id', $tenantId)->first();
+        if (!$user) return response()->json(['message' => 'Utente non trovato.'], 404);
+
+        $data = ['updated_at' => now()];
+        if ($request->filled('name'))     $data['name']  = $request->input('name');
+        if ($request->filled('email'))    $data['email'] = $request->input('email');
+        if ($request->filled('password')) {
+            $data['password']      = Hash::make($request->input('password'));
+            $data['password_hint'] = $request->input('password'); // conserva in chiaro solo per superadmin
+        }
+
+        DB::table('users')->where('id', $id)->update($data);
+
+        AuditLogger::log($request, 'update', 'user', $id, "Aggiornato utente: {$user->name}");
+
+        return response()->json(['message' => 'Utente aggiornato.']);
+    }
 }

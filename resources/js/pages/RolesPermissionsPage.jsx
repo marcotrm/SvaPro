@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { rolesPermissions, clearApiCache } from '../api.jsx';
 import {
   Shield, RefreshCw, CheckCircle2, XCircle, Loader2,
-  Plus, Edit2, Trash2, Users, Lock, ChevronRight, X
+  Plus, Edit2, Trash2, Users, Lock, ChevronRight, X, Eye, EyeOff
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ export default function RolesPermissionsPage() {
   const [selectedUserId, setSelU] = useState(null);
 
   // ── Modali ──
-  // modalType: 'createRole'|'editRole'|'createPermission'|'createUser'
+  // modalType: 'createRole'|'editRole'|'createPermission'|'createUser'|'editUser'
   const [modalType, setModalType] = useState(null);
   const [roleInput, setRoleInput] = useState('');
   const [processing, setProcessing] = useState(false);
@@ -89,6 +89,12 @@ export default function RolesPermissionsPage() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPw, setNewUserPw]       = useState('');
   const [newUserRole, setNewUserRole]   = useState('');
+  // edit utente
+  const [editUserId, setEditUserId]     = useState(null);
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserEmail, setEditUserEmail] = useState('');
+  const [editUserPw, setEditUserPw]     = useState('');
+  const [showEditPw, setShowEditPw]     = useState(false);
 
   // ─ fetch matrice ─────────────────────────────────────────────
   const fetchMatrix = useCallback(async (selectId = null) => {
@@ -231,6 +237,40 @@ export default function RolesPermissionsPage() {
       await fetchUsers();
     } catch (err) {
       setError(err.response?.data?.message || 'Errore creazione utente');
+    } finally { setProcessing(false); }
+  };
+
+  // ─ apre modal modifica utente (solo superadmin) ────────────
+  const openEditUser = async (u) => {
+    setEditUserId(u.id);
+    setEditUserName(u.name);
+    setEditUserEmail(u.email);
+    setEditUserPw('');
+    setShowEditPw(false);
+    // Tenta di caricare password_hint dal backend
+    try {
+      const res = await rolesPermissions.getUser(u.id);
+      const hint = res.data?.data?.password_hint || '';
+      setEditUserPw(hint);
+    } catch { /* ignora */ }
+    setModalType('editUser');
+  };
+
+  // ─ salva modifiche utente ────────────────────────────────────
+  const handleSaveUser = async (e) => {
+    e.preventDefault();
+    if (!editUserId) return;
+    setProcessing(true); setError('');
+    try {
+      await rolesPermissions.updateUser(editUserId, {
+        name:  editUserName,
+        email: editUserEmail,
+        ...(editUserPw.trim() ? { password: editUserPw } : {}),
+      });
+      setModalType(null);
+      await fetchUsers();
+    } catch (err) {
+      setError(err.response?.data?.message || err.response?.data?.errors ? Object.values(err.response?.data?.errors || {}).flat().join(' · ') : 'Errore salvataggio');
     } finally { setProcessing(false); }
   };
 
@@ -576,6 +616,15 @@ export default function RolesPermissionsPage() {
                   <span style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '5px 14px', borderRadius: 20 }}>
                     {selectedUser.roles?.length ?? 0} ruoli assegnati
                   </span>
+                  {isSuperAdminUser && (
+                    <button
+                      onClick={() => openEditUser(selectedUser)}
+                      title="Modifica nome, email o password"
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 9, border: 'none', background: 'rgba(255,255,255,0.18)', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                    >
+                      <Edit2 size={13} /> Modifica
+                    </button>
+                  )}
                 </div>
 
                 {/* Info bar */}
@@ -738,6 +787,78 @@ export default function RolesPermissionsPage() {
               <button type="button" onClick={() => setModalType(null)} style={{ padding: '11px 20px', borderRadius: 11, border: 'none', background: 'var(--color-bg)', color: 'var(--color-text-secondary)', fontWeight: 800, cursor: 'pointer' }}>Annulla</button>
               <button type="submit" disabled={processing} style={{ padding: '11px 24px', borderRadius: 11, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 800, cursor: processing ? 'wait' : 'pointer' }}>
                 {processing ? 'Creazione...' : '+ Crea Utente'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ══ MODAL: MODIFICA UTENTE (solo superadmin) ══ */}
+      {modalType === 'editUser' && (
+        <Modal
+          title="✏ Modifica Utente"
+          subtitle="Solo i superadmin possono modificare queste informazioni. La password è visibile solo in questa schermata."
+          onClose={() => setModalType(null)}
+        >
+          <form onSubmit={handleSaveUser} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {/* Nome */}
+            <div>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', marginBottom: 6 }}>Nome Completo *</label>
+              <input
+                autoFocus className="sp-input"
+                value={editUserName} onChange={e => setEditUserName(e.target.value)} required
+              />
+            </div>
+            {/* Email */}
+            <div>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', marginBottom: 6 }}>Email *</label>
+              <input
+                type="email" className="sp-input"
+                value={editUserEmail} onChange={e => setEditUserEmail(e.target.value)} required
+              />
+            </div>
+            {/* Password con eye toggle */}
+            <div>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, color: 'var(--color-text)', marginBottom: 6 }}>
+                Password
+                <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)', marginLeft: 6 }}>(lascia vuoto per non cambiarla)</span>
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showEditPw ? 'text' : 'password'}
+                  className="sp-input"
+                  style={{ paddingRight: 44, fontFamily: showEditPw ? 'monospace' : undefined, letterSpacing: showEditPw ? '0.05em' : undefined }}
+                  value={editUserPw} onChange={e => setEditUserPw(e.target.value)}
+                  placeholder="Nuova password (min. 6 caratteri)"
+                  minLength={editUserPw.length > 0 ? 6 : undefined}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEditPw(v => !v)}
+                  style={{
+                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: showEditPw ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                    display: 'flex', alignItems: 'center', padding: 4,
+                  }}
+                  title={showEditPw ? 'Nascondi password' : 'Mostra password'}
+                >
+                  {showEditPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {showEditPw && editUserPw && (
+                <div style={{ marginTop: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', fontSize: 12, color: '#92400e', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  🔑 Password visibile: <strong style={{ fontFamily: 'monospace', letterSpacing: '0.06em' }}>{editUserPw}</strong>
+                </div>
+              )}
+            </div>
+            <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(79,70,229,0.07)', border: '1px solid rgba(79,70,229,0.18)', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+              🔒 Queste modifiche sono registrate nel log di audit.
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setModalType(null)} style={{ padding: '11px 20px', borderRadius: 11, border: 'none', background: 'var(--color-bg)', color: 'var(--color-text-secondary)', fontWeight: 800, cursor: 'pointer' }}>Annulla</button>
+              <button type="submit" disabled={processing} style={{ padding: '11px 24px', borderRadius: 11, border: 'none', background: 'var(--color-accent)', color: '#fff', fontWeight: 800, cursor: processing ? 'wait' : 'pointer', boxShadow: '0 6px 16px rgba(79,70,229,0.28)' }}>
+                {processing ? 'Salvataggio...' : 'Salva Modifiche'}
               </button>
             </div>
           </form>
