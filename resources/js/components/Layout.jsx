@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache, cashMovements as cashApi, reports, exports_, employees as employeesApi } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
@@ -686,7 +686,7 @@ export default function Layout({ user, setUser }) {
                   {/* Header */}
                   <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ fontWeight: 800, fontSize: 13, color: '#fff' }}> Notifiche Cassa</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Soglia: â‚¬{CASH_THRESHOLD.toLocaleString()}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Soglia: €{CASH_THRESHOLD.toLocaleString()}</div>
                   </div>
 
                   {/* Lista allerte */}
@@ -729,7 +729,7 @@ export default function Layout({ user, setUser }) {
                     )}
                     {!dailyReportAvailable && cashAlertStores.length === 0 ? (
                       <div style={{ padding: '24px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>
-                        âœ… Nessuna allerta attiva
+                        ✅ Nessuna allerta attiva
                       </div>
                     ) : (
                       cashAlertStores.map((s, i) => (
@@ -746,7 +746,7 @@ export default function Layout({ user, setUser }) {
                             <div style={{ fontWeight: 900, fontSize: 14, color: '#ef4444' }}>
                               {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(s.balance)}
                             </div>
-                            <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: 8 }}>âš  ALLERTA</span>
+                             <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: 8 }}>⚠ ALLERTA</span>
                           </div>
                         </div>
                       ))
@@ -773,7 +773,7 @@ export default function Layout({ user, setUser }) {
                         style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                         title="Le allerte ricompariranno automaticamente dopo 3 ore se il saldo ÃƒÂ¨ ancora alto"
                       >
-                        Ã¢ÂÂ° Chiudi & Ricorda tra 3 ore
+                        ⏰ Chiudi & Ricorda tra 3 ore
                       </button>
                     </div>
                   )}
