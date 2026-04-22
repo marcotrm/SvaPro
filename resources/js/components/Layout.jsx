@@ -563,7 +563,7 @@ export default function Layout({ user, setUser }) {
             </div>
           </div>
           <div className="sp-topbar-actions">
-            {storesList.length > 1 && !userRoles.includes('store_manager') && (
+            {storesList.length > 1 && (
               <select 
                 className="sp-select sp-desktop-only" 
                 style={{ width: 200 }}
@@ -840,7 +840,7 @@ export default function Layout({ user, setUser }) {
             </div>
 
             {/* Store selector in drawer */}
-            {storesList.length > 0 && !userRoles.includes('store_manager') && (
+            {storesList.length > 0 && (
               <div style={{ padding: '12px 16px', borderBottom: '1px solid #1a1a1a' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 6 }}>Negozio Attivo</div>
                 <select
