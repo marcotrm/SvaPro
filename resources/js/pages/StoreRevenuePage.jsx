@@ -57,11 +57,10 @@ export default function StoreRevenuePage() {
   const [sortDir,     setSortDir]     = useState('desc');
   const [activeKeys,  setActiveKeys]  = useState(DEFAULT_ACTIVE);
   const [showPicker,  setShowPicker]  = useState(false);
-  // Default: ultimi 30 giorni
-  const defaultFrom = () => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0,10); };
-  const defaultTo   = () => new Date().toISOString().slice(0,10);
-  const [dateFrom,  setDateFrom]  = useState(defaultFrom);
-  const [dateTo,    setDateTo]    = useState(defaultTo);
+  // Default: oggi per entrambe le date
+  const todayISO = () => new Date().toISOString().slice(0,10);
+  const [dateFrom, setDateFrom] = useState(todayISO);
+  const [dateTo,   setDateTo]   = useState(todayISO);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -243,28 +242,33 @@ export default function StoreRevenuePage() {
           {/* Filtro periodo — Dal / Al */}
           {tab === 'ranking' && (
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--color-surface)', border:'1.5px solid var(--color-border)', borderRadius:10, padding:'5px 12px' }}>
-                <Calendar size={13} color="#7B6FD0" />
-                <span style={{ fontSize:11, fontWeight:700, color:'var(--color-text-tertiary)' }}>Dal</span>
+              {/* DAL */}
+              <label style={{ display:'flex', alignItems:'center', gap:7, background:'#1e2235', border:'1.5px solid rgba(123,111,208,0.4)', borderRadius:12, padding:'7px 13px', cursor:'pointer' }}>
+                <Calendar size={13} color="#7B6FD0"/>
+                <span style={{ fontSize:11, fontWeight:700, color:'#7B6FD0' }}>Dal</span>
                 <input
                   type="date"
                   value={dateFrom}
                   max={dateTo}
                   onChange={e => setDateFrom(e.target.value)}
-                  style={{ border:'none', background:'transparent', fontSize:12, fontWeight:700, color:'var(--color-text)', outline:'none', cursor:'pointer' }}
+                  style={{ border:'none', background:'transparent', fontSize:13, fontWeight:700, color:'#E2E8F0', outline:'none', cursor:'pointer', colorScheme:'dark' }}
                 />
-              </div>
-              <span style={{ fontSize:13, color:'var(--color-text-tertiary)' }}>→</span>
-              <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--color-surface)', border:'1.5px solid var(--color-border)', borderRadius:10, padding:'5px 12px' }}>
-                <span style={{ fontSize:11, fontWeight:700, color:'var(--color-text-tertiary)' }}>Al</span>
+              </label>
+
+              <span style={{ fontSize:14, color:'rgba(255,255,255,0.3)', fontWeight:700 }}>→</span>
+
+              {/* AL */}
+              <label style={{ display:'flex', alignItems:'center', gap:7, background:'#1e2235', border:'1.5px solid rgba(123,111,208,0.4)', borderRadius:12, padding:'7px 13px', cursor:'pointer' }}>
+                <Calendar size={13} color="#7B6FD0"/>
+                <span style={{ fontSize:11, fontWeight:700, color:'#7B6FD0' }}>Al</span>
                 <input
                   type="date"
                   value={dateTo}
                   min={dateFrom}
                   onChange={e => setDateTo(e.target.value)}
-                  style={{ border:'none', background:'transparent', fontSize:12, fontWeight:700, color:'var(--color-text)', outline:'none', cursor:'pointer' }}
+                  style={{ border:'none', background:'transparent', fontSize:13, fontWeight:700, color:'#E2E8F0', outline:'none', cursor:'pointer', colorScheme:'dark' }}
                 />
-              </div>
+              </label>
             </div>
           )}
           {tab === 'history' && (
