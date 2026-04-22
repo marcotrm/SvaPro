@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { stockTransfers, stores as storesApi, catalog } from '../api.jsx';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
+import MagazziniereDDTPage from './MagazziniereDDTPage.jsx';
 
 const STATUS_LABELS = {
     draft:      { label: 'Bozza',       cls: 'mid'  },
@@ -250,7 +251,11 @@ function DDTDetailModal({ transfer, onClose }) {
 
 /* ─── Componente principale ─────────────────────────────────────── */
 export default function StockTransfersPage() {
-    const { selectedStoreId } = useOutletContext();
+    const { selectedStoreId, user } = useOutletContext();
+
+    // Magazziniere: vista mobile dedicata
+    const isMagazziniere = user?.roles?.includes('magazziniere') && !user?.roles?.includes('superadmin') && !user?.roles?.includes('admin_cliente');
+    if (isMagazziniere) return <MagazziniereDDTPage />;
 
     const [list,    setList]    = useState([]);
     const [stores,  setStores]  = useState([]);
