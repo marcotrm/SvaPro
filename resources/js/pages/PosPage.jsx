@@ -49,29 +49,32 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
       onClick={handleAdd}
       className={popped ? 'sp-pos-card-added' : ''}
       style={{
-        background: 'white',
-        borderRadius: 12,
+        background: '#fff',
+        borderRadius: 14,
         overflow: 'hidden',
-        cursor: 'pointer',
-        border: qscarePrice > 0 ? '1px solid rgba(99,102,241,0.25)' : '1px solid #eee',
+        cursor: inStock ? 'pointer' : 'default',
+        border: qscarePrice > 0 ? '1.5px solid rgba(99,102,241,0.3)' : '1.5px solid #f0f0f5',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        transition: 'all 0.18s cubic-bezier(.4,0,.2,1)',
-        boxShadow: qscarePrice > 0 ? '0 1px 6px rgba(99,102,241,0.15)' : '0 1px 4px rgba(0,0,0,0.06)',
-        opacity: inStock ? 1 : 0.65,
+        transition: 'transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.18s',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+        opacity: inStock ? 1 : 0.55,
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-3px)';
-        e.currentTarget.style.boxShadow = qscarePrice > 0 ? '0 12px 28px rgba(99,102,241,0.25)' : '0 12px 28px rgba(0,0,0,0.13)';
+        if (!inStock) return;
+        e.currentTarget.style.transform = 'translateY(-4px)';
+        e.currentTarget.style.boxShadow = qscarePrice > 0
+          ? '0 16px 36px rgba(99,102,241,0.2)'
+          : '0 16px 36px rgba(0,0,0,0.11)';
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = qscarePrice > 0 ? '0 1px 6px rgba(99,102,241,0.15)' : '0 1px 4px rgba(0,0,0,0.06)';
+        e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.06)';
       }}
     >
-      {/* Immagine o gradient placeholder */}
-      <div style={{ height: 100, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+      {/* Immagine / gradient */}
+      <div style={{ height: 110, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
         {imgUrl ? (
           <img
             src={imgUrl}
@@ -80,7 +83,6 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
             onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
           />
         ) : null}
-        {/* Fallback gradient — shown when no image or image fails */}
         <div style={{
           width: '100%', height: '100%',
           background: palette.bg,
@@ -89,41 +91,41 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
           position: imgUrl ? 'absolute' : 'relative',
           inset: 0,
         }}>
-          <Package size={36} color="rgba(255,255,255,0.5)" />
+          <Package size={36} color="rgba(255,255,255,0.55)" />
         </div>
 
-        {/* Stock badge */}
+        {/* Stock pill */}
         <div style={{
-          position: 'absolute', top: 7, left: 7,
-          background: inStock ? 'rgba(16,185,129,0.92)' : 'rgba(239,68,68,0.92)',
-          color: '#fff', borderRadius: 8, padding: '2px 8px', fontSize: 10, fontWeight: 800,
+          position: 'absolute', top: 8, left: 8,
+          background: inStock ? 'rgba(6,182,112,0.92)' : 'rgba(239,68,68,0.9)',
+          color: '#fff', borderRadius: 20, padding: '2px 9px',
+          fontSize: 10, fontWeight: 800,
           backdropFilter: 'blur(6px)',
-          boxShadow: inStock ? '0 2px 8px rgba(16,185,129,0.4)' : '0 2px 8px rgba(239,68,68,0.4)',
           letterSpacing: '0.02em',
+          boxShadow: inStock ? '0 2px 8px rgba(6,182,112,0.35)' : '0 2px 8px rgba(239,68,68,0.35)',
         }}>
-          {inStock ? onHand : '×'}
+          {inStock ? `Qta ${onHand}` : 'Esaurito'}
         </div>
 
-        {/* QScare badge — visibile solo per hardware con prezzo configurato */}
+        {/* QScare badge */}
         {qscarePrice > 0 && (
           <div style={{
-            position: 'absolute', bottom: 7, left: 7,
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.92), rgba(139,92,246,0.92))',
-            color: '#fff', borderRadius: 8, padding: '2px 7px', fontSize: 9, fontWeight: 800,
+            position: 'absolute', top: 8, right: 8,
+            background: 'linear-gradient(135deg,rgba(99,102,241,0.92),rgba(139,92,246,0.92))',
+            color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 9, fontWeight: 800,
             backdropFilter: 'blur(6px)',
-            boxShadow: '0 2px 8px rgba(99,102,241,0.4)',
             display: 'flex', alignItems: 'center', gap: 3,
-            letterSpacing: '0.02em',
             whiteSpace: 'nowrap',
           }}>
             🛡 {fmt(qscarePrice)}
           </div>
         )}
-        {/* Featured badge */}
+
+        {/* Featured */}
         {product.is_featured && (
           <div style={{
-            position: 'absolute', bottom: 7, right: 7,
-            background: 'rgba(251,191,36,0.92)',
+            position: 'absolute', bottom: 8, right: 8,
+            background: 'rgba(251,191,36,0.95)',
             borderRadius: '50%', width: 22, height: 22,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 2px 6px rgba(251,191,36,0.5)',
@@ -133,9 +135,12 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
         )}
       </div>
 
+      {/* Bottom accent bar */}
+      <div style={{ height: 3, background: palette.bg, flexShrink: 0 }} />
+
       {/* Info */}
-      <div style={{ padding: '12px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.4, color: '#1a1a2e', WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+      <div style={{ padding: '10px 12px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.35, color: '#111827', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {displayMode === 'sku' ? (product.sku || product.name) : product.name}
         </div>
         {variant?.flavor && (
@@ -143,8 +148,9 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
             <Cherry size={9} style={{ display: 'inline', marginRight: 3 }} />{variant.flavor}
           </div>
         )}
+
         <div style={{ marginTop: 'auto', paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 18, fontWeight: 800, color: palette.accent }}>
+          <span style={{ fontSize: 17, fontWeight: 900, color: palette.accent }}>
             {fmt(price)}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -152,27 +158,27 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
               <button
                 onClick={e => { e.stopPropagation(); onNegozi(product); }}
                 style={{
-                  background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-                  borderRadius: 8, padding: '4px 8px', fontSize: 11, fontWeight: 700,
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  cursor: 'pointer', color: 'var(--color-text-secondary)'
+                  background: '#f5f3ff', border: '1px solid #ede9fe',
+                  borderRadius: 8, padding: '4px 7px', fontSize: 10, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', gap: 3,
+                  cursor: 'pointer', color: '#7c3aed',
                 }}
                 title="Giacenze Locali"
               >
-                <MapPin size={12} color="#10B981" /> Store
+                <MapPin size={11} color="#7c3aed" /> Store
               </button>
             )}
             <button
               onClick={e => { e.stopPropagation(); onInfo(product); }}
               style={{
-                background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                background: '#f9fafb', border: '1px solid #e5e7eb',
                 borderRadius: 8, padding: '4px 6px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer'
               }}
               title="Informazioni Prodotto"
             >
-              <Info size={14} color="var(--color-text-secondary)" strokeWidth={2.5} />
+              <Info size={13} color="#9ca3af" strokeWidth={2.5} />
             </button>
           </div>
           {variant?.location && (
@@ -185,12 +191,12 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
 
       {/* Hover add overlay */}
       <div className="pos-add-overlay" style={{
-        position: 'absolute', inset: 0, background: 'rgba(123,111,208,0.08)',
+        position: 'absolute', inset: 0, background: 'rgba(123,111,208,0.07)',
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-        paddingBottom: 10, opacity: 0, transition: 'opacity 0.15s',
+        paddingBottom: 12, opacity: 0, transition: 'opacity 0.15s',
         pointerEvents: 'none',
       }}>
-        <div style={{ background: '#7B6FD0', color: '#fff', borderRadius: 20, padding: '4px 14px', fontSize: 11, fontWeight: 700 }}>
+        <div style={{ background: '#7B6FD0', color: '#fff', borderRadius: 20, padding: '5px 16px', fontSize: 11, fontWeight: 700, boxShadow: '0 4px 12px rgba(123,111,208,0.4)' }}>
           + Aggiungi
         </div>
       </div>
@@ -905,7 +911,7 @@ export default function PosPage() {
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: 16,
+            gap: 18,
           }}>
             {filteredProducts.map(p => (
               <ProductCard
