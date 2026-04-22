@@ -21,8 +21,8 @@ import {
 const allNavigation = [
   // Ã¢â€â‚¬Ã¢â€â‚¬ Principale Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Principale', icon: LayoutDashboard, items: [
-    { label: 'POS Cassa',              href: '/',               icon: Monitor,     roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
-    { label: 'Report & Analisi',       href: '/reports',        icon: Activity,    roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'POS Cassa',              href: '/',               icon: Monitor,     roles: ['superadmin','admin_cliente','store_manager','dipendente','project_manager'] },
+    { label: 'Report & Analisi',       href: '/reports',        icon: Activity,    roles: ['superadmin','admin_cliente','store_manager','project_manager'] },
     { label: 'Fatturato Negozi',       href: '/store-revenue',  icon: BarChart3,   roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Bolle in Arrivo',       href: '/warehouse/delivery-notes', icon: Truck, roles: ['dipendente','magazziniere'] },
     { label: 'Clienti',                href: '/customers',      icon: Users,       roles: ['dipendente'] },
@@ -30,7 +30,7 @@ const allNavigation = [
 
   // 4. Magazzino Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Magazzino', icon: Warehouse, items: [
-    { label: 'Giacenze & Stock',       href: '/inventory',            icon: Warehouse,      roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Giacenze & Stock',       href: '/inventory',            icon: Warehouse,      roles: ['superadmin','admin_cliente','store_manager','project_manager'] },
     { label: 'Giacenze Locali',        href: '/warehouse/cross-store', icon: MapPin,         roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Prodotti',               href: '/catalog',              icon: Package,        roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Carico Merce (DDT)',     href: '/supplier-delivery',    icon: Truck,          roles: ['superadmin','admin_cliente','store_manager'] },
@@ -59,11 +59,11 @@ const allNavigation = [
 
   // 8. Dipendenti Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Dipendenti', icon: Users, items: [
-    { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente','store_manager'] },
-    { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin'] },
+    { label: 'Anagrafica Dipendenti',  href: '/employees',    icon: Users,       roles: ['superadmin','admin_cliente','store_manager','project_manager'] },
+    { label: 'Presenze & Timbrature',  href: '/attendance',   icon: Fingerprint, roles: ['superadmin','project_manager'] },
     { label: 'Kiosk Timbratura',       href: '/clock-in',     icon: Fingerprint, roles: ['superadmin'] },
     { label: 'Timbra Entrata/Uscita',  href: '/clock-in',     icon: Fingerprint, roles: ['dipendente'] },
-    { label: 'Pianificazione Turni',   href: '/shifts',       icon: Calendar,    roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
+    { label: 'Pianificazione Turni',   href: '/shifts',       icon: Calendar,    roles: ['superadmin','admin_cliente','store_manager','dipendente','project_manager'] },
     { label: 'Gamification',         href: '/gamification', icon: Star,        roles: ['superadmin','admin_cliente','store_manager','dipendente'] },
   ]},
 
@@ -73,7 +73,7 @@ const allNavigation = [
     { label: 'Dashboard Amm.',         href: '/admin-panel',  icon: BarChart3,        roles: ['superadmin'] },
     { label: 'Dashboard QScare',       href: '/qscare-dashboard', icon: Shield,       roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Anagrafica Clienti',     href: '/customers',    icon: Users,            roles: ['superadmin'] },
-    { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,            roles: ['superadmin'] },
+    { label: 'Negozi & Punti Vendita', href: '/stores',       icon: Store,            roles: ['superadmin','project_manager'] },
     { label: 'Fatturazione',           href: '/invoices',     icon: FileText,         roles: ['superadmin'] },
   ]},
 
