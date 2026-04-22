@@ -150,8 +150,8 @@ export default function Layout({ user, setUser }) {
     try {
       const response = await stores.getStores();
       let slist = response.data?.data || [];
-      // Se è un dipendente (e NON project_manager/superadmin) e ha un negozio assegnato, mostra solo quello
-      const isOnlyDipendente = user?.roles?.includes('dipendente') && !user?.roles?.includes('project_manager') && !user?.roles?.includes('superadmin');
+      // Se è un dipendente puro (senza ruoli admin/manager) e ha un negozio assegnato, mostra solo quello
+      const isOnlyDipendente = user?.roles?.includes('dipendente') && !user?.roles?.includes('project_manager') && !user?.roles?.includes('superadmin') && !user?.roles?.includes('store_manager') && !user?.roles?.includes('admin');
       if (isOnlyDipendente && user?.employee_store_id) {
         slist = slist.filter(s => String(s.id) === String(user.employee_store_id));
         if (slist.length > 0 && String(selectedStoreId) !== String(user.employee_store_id)) {
