@@ -906,63 +906,47 @@ export default function Layout({ user, setUser }) {
       {/* â”€â”€ MOBILE BOTTOM NAV â€” role-aware â”€â”€ */}
       <nav className="sp-mobile-nav" aria-label="Navigazione principale mobile">
         <div className="sp-mobile-nav-inner">
-          {/* POS Cassa â€” tutti i ruoli */}
-          <button
-            className={`sp-mobile-nav-btn ${location.pathname === '/' || location.pathname === '/pos' ? 'active' : ''}`}
-            onClick={() => navigate('/')}
-          >
-            <Monitor size={22} />
-            <span>Cassa</span>
-          </button>
-
-          {/* DIPENDENTI: Timbra + Bolle */}
-          {userRoles.includes('dipendente') && !userRoles.includes('admin_cliente') && !userRoles.includes('store_manager') && !userRoles.includes('superadmin') ? (
+          {/* MAGAZZINIERE: solo pagine magazzino */}
+          {userRoles.includes('magazziniere') && !userRoles.includes('superadmin') && !userRoles.includes('admin_cliente') ? (
             <>
-              <button
-                className={`sp-mobile-nav-btn ${location.pathname === '/clock-in' ? 'active' : ''}`}
-                onClick={() => navigate('/clock-in')}
-              >
-                <Fingerprint size={22} />
-                <span>Timbra</span>
+              <button className={`sp-mobile-nav-btn ${location.pathname === '/stock-transfers' ? 'active' : ''}`} onClick={() => navigate('/stock-transfers')}>
+                <ArrowRightLeft size={22} /><span>DDT</span>
               </button>
-              <button
-                className={`sp-mobile-nav-btn ${location.pathname === '/warehouse/restock' ? 'active' : ''}`}
-                onClick={() => navigate('/warehouse/restock')}
-              >
-                <Package size={22} />
-                <span>Riassort.</span>
+              <button className={`sp-mobile-nav-btn ${location.pathname === '/warehouse/delivery-notes' ? 'active' : ''}`} onClick={() => navigate('/warehouse/delivery-notes')}>
+                <Truck size={22} /><span>Scarico</span>
               </button>
-              <button
-                className={`sp-mobile-nav-btn ${location.pathname === '/warehouse/delivery-notes' ? 'active' : ''}`}
-                onClick={() => navigate('/warehouse/delivery-notes')}
-              >
-                <Truck size={22} />
-                <span>Bolle</span>
+              <button className={`sp-mobile-nav-btn ${location.pathname === '/supplier-delivery' ? 'active' : ''}`} onClick={() => navigate('/supplier-delivery')}>
+                <Package size={22} /><span>Arrivo</span>
+              </button>
+            </>
+          ) : userRoles.includes('dipendente') && !userRoles.includes('admin_cliente') && !userRoles.includes('store_manager') && !userRoles.includes('superadmin') ? (
+            <>
+              <button className={`sp-mobile-nav-btn ${location.pathname === '/' || location.pathname === '/pos' ? 'active' : ''}`} onClick={() => navigate('/')}>
+                <Monitor size={22} /><span>Cassa</span>
+              </button>
+              <button className={`sp-mobile-nav-btn ${location.pathname === '/clock-in' ? 'active' : ''}`} onClick={() => navigate('/clock-in')}>
+                <Fingerprint size={22} /><span>Timbra</span>
+              </button>
+              <button className={`sp-mobile-nav-btn ${location.pathname === '/warehouse/restock' ? 'active' : ''}`} onClick={() => navigate('/warehouse/restock')}>
+                <Package size={22} /><span>Riassort.</span>
+              </button>
+              <button className={`sp-mobile-nav-btn ${location.pathname === '/warehouse/delivery-notes' ? 'active' : ''}`} onClick={() => navigate('/warehouse/delivery-notes')}>
+                <Truck size={22} /><span>Bolle</span>
               </button>
             </>
           ) : (
-            /* ADMIN: Negozi + Vendite */
             <>
-              <button
-                className={`sp-mobile-nav-btn ${location.pathname === '/stores' ? 'active' : ''}`}
-                onClick={() => navigate('/stores')}
-              >
-                <Store size={22} />
-                <span>Negozi</span>
+              <button className={`sp-mobile-nav-btn ${location.pathname === '/' || location.pathname === '/pos' ? 'active' : ''}`} onClick={() => navigate('/')}>
+                <Monitor size={22} /><span>Cassa</span>
               </button>
-              <button
-                className={`sp-mobile-nav-btn ${showStoreStats ? 'active' : ''}`}
-                onClick={() => setShowStoreStats(v => !v)}
-              >
-                <BarChart3 size={22} />
-                <span>Vendite</span>
+              <button className={`sp-mobile-nav-btn ${location.pathname === '/stores' ? 'active' : ''}`} onClick={() => navigate('/stores')}>
+                <Store size={22} /><span>Negozi</span>
               </button>
-              <button
-                className={`sp-mobile-nav-btn ${location.pathname.startsWith('/customers') ? 'active' : ''}`}
-                onClick={() => navigate('/customers')}
-              >
-                <Users size={22} />
-                <span>Clienti</span>
+              <button className={`sp-mobile-nav-btn ${showStoreStats ? 'active' : ''}`} onClick={() => setShowStoreStats(v => !v)}>
+                <BarChart3 size={22} /><span>Vendite</span>
+              </button>
+              <button className={`sp-mobile-nav-btn ${location.pathname.startsWith('/customers') ? 'active' : ''}`} onClick={() => navigate('/customers')}>
+                <Users size={22} /><span>Clienti</span>
               </button>
             </>
           )}
