@@ -1102,11 +1102,11 @@ export default function ShiftsPage() {
   const { selectedStoreId, userRoles = [], user } = useOutletContext?.() || {};
 
   // Ruoli turni
-  const isDipendente     = userRoles.includes('dipendente') && !userRoles.includes('store_manager') && !userRoles.includes('project_manager') && !userRoles.includes('superadmin');
-  const isStoreManager   = userRoles.includes('store_manager');
+  const isDipendente     = userRoles.includes('dipendente') && !userRoles.includes('project_manager') && !userRoles.includes('superadmin');
   const isProjectManager = userRoles.includes('project_manager');
   const isSuperAdmin     = userRoles.includes('superadmin');
-  const isShiftManager   = isStoreManager || isProjectManager || isSuperAdmin || userRoles.includes('admin') || userRoles.includes('shift_manager');
+  // Tutti i dipendenti possono proporre e bloccare turni. PM e superadmin hanno accesso completo.
+  const isShiftManager   = isProjectManager || isSuperAdmin || userRoles.includes('admin') || userRoles.includes('shift_manager');
   // Dipendente: legge employee_id dall'account oppure dalla scelta manuale in sessione
   const sessionKey = `svapro_self_emp_${user?.id || 'anon'}`;
   const [sessionSelfEmpId, setSessionSelfEmpIdRaw] = useState(
@@ -1121,10 +1121,10 @@ export default function ShiftsPage() {
     ? String(user.employee_id)
     : sessionSelfEmpId || null;
 
-  // Solo admin/shift_manager possono modificare turni altrui. Il dipendente può modificare solo la propria riga
-  const canEditShifts = isShiftManager;
+  // Dipendenti possono proporre i propri turni e bloccarli. PM/Superadmin possono modificare tutto.
+  const canEditShifts = true; // Tutti possono editare (dipendenti propongono, admin confermano)
   // canEditGrid sarà definito più avanti dopo lo stato weekLock
-  const canSaveShifts = !isDipendente; // Dipendenti non possono salvare
+  const canSaveShifts = true; // Tutti possono salvare
 
   // Dipendente: usa il suo store anche se selectedStoreId non è ancora impostato
   const defaultStoreId = selectedStoreId || (isDipendente && user?.employee_store_id ? String(user.employee_store_id) : '');
@@ -1342,12 +1342,8 @@ export default function ShiftsPage() {
     try {
       const startDateStr = weekDays[0].dateStr;
       const endDateStr   = weekDays[6].dateStr;
-      // Per i dipendenti: cerca i propri turni su QUALUNQUE store (il superadmin può
-      // averli salvati con uno store_id diverso da quello del dipendente).
-      // Non passiamo store_id così il backend non filtra per negozio.
-      const shiftParams = isDipendente && currentEmployeeId
-        ? { employee_id: currentEmployeeId, start_date: startDateStr, end_date: endDateStr }
-        : { store_id: storeId, start_date: startDateStr, end_date: endDateStr };
+      // Tutti vedono i turni dello store selezionato (inclusi i dipendenti)
+      const shiftParams = { store_id: storeId, start_date: startDateStr, end_date: endDateStr };
       
       // Chiama le API separatamente per isolare gli errori
       let empRes = null, shRes = null, tplRes = null;
@@ -1392,13 +1388,9 @@ export default function ShiftsPage() {
       const empIdSet = new Set(empList.map(e => String(e.id)));
       const shiftsMap = {};
       (shRes?.data?.data || []).forEach(s => {
-        // Per i dipendenti: mostra solo i propri turni (bypassa il filtro store per non perdere turni assegnati dal superadmin)
-        if (isDipendente) {
-          if (currentEmployeeId && String(s.employee_id) !== String(currentEmployeeId)) return;
-        } else {
-          // Filtra i turni orfani: solo quelli di dipendenti presenti in questo store
-          if (!empIdSet.has(String(s.employee_id))) return;
-        }
+        // Mostra tutti i turni dello store (dipendenti vedono tutto, possono proporre solo i propri)
+        // Filtra solo i turni orfani (dipendenti non più nello store)
+        if (!empIdSet.has(String(s.employee_id))) return;
         const key = `${s.employee_id}_${s.date}`;
         shiftsMap[key] = {
           id:         s.id,
@@ -2145,7 +2137,7 @@ export default function ShiftsPage() {
 
 
       {/* ── Lock Status Banner ── */}
-      {(isStoreManager || isSuperAdmin) && isWeekLocked && !isWeekConfirmed && (
+      {(isDipendente || isSuperAdmin) && isWeekLocked && !isWeekConfirmed && (
         <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 12, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#D97706', fontWeight: 700 }}>
             <span style={{ fontSize: 18 }}>🔒</span> Turni bloccati — in attesa di conferma dal Project Manager.
@@ -2158,14 +2150,14 @@ export default function ShiftsPage() {
         </div>
       )}
 
-      {(isStoreManager || isSuperAdmin) && isWeekConfirmed && (
+      {(isDipendente || isSuperAdmin) && isWeekConfirmed && (
         <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#10B981', fontWeight: 700 }}>
           <span style={{ fontSize: 18 }}>✅</span> Turni confermati dal Project Manager. Settimana definitiva.
         </div>
       )}
 
-      {/* ── Bottone Blocca/Invia Turni — solo Store Manager ── */}
-      {isStoreManager && !isWeekLocked && !isWeekConfirmed && (
+      {/* ── Bottone Blocca/Invia Turni — per dipendenti e superadmin ── */}
+      {(isDipendente || isSuperAdmin) && !isWeekLocked && !isWeekConfirmed && (
         <div style={{ marginBottom: 16 }}>
           <button onClick={handleLockWeek} disabled={lockLoading} style={{
             display: 'flex', alignItems: 'center', gap: 10, padding: '14px 24px', borderRadius: 14,
@@ -2175,7 +2167,7 @@ export default function ShiftsPage() {
             opacity: lockLoading ? 0.7 : 1, transition: 'all 0.2s',
           }}>
             {lockLoading ? <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <span style={{ fontSize: 18 }}>🔒</span>}
-            Blocca e Invia Turni al Project Manager
+            Blocca e Invia Turni al Project Manager (Store Manager)
           </button>
         </div>
       )}
