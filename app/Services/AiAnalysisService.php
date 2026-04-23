@@ -149,19 +149,40 @@ EOT;
             'parallel_tool_calls' => false
         ];
 
-        // Log del JSON esatto inviato a Groq
-        Log::info("Invio payload a Groq:", ['payload' => json_encode($payload)]);
+        // Helper function for API calls with retry
+        $makeApiCall = function($payload) use ($apiKey) {
+            $maxRetries = 2;
+            $retryDelay = 3; // seconds
+            
+            for ($i = 0; $i <= $maxRetries; $i++) {
+                $response = Http::withoutVerifying()->withHeaders([
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Content-Type' => 'application/json',
+                ])->timeout(30)->post("https://api.groq.com/openai/v1/chat/completions", $payload);
 
-        try {
-            $response = Http::withoutVerifying()->withHeaders([
-                'Authorization' => 'Bearer ' . $apiKey,
-                'Content-Type' => 'application/json',
-            ])->timeout(30)->post("https://api.groq.com/openai/v1/chat/completions", $payload);
-
-            if (!$response->successful()) {
-                Log::error("Errore Groq API", ['status' => $response->status(), 'body' => $response->body()]);
-                return "Errore Groq: " . $response->status();
+                if ($response->successful()) {
+                    return $response;
+                }
+                
+                if ($response->status() === 429 && $i < $maxRetries) {
+                    Log::warning("Groq Rate Limit (429). Retrying in {$retryDelay}s...");
+                    sleep($retryDelay);
+                    $retryDelay *= 2; // Exponential backoff
+                    continue;
+                }
+                
+                return $response; // Return the failed response if not 429 or max retries reached
             }
+            return null;
+        };
+
+        $response = $makeApiCall($payload);
+
+        if (!$response || !$response->successful()) {
+            $status = $response ? $response->status() : 'Timeout';
+            Log::error("Errore Groq API", ['status' => $status, 'body' => $response ? $response->body() : '']);
+            return "Il sistema AI è momentaneamente sovraccarico (Limite Token API). Riprova tra 10 secondi.";
+        }
 
             $responseData = $response->json();
             $message = $responseData['choices'][0]['message'];
@@ -193,15 +214,13 @@ EOT;
                 $payload['messages'] = $messages;
                 
                 // Rinviamo il risultato al modello. NON rimuoviamo i tools così può riprovare se ha sbagliato.
-                $finalResponse = Http::withoutVerifying()->withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey,
-                    'Content-Type' => 'application/json',
-                ])->post("https://api.groq.com/openai/v1/chat/completions", $payload);
+                $finalResponse = $makeApiCall($payload);
 
-                if ($finalResponse->successful()) {
+                if ($finalResponse && $finalResponse->successful()) {
                     $message = $finalResponse->json()['choices'][0]['message'];
                 } else {
-                    Log::error("Errore Groq round " . $rounds, ['status' => $finalResponse->status(), 'body' => $finalResponse->body()]);
+                    $status = $finalResponse ? $finalResponse->status() : 'Timeout';
+                    Log::error("Errore Groq round " . $rounds, ['status' => $status, 'body' => $finalResponse ? $finalResponse->body() : '']);
                     break;
                 }
                 $rounds++;
