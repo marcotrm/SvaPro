@@ -102,7 +102,7 @@ $dataJson
         ];
 
         try {
-            $response = Http::withHeaders([
+            $response = Http::withoutVerifying()->withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
             ])->post("https://api.groq.com/openai/v1/chat/completions", $payload);
@@ -170,7 +170,7 @@ Importante: restituisci SOLO ed esclusivamente un oggetto JSON valido, dove la c
         ];
 
         try {
-            $response = Http::withHeaders([
+            $response = Http::withoutVerifying()->withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
             ])->post("https://api.groq.com/openai/v1/chat/completions", $payload);
