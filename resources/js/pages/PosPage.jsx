@@ -104,7 +104,10 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
           letterSpacing: '0.02em',
           boxShadow: inStock ? '0 2px 8px rgba(6,182,112,0.35)' : '0 2px 8px rgba(239,68,68,0.35)',
         }}>
-          {inStock ? onHand : '×'}
+          {isDipendente
+            ? (inStock ? '● Disponibile' : '● Esaurito')
+            : (inStock ? onHand : '×')
+          }
         </div>
 
         {/* QScare badge */}
