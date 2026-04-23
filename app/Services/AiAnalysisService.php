@@ -14,115 +14,55 @@ class AiAnalysisService
      */
     public function getAggregatedData(int $tenantId): array
     {
-        // Vendite recenti (aggregate)
-        $sales = DB::table('stock_movements')
-            ->join('product_variants as pv', 'pv.id', '=', 'stock_movements.product_variant_id')
-            ->join('products as p', 'p.id', '=', 'pv.product_id')
-            ->join('stores as s', 's.id', '=', 'stock_movements.warehouse_id')
-            ->where('stock_movements.tenant_id', $tenantId)
-            ->where('stock_movements.qty', '<', 0)
-            ->where('stock_movements.occurred_at', '>=', now()->subDays(30))
-            ->selectRaw('s.name as store, p.name as prod, SUM(ABS(stock_movements.qty)) as sold')
-            ->groupBy('s.name', 'p.name')
-            ->orderByDesc('sold')
-            ->limit(100)
-            ->get();
-
-        // Giacenze attuali aggregate
-        $stock = DB::table('stock_items')
-            ->join('product_variants as pv', 'pv.id', '=', 'stock_items.product_variant_id')
-            ->join('products as p', 'p.id', '=', 'pv.product_id')
-            ->join('stores as s', 's.id', '=', 'stock_items.warehouse_id')
-            ->where('p.tenant_id', $tenantId)
-            ->where('stock_items.on_hand', '>', 0)
-            ->selectRaw('s.name as store, p.name as prod, SUM(stock_items.on_hand) as qty')
-            ->groupBy('s.name', 'p.name')
-            ->orderByDesc('qty')
-            ->limit(100)
-            ->get();
-
-        // Negozi (ridotti)
-        $stores = DB::table('stores')->where('tenant_id', $tenantId)->select('id', 'name')->get();
-
-        // Fornitori (ridotti)
-        $suppliers = DB::table('suppliers')->where('tenant_id', $tenantId)->select('id', 'name', 'lead_time_days as lt')->get();
-
-        // Ordini di Acquisto (Bozze o In Attesa)
-        $purchaseOrders = DB::table('purchase_orders')
-            ->join('suppliers as sup', 'sup.id', '=', 'purchase_orders.supplier_id')
-            ->join('stores as s', 's.id', '=', 'purchase_orders.store_id')
-            ->where('purchase_orders.tenant_id', $tenantId)
-            ->whereIn('purchase_orders.status', ['draft', 'sent', 'partial'])
-            ->select('purchase_orders.id', 'purchase_orders.status', 'sup.name as sup', 's.name as store', 'purchase_orders.total_net as tot')
-            ->get();
-
-        // Trasferimenti Merce
-        $transfers = DB::table('stock_transfers')
-            ->join('stores as sf', 'sf.id', '=', 'stock_transfers.from_store_id')
-            ->join('stores as st', 'st.id', '=', 'stock_transfers.to_store_id')
-            ->where('stock_transfers.tenant_id', $tenantId)
-            ->whereIn('stock_transfers.status', ['draft', 'shipped'])
-            ->select('stock_transfers.id', 'stock_transfers.status', 'sf.name as from', 'st.name as to')
-            ->get();
-
-        // Sessioni di inventario recenti
-        $inventories = DB::table('inventory_count_sessions')
-            ->join('stores as s', 's.id', '=', 'inventory_count_sessions.warehouse_id')
-            ->where('inventory_count_sessions.tenant_id', $tenantId)
-            ->select('inventory_count_sessions.id', 's.name as store', 'inventory_count_sessions.status')
-            ->orderByDesc('inventory_count_sessions.created_at')
-            ->limit(10)
-            ->get();
-
-        // Resi recenti
-        $returns = DB::table('customer_returns')
-            ->where('tenant_id', $tenantId)
-            ->select('id', 'status', 'reason')
-            ->orderByDesc('created_at')
-            ->limit(10)
-            ->get();
-
-        // Promozioni attive
-        $promotions = DB::table('promotions')
-            ->where('tenant_id', $tenantId)
-            ->where('active', true)
-            ->where('starts_at', '<=', now())
-            ->where(function($q) {
-                $q->whereNull('ends_at')->orWhere('ends_at', '>=', now());
-            })
-            ->select('id', 'name', 'type', 'value')
-            ->limit(10)
-            ->get();
-
-        return [
-            'negozi' => $stores,
-            'fornitori' => $suppliers,
-            'trasferimenti' => $transfers,
-            'ordini_fornitore' => $purchaseOrders,
-            'vendite_30gg' => $sales,
-            'giacenze' => $stock,
-            'inventari' => $inventories,
-            'resi' => $returns,
-            'promo' => $promotions
-        ];
+        // ... codice rimosso poichè ora usiamo function calling dinamico,
+        // ma lo manteniamo per compatibilità con il resto dell'app se serve altrove
+        return [];
     }
 
     /**
-     * Esegue una query SQL in sola lettura in modo sicuro.
+     * Tool: Ottiene la giacenza di un prodotto.
      */
-    private function executeReadOnlyQuery(string $query): array|string
+    private function get_stock_data(string $productName = null, string $storeName = null): array
     {
-        // Controllo di sicurezza base per consentire solo SELECT
-        if (!preg_match('/^\s*SELECT/i', $query)) {
-            return "ERRORE: Sono consentite solo query di tipo SELECT per motivi di sicurezza.";
+        $query = DB::table('stock_items')
+            ->join('product_variants as pv', 'pv.id', '=', 'stock_items.product_variant_id')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->join('stores as s', 's.id', '=', 'stock_items.warehouse_id');
+            
+        if ($productName) {
+            $query->where('p.name', 'like', '%' . $productName . '%');
+        }
+        if ($storeName) {
+            $query->where('s.name', 'like', '%' . $storeName . '%');
         }
 
-        try {
-            $results = DB::select($query);
-            return $results;
-        } catch (\Exception $e) {
-            return "ERRORE SQL: " . $e->getMessage();
+        return $query->select('s.name as store', 'p.name as product', 'stock_items.on_hand')
+                     ->limit(50)->get()->toArray();
+    }
+
+    /**
+     * Tool: Ottiene i dati di vendita recenti.
+     */
+    private function get_sales_data(string $productName = null, string $storeName = null, int $days = 30): array
+    {
+        $query = DB::table('stock_movements')
+            ->join('product_variants as pv', 'pv.id', '=', 'stock_movements.product_variant_id')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->join('stores as s', 's.id', '=', 'stock_movements.warehouse_id')
+            ->where('stock_movements.qty', '<', 0)
+            ->where('stock_movements.occurred_at', '>=', now()->subDays($days));
+
+        if ($productName) {
+            $query->where('p.name', 'like', '%' . $productName . '%');
         }
+        if ($storeName) {
+            $query->where('s.name', 'like', '%' . $storeName . '%');
+        }
+
+        return $query->selectRaw('s.name as store, p.name as product, SUM(ABS(stock_movements.qty)) as sold')
+                     ->groupBy('s.name', 'p.name')
+                     ->orderByDesc('sold')
+                     ->limit(50)->get()->toArray();
     }
 
     /**
@@ -135,19 +75,17 @@ class AiAnalysisService
             return "Errore: Chiave API di Groq non configurata nel server.";
         }
 
-        $dictionaryPath = storage_path('app/data_dictionary.json');
-        $dictionary = file_exists($dictionaryPath) ? file_get_contents($dictionaryPath) : '{}';
-
         $systemInstruction = "Tu sei un analista dati integrato in un ERP (SvaPro).
 La Regola d'Oro: Niente Documenti, Niente Risposta.
-Rispondi SOLO basandoti sui dati forniti nel contesto o ottenuti tramite le tue funzioni (tools). Se la risposta non è deducibile dai dati, rispondi: 'Dato non disponibile nel sistema'. Non stimare, non inventare e non usare conoscenze esterne per i numeri di magazzino.
-Inoltre, mostra sempre il Chain of Thought (Ragionamento a catena) per i calcoli prima di dare il suggerimento finale.
+Rispondi SOLO basandoti sui dati ottenuti tramite le tue funzioni (tools). 
+NON devi MAI rispondere a domande sui numeri di magazzino o vendite senza prima chiamare una delle funzioni di database.
+Se la risposta non è deducibile dai dati estratti, rispondi: 'Dato non disponibile nel sistema'. Non stimare, non inventare e non usare conoscenze esterne.
+Mostra sempre i calcoli prima di dare un suggerimento.
 
-Hai a disposizione la funzione 'run_sql_query' per interrogare il database reale dell'ERP.
-Questo è il Data Dictionary (schema) del database:
-$dictionary
+Hai a disposizione queste funzioni sicure:
+1. get_stock_data: per conoscere le giacenze attuali di un prodotto o negozio.
+2. get_sales_data: per conoscere le vendite di un prodotto in un arco di tempo.
 
-Usa la funzione run_sql_query per interrogare i dati prima di rispondere all'utente.
 Se l'utente chiede di 'preparare un riordino', restituisci alla fine un JSON strutturato così:
 {
   \"type\": \"action_card\",
@@ -173,17 +111,29 @@ Altrimenti rispondi SEMPRE con un JSON: { \"type\": \"text\", \"content\": \"...
             [
                 'type' => 'function',
                 'function' => [
-                    'name' => 'run_sql_query',
-                    'description' => 'Esegue una query SQL SELECT in sola lettura sul database ERP per recuperare i dati richiesti.',
+                    'name' => 'get_stock_data',
+                    'description' => 'Usa questa funzione per ottenere la giacenza reale di un prodotto in un determinato negozio.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
-                            'query' => [
-                                'type' => 'string',
-                                'description' => 'La query SQL SELECT da eseguire. Es: SELECT sum(on_hand) FROM stock_items WHERE warehouse_id=1'
-                            ]
-                        ],
-                        'required' => ['query']
+                            'product_name' => ['type' => 'string', 'description' => 'Nome opzionale del prodotto da cercare'],
+                            'store_name' => ['type' => 'string', 'description' => 'Nome opzionale del negozio da cercare']
+                        ]
+                    ]
+                ]
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_sales_data',
+                    'description' => 'Usa questa funzione per ottenere i dati di vendita di un prodotto in un determinato negozio.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'product_name' => ['type' => 'string', 'description' => 'Nome opzionale del prodotto'],
+                            'store_name' => ['type' => 'string', 'description' => 'Nome opzionale del negozio'],
+                            'days' => ['type' => 'integer', 'description' => 'Giorni indietro da controllare (es. 30)']
+                        ]
                     ]
                 ]
             ]
@@ -198,7 +148,6 @@ Altrimenti rispondi SEMPRE con un JSON: { \"type\": \"text\", \"content\": \"...
         ];
 
         try {
-            // Primo round: chiamata all'API
             $response = Http::withoutVerifying()->withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
@@ -211,28 +160,33 @@ Altrimenti rispondi SEMPRE con un JSON: { \"type\": \"text\", \"content\": \"...
             $responseData = $response->json();
             $message = $responseData['choices'][0]['message'];
 
-            // Se l'AI decide di chiamare la funzione
+            // Tool Calling
             if (isset($message['tool_calls']) && count($message['tool_calls']) > 0) {
-                $messages[] = $message; // Aggiunge il tool_call all'history
+                Log::info("Groq ha chiamato dei tools!", ['tool_calls' => $message['tool_calls']]);
+                $messages[] = $message;
 
                 foreach ($message['tool_calls'] as $toolCall) {
-                    if ($toolCall['function']['name'] === 'run_sql_query') {
-                        $args = json_decode($toolCall['function']['arguments'], true);
-                        $sqlQuery = $args['query'] ?? '';
-                        $sqlResult = $this->executeReadOnlyQuery($sqlQuery);
-
-                        $messages[] = [
-                            'role' => 'tool',
-                            'tool_call_id' => $toolCall['id'],
-                            'name' => 'run_sql_query',
-                            'content' => json_encode($sqlResult, JSON_UNESCAPED_UNICODE)
-                        ];
+                    $args = json_decode($toolCall['function']['arguments'], true);
+                    $resultData = [];
+                    
+                    if ($toolCall['function']['name'] === 'get_stock_data') {
+                        $resultData = $this->get_stock_data($args['product_name'] ?? null, $args['store_name'] ?? null);
+                    } elseif ($toolCall['function']['name'] === 'get_sales_data') {
+                        $resultData = $this->get_sales_data($args['product_name'] ?? null, $args['store_name'] ?? null, $args['days'] ?? 30);
                     }
+                    
+                    Log::info("Tool eseguito: " . $toolCall['function']['name'], ['args' => $args, 'results_count' => count($resultData)]);
+
+                    $messages[] = [
+                        'role' => 'tool',
+                        'tool_call_id' => $toolCall['id'],
+                        'name' => $toolCall['function']['name'],
+                        'content' => json_encode($resultData, JSON_UNESCAPED_UNICODE)
+                    ];
                 }
 
-                // Secondo round: invia i risultati del database all'AI
                 $payload['messages'] = $messages;
-                unset($payload['tools']); // Per evitare loop infiniti omettiamo i tools al secondo giro
+                unset($payload['tools']);
                 unset($payload['tool_choice']);
                 $payload['response_format'] = ['type' => 'json_object'];
 
@@ -243,12 +197,16 @@ Altrimenti rispondi SEMPRE con un JSON: { \"type\": \"text\", \"content\": \"...
 
                 if ($finalResponse->successful()) {
                     $message = $finalResponse->json()['choices'][0]['message'];
+                    Log::info("Risposta finale Groq:", ['message' => $message]);
+                } else {
+                    Log::error("Errore secondo round Groq", ['status' => $finalResponse->status(), 'body' => $finalResponse->body()]);
                 }
+            } else {
+                Log::info("Groq NON ha chiamato tools. Ha risposto:", ['content' => $message['content']]);
             }
 
             $content = $message['content'] ?? '';
             
-            // Prova a estrarre un JSON se l'AI lo ha formattato in markdown
             $cleanContent = trim($content);
             if (preg_match('/^```json\s*(.*?)\s*```$/s', $cleanContent, $matches)) {
                 $cleanContent = trim($matches[1]);
