@@ -1012,7 +1012,7 @@ export default function Layout({ user, setUser }) {
         </div>
       </nav>
       {showMichelePanel && <MichelePanelModal onClose={() => setShowMichelePanel(false)} />}
-      <FloatingAI />
+      {(!userRoles.includes('dipendente') || userRoles.some(r => ['project_manager','superadmin','store_manager','admin_cliente','admin'].includes(r))) && <FloatingAI />}
     </div>
   );
 }
