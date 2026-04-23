@@ -930,3 +930,8 @@ export const driverDeliveries = {
   updateStatus: (id, tenantCode, data) => driverApi.patch(`/driver/deliveries/${id}/status?tk=${encodeURIComponent(tenantCode)}`, data),
 };
 
+// ── AI Business Intelligence ───────────────────────────────────────
+export const ai = {
+  askAdvice: (question) => api.post('/ai/chiedi-consiglio', { question }),
+};
+

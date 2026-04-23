@@ -1,0 +1,112 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
+class AiAnalysisService
+{
+    /**
+     * Estrae i dati storici (ultimi 30 giorni) e le giacenze per l'AI.
+     * Anonimizza ed aggrega i dati per evitare perdite di info sensibili.
+     */
+    public function getAggregatedData(int $tenantId): array
+    {
+        // Vendite degli ultimi 30 giorni aggregate per prodotto e magazzino
+        $sales = DB::table('stock_movements')
+            ->join('product_variants as pv', 'pv.id', '=', 'stock_movements.product_variant_id')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->leftJoin('categories as c', 'c.id', '=', 'p.category_id')
+            ->where('stock_movements.tenant_id', $tenantId)
+            ->where('stock_movements.qty', '<', 0) // Uscite/Vendite
+            ->where('stock_movements.occurred_at', '>=', now()->subDays(30))
+            ->selectRaw('c.name as category, p.name as product, SUM(ABS(stock_movements.qty)) as total_sold')
+            ->groupBy('c.name', 'p.name')
+            ->orderByDesc('total_sold')
+            ->limit(100) // Limitiamo ai top 100 per non eccedere il context limit
+            ->get();
+
+        // Giacenze attuali aggregate
+        $stock = DB::table('stock_items')
+            ->join('product_variants as pv', 'pv.id', '=', 'stock_items.product_variant_id')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->where('p.tenant_id', $tenantId)
+            ->where('stock_items.on_hand', '>', 0)
+            ->selectRaw('p.name as product, SUM(stock_items.on_hand) as total_stock')
+            ->groupBy('p.name')
+            ->orderByDesc('total_stock')
+            ->limit(100)
+            ->get();
+
+        return [
+            'vendite_ultimi_30_giorni_top_100' => $sales,
+            'giacenze_attuali_top_100' => $stock
+        ];
+    }
+
+    /**
+     * Invia il prompt a Gemini REST API.
+     */
+    public function askGemini(int $tenantId, string $userQuestion): string
+    {
+        $apiKey = env('GEMINI_API_KEY');
+        if (!$apiKey) {
+            return "Errore: Chiave API di Gemini non configurata nel server.";
+        }
+
+        $data = $this->getAggregatedData($tenantId);
+        $dataJson = json_encode($data, JSON_UNESCAPED_UNICODE);
+
+        $systemInstruction = "Sei un Esperto di Logica e Fiscalità dello Svapo (SvaPro ERP).
+Conosci perfettamente la differenza tra PLI (Prodotti Liquidi da Inalazione con nicotina, soggetti a monopolio) e PL0 (senza nicotina), e l'importanza della tracciabilità dei lotti.
+Il tuo compito è analizzare i dati aggregati di vendite e giacenze forniti e rispondere alla domanda dell'utente in modo professionale, conciso e orientato al business.
+NON menzionare mai dati personali (che non ti sono stati comunque forniti). Formula tabelle in Markdown se necessario per migliorare la leggibilità.
+
+Dati forniti dal sistema:
+$dataJson
+";
+
+        $payload = [
+            'contents' => [
+                [
+                    'role' => 'user',
+                    'parts' => [
+                        ['text' => "Domanda dell'utente: $userQuestion"]
+                    ]
+                ]
+            ],
+            'systemInstruction' => [
+                'role' => 'system',
+                'parts' => [
+                    ['text' => $systemInstruction]
+                ]
+            ],
+            'generationConfig' => [
+                'temperature' => 0.4,
+                'maxOutputTokens' => 1024,
+            ]
+        ];
+
+        try {
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+            ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={$apiKey}", $payload);
+
+            if ($response->successful()) {
+                $result = $response->json();
+                if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
+                    return $result['candidates'][0]['content']['parts'][0]['text'];
+                }
+                return "Risposta non decifrabile dall'AI.";
+            }
+
+            Log::error('Gemini API Error', ['status' => $response->status(), 'body' => $response->body()]);
+            return "Errore di comunicazione con i server AI (" . $response->status() . ").";
+        } catch (\Exception $e) {
+            Log::error('Gemini API Exception', ['message' => $e->getMessage()]);
+            return "Errore interno durante la richiesta AI.";
+        }
+    }
+}
