@@ -370,6 +370,49 @@ const StatusBadge = ({ status }) => {
   return <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{s.label}</span>;
 };
 
+const AiReorderCard = ({ proposal, setAiAnswer }) => {
+  const [loading, setLoading] = useState(false);
+  const handleAccept = async () => {
+    setLoading(true);
+    try {
+      const { ai } = await import('../api.jsx');
+      const res = await ai.acceptReorder(proposal.ordini);
+      setAiAnswer(`✅ **Operazione completata!**\n\n${res.data.message}`);
+    } catch(err) {
+      setAiAnswer(`❌ Errore durante la creazione delle bolle: ${err.message}`);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontWeight: 800, fontSize: 14, color: '#C5BEE8' }}>✨ Proposta di Riordino AI</div>
+      <p style={{ margin: 0 }}>{proposal.motivazione}</p>
+      
+      <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 10 }}>
+        {proposal.ordini.map((o, idx) => (
+          <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: idx < proposal.ordini.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', padding: '6px 0' }}>
+            <div>
+               <div style={{ fontWeight: 600 }}>Da negozio {o.from_store_id} a negozio {o.to_store_id}</div>
+               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{o.notes || `Prodotto ID: ${o.product_variant_id}`}</div>
+            </div>
+            <div style={{ fontWeight: 800 }}>{o.quantity} pz</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+        <button onClick={handleAccept} disabled={loading} style={{ flex: 1, background: '#22C55E', color: '#fff', border: 'none', padding: '8px 0', borderRadius: 8, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer' }}>
+          {loading ? 'Creazione...' : 'Accetta e Crea Bolle'}
+        </button>
+        <button onClick={() => setAiAnswer('Operazione annullata. Riformula la tua domanda per modificare la proposta.')} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
+          Modifica
+        </button>
+      </div>
+    </div>
+  );
+};
+
 /* ═══════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════════ */
@@ -414,7 +457,12 @@ export default function DashboardPage() {
     setAiLoading(true);
     try {
       const res = await ai.askAdvice(aiQuestion);
-      setAiAnswer(res.data.answer);
+      let answerText = res.data.answer;
+      try {
+        const parsed = JSON.parse(answerText);
+        answerText = parsed;
+      } catch (e) {}
+      setAiAnswer(answerText);
     } catch (err) {
       setAiAnswer('Errore durante la richiesta AI. Riprova più tardi.');
     }
@@ -1039,7 +1087,11 @@ export default function DashboardPage() {
 
           {aiAnswer && (
             <div style={{ background:'rgba(0,0,0,0.2)', padding:14, borderRadius:12, fontSize:13, lineHeight:1.5, maxHeight:300, overflowY:'auto', border:'1px solid rgba(255,255,255,0.05)' }} className="markdown-body-dark">
-              <ReactMarkdown>{aiAnswer}</ReactMarkdown>
+              {typeof aiAnswer === 'string' ? (
+                <ReactMarkdown>{aiAnswer}</ReactMarkdown>
+              ) : aiAnswer?.type === 'action_card' && aiAnswer?.action === 'proponi_riordino' ? (
+                <AiReorderCard proposal={aiAnswer.payload} setAiAnswer={setAiAnswer} />
+              ) : null}
             </div>
           )}
 

@@ -278,8 +278,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/loyalty/redemptions', [LoyaltyController::class, 'redemptionHistory']);
         Route::post('/loyalty/customers/{customerId}/redeem', [LoyaltyController::class, 'redeemPoints'])->middleware('permission:loyalty.manage');
 
-        // AI Business Intelligence
+        // AI e Assistenza
         Route::post('/ai/chiedi-consiglio', [\App\Http\Controllers\Api\AiController::class, 'askAdvice']);
+        Route::post('/ai/proponi-riordino', [\App\Http\Controllers\Api\AiController::class, 'acceptReorder']);
+        Route::get('/chat/rooms', [ChatController::class, 'rooms']);
 
         // Employee KPI Dashboard
         Route::get('/employees/kpi-dashboard', [EmployeeController::class, 'kpiDashboard']);

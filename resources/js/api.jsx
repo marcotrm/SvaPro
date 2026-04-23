@@ -933,5 +933,5 @@ export const driverDeliveries = {
 // ── AI Business Intelligence ───────────────────────────────────────
 export const ai = {
   askAdvice: (question) => api.post('/ai/chiedi-consiglio', { question }),
+  acceptReorder: (ordini) => api.post('/ai/proponi-riordino', { ordini }),
 };
-

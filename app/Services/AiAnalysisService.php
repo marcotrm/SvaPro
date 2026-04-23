@@ -86,6 +86,38 @@ $dataJson
             'generationConfig' => [
                 'temperature' => 0.4,
                 'maxOutputTokens' => 1024,
+            ],
+            'tools' => [
+                [
+                    'functionDeclarations' => [
+                        [
+                            'name' => 'proponi_riordino',
+                            'description' => 'Genera una proposta strutturata di riordino merce. Usa questa funzione quando vuoi proporre all\'utente di creare bolle di trasferimento o ordini. L\'utente vedrà la proposta e potrà accettarla.',
+                            'parameters' => [
+                                'type' => 'OBJECT',
+                                'properties' => [
+                                    'motivazione' => [
+                                        'type' => 'STRING',
+                                        'description' => 'Motivazione discorsiva per cui stai proponendo questo riordino.'
+                                    ],
+                                    'ordini' => [
+                                        'type' => 'ARRAY',
+                                        'items' => [
+                                            'type' => 'OBJECT',
+                                            'properties' => [
+                                                'from_store_id' => ['type' => 'INTEGER', 'description' => 'ID negozio mittente (es. 1 per magazzino centrale)'],
+                                                'to_store_id' => ['type' => 'INTEGER', 'description' => 'ID negozio destinatario'],
+                                                'product_variant_id' => ['type' => 'INTEGER', 'description' => 'ID variante prodotto'],
+                                                'quantity' => ['type' => 'INTEGER', 'description' => 'Quantità da trasferire'],
+                                                'notes' => ['type' => 'STRING', 'description' => 'Note o nome prodotto']
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
             ]
         ];
 
@@ -96,8 +128,24 @@ $dataJson
 
             if ($response->successful()) {
                 $result = $response->json();
-                if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
-                    return $result['candidates'][0]['content']['parts'][0]['text'];
+                $parts = $result['candidates'][0]['content']['parts'] ?? [];
+                
+                // Controlla se c'è un functionCall
+                foreach ($parts as $part) {
+                    if (isset($part['functionCall'])) {
+                        $call = $part['functionCall'];
+                        if ($call['name'] === 'proponi_riordino') {
+                            return json_encode([
+                                'type' => 'action_card',
+                                'action' => 'proponi_riordino',
+                                'payload' => $call['args']
+                            ]);
+                        }
+                    }
+                }
+
+                if (isset($parts[0]['text'])) {
+                    return $parts[0]['text'];
                 }
                 return "Risposta non decifrabile dall'AI.";
             }
