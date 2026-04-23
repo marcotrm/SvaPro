@@ -503,8 +503,8 @@ export default function InventoryBollePage() {
 
               <div style={{ color:'var(--color-text-tertiary)', fontSize:20, flexShrink:0 }}>›</div>
 
-              {/* Pulsante elimina — solo DRAFT/CANCELLED */}
-              {isAdmin && ['DRAFT','CANCELLED'].includes(s.status) && (
+              {/* Pulsante elimina — non per APPROVED/CLOSED_BY_STORE definitivi */}
+              {isAdmin && !['APPROVED','CLOSED_BY_STORE','UNDER_REVIEW'].includes(s.status) && (
                 <button
                   type="button"
                   onClick={e => handleDelete(e, s.id)}

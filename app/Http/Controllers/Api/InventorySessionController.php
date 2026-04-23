@@ -193,8 +193,8 @@ class InventorySessionController extends Controller
         $userId = $request->user()->id;
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->first();
         if (!$session) return response()->json(['message'=>'Bolla non trovata'],404);
-        if (!in_array($session->status, ['DRAFT','CANCELLED'])) {
-            return response()->json(['message'=>'Puoi eliminare solo bolle in bozza o annullate'],422);
+        if (in_array($session->status, ['APPROVED','CLOSED_BY_STORE','UNDER_REVIEW'])) {
+            return response()->json(['message'=>'Non puoi eliminare una bolla già chiusa o approvata'],422);
         }
         DB::beginTransaction();
         try {
