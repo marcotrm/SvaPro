@@ -334,6 +334,8 @@ export default function InventoryBollePage() {
 
   const isAdmin = user && ['superadmin','admin_cliente','magazziniere','store_manager'].includes(user.role);
 
+  const STORE_VISIBLE_STATUSES = ['SENT_TO_STORE','IN_PROGRESS','CLOSED_BY_STORE','UNDER_REVIEW','APPROVED','DISPUTED','REOPENED'];
+
   const load = async () => {
     setLoading(true);
     setLoadError('');
@@ -346,21 +348,21 @@ export default function InventoryBollePage() {
         setKpi(kR.data?.data ?? null);
         setSessions(sR.data?.data ?? []);
       } else {
-        const r = await inventorySessions.storeGetAll();
-        setSessions(r.data?.data ?? []);
+        // Dipendente: usa lo stesso endpoint admin che già funziona.
+        // Non dipende da store_id — vede le bolle del suo tenant filtrate per status.
+        const r = await inventorySessions.getAll({});
+        const all = r.data?.data ?? [];
+        // Filtra solo sessioni visibili al negozio (no DRAFT, no CANCELLED)
+        setSessions(all.filter(s => STORE_VISIBLE_STATUSES.includes(s.status)));
       }
     } catch (e) {
       const msg = e.response?.data?.message || e.message || 'Errore caricamento inventari';
-      const status = e.response?.status;
-      if (status === 403) {
-        setLoadError('Nessun negozio associato al tuo account. Contatta un amministratore per assegnarti a un punto vendita.');
-      } else {
-        setLoadError(`Errore ${status ?? ''}: ${msg}`);
-      }
+      setLoadError(`Errore: ${msg}`);
       console.error('InventoryBollePage load error:', e);
     }
     setLoading(false);
   };
+
 
   useEffect(() => { if (user !== null) load(); }, [user, filterStatus]); // eslint-disable-line
 
