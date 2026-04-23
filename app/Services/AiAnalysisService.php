@@ -9,121 +9,38 @@ use Illuminate\Support\Facades\Log;
 class AiAnalysisService
 {
     /**
-     * Estrae i dati storici di base (Negozi, Fornitori) per dare contesto generale all'AI.
+     * Tool: Esegue una query SQL in sola lettura generata dall'AI.
      */
-    public function getBasicContext(int $tenantId): array
+    private function execute_readonly_query(string $sqlQuery): array
     {
-        $stores = DB::table('stores')->where('tenant_id', $tenantId)->select('id', 'name')->get();
-        $suppliers = DB::table('suppliers')->where('tenant_id', $tenantId)->select('id', 'name')->get();
-        
-        return [
-            'negozi_registrati' => $stores,
-            'fornitori_registrati' => $suppliers
-        ];
-    }
+        $sql = trim($sqlQuery);
 
-    /**
-     * Tool: Ottiene la giacenza di un prodotto.
-     */
-    private function get_stock_data(string $productName = null, string $storeName = null): array
-    {
-        $query = DB::table('stock_items')
-            ->join('product_variants as pv', 'pv.id', '=', 'stock_items.product_variant_id')
-            ->join('products as p', 'p.id', '=', 'pv.product_id')
-            ->join('stores as s', 's.id', '=', 'stock_items.warehouse_id');
-            
-        if ($productName) {
-            $query->where('p.name', 'like', '%' . $productName . '%');
-        }
-        if ($storeName) {
-            $query->where('s.name', 'like', '%' . $storeName . '%');
+        // Blocco comandi pericolosi
+        if (preg_match('/(UPDATE|DELETE|DROP|ALTER|TRUNCATE|INSERT|CREATE|REPLACE|GRANT|REVOKE)\s/i', $sql)) {
+            return [['error' => 'Comandi SQL di modifica bloccati. Usa solo SELECT.']];
         }
 
-        return $query->select('s.name as store', 'p.name as product', 'stock_items.on_hand')
-                     ->limit(50)->get()->toArray();
-    }
-
-    /**
-     * Tool: Ottiene i dati di vendita recenti.
-     */
-    private function get_sales_data(string $productName = null, string $storeName = null, int $days = 30): array
-    {
-        $query = DB::table('stock_movements')
-            ->join('product_variants as pv', 'pv.id', '=', 'stock_movements.product_variant_id')
-            ->join('products as p', 'p.id', '=', 'pv.product_id')
-            ->join('stores as s', 's.id', '=', 'stock_movements.warehouse_id')
-            ->where('stock_movements.qty', '<', 0)
-            ->where('stock_movements.occurred_at', '>=', now()->subDays($days));
-
-        if ($productName) {
-            $query->where('p.name', 'like', '%' . $productName . '%');
-        }
-        if ($storeName) {
-            $query->where('s.name', 'like', '%' . $storeName . '%');
+        if (!preg_match('/^SELECT\s/i', $sql)) {
+            return [['error' => 'Solo le query SELECT sono ammesse.']];
         }
 
-        return $query->selectRaw('s.name as store, p.name as product, SUM(ABS(stock_movements.qty)) as sold')
-                     ->groupBy('s.name', 'p.name')
-                     ->orderByDesc('sold')
-                     ->limit(50)->get()->toArray();
-    }
+        try {
+            // Esecuzione query
+            $results = DB::select($sql);
+            $resultsArray = json_decode(json_encode($results), true);
 
-    /**
-     * Tool: Ottiene le bolle di inventario (sessioni di conteggio).
-     */
-    private function get_inventory_sessions(string $storeName = null): array
-    {
-        $query = DB::table('inventory_count_sessions')
-            ->join('stores as s', 's.id', '=', 'inventory_count_sessions.warehouse_id');
+            // Protezione Output: Limite 50 righe
+            if (count($resultsArray) > 50) {
+                $resultsArray = array_slice($resultsArray, 0, 50);
+                $resultsArray[] = ['system_warning' => 'Risultato troppo lungo, mostro solo le prime 50 righe. Specifica meglio la query se serve altro'];
+            }
 
-        if ($storeName) {
-            $query->where('s.name', 'like', '%' . $storeName . '%');
+            return $resultsArray;
+
+        } catch (\Exception $e) {
+            // Error Handling: Rimanda l'errore SQL all'AI
+            return [['error' => 'La query è fallita con questo errore: ' . $e->getMessage() . '. Riprova correggendo la sintassi.']];
         }
-
-        return $query->select('inventory_count_sessions.id as numero_bolla', 's.name as store', 'inventory_count_sessions.status', 'inventory_count_sessions.created_at')
-                     ->orderByDesc('inventory_count_sessions.created_at')
-                     ->limit(10)->get()->toArray();
-    }
-
-    /**
-     * Tool: Ottiene le bolle di trasferimento merce.
-     */
-    private function get_stock_transfers(string $storeName = null): array
-    {
-        $query = DB::table('stock_transfers')
-            ->join('stores as sf', 'sf.id', '=', 'stock_transfers.from_store_id')
-            ->join('stores as st', 'st.id', '=', 'stock_transfers.to_store_id');
-
-        if ($storeName) {
-            $query->where(function($q) use ($storeName) {
-                $q->where('sf.name', 'like', '%' . $storeName . '%')
-                  ->orWhere('st.name', 'like', '%' . $storeName . '%');
-            });
-        }
-
-        return $query->select('stock_transfers.id as numero_bolla', 'sf.name as from_store', 'st.name as to_store', 'stock_transfers.status')
-                     ->orderByDesc('stock_transfers.created_at')
-                     ->limit(10)->get()->toArray();
-    }
-
-    /**
-     * Tool: Ottiene le statistiche di vendita giornaliere (scontrini e incassi).
-     */
-    private function get_daily_sales_stats(string $storeName = null, string $date = null): array
-    {
-        $dateStr = $date ?: now()->toDateString();
-        $query = DB::table('sales_orders')
-            ->join('stores as s', 's.id', '=', 'sales_orders.store_id')
-            ->whereDate('sales_orders.created_at', $dateStr)
-            ->where('sales_orders.status', '!=', 'cancelled');
-
-        if ($storeName) {
-            $query->where('s.name', 'like', '%' . $storeName . '%');
-        }
-
-        return $query->selectRaw('s.name as store, COUNT(*) as scontrini, SUM(grand_total) as incasso_totale')
-                     ->groupBy('s.name')
-                     ->get()->toArray();
     }
 
     /**
@@ -136,34 +53,20 @@ class AiAnalysisService
             return "Errore: Chiave API di Groq non configurata nel server.";
         }
 
-        // Recuperiamo il contesto base per l'AI
-        $basicContext = json_encode($this->getBasicContext($tenantId), JSON_UNESCAPED_UNICODE);
+        $metadataPath = storage_path('app/metadata_for_ai.txt');
+        $schemaText = file_exists($metadataPath) ? file_get_contents($metadataPath) : 'Schema non disponibile.';
 
-        $systemInstruction = "Tu sei un analista dati integrato in un ERP (SvaPro).
-La Regola d'Oro: Niente Documenti, Niente Risposta.
-Rispondi SOLO basandoti sui dati ottenuti tramite le tue funzioni (tools) o forniti nel Contesto Base.
-Quando usi una funzione, trasforma il JSON restituito in una frase colloquiale in italiano. Non restituire mai JSON grezzo all'utente.
-Non menzionare MAI il nome delle tue funzioni interne (es. get_sales_data, get_stock_data) all'utente.
-NON devi MAI rispondere a domande sui numeri di magazzino o vendite senza prima chiamare una delle funzioni di database.
-Se la risposta non è deducibile, rispondi: 'Dato non disponibile nel sistema'. Non stimare o inventare nulla.
-
-[Contesto Base di SvaPro (Usa queste info per rispondere a domande generiche su quali negozi o fornitori esistono)]
-$basicContext
-
-Hai a disposizione queste funzioni sicure:
-1. get_stock_data: per conoscere le giacenze attuali di un prodotto o negozio.
-2. get_sales_data: per conoscere le vendite di un prodotto in un arco di tempo.
-3. get_inventory_sessions: per conoscere le 'bolle inventario' (sessioni di conteggio e stato).
-4. get_stock_transfers: per conoscere le 'bolle di trasferimento' tra negozi.
-5. get_daily_sales_stats: per conoscere statistiche generiche (incassi, numero di scontrini/ordini) di oggi o di una data specifica.
-
-Se l'utente chiede di 'preparare un riordino', restituisci alla fine un JSON strutturato così:
-{
-  \"type\": \"action_card\",
-  \"action\": \"proponi_riordino\",
-  \"payload\": { \"motivazione\": \"...\", \"ordini\": [ ... ] }
-}
-Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"content\": \"La tua risposta colloquiale e discorsiva qui...\" }";
+        $systemInstruction = "Tu sei il Master Controller dell'ERP SvaPro. Hai accesso completo in sola lettura ai dati tramite la funzione execute_readonly_query.
+Se l'utente ti chiede degli scontrini, dei venduti o di qualsiasi dato, NON dire che non puoi. Invece:
+1. Ragiona su quale query SQL servirebbe basandoti su questo schema:
+$schemaText
+2. Esegui la query tramite il tool execute_readonly_query.
+3. Analizza i dati ricevuti e rispondi all'utente in un italiano colloquiale chiaro.
+Se non trovi una tabella, chiedi prima di elencare le tabelle disponibili.
+Se la query restituisce un errore, riprova correggendo la sintassi SQL.
+Se l'utente chiede un riordino, restituisci alla fine un JSON strutturato così:
+{ \"type\": \"action_card\", \"action\": \"proponi_riordino\", \"payload\": { \"motivazione\": \"...\", \"ordini\": [ ... ] } }
+Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"content\": \"La tua risposta qui...\" }";
 
         $messages = [
             ['role' => 'system', 'content' => $systemInstruction]
@@ -182,69 +85,17 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
             [
                 'type' => 'function',
                 'function' => [
-                    'name' => 'get_stock_data',
-                    'description' => 'Usa questa funzione per ottenere la giacenza reale di un prodotto in un determinato negozio.',
+                    'name' => 'execute_readonly_query',
+                    'description' => 'Esegue una query SQL SELECT sul database di produzione per ottenere qualsiasi dato richiesto dall\'utente.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
-                            'product_name' => ['type' => 'string', 'description' => 'Nome opzionale del prodotto da cercare'],
-                            'store_name' => ['type' => 'string', 'description' => 'Nome opzionale del negozio da cercare']
-                        ]
-                    ]
-                ]
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'get_sales_data',
-                    'description' => 'Usa questa funzione per ottenere i dati di vendita di un prodotto in un determinato negozio.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'product_name' => ['type' => 'string', 'description' => 'Nome opzionale del prodotto'],
-                            'store_name' => ['type' => 'string', 'description' => 'Nome opzionale del negozio'],
-                            'days' => ['type' => 'integer', 'description' => 'Giorni indietro da controllare (es. 30)']
-                        ]
-                    ]
-                ]
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'get_inventory_sessions',
-                    'description' => 'Usa questa funzione per ottenere le bolle inventario (sessioni di conteggio in negozio) e il loro stato.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'store_name' => ['type' => 'string', 'description' => 'Nome opzionale del negozio da filtrare']
-                        ]
-                    ]
-                ]
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'get_stock_transfers',
-                    'description' => 'Usa questa funzione per ottenere le bolle di trasferimento merce tra negozi.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'store_name' => ['type' => 'string', 'description' => 'Nome opzionale del negozio da filtrare (mittente o destinatario)']
-                        ]
-                    ]
-                ]
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'get_daily_sales_stats',
-                    'description' => 'Usa questa funzione per ottenere statistiche di vendita (incasso totale, numero di scontrini/ordini) di un giorno specifico.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'store_name' => ['type' => 'string', 'description' => 'Nome opzionale del negozio'],
-                            'date' => ['type' => 'string', 'description' => 'Data nel formato YYYY-MM-DD. Se non fornita o non chiara, usa la data di oggi.']
-                        ]
+                            'sql_query' => [
+                                'type' => 'string',
+                                'description' => 'La query SQL (solo SELECT) da eseguire sul database.'
+                            ]
+                        ],
+                        'required' => ['sql_query']
                     ]
                 ]
             ]
@@ -258,6 +109,9 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
             'tool_choice' => 'auto'
         ];
 
+        // Log del JSON esatto inviato a Groq
+        Log::info("Invio payload a Groq:", ['payload' => json_encode($payload)]);
+
         try {
             $response = Http::withoutVerifying()->withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
@@ -265,35 +119,29 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
             ])->timeout(30)->post("https://api.groq.com/openai/v1/chat/completions", $payload);
 
             if (!$response->successful()) {
+                Log::error("Errore Groq API", ['status' => $response->status(), 'body' => $response->body()]);
                 return "Errore Groq: " . $response->status();
             }
 
             $responseData = $response->json();
             $message = $responseData['choices'][0]['message'];
 
-            // Tool Calling
-            if (isset($message['tool_calls']) && count($message['tool_calls']) > 0) {
-                Log::info("Groq ha chiamato dei tools!", ['tool_calls' => $message['tool_calls']]);
+            // Tool Calling Loop (esegue query finché Groq non è soddisfatto o si arrende, limitato a 3 round max per evitare loop infiniti)
+            $rounds = 0;
+            while (isset($message['tool_calls']) && count($message['tool_calls']) > 0 && $rounds < 3) {
+                Log::info("Groq ha chiamato un tool:", ['tool_calls' => $message['tool_calls']]);
                 $messages[] = $message;
 
                 foreach ($message['tool_calls'] as $toolCall) {
                     $args = json_decode($toolCall['function']['arguments'], true);
                     $resultData = [];
                     
-                    if ($toolCall['function']['name'] === 'get_stock_data') {
-                        $resultData = $this->get_stock_data($args['product_name'] ?? null, $args['store_name'] ?? null);
-                    } elseif ($toolCall['function']['name'] === 'get_sales_data') {
-                        $resultData = $this->get_sales_data($args['product_name'] ?? null, $args['store_name'] ?? null, $args['days'] ?? 30);
-                    } elseif ($toolCall['function']['name'] === 'get_inventory_sessions') {
-                        $resultData = $this->get_inventory_sessions($args['store_name'] ?? null);
-                    } elseif ($toolCall['function']['name'] === 'get_stock_transfers') {
-                        $resultData = $this->get_stock_transfers($args['store_name'] ?? null);
-                    } elseif ($toolCall['function']['name'] === 'get_daily_sales_stats') {
-                        $resultData = $this->get_daily_sales_stats($args['store_name'] ?? null, $args['date'] ?? null);
+                    if ($toolCall['function']['name'] === 'execute_readonly_query') {
+                        $sqlQuery = $args['sql_query'] ?? '';
+                        Log::info("L'AI sta pensando/eseguendo la query:", ['sql' => $sqlQuery]);
+                        $resultData = $this->execute_readonly_query($sqlQuery);
                     }
                     
-                    Log::info("Tool eseguito: " . $toolCall['function']['name'], ['args' => $args, 'results_count' => count($resultData)]);
-
                     $messages[] = [
                         'role' => 'tool',
                         'tool_call_id' => $toolCall['id'],
@@ -305,8 +153,8 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
                 $payload['messages'] = $messages;
                 unset($payload['tools']);
                 unset($payload['tool_choice']);
-                $payload['response_format'] = ['type' => 'json_object'];
-
+                
+                // Rinviamo il risultato al modello
                 $finalResponse = Http::withoutVerifying()->withHeaders([
                     'Authorization' => 'Bearer ' . $apiKey,
                     'Content-Type' => 'application/json',
@@ -314,12 +162,11 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
 
                 if ($finalResponse->successful()) {
                     $message = $finalResponse->json()['choices'][0]['message'];
-                    Log::info("Risposta finale Groq:", ['message' => $message]);
                 } else {
-                    Log::error("Errore secondo round Groq", ['status' => $finalResponse->status(), 'body' => $finalResponse->body()]);
+                    Log::error("Errore Groq round " . $rounds, ['status' => $finalResponse->status()]);
+                    break;
                 }
-            } else {
-                Log::info("Groq NON ha chiamato tools. Ha risposto:", ['content' => $message['content']]);
+                $rounds++;
             }
 
             $content = $message['content'] ?? '';
@@ -373,7 +220,7 @@ Restituisci SOLO un JSON: { \"id_prodotto\": \"motivazione\" }.";
         $userPrompt = "Dati: " . json_encode($payloadData, JSON_UNESCAPED_UNICODE);
 
         $payload = [
-            'model' => 'llama-3.3-70b-versatile', // Modello pesante per analisi logiche
+            'model' => 'llama-3.3-70b-versatile',
             'temperature' => 0,
             'response_format' => ['type' => 'json_object'],
             'messages' => [
