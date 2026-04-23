@@ -67,7 +67,8 @@ class AiAnalysisService
         $metadataPath = storage_path('app/metadata_for_ai.txt');
         $schemaText = file_exists($metadataPath) ? file_get_contents($metadataPath) : 'Schema non disponibile.';
 
-        $systemInstruction = "Tu sei il Master Controller dell'ERP SvaPro. Hai accesso completo in sola lettura ai dati tramite la funzione execute_readonly_query.
+        $systemInstruction = <<<EOT
+Tu sei il Master Controller dell'ERP SvaPro. Hai accesso completo in sola lettura ai dati tramite la funzione execute_readonly_query.
 Se l'utente ti chiede degli scontrini, dei venduti o di qualsiasi dato, NON dire che non puoi. Invece:
 1. Ragiona su quale query SQL servirebbe basandoti su questo schema:
 $schemaText
@@ -83,23 +84,33 @@ REGOLE SINTASSI SQL:
 - Per la data di oggi usa CURRENT_DATE.
 - Non usare MAI comandi come SHOW TABLES.
 
-2. Esegui la query tramite il tool execute_readonly_query.
-3. Analizza i dati ricevuti e rispondi all'utente in un italiano colloquiale chiaro.
-Se non trovi una tabella, chiedi prima di elencare le tabelle disponibili.
-Se la query restituisce un errore, riprova correggendo la sintassi SQL.
+2. ESECUZIONE OBBLIGATORIA DEL TOOL:
+DEVI TASSATIVAMENTE chiamare il tool `execute_readonly_query` per leggere i dati REALI dal database PRIMA di generare la risposta finale. Non inventare MAI i dati! Esegui prima la query!
 
-IMPORTANTE: Se l'utente chiede 'analizza vendite', 'prevedi scorte', o 'fai un riordino', DEVI restituire alla fine ESATTAMENTE questo JSON:
-{ \"type\": \"action_card\", \"action\": \"proponi_riordino\", \"payload\": { \"motivazione\": \"Spiegazione del riordino...\", \"ordini\": [ { \"from_store_id\": 1, \"to_store_id\": ID_NEGOZIO, \"product_variant_id\": ID_VARIANTE, \"quantity\": QUANTITA_SUGGERITA, \"notes\": \"...\" } ] } }
+3. Analizza i dati ricevuti dal database e POI rispondi all'utente.
+NON INVENTARE MAI GLI ORDINI. DEVI PRIMA ESTRARRE I VERI DATI DAL DATABASE (es. prodotti con on_hand < 10)!
 
-Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"content\": \"La tua risposta qui...\" }";
+REGOLA FONDAMENTALE SULL'OUTPUT FINALE:
+Quando hai i dati reali dal database, devi SEMPRE rispondere con un SINGOLO oggetto JSON valido:
+
+OPZIONE A (Schedina di Riordino):
+USA QUESTA OPZIONE SE l'utente chiede "analizza vendite", "prevedi scorte", "quali prodotti stanno finendo", o "riordino".
+Metti nel JSON i VERI `product_variant_id` e `store_id` che hai trovato nel database. (L'esempio sotto usa ID finti, tu usa i veri).
+{ "type": "action_card", "action": "proponi_riordino", "payload": { "motivazione": "Ho trovato X prodotti in esaurimento...", "ordini": [ { "from_store_id": 1, "to_store_id": 1, "product_variant_id": 123, "quantity": 10, "notes": "scorta bassa" } ] } }
+
+OPZIONE B (Risposta Testuale Standard):
+USA QUESTA OPZIONE per tutto il resto (es. scontrini, resoconti, chiacchiere).
+{ "type": "text", "content": "La tua risposta colloquiale qui..." }
+EOT;
 
         $messages = [
             ['role' => 'system', 'content' => $systemInstruction]
         ];
 
         foreach ($chatHistory as $msg) {
+            $msgRole = ($msg['role'] === 'user') ? 'user' : 'assistant';
             $messages[] = [
-                'role' => $msg['role'] === 'user' ? 'user' : 'assistant',
+                'role' => $msgRole,
                 'content' => $msg['content']
             ];
         }
