@@ -17,13 +17,19 @@ class InventorySessionController extends Controller
         DB::table('inventory_audit_logs')->insert(['tenant_id'=>$tenantId,'user_id'=>$userId,'action'=>$action,'inventory_session_id'=>$sessionId,'inventory_item_id'=>$itemId,'old_value'=>$old?json_encode($old):null,'new_value'=>$new?json_encode($new):null,'note'=>$note,'created_at'=>now()]);
     }
 
-    // Risolve store_id: middleware -> user_roles -> employees (fallback per prod)
+    // Risolve store_id: middleware -> user_roles -> employees -> hint frontend (validato sul tenant)
     private function resolveStoreId(Request $request): int {
         $uid = $request->user()->id;
         $tid = (int)$request->attributes->get('tenant_id');
         $sid = (int)$request->attributes->get('store_id');
         if (!$sid) $sid = (int)DB::table('user_roles')->where('user_id',$uid)->whereNotNull('store_id')->value('store_id');
         if (!$sid) $sid = (int)DB::table('employees')->where('user_id',$uid)->where('tenant_id',$tid)->whereNotNull('store_id')->value('store_id');
+        // Fallback: store_id hint dal frontend (employee_store_id da auth response) — validato lato server
+        if (!$sid && $request->filled('hint_store_id')) {
+            $hint = (int)$request->input('hint_store_id');
+            $valid = DB::table('stores')->where('id',$hint)->where('tenant_id',$tid)->exists();
+            if ($valid) $sid = $hint;
+        }
         return $sid;
     }
 
