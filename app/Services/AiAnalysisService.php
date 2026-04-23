@@ -69,6 +69,44 @@ class AiAnalysisService
     }
 
     /**
+     * Tool: Ottiene le bolle di inventario (sessioni di conteggio).
+     */
+    private function get_inventory_sessions(string $storeName = null): array
+    {
+        $query = DB::table('inventory_count_sessions')
+            ->join('stores as s', 's.id', '=', 'inventory_count_sessions.warehouse_id');
+
+        if ($storeName) {
+            $query->where('s.name', 'like', '%' . $storeName . '%');
+        }
+
+        return $query->select('inventory_count_sessions.id as numero_bolla', 's.name as store', 'inventory_count_sessions.status', 'inventory_count_sessions.created_at')
+                     ->orderByDesc('inventory_count_sessions.created_at')
+                     ->limit(10)->get()->toArray();
+    }
+
+    /**
+     * Tool: Ottiene le bolle di trasferimento merce.
+     */
+    private function get_stock_transfers(string $storeName = null): array
+    {
+        $query = DB::table('stock_transfers')
+            ->join('stores as sf', 'sf.id', '=', 'stock_transfers.from_store_id')
+            ->join('stores as st', 'st.id', '=', 'stock_transfers.to_store_id');
+
+        if ($storeName) {
+            $query->where(function($q) use ($storeName) {
+                $q->where('sf.name', 'like', '%' . $storeName . '%')
+                  ->orWhere('st.name', 'like', '%' . $storeName . '%');
+            });
+        }
+
+        return $query->select('stock_transfers.id as numero_bolla', 'sf.name as from_store', 'st.name as to_store', 'stock_transfers.status')
+                     ->orderByDesc('stock_transfers.created_at')
+                     ->limit(10)->get()->toArray();
+    }
+
+    /**
      * Invia il prompt a Gemini REST API con Tool Calling (Function Calling).
      */
     public function askGemini(int $tenantId, string $userQuestion, array $chatHistory = []): string
@@ -94,6 +132,8 @@ $basicContext
 Hai a disposizione queste funzioni sicure:
 1. get_stock_data: per conoscere le giacenze attuali di un prodotto o negozio.
 2. get_sales_data: per conoscere le vendite di un prodotto in un arco di tempo.
+3. get_inventory_sessions: per conoscere le 'bolle inventario' (sessioni di conteggio e stato).
+4. get_stock_transfers: per conoscere le 'bolle di trasferimento' tra negozi.
 
 Se l'utente chiede di 'preparare un riordino', restituisci alla fine un JSON strutturato così:
 {
@@ -145,6 +185,32 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
                         ]
                     ]
                 ]
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_inventory_sessions',
+                    'description' => 'Usa questa funzione per ottenere le bolle inventario (sessioni di conteggio in negozio) e il loro stato.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'store_name' => ['type' => 'string', 'description' => 'Nome opzionale del negozio da filtrare']
+                        ]
+                    ]
+                ]
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_stock_transfers',
+                    'description' => 'Usa questa funzione per ottenere le bolle di trasferimento merce tra negozi.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'store_name' => ['type' => 'string', 'description' => 'Nome opzionale del negozio da filtrare (mittente o destinatario)']
+                        ]
+                    ]
+                ]
             ]
         ];
 
@@ -182,6 +248,10 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
                         $resultData = $this->get_stock_data($args['product_name'] ?? null, $args['store_name'] ?? null);
                     } elseif ($toolCall['function']['name'] === 'get_sales_data') {
                         $resultData = $this->get_sales_data($args['product_name'] ?? null, $args['store_name'] ?? null, $args['days'] ?? 30);
+                    } elseif ($toolCall['function']['name'] === 'get_inventory_sessions') {
+                        $resultData = $this->get_inventory_sessions($args['store_name'] ?? null);
+                    } elseif ($toolCall['function']['name'] === 'get_stock_transfers') {
+                        $resultData = $this->get_stock_transfers($args['store_name'] ?? null);
                     }
                     
                     Log::info("Tool eseguito: " . $toolCall['function']['name'], ['args' => $args, 'results_count' => count($resultData)]);
