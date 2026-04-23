@@ -64,56 +64,58 @@ class AiController extends Controller
                 return response()->json(['message' => 'Nessun ordine valido trovato nei dati AI.'], 400);
             }
 
-            // Recupera il fornitore (default_supplier_id) per ogni prodotto
+            // Recupera il fornitore e i prezzi per ogni prodotto
             $variantIds = array_column($ordiniPuliti, 'product_variant_id');
-            $variantsSuppliers = \Illuminate\Support\Facades\DB::table('product_variants')
+            $variantsInfo = \Illuminate\Support\Facades\DB::table('product_variants')
                 ->join('products', 'products.id', '=', 'product_variants.product_id')
                 ->whereIn('product_variants.id', $variantIds)
-                ->pluck('products.default_supplier_id', 'product_variants.id')
-                ->toArray();
+                ->select('product_variants.id', 'product_variants.cost_price', 'products.default_supplier_id')
+                ->get()
+                ->keyBy('id');
 
-            // Raggruppa gli ordini per [from_store_id, to_store_id, supplier_id]
+            // Trova un supplier di fallback se alcuni prodotti non ne hanno uno (es. il primo fornitore disponibile)
+            $fallbackSupplier = \Illuminate\Support\Facades\DB::table('suppliers')
+                ->where('tenant_id', $tenantId)
+                ->first();
+            $fallbackSupplierId = $fallbackSupplier ? $fallbackSupplier->id : 1; // 1 come ultimate fallback
+
+            // Raggruppa gli ordini per supplier_id
             foreach ($ordiniPuliti as &$item) {
-                $supplierId = $variantsSuppliers[$item['product_variant_id']] ?? 0;
-                $item['group_key'] = $item['from_store_id'] . '-' . $item['to_store_id'] . '-' . $supplierId;
+                $info = $variantsInfo->get($item['product_variant_id']);
+                $item['supplier_id'] = ($info && $info->default_supplier_id) ? $info->default_supplier_id : $fallbackSupplierId;
+                $item['unit_cost'] = $info ? ($info->cost_price ?: 0) : 0;
             }
 
-            $groups = collect($ordiniPuliti)->groupBy('group_key');
+            $groups = collect($ordiniPuliti)->groupBy('supplier_id');
 
             $createdCount = 0;
             $createdIds = [];
             \Illuminate\Support\Facades\DB::beginTransaction();
 
-            foreach ($groups as $key => $items) {
-                list($fromStoreId, $toStoreId, $supplierId) = explode('-', $key);
+            foreach ($groups as $supplierId => $items) {
+                // Calcola il totale netto dell'ordine
+                $totalNet = $items->sum(function ($item) {
+                    return $item['quantity'] * $item['unit_cost'];
+                });
 
-                $lastNum = \Illuminate\Support\Facades\DB::table('stock_transfers')
-                    ->where('tenant_id', $tenantId)
-                    ->whereYear('created_at', now()->year)
-                    ->count();
-                $ddtNumber = 'AI-DDT-' . now()->year . '-' . str_pad($lastNum + 1, 4, '0', STR_PAD_LEFT);
-
-                $transferId = \Illuminate\Support\Facades\DB::table('stock_transfers')->insertGetId([
+                $orderId = \Illuminate\Support\Facades\DB::table('purchase_orders')->insertGetId([
                     'tenant_id'       => $tenantId,
-                    'ddt_number'      => $ddtNumber,
-                    'from_store_id'   => $fromStoreId,
-                    'to_store_id'     => $toStoreId,
+                    'supplier_id'     => $supplierId,
                     'status'          => 'draft',
-                    'notes'           => 'Generato automaticamente tramite AI Groq' . ($supplierId ? " (Fornitore ID: $supplierId)" : ''),
-                    'created_by'      => $userId,
+                    'total_net'       => $totalNet,
                     'is_ai_generated' => true,
                     'created_at'      => now(),
                     'updated_at'      => now(),
                 ]);
 
-                $createdIds[] = $transferId;
+                $createdIds[] = $orderId;
 
                 foreach ($items as $item) {
-                    \Illuminate\Support\Facades\DB::table('stock_transfer_items')->insert([
-                        'transfer_id'        => $transferId,
+                    \Illuminate\Support\Facades\DB::table('purchase_order_lines')->insert([
+                        'purchase_order_id'  => $orderId,
                         'product_variant_id' => $item['product_variant_id'],
-                        'quantity_sent'      => $item['quantity'],
-                        'notes'              => $item['notes'],
+                        'qty'                => $item['quantity'],
+                        'unit_cost'          => $item['unit_cost'],
                         'created_at'         => now(),
                         'updated_at'         => now(),
                     ]);
@@ -123,12 +125,12 @@ class AiController extends Controller
             \Illuminate\Support\Facades\DB::commit();
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\DB::rollBack();
-            \Illuminate\Support\Facades\Log::error('Errore creazione bolle AI: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-            return response()->json(['message' => 'Errore creazione bolle AI: ' . $e->getMessage()], 500);
+            \Illuminate\Support\Facades\Log::error('Errore creazione PO AI: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return response()->json(['message' => 'Errore creazione PO AI: ' . $e->getMessage()], 500);
         }
 
         return response()->json([
-            'message' => "Create con successo $createdCount bolle di trasferimento.",
+            'message' => "Creati con successo $createdCount ordini di acquisto.",
             'created_ids' => $createdIds
         ]);
     }

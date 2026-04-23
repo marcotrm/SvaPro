@@ -379,7 +379,7 @@ const AiReorderCard = ({ proposal, setAiAnswer }) => {
       const res = await ai.acceptReorder(proposal.ordini);
       let answerText = `✅ **Operazione completata!**\n\n${res.data.message}`;
       if (res.data.created_ids && res.data.created_ids.length > 0) {
-        answerText += `\n\nBolle create con successo: ` + res.data.created_ids.map(id => `[Vedi Bolla #${id}](/stock-transfers)`).join(', ');
+        answerText += `\n\nOrdini creati con successo: ` + res.data.created_ids.map(id => `[Vedi Ordine #${id}](/purchase-orders)`).join(', ');
       }
       setAiAnswer(answerText);
     } catch(err) {

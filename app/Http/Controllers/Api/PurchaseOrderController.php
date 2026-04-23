@@ -57,9 +57,11 @@ class PurchaseOrderController extends Controller
                 'po.fulfillment_status',
                 'po.expected_at',
                 'po.total_net',
+                'po.is_ai_generated',
                 'po.created_at',
                 'po.updated_at',
             ])
+            ->orderByDesc('po.is_ai_generated')
             ->orderByDesc('po.created_at')
             ->limit($limit)
             ->get();
