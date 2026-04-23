@@ -20,10 +20,18 @@ class AiController extends Controller
         $tenantId = (int)$request->attributes->get('tenant_id');
         
         $request->validate([
-            'question' => 'required|string|max:1000'
+            'question' => 'required|string|max:1000',
+            'context_url' => 'nullable|string',
+            'page_data' => 'nullable|array' // opzionale se il frontend passa dati
         ]);
 
         $question = $request->input('question');
+        $contextUrl = $request->input('context_url');
+        
+        if ($contextUrl) {
+            $question = "[CONTESTO: L'utente si trova attualmente nella rotta: $contextUrl]\nDomanda: " . $question;
+        }
+
         $answer = $this->aiService->askGemini($tenantId, $question);
 
         return response()->json([
