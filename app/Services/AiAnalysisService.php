@@ -108,7 +108,25 @@ class AiAnalysisService
     }
 
     /**
-     * Invia il prompt a Gemini REST API.
+     * Esegue una query SQL in sola lettura in modo sicuro.
+     */
+    private function executeReadOnlyQuery(string $query): array|string
+    {
+        // Controllo di sicurezza base per consentire solo SELECT
+        if (!preg_match('/^\s*SELECT/i', $query)) {
+            return "ERRORE: Sono consentite solo query di tipo SELECT per motivi di sicurezza.";
+        }
+
+        try {
+            $results = DB::select($query);
+            return $results;
+        } catch (\Exception $e) {
+            return "ERRORE SQL: " . $e->getMessage();
+        }
+    }
+
+    /**
+     * Invia il prompt a Gemini REST API con Tool Calling (Function Calling).
      */
     public function askGemini(int $tenantId, string $userQuestion, array $chatHistory = []): string
     {
@@ -117,36 +135,31 @@ class AiAnalysisService
             return "Errore: Chiave API di Groq non configurata nel server.";
         }
 
-        $data = $this->getAggregatedData($tenantId);
-        $dataJson = json_encode($data, JSON_UNESCAPED_UNICODE);
+        $dictionaryPath = storage_path('app/data_dictionary.json');
+        $dictionary = file_exists($dictionaryPath) ? file_get_contents($dictionaryPath) : '{}';
 
-        $systemInstruction = "Sei SvaPro AI, l'esperto di Logistica e Fiscalità dello Svapo (SvaPro ERP).
-Il tuo compito è analizzare i dati aggregati forniti (giacenze, vendite, resi, promo) e rispondere alla domanda.
-NON menzionare mai dati personali. Sii conciso, professionale e diretto al punto.
+        $systemInstruction = "Tu sei un analista dati integrato in un ERP (SvaPro).
+La Regola d'Oro: Niente Documenti, Niente Risposta.
+Rispondi SOLO basandoti sui dati forniti nel contesto o ottenuti tramite le tue funzioni (tools). Se la risposta non è deducibile dai dati, rispondi: 'Dato non disponibile nel sistema'. Non stimare, non inventare e non usare conoscenze esterne per i numeri di magazzino.
+Inoltre, mostra sempre il Chain of Thought (Ragionamento a catena) per i calcoli prima di dare il suggerimento finale.
 
-Se l'utente chiede di 'preparare un riordino', restituisci ESCLUSIVAMENTE un JSON strutturato così (niente markdown fuori):
+Hai a disposizione la funzione 'run_sql_query' per interrogare il database reale dell'ERP.
+Questo è il Data Dictionary (schema) del database:
+$dictionary
+
+Usa la funzione run_sql_query per interrogare i dati prima di rispondere all'utente.
+Se l'utente chiede di 'preparare un riordino', restituisci alla fine un JSON strutturato così:
 {
   \"type\": \"action_card\",
   \"action\": \"proponi_riordino\",
-  \"payload\": {
-    \"motivazione\": \"stringa\",
-    \"ordini\": [ { \"from_store_id\": 1, \"to_store_id\": 2, \"product_variant_id\": 1, \"quantity\": 10, \"notes\": \"\" } ]
-  }
+  \"payload\": { \"motivazione\": \"...\", \"ordini\": [ ... ] }
 }
-Altrimenti rispondi SEMPRE con un JSON:
-{
-  \"type\": \"text\",
-  \"content\": \"la tua risposta qui...\"
-}
-
-Dati:
-$dataJson";
+Altrimenti rispondi SEMPRE con un JSON: { \"type\": \"text\", \"content\": \"...\" }";
 
         $messages = [
             ['role' => 'system', 'content' => $systemInstruction]
         ];
 
-        // Aggiungi gli ultimi messaggi per il contesto (limitato a 5 dal frontend)
         foreach ($chatHistory as $msg) {
             $messages[] = [
                 'role' => $msg['role'] === 'user' ? 'user' : 'assistant',
@@ -154,39 +167,103 @@ $dataJson";
             ];
         }
 
-        $messages[] = ['role' => 'user', 'content' => "Domanda: $userQuestion"];
+        $messages[] = ['role' => 'user', 'content' => $userQuestion];
+
+        $tools = [
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'run_sql_query',
+                    'description' => 'Esegue una query SQL SELECT in sola lettura sul database ERP per recuperare i dati richiesti.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'query' => [
+                                'type' => 'string',
+                                'description' => 'La query SQL SELECT da eseguire. Es: SELECT sum(on_hand) FROM stock_items WHERE warehouse_id=1'
+                            ]
+                        ],
+                        'required' => ['query']
+                    ]
+                ]
+            ]
+        ];
 
         $payload = [
-            'model' => 'llama-3.1-8b-instant', // Modello veloce per le query del widget
+            'model' => 'llama-3.1-8b-instant',
             'temperature' => 0,
-            'response_format' => ['type' => 'json_object'],
-            'messages' => $messages
+            'messages' => $messages,
+            'tools' => $tools,
+            'tool_choice' => 'auto'
         ];
 
         try {
+            // Primo round: chiamata all'API
             $response = Http::withoutVerifying()->withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
-            ])->post("https://api.groq.com/openai/v1/chat/completions", $payload);
+            ])->timeout(30)->post("https://api.groq.com/openai/v1/chat/completions", $payload);
 
-            if ($response->successful()) {
-                $result = $response->json();
-                $content = $result['choices'][0]['message']['content'] ?? '';
-                
-                $parsed = json_decode(trim($content), true);
-                if (is_array($parsed)) {
-                    if (isset($parsed['type']) && $parsed['type'] === 'action_card') {
-                        return json_encode($parsed);
-                    }
-                    if (isset($parsed['type']) && $parsed['type'] === 'text') {
-                        return $parsed['content'];
-                    }
-                }
-                return $content ?: "Risposta vuota dall'AI.";
+            if (!$response->successful()) {
+                return "Errore Groq: " . $response->status();
             }
 
-            Log::error('Groq API Error', ['status' => $response->status(), 'body' => $response->body()]);
-            return "Errore Groq " . $response->status();
+            $responseData = $response->json();
+            $message = $responseData['choices'][0]['message'];
+
+            // Se l'AI decide di chiamare la funzione
+            if (isset($message['tool_calls']) && count($message['tool_calls']) > 0) {
+                $messages[] = $message; // Aggiunge il tool_call all'history
+
+                foreach ($message['tool_calls'] as $toolCall) {
+                    if ($toolCall['function']['name'] === 'run_sql_query') {
+                        $args = json_decode($toolCall['function']['arguments'], true);
+                        $sqlQuery = $args['query'] ?? '';
+                        $sqlResult = $this->executeReadOnlyQuery($sqlQuery);
+
+                        $messages[] = [
+                            'role' => 'tool',
+                            'tool_call_id' => $toolCall['id'],
+                            'name' => 'run_sql_query',
+                            'content' => json_encode($sqlResult, JSON_UNESCAPED_UNICODE)
+                        ];
+                    }
+                }
+
+                // Secondo round: invia i risultati del database all'AI
+                $payload['messages'] = $messages;
+                unset($payload['tools']); // Per evitare loop infiniti omettiamo i tools al secondo giro
+                unset($payload['tool_choice']);
+                $payload['response_format'] = ['type' => 'json_object'];
+
+                $finalResponse = Http::withoutVerifying()->withHeaders([
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Content-Type' => 'application/json',
+                ])->post("https://api.groq.com/openai/v1/chat/completions", $payload);
+
+                if ($finalResponse->successful()) {
+                    $message = $finalResponse->json()['choices'][0]['message'];
+                }
+            }
+
+            $content = $message['content'] ?? '';
+            
+            // Prova a estrarre un JSON se l'AI lo ha formattato in markdown
+            $cleanContent = trim($content);
+            if (preg_match('/^```json\s*(.*?)\s*```$/s', $cleanContent, $matches)) {
+                $cleanContent = trim($matches[1]);
+            } elseif (preg_match('/^```\s*(.*?)\s*```$/s', $cleanContent, $matches)) {
+                $cleanContent = trim($matches[1]);
+            }
+
+            $parsed = json_decode($cleanContent, true);
+            if (is_array($parsed)) {
+                if (isset($parsed['type']) && in_array($parsed['type'], ['action_card', 'text'])) {
+                    return $parsed['type'] === 'action_card' ? json_encode($parsed) : $parsed['content'];
+                }
+            }
+            return $content ?: "Dato non disponibile nel sistema.";
+            
         } catch (\Exception $e) {
             Log::error('Groq API Exception', ['message' => $e->getMessage()]);
             return "Errore interno durante la richiesta AI.";
