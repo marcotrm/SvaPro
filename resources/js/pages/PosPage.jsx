@@ -28,13 +28,13 @@ const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency:
 
 /* ─── ProductCard ───────────────────────────────── */
 function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, isDipendente }) {
-  const variant   = product.variants?.[0];
-  const price     = parseFloat(variant?.sale_price) || 0;
+  const variant = product.variants?.[0];
+  const price = parseFloat(variant?.sale_price) || 0;
   const stockInfo = variant ? stockMap[variant.id] : null;
-  const onHand    = stockInfo?.on_hand ?? variant?.stock_quantity ?? variant?.on_hand ?? 0;
-  const palette   = catPalette(product.category_id);
-  const imgUrl    = product.image_url ? getImageUrl(product.image_url) : null;
-  const inStock   = onHand > 0;
+  const onHand = stockInfo?.on_hand ?? variant?.stock_quantity ?? variant?.on_hand ?? 0;
+  const palette = catPalette(product.category_id);
+  const imgUrl = product.image_url ? getImageUrl(product.image_url) : null;
+  const inStock = onHand > 0;
   const qscarePrice = parseFloat(product.qscare_price) || 0;
   const [popped, setPopped] = React.useState(false);
 
@@ -104,7 +104,10 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
           letterSpacing: '0.02em',
           boxShadow: inStock ? '0 2px 8px rgba(6,182,112,0.35)' : '0 2px 8px rgba(239,68,68,0.35)',
         }}>
-          {inStock ? `Qta ${onHand}` : 'Esaurito'}
+          {isDipendente
+            ? (inStock ? '● Disponibile' : '● Esaurito')
+            : (inStock ? onHand : '×')
+          }
         </div>
 
         {/* QScare badge */}
@@ -250,15 +253,15 @@ export default function PosPage() {
   const { selectedStoreId, displayMode, user } = useOutletContext();
   // Controllo ruolo dipendente
   const isDipendente = (user?.roles || []).includes('dipendente') || user?.role === 'dipendente';
-  const [loading, setLoading]           = useState(true);
-  const [products, setProducts]         = useState([]);
-  const [categories, setCategories]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState('top_selling');
-  const [fetchedCats, setFetchedCats]   = useState(new Set(['top_selling', 'featured']));
+  const [fetchedCats, setFetchedCats] = useState(new Set(['top_selling', 'featured']));
 
-  const [searchTerm, setSearchTerm]     = useState('');
-  const [flavorTerm, setFlavorTerm]     = useState('');
-  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [flavorTerm, setFlavorTerm] = useState('');
+
   // Effetto Debounce per Ricerca Globale su tutto il magazzino
   useEffect(() => {
     if (!searchTerm || searchTerm.trim().length < 2) return;
@@ -273,46 +276,46 @@ export default function PosPage() {
             return Array.from(map.values());
           });
         }
-      } catch (err) {}
+      } catch (err) { }
     }, 400);
     return () => clearTimeout(timer);
   }, [searchTerm]);
-  const searchRef                       = useRef(null);
+  const searchRef = useRef(null);
 
-  const [cartLines, setCartLines]       = useState([]);
+  const [cartLines, setCartLines] = useState([]);
   const [pointsRedeemed, setPointsRedeemed] = useState(0); // punti usati come sconto
   const [showPointsModal, setShowPointsModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
 
-  const [stockMap, setStockMap]         = useState({});
-  const [warehouseId, setWarehouseId]   = useState('');
-  const [employees, setEmployees]       = useState([]);
+  const [stockMap, setStockMap] = useState({});
+  const [warehouseId, setWarehouseId] = useState('');
+  const [employees, setEmployees] = useState([]);
   const [soldByEmployeeId, setSoldByEmployeeId] = useState('');
   const [operatorBarcode, setOperatorBarcode] = useState('');
-  const [operatorName, setOperatorName]   = useState('');
+  const [operatorName, setOperatorName] = useState('');
   const [operatorError, setOperatorError] = useState('');
   const [showOperatorDrop, setShowOperatorDrop] = useState(false);
   const operatorBarcodeRef = useRef(null);
   const operatorDebounceRef = useRef(null);
-  const [note, setNote]                   = useState('');
+  const [note, setNote] = useState('');
   const [showResoModal, setShowResoModal] = useState(false);
-  const [showMyShifts, setShowMyShifts]   = useState(false);
+  const [showMyShifts, setShowMyShifts] = useState(false);
 
   const [allCustomers, setAllCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [customerSearch, setCustomerSearch]     = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerDrop, setShowCustomerDrop] = useState(false);
-  const [showProductInfo, setShowProductInfo]   = useState(null);
+  const [showProductInfo, setShowProductInfo] = useState(null);
   const [inventoryProduct, setInventoryProduct] = useState(null);
 
   const [qscareLines, setQscareLines] = useState({}); // { [product_variant_id]: bool }
 
   // ── Codice Promozionale ────────────────────────────────────────────────────
-  const [promoCode,    setPromoCode]    = useState('');
+  const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState(null); // { id, name, type, value, discount_amount }
   const [promoLoading, setPromoLoading] = useState(false);
-  const [promoError,   setPromoError]   = useState('');
+  const [promoError, setPromoError] = useState('');
   const promoRef = useRef(null);
 
   /* Load data */
@@ -328,9 +331,9 @@ export default function PosPage() {
         catalog.getCategories(),
       ]);
 
-      const topProds  = topRes.status  === 'fulfilled' ? (topRes.value.data?.data  || []) : [];
+      const topProds = topRes.status === 'fulfilled' ? (topRes.value.data?.data || []) : [];
       const featProds = featRes.status === 'fulfilled' ? (featRes.value.data?.data || []) : [];
-      const allCats   = cRes.status    === 'fulfilled' ? (cRes.value.data?.data   || []) : [];
+      const allCats = cRes.status === 'fulfilled' ? (cRes.value.data?.data || []) : [];
 
       setCategories(allCats.filter(c => !c.parent_id));
       const merged = new Map();
@@ -351,7 +354,7 @@ export default function PosPage() {
 
       if (oRes.status === 'fulfilled') {
         const optEmp = oRes.value.data?.data?.employees || [];
-        const whs    = oRes.value.data?.data?.warehouses || [];
+        const whs = oRes.value.data?.data?.warehouses || [];
         if (whs.length > 0) setWarehouseId(whs[0].id);
         setEmployees(optEmp);
       }
@@ -375,12 +378,12 @@ export default function PosPage() {
         limit: 80,  // Limitato a 80 per performance (era 1000)
         ...(selectedStoreId ? { store_id: selectedStoreId } : {}),
       }).then(res => {
-         const newProds = res.data?.data || [];
-         setProducts(prev => {
-            const map = new Map(prev.map(p => [p.id, p]));
-            newProds.forEach(p => map.set(p.id, p));
-            return Array.from(map.values());
-         });
+        const newProds = res.data?.data || [];
+        setProducts(prev => {
+          const map = new Map(prev.map(p => [p.id, p]));
+          newProds.forEach(p => map.set(p.id, p));
+          return Array.from(map.values());
+        });
       });
     }
   }, [activeCategory, fetchedCats, selectedStoreId]);
@@ -406,12 +409,12 @@ export default function PosPage() {
           const { employees: empApi } = await import('../api.jsx');
           const res = await empApi.getEmployees({ search: val, limit: 10 });
           const list = res.data?.data || [];
-          found = list.find(em => 
+          found = list.find(em =>
             (em.barcode && em.barcode.toLowerCase() === valLow) ||
             (em.employee_code && em.employee_code.toLowerCase() === valLow) ||
             String(em.id) === valLow
           ) || (/^\d+$/.test(val) && list.find(em => String(em.id) === val));
-        } catch {}
+        } catch { }
       }
 
       if (found) {
@@ -474,16 +477,16 @@ export default function PosPage() {
     setCartLines(prev => prev.map(l => {
       if (l.product_variant_id !== variantId) return l;
       const n = l.qty + delta;
-      
+
       // Controllo QScare: riduci la quantità QScare se eccede la nuova quantità del carrello
       if (n > 0) {
-         setQscareLines(qsc => {
-            const currentQsc = qsc[variantId] || 0;
-            if (currentQsc > n) return { ...qsc, [variantId]: n };
-            return qsc;
-         });
+        setQscareLines(qsc => {
+          const currentQsc = qsc[variantId] || 0;
+          if (currentQsc > n) return { ...qsc, [variantId]: n };
+          return qsc;
+        });
       }
-      
+
       return n <= 0 ? null : { ...l, qty: n };
     }).filter(Boolean));
   };
@@ -496,8 +499,28 @@ export default function PosPage() {
   };
   const clearCart = () => setCartLines([]);
 
+  // Totale locale (immediato, per UX reattiva)
   const cartTotal = useMemo(() => cartLines.reduce((s, l) => s + l.price * l.qty, 0), [cartLines]);
   const cartCount = useMemo(() => cartLines.reduce((s, l) => s + l.qty, 0), [cartLines]);
+
+  // Quote validata dal server (Regola 4: calcoli critici sul backend)
+  const [serverQuote, setServerQuote] = useState(null);
+  const quoteTimerRef = useRef(null);
+  useEffect(() => {
+    if (!cartLines.length) { setServerQuote(null); return; }
+    clearTimeout(quoteTimerRef.current);
+    quoteTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await ordersApi.quote({
+          lines: cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
+          customer_id: selectedCustomer?.id || null,
+          order_discount_amount: appliedPromo?.discount_amount || 0,
+        });
+        setServerQuote(res.data);
+      } catch { /* fallback al totale locale */ }
+    }, 600); // debounce 600ms
+    return () => clearTimeout(quoteTimerRef.current);
+  }, [cartLines, selectedCustomer?.id, appliedPromo?.discount_amount]); // eslint-disable-line
 
   // ── Funzione: applica codice promo ─────────────────────────────────────────
   const applyPromoCode = async () => {
@@ -565,15 +588,15 @@ export default function PosPage() {
   };
 
   const effectiveQscarePrice = cartQscarePrice; // somma delle QScare attivate per-riga
-  const cartTotalWithQscare  = cartTotal + effectiveQscarePrice;
-  const promoDiscount        = appliedPromo?.discount_amount || 0;
-  const customerDiscountPct  = parseFloat(selectedCustomer?.personal_discount || 0);
-  const customerDiscountAmt  = customerDiscountPct > 0
+  const cartTotalWithQscare = cartTotal + effectiveQscarePrice;
+  const promoDiscount = appliedPromo?.discount_amount || 0;
+  const customerDiscountPct = parseFloat(selectedCustomer?.personal_discount || 0);
+  const customerDiscountAmt = customerDiscountPct > 0
     ? Math.round(Math.max(0, cartTotalWithQscare - promoDiscount) * customerDiscountPct * 100) / 10000
     : 0;
-  const cartTotalFinal       = Math.max(0, cartTotalWithQscare - promoDiscount - customerDiscountAmt);
-  const pointsDiscountAmt    = pointsRedeemed > 0 ? Math.min(parseFloat((pointsRedeemed * 0.01).toFixed(2)), cartTotalFinal) : 0;
-  const cartGrandTotal       = Math.max(0, cartTotalFinal - pointsDiscountAmt);
+  const cartTotalFinal = Math.max(0, cartTotalWithQscare - promoDiscount - customerDiscountAmt);
+  const pointsDiscountAmt = pointsRedeemed > 0 ? Math.min(parseFloat((pointsRedeemed * 0.01).toFixed(2)), cartTotalFinal) : 0;
+  const cartGrandTotal = Math.max(0, cartTotalFinal - pointsDiscountAmt);
 
 
   // Sconto totale combinato (promo codice + sconto personale cliente)
@@ -637,7 +660,7 @@ export default function PosPage() {
         ? Object.values(err.response.data.errors).flat().join(' • ')
         : err.response?.data?.message || 'Errore durante il pagamento';
       toast.error(msg);
-        throw err;
+      throw err;
     }
     finally { setPlacingOrder(false); }
   };
@@ -661,8 +684,8 @@ export default function PosPage() {
     }
 
 
-    const matchS = !s || p.name?.toLowerCase().includes(s) 
-      || p.sku?.toLowerCase().includes(s) 
+    const matchS = !s || p.name?.toLowerCase().includes(s)
+      || p.sku?.toLowerCase().includes(s)
       || p.barcode?.toLowerCase().includes(s)
       || p.variants?.some(v => v.barcode?.toLowerCase().includes(s) || v.sku?.toLowerCase().includes(s));
     // Fix ricerca aroma: controlla anche description e tags, normalizza accenti
@@ -695,8 +718,8 @@ export default function PosPage() {
         const s = customerSearch.trim().toLowerCase();
         const exact = list.find(c =>
           (c.fidelity_card && c.fidelity_card.toLowerCase() === s) ||
-          (c.code          && c.code.toLowerCase()          === s) ||
-          (c.phone         && c.phone.toLowerCase()         === s) ||
+          (c.code && c.code.toLowerCase() === s) ||
+          (c.phone && c.phone.toLowerCase() === s) ||
           String(c.id) === s
         );
         if (exact) {
@@ -749,7 +772,7 @@ export default function PosPage() {
               return Array.from(map.values());
             });
           }
-        } catch {}
+        } catch { }
       }
 
       if (match) {
@@ -958,8 +981,8 @@ export default function PosPage() {
                       {imgUrl
                         ? <img src={imgUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         : <div style={{ width: '100%', height: '100%', background: pal.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Package size={22} color="rgba(255,255,255,0.6)" />
-                          </div>
+                          <Package size={22} color="rgba(255,255,255,0.6)" />
+                        </div>
                       }
                     </div>
                     <div style={{ padding: '8px 10px' }}>
@@ -1058,7 +1081,7 @@ export default function PosPage() {
                             const { employees: empApi } = await import('../api.jsx');
                             const res = await empApi.getEmployees({ search: val, limit: 10 });
                             found = (res.data?.data || [])[0];
-                          } catch {}
+                          } catch { }
                         }
                         if (found) {
                           setSoldByEmployeeId(String(found.id));
@@ -1140,23 +1163,23 @@ export default function PosPage() {
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <User size={9} /> Cliente
               </div>
-                {selectedCustomer ? (
-                  <div style={{ background: 'rgba(123,111,208,0.18)', border: '1px solid rgba(123,111,208,0.4)', borderRadius: 12, padding: '10px 12px' }}>
-                    {/* Riga nome + X */}
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCustomer.name}</div>
-                        {customerDiscountPct > 0 && (<div style={{ fontSize: 10, color: '#86efac', fontWeight: 700, marginTop: 1 }}>🎟️ Sconto {customerDiscountPct}%</div>)}
-                      </div>
-                      <button onClick={() => { setSelectedCustomer(null); setPointsRedeemed(0); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 0, flexShrink: 0 }}>
-                        <X size={12} />
-                      </button>
+              {selectedCustomer ? (
+                <div style={{ background: 'rgba(123,111,208,0.18)', border: '1px solid rgba(123,111,208,0.4)', borderRadius: 12, padding: '10px 12px' }}>
+                  {/* Riga nome + X */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCustomer.name}</div>
+                      {customerDiscountPct > 0 && (<div style={{ fontSize: 10, color: '#86efac', fontWeight: 700, marginTop: 1 }}>🎟️ Sconto {customerDiscountPct}%</div>)}
                     </div>
-                     {/* Sconto punti attivo - solo indicatore, gestione via popup */}
-                     {pointsRedeemed > 0 && (
-                       <div style={{ marginTop: 6, fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>⭐ -{fmt(pointsDiscountAmt)} punti applicati</div>
-                     )}
-                   </div>
+                    <button onClick={() => { setSelectedCustomer(null); setPointsRedeemed(0); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 0, flexShrink: 0 }}>
+                      <X size={12} />
+                    </button>
+                  </div>
+                  {/* Sconto punti attivo - solo indicatore, gestione via popup */}
+                  {pointsRedeemed > 0 && (
+                    <div style={{ marginTop: 6, fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>⭐ -{fmt(pointsDiscountAmt)} punti applicati</div>
+                  )}
+                </div>
               ) : (
                 <div style={{ position: 'relative' }}>
                   <User size={11} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }} />
@@ -1352,13 +1375,13 @@ export default function PosPage() {
                     </div>
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>Copertura guasti accidentali</div>
                   </div>
-                  
+
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                     <span style={{ fontSize: 12, fontWeight: 900, color: hasQscare ? '#86efac' : 'rgba(255,255,255,0.5)' }}>
                       +{fmt(qscarePrice * qscQty)}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <button 
+                      <button
                         onClick={() => updateQscareForLine(line.product_variant_id, -1, line.qty)}
                         disabled={qscQty <= 0}
                         style={{ width: 22, height: 22, borderRadius: 6, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: qscQty > 0 ? 'pointer' : 'not-allowed', opacity: qscQty > 0 ? 1 : 0.4 }}
@@ -1366,7 +1389,7 @@ export default function PosPage() {
                       <span style={{ fontSize: 11, fontWeight: 800, color: hasQscare ? '#86efac' : '#fff', minWidth: 20, textAlign: 'center' }}>
                         {qscQty} <span style={{ fontSize: 9, opacity: 0.6 }}>/ {line.qty}</span>
                       </span>
-                      <button 
+                      <button
                         onClick={() => updateQscareForLine(line.product_variant_id, 1, line.qty)}
                         disabled={qscQty >= line.qty}
                         style={{ width: 22, height: 22, borderRadius: 6, border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: qscQty < line.qty ? 'pointer' : 'not-allowed', opacity: qscQty < line.qty ? 1 : 0.4 }}
@@ -1498,8 +1521,8 @@ export default function PosPage() {
                   {imgUrl
                     ? <img src={imgUrl} alt={showProductInfo.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <div style={{ width: '100%', height: '100%', background: pal.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Package size={48} color="rgba(255,255,255,0.4)" />
-                      </div>
+                      <Package size={48} color="rgba(255,255,255,0.4)" />
+                    </div>
                   }
                   <button onClick={() => setShowProductInfo(null)}
                     style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
@@ -1575,7 +1598,7 @@ export default function PosPage() {
         onClose={() => setShowResoModal(false)}
         onDone={() => { setShowResoModal(false); clearApiCache(); fetchData(); }}
       />}
-      
+
       {/* ─── Modal Giacenze Multi-Store ─── */}
       {inventoryProduct && (
         <ProductInventoryModal product={inventoryProduct} onClose={() => setInventoryProduct(null)} />
@@ -1587,12 +1610,12 @@ export default function PosPage() {
 /* ─── Modal Reso POS ──────────────────────────────────────────── */
 function PosResoModal({ storeId, onClose, onDone }) {
   const [orderId, setOrderId] = useState('');
-  const [order, setOrder]     = useState(null);
+  const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState('');
-  const [reason, setReason]   = useState('customer_request');
-  const [lines, setLines]     = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [reason, setReason] = useState('customer_request');
+  const [lines, setLines] = useState([]);
 
   const searchOrder = async () => {
     if (!orderId.trim()) return;
@@ -1650,7 +1673,7 @@ function PosResoModal({ storeId, onClose, onDone }) {
             <RotateCcw size={18} color="#fbbf24" />
             <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>Reso / Rimborso</span>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)' }}><X size={18}/></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)' }}><X size={18} /></button>
         </div>
 
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1704,7 +1727,7 @@ function PosResoModal({ storeId, onClose, onDone }) {
                     <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{l.product_name || `Variante #${l.product_variant_id}`}</div>
                     <div style={{ fontSize: 11, color: '#6b7280' }}>max {l.qty}</div>
                     <input type="number" min="0" max={l.qty} value={l.qty_return}
-                      onChange={e => { const ls = [...lines]; ls[i] = { ...ls[i], qty_return: Math.min(l.qty, Math.max(0, parseInt(e.target.value)||0)) }; setLines(ls); }}
+                      onChange={e => { const ls = [...lines]; ls[i] = { ...ls[i], qty_return: Math.min(l.qty, Math.max(0, parseInt(e.target.value) || 0)) }; setLines(ls); }}
                       style={{ width: 60, padding: '6px 8px', border: '1.5px solid #e5e7eb', borderRadius: 8, textAlign: 'center', fontWeight: 700, fontSize: 13, outline: 'none' }}
                     />
                   </div>
@@ -1823,74 +1846,74 @@ function PointsModal({ customer, pointsRedeemed, pointsDiscountAmt, cartTotal, f
 /* ─── Modal "I Miei Turni" POS ────────────────────────────────────── */
 function MyShiftsModal({ employeeId, employeeName, onClose }) {
   const [myShifts, setMyShifts] = React.useState([]);
-  const [loading, setLoading]   = React.useState(true);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     if (!employeeId) return;
     const now = new Date();
     const start = new Date(now); start.setDate(start.getDate() - 3);
-    const end   = new Date(now); end.setDate(end.getDate() + 14);
-    const fmtD = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const end = new Date(now); end.setDate(end.getDate() + 14);
+    const fmtD = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     import('../api.jsx').then(({ shifts: shiftsAPI }) => {
       shiftsAPI.getAll({ employee_id: employeeId, start_date: fmtD(start), end_date: fmtD(end) })
         .then(res => setMyShifts(res.data?.data || []))
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => setLoading(false));
     });
   }, [employeeId]);
 
-  const DAY_IT = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+  const DAY_IT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
   const today = new Date().toISOString().split('T')[0];
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
       onClick={onClose}>
-      <div style={{ background:'#0f172a', borderRadius:20, width:'100%', maxWidth:400, boxShadow:'0 32px 80px rgba(0,0,0,0.5)', border:'1px solid rgba(255,255,255,0.08)', overflow:'hidden' }}
+      <div style={{ background: '#0f172a', borderRadius: 20, width: '100%', maxWidth: 400, boxShadow: '0 32px 80px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}
         onClick={e => e.stopPropagation()}>
-        <div style={{ padding:'18px 22px', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ width:36, height:36, borderRadius:10, background:'rgba(99,102,241,0.2)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <CalendarIcon size={18} color="#a5b4fc" />
             </div>
             <div>
-              <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>I Miei Turni</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>{employeeName}</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>I Miei Turni</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{employeeName}</div>
             </div>
           </div>
-          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.4)' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
             <X size={18} />
           </button>
         </div>
-        <div style={{ padding:'16px 22px 22px', maxHeight:420, overflowY:'auto' }}>
+        <div style={{ padding: '16px 22px 22px', maxHeight: 420, overflowY: 'auto' }}>
           {loading ? (
-            <div style={{ textAlign:'center', padding:'32px 0', color:'rgba(255,255,255,0.3)' }}>
-              <Loader2 size={24} style={{ margin:'0 auto 8px', display:'block' }} />
-              <div style={{ fontSize:12 }}>Caricamento turni...</div>
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'rgba(255,255,255,0.3)' }}>
+              <Loader2 size={24} style={{ margin: '0 auto 8px', display: 'block' }} />
+              <div style={{ fontSize: 12 }}>Caricamento turni...</div>
             </div>
           ) : myShifts.length === 0 ? (
-            <div style={{ textAlign:'center', padding:'32px 0', color:'rgba(255,255,255,0.3)', fontSize:13 }}>
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
               📅 Nessun turno assegnato nei prossimi giorni
             </div>
           ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {myShifts.map(s => {
                 const d = new Date(s.date + 'T12:00:00');
                 const isToday = s.date === today;
-                const isPast  = s.date < today;
+                const isPast = s.date < today;
                 return (
-                  <div key={s.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:12, background: isToday ? 'rgba(16,185,129,0.12)' : isPast ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)', border: isToday ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.07)', opacity: isPast ? 0.6 : 1 }}>
-                    <div style={{ width:10, height:10, borderRadius:'50%', background: s.color || '#7B6FD0', flexShrink:0 }} />
-                    <div style={{ minWidth:90 }}>
-                      <div style={{ fontSize:12, fontWeight:800, color: isToday ? '#86efac' : '#fff' }}>
-                        {isToday ? '📍 OGGI' : DAY_IT[d.getDay()]} {d.getDate()}/{d.getMonth()+1}
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, background: isToday ? 'rgba(16,185,129,0.12)' : isPast ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)', border: isToday ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.07)', opacity: isPast ? 0.6 : 1 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color || '#7B6FD0', flexShrink: 0 }} />
+                    <div style={{ minWidth: 90 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: isToday ? '#86efac' : '#fff' }}>
+                        {isToday ? '📍 OGGI' : DAY_IT[d.getDay()]} {d.getDate()}/{d.getMonth() + 1}
                       </div>
-                      {s.store?.name && <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', marginTop:1 }}>{s.store.name}</div>}
+                      {s.store?.name && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{s.store.name}</div>}
                     </div>
-                    <div style={{ marginLeft:'auto', textAlign:'right' }}>
+                    <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
                       {s.start_time && s.end_time ? (
-                        <div style={{ fontSize:13, fontWeight:700, color:'rgba(255,255,255,0.85)', fontFamily:'monospace' }}>{s.start_time.slice(0,5)} – {s.end_time.slice(0,5)}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.85)', fontFamily: 'monospace' }}>{s.start_time.slice(0, 5)} – {s.end_time.slice(0, 5)}</div>
                       ) : (
-                        <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)' }}>Orario non impostato</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Orario non impostato</div>
                       )}
                     </div>
                   </div>

@@ -18,6 +18,7 @@
     "dependencies": {
         "clsx": "^2.1.1",
         "date-fns": "^4.1.0",
+        "groq-sdk": "^1.1.2",
         "lucide-react": "^0.577.0",
         "react": "^19.2.4",
         "react-barcode": "^1.6.1",
@@ -25,6 +26,7 @@
         "react-dom": "^19.2.4",
         "react-hot-toast": "^2.6.0",
         "react-is": "^19.2.4",
+        "react-markdown": "^10.1.0",
         "react-router-dom": "^7.13.1",
         "recharts": "^3.8.0",
         "xlsx": "^0.18.5"

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { orders as ordersApi, inventory, customers, reports, stores as storesApi, employees as employeesApi } from '../api.jsx';
+import { orders as ordersApi, inventory, customers, reports, stores as storesApi, employees as employeesApi, ai } from '../api.jsx';
+import ReactMarkdown from 'react-markdown';
+import { Send, Bot } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, LineChart, Line, Cell, PieChart, Pie
@@ -328,7 +330,7 @@ const DonutChart = ({ data = [], colors = STORE_COLORS }) => {
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
         <span style={{ fontSize: 11, color: '#9CA3AF' }}>Totale</span>
-        <span style={{ fontSize: 18, fontWeight: 800 }}>{total}</span>
+        <span style={{ fontSize: 18, fontWeight: 800 }}>{total.toLocaleString('it-IT', { maximumFractionDigits: 0 })}</span>
       </div>
     </div>
   );
@@ -368,12 +370,61 @@ const StatusBadge = ({ status }) => {
   return <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{s.label}</span>;
 };
 
+const AiReorderCard = ({ proposal, setAiAnswer }) => {
+  const [loading, setLoading] = useState(false);
+  const handleAccept = async () => {
+    setLoading(true);
+    try {
+      const { ai } = await import('../api.jsx');
+      const res = await ai.acceptReorder(proposal.ordini);
+      let answerText = `✅ **Operazione completata!**\n\n${res.data.message}`;
+      if (res.data.created_ids && res.data.created_ids.length > 0) {
+        answerText += `\n\nOrdini creati con successo: ` + res.data.created_ids.map(id => `[Vedi Ordine #${id}](/purchase-orders)`).join(', ');
+      }
+      setAiAnswer(answerText);
+    } catch(err) {
+      console.error("ERRORE BACKEND DETTAGLIATO:", err.response?.data || err.message);
+      const serverMsg = err.response?.data?.message || err.message;
+      setAiAnswer(`❌ Errore durante la creazione delle bolle: ${serverMsg}`);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontWeight: 800, fontSize: 14, color: '#C5BEE8' }}>✨ Proposta di Riordino AI</div>
+      <p style={{ margin: 0 }}>{proposal.motivazione}</p>
+      
+      <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 10 }}>
+        {proposal.ordini.map((o, idx) => (
+          <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: idx < proposal.ordini.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', padding: '6px 0' }}>
+            <div>
+               <div style={{ fontWeight: 600 }}>Da negozio {o.from_store_id} a negozio {o.to_store_id}</div>
+               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{o.notes || `Prodotto ID: ${o.product_variant_id}`}</div>
+            </div>
+            <div style={{ fontWeight: 800 }}>{o.quantity} pz</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+        <button onClick={handleAccept} disabled={loading} style={{ flex: 1, background: '#22C55E', color: '#fff', border: 'none', padding: '8px 0', borderRadius: 8, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer' }}>
+          {loading ? 'Creazione...' : 'Accetta e Crea Bolle'}
+        </button>
+        <button onClick={() => setAiAnswer('Operazione annullata. Riformula la tua domanda per modificare la proposta.')} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
+          Modifica
+        </button>
+      </div>
+    </div>
+  );
+};
+
 /* ═══════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════════ */
 export default function DashboardPage() {
   const navigate  = useNavigate();
-  const { selectedStoreId } = useOutletContext();
+  const { selectedStoreId, userRoles = [] } = useOutletContext();
 
   const [kpi,          setKpi]          = useState(null);
   const [monthlyChart, setMonthlyChart] = useState([]);
@@ -400,6 +451,29 @@ export default function DashboardPage() {
   const [storeTab, setStoreTab]           = useState('ranking'); // 'ranking' | 'history'
   const [storesList, setStoresList]       = useState([]);
   const [donutStoreId, setDonutStoreId]   = useState('all');
+
+  // AI Chat State
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [aiAnswer, setAiAnswer] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const handleAskAi = async (e) => {
+    e?.preventDefault();
+    if (!aiQuestion.trim()) return;
+    setAiLoading(true);
+    try {
+      const res = await ai.askAdvice(aiQuestion);
+      let answerText = res.data.answer;
+      try {
+        const parsed = JSON.parse(answerText);
+        answerText = parsed;
+      } catch (e) {}
+      setAiAnswer(answerText);
+    } catch (err) {
+      setAiAnswer('Errore durante la richiesta AI. Riprova più tardi.');
+    }
+    setAiLoading(false);
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -995,12 +1069,53 @@ export default function DashboardPage() {
           onClick={() => window.open('/api/export/orders', '_blank')}
           style={{ background:'#1C1B2E', color:'#fff', borderRadius:16, padding:'14px 20px',
             border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
-            gap:8, fontWeight:700, fontSize:14, transition:'opacity 0.15s' }}
+            gap:8, fontWeight:700, fontSize:14, transition:'opacity 0.15s', marginBottom:8 }}
           onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
           onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
           <Download size={16} />
           Esporta statistiche
         </button>
+
+        {/* AI Assistant Widget */}
+        {(!userRoles.includes('dipendente') || userRoles.some(r => ['project_manager','superadmin','store_manager','admin_cliente','admin'].includes(r))) && (
+          <div style={{ background:'linear-gradient(135deg, #1C1B2E, #2A2846)', borderRadius:22, padding:22, color:'#fff', display:'flex', flexDirection:'column', gap:12 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
+              <Bot size={22} color={PURPLE_L} />
+              <span style={{ fontSize:15, fontWeight:800 }}>AI Business Intelligence</span>
+            </div>
+            
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:4 }}>
+              {['Analizza vendite mese', 'Prevedi scorte', 'Ottimizza magazzino'].map(q => (
+                <button key={q} onClick={() => setAiQuestion(q)} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:20, padding:'6px 12px', fontSize:11, color:'#C5BEE8', cursor:'pointer', transition:'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.2)'} onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'}>
+                  {q}
+                </button>
+              ))}
+            </div>
+
+            {aiAnswer && (
+              <div style={{ background:'rgba(0,0,0,0.2)', padding:14, borderRadius:12, fontSize:13, lineHeight:1.5, maxHeight:300, overflowY:'auto', border:'1px solid rgba(255,255,255,0.05)' }} className="markdown-body-dark">
+                {typeof aiAnswer === 'string' ? (
+                  <ReactMarkdown>{aiAnswer}</ReactMarkdown>
+                ) : aiAnswer?.type === 'action_card' && aiAnswer?.action === 'proponi_riordino' ? (
+                  <AiReorderCard proposal={aiAnswer.payload} setAiAnswer={setAiAnswer} />
+                ) : null}
+              </div>
+            )}
+
+            <form onSubmit={handleAskAi} style={{ display:'flex', gap:8, marginTop:4 }}>
+              <input 
+                type="text" 
+                value={aiQuestion} 
+                onChange={e => setAiQuestion(e.target.value)} 
+                placeholder="Chiedi un consiglio..." 
+                style={{ flex:1, padding:'10px 14px', borderRadius:12, border:'none', background:'rgba(255,255,255,0.08)', color:'#fff', fontSize:13, outline:'none' }}
+              />
+              <button type="submit" disabled={aiLoading || !aiQuestion.trim()} style={{ background:PURPLE_D, border:'none', borderRadius:12, width:40, display:'flex', alignItems:'center', justifyContent:'center', cursor:aiLoading||!aiQuestion.trim()?'not-allowed':'pointer', opacity:aiLoading||!aiQuestion.trim()?0.5:1, color:'#fff' }}>
+                {aiLoading ? <div className="sp-spin" style={{ width:16, height:16, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%' }} /> : <Send size={16} />}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
     </div>

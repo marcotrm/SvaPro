@@ -725,7 +725,10 @@ export default function StockTransfersPage() {
                             const st = STATUS_LABELS[t.status] || { label: t.status, cls: '' };
                             return (
                                 <tr key={t.id}>
-                                    <td className="mono" style={{ fontWeight: 600 }}>{t.ddt_number}</td>
+                                    <td className="mono" style={{ fontWeight: 600 }}>
+                                        {t.ddt_number}
+                                        {t.is_ai_generated ? <span style={{ marginLeft: 6, fontSize: 10, background: '#8B5CF6', color: '#fff', padding: '2px 6px', borderRadius: 4 }}>AI 🤖</span> : null}
+                                    </td>
                                     <td>
                                         <span style={{ fontWeight: 600 }}>{t.from_store_name}</span>
                                         <span style={{ color: 'var(--color-accent)', margin: '0 6px' }}>→</span>

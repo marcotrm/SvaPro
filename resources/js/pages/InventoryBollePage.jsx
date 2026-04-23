@@ -325,6 +325,8 @@ export default function InventoryBollePage() {
   const [loading, setLoading]  = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     try { const s = localStorage.getItem('user'); if(s) setUser(JSON.parse(s)); } catch {}
@@ -332,8 +334,11 @@ export default function InventoryBollePage() {
 
   const isAdmin = user && ['superadmin','admin_cliente','magazziniere','store_manager'].includes(user.role);
 
+  const STORE_VISIBLE_STATUSES = ['SENT_TO_STORE','IN_PROGRESS','CLOSED_BY_STORE','UNDER_REVIEW','APPROVED','DISPUTED','REOPENED'];
+
   const load = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       if (isAdmin) {
         const [kR, sR] = await Promise.all([
@@ -346,9 +351,14 @@ export default function InventoryBollePage() {
         const r = await inventorySessions.storeGetAll();
         setSessions(r.data?.data ?? []);
       }
-    } catch (e) { console.error('InventoryBollePage load error:', e); }
+    } catch (e) {
+      const msg = e.response?.data?.message || e.message || 'Errore caricamento inventari';
+      setLoadError(`Errore: ${msg}`);
+      console.error('InventoryBollePage load error:', e);
+    }
     setLoading(false);
   };
+
 
   useEffect(() => { if (user !== null) load(); }, [user, filterStatus]); // eslint-disable-line
 
@@ -356,6 +366,20 @@ export default function InventoryBollePage() {
     setShowCreate(false);
     if (sessionId) navigate(`/inventory/bolle/${sessionId}`);
     else load();
+  };
+
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
+    if (!window.confirm('Annullare questa bolla? Verr\u00e0 marcata come CANCELLATA e non potr\u00e0 essere riattivata.')) return;
+    setDeletingId(id);
+    try {
+      await inventorySessions.deleteSession(id);
+      // Soft delete: aggiorna lo status nella lista locale invece di rimuoverla
+      setSessions(prev => prev.map(s => s.id === id ? { ...s, status: 'CANCELLED' } : s));
+    } catch (err) {
+      alert(err.response?.data?.message ?? 'Errore durante l\'annullamento');
+    }
+    setDeletingId(null);
   };
 
   const FILTER_STATUSES = ['', 'SENT_TO_STORE', 'IN_PROGRESS', 'CLOSED_BY_STORE', 'UNDER_REVIEW', 'APPROVED'];
@@ -386,6 +410,18 @@ export default function InventoryBollePage() {
           <KpiCard label="In revisione" value={kpi.under_review} color="#F97316" />
           <KpiCard label="Approvate"    value={kpi.approved}     color="#10B981" />
           <KpiCard label="Totale"       value={kpi.total}        color="var(--color-text-secondary)" />
+        </div>
+      )}
+
+      {/* Banner errore */}
+      {loadError && (
+        <div style={{
+          background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.35)',
+          borderRadius:10, padding:'14px 18px', marginBottom:20,
+          color:'#FCA5A5', fontSize:14, display:'flex', alignItems:'center', gap:10
+        }}>
+          <span style={{ fontSize:20 }}>⚠️</span>
+          <span>{loadError}</span>
         </div>
       )}
 
@@ -488,6 +524,27 @@ export default function InventoryBollePage() {
               )}
 
               <div style={{ color:'var(--color-text-tertiary)', fontSize:20, flexShrink:0 }}>›</div>
+
+              {/* Pulsante elimina — non per APPROVED/CLOSED_BY_STORE definitivi */}
+              {isAdmin && !['APPROVED','CLOSED_BY_STORE','UNDER_REVIEW'].includes(s.status) && (
+                <button
+                  type="button"
+                  onClick={e => handleDelete(e, s.id)}
+                  disabled={deletingId === s.id}
+                  title="Elimina bolla"
+                  style={{
+                    flexShrink:0, background:'none', border:'1.5px solid #EF444460',
+                    borderRadius:8, padding:'6px 10px', cursor:'pointer',
+                    color:'#EF4444', fontSize:13, fontWeight:700,
+                    opacity: deletingId === s.id ? 0.5 : 1,
+                    transition:'all 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#EF444415'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  {deletingId === s.id ? '⏳' : '🗑'}
+                </button>
+              )}
             </div>
           ))}
         </div>

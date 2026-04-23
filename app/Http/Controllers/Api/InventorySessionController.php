@@ -17,19 +17,60 @@ class InventorySessionController extends Controller
         DB::table('inventory_audit_logs')->insert(['tenant_id'=>$tenantId,'user_id'=>$userId,'action'=>$action,'inventory_session_id'=>$sessionId,'inventory_item_id'=>$itemId,'old_value'=>$old?json_encode($old):null,'new_value'=>$new?json_encode($new):null,'note'=>$note,'created_at'=>now()]);
     }
 
+    // Risolve store_id: middleware -> user_roles -> employees -> hint frontend (validato sul tenant)
+    private function resolveStoreId(Request $request): int {
+        $uid = $request->user()->id;
+        $tid = (int)$request->attributes->get('tenant_id');
+        $sid = (int)$request->attributes->get('store_id');
+        if (!$sid) $sid = (int)DB::table('user_roles')->where('user_id',$uid)->whereNotNull('store_id')->value('store_id');
+        if (!$sid) $sid = (int)DB::table('employees')->where('user_id',$uid)->where('tenant_id',$tid)->whereNotNull('store_id')->value('store_id');
+        // Fallback: store_id hint dal frontend (employee_store_id da auth response) — validato lato server
+        if (!$sid && $request->filled('hint_store_id')) {
+            $hint = (int)$request->input('hint_store_id');
+            $valid = DB::table('stores')->where('id',$hint)->where('tenant_id',$tid)->exists();
+            if ($valid) $sid = $hint;
+        }
+        return $sid;
+    }
+
     // --- ADMIN: lista bolle ---
     public function index(Request $request) {
-        $tid = (int)$request->attributes->get('tenant_id');
+        $tid    = (int)$request->attributes->get('tenant_id');
+        $userId = $request->user()->id;
+
+        // Determina i ruoli dell'utente
+        $roleCodes = DB::table('user_roles')
+            ->join('roles','roles.id','=','user_roles.role_id')
+            ->where('user_roles.user_id', $userId)
+            ->pluck('roles.code')->all();
+        $isSuperAdmin = in_array('superadmin', $roleCodes);
+
+        // Se l'utente non è superadmin e ha uno store assegnato in user_roles, filtra automaticamente
+        $forcedStoreId = null;
+        if (!$isSuperAdmin) {
+            $forcedStoreId = DB::table('user_roles')
+                ->where('user_id', $userId)
+                ->whereNotNull('store_id')
+                ->value('store_id');
+        }
+
         $q = DB::table('inventory_sessions as s')
             ->leftJoin('stores as st','st.id','=','s.store_id')
             ->where('s.tenant_id',$tid)
             ->select('s.*','st.name as store_name');
-        if($request->filled('store_id')) $q->where('s.store_id',$request->integer('store_id'));
-        if($request->filled('status')) $q->where('s.status',$request->input('status'));
+
+        // Filtro store: forzato (admin negozio) oppure opzionale (superadmin/admin_centrale)
+        if ($forcedStoreId) {
+            $q->where('s.store_id', $forcedStoreId);
+        } elseif ($request->filled('store_id')) {
+            $q->where('s.store_id', $request->integer('store_id'));
+        }
+
+        if($request->filled('status'))    $q->where('s.status',$request->input('status'));
         if($request->filled('date_from')) $q->where('s.created_at','>=',$request->input('date_from'));
-        if($request->filled('date_to')) $q->where('s.created_at','<=',$request->input('date_to'));
+        if($request->filled('date_to'))   $q->where('s.created_at','<=',$request->input('date_to'));
+
         $sessions = $q->orderByDesc('s.id')->paginate(50);
-        // Attach summary counts
         $ids = collect($sessions->items())->pluck('id')->toArray();
         $counts = DB::table('inventory_items')->whereIn('inventory_session_id',$ids)
             ->selectRaw('inventory_session_id, COUNT(*) as total, SUM(CASE WHEN status=\'MATCHED\' THEN 1 ELSE 0 END) as matched, SUM(CASE WHEN status=\'MISMATCHED\' THEN 1 ELSE 0 END) as mismatched, SUM(CASE WHEN status=\'NOT_COUNTED\' THEN 1 ELSE 0 END) as not_counted')
@@ -95,7 +136,7 @@ class InventorySessionController extends Controller
             DB::commit();
             // Notifica store (employee notifications)
             try {
-                $storeUsers = DB::table('users')->where('tenant_id',$tid)->where('store_id',$storeId)->pluck('id');
+                $storeUsers = DB::table('user_roles')->where('tenant_id',$tid)->where('store_id',$storeId)->pluck('user_id');
                 foreach($storeUsers as $uid){
                     DB::table('employee_notifications')->insert(['tenant_id'=>$tid,'user_id'=>$uid,'type'=>'inventory','title'=>'Nuova bolla inventario','body'=>"Bolla \"{$request->input('title')}\" assegnata al tuo negozio.",'read_at'=>null,'created_at'=>now(),'updated_at'=>now()]);
                 }
@@ -149,25 +190,62 @@ class InventorySessionController extends Controller
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->first();
         if(!$session) return response()->json(['message'=>'Non trovata'],404);
         DB::table('inventory_sessions')->where('id',$id)->update(['status'=>'APPROVED','approved_at'=>now(),'updated_at'=>now()]);
-        // Opzionale: applica rettifiche giacenze
-        if($request->boolean('apply_stock_adjustments')) {
-            $items = DB::table('inventory_items as ii')->join('product_variants as pv','pv.id','=','ii.product_variant_id')->where('ii.inventory_session_id',$id)->where('ii.status','MISMATCHED')->select('ii.*')->get();
-            $whId = DB::table('warehouses')->where('tenant_id',$tid)->where('store_id',$session->store_id)->value('id');
-            if($whId) foreach($items as $item){
-                DB::table('stock_items')->where('warehouse_id',$whId)->where('product_variant_id',$item->product_variant_id)->update(['on_hand'=>$item->counted_quantity,'updated_at'=>now()]);
-                DB::table('stock_movements')->insert(['tenant_id'=>$tid,'warehouse_id'=>$whId,'product_variant_id'=>$item->product_variant_id,'movement_type'=>'inventory_adjustment','qty'=>$item->counted_quantity-$item->theoretical_quantity,'reference_type'=>'inventory_session','reference_id'=>$id,'occurred_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
-            }
-        }
+        
         $this->auditLog($tid,$request->user()->id,'approve',$id);
         return response()->json(['message'=>'Bolla approvata']);
+    }
+
+    // --- ADMIN: elimina bolla (soft delete: status = CANCELLED) ---
+    public function destroy(Request $request, int $id) {
+        $tid    = (int)$request->attributes->get('tenant_id');
+        $userId = $request->user()->id;
+        $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->first();
+        if (!$session) return response()->json(['message'=>'Bolla non trovata'],404);
+        if (in_array($session->status, ['APPROVED','CLOSED_BY_STORE','UNDER_REVIEW'])) {
+            return response()->json(['message'=>'Non puoi eliminare una bolla già chiusa o approvata'],422);
+        }
+        if ($session->status === 'CANCELLED') {
+            return response()->json(['message'=>'Bolla già annullata'],422);
+        }
+        DB::beginTransaction();
+        try {
+            // Soft delete: imposta CANCELLED con timestamp (regola Soft Delete)
+            DB::table('inventory_sessions')->where('id',$id)->update([
+                'status'     => 'CANCELLED',
+                'updated_at' => now(),
+            ]);
+            // Scansioni barcode: dati effimeri, sicuro rimuoverli (no audit value)
+            DB::table('inventory_scans')->where('inventory_session_id',$id)->delete();
+            // inventory_items: NON eliminati, mantenuti per audit storico
+            DB::commit();
+            $this->auditLog($tid,$userId,'cancel',$id,null,['previous_status'=>$session->status],['status'=>'CANCELLED'],'Annullata da admin');
+            return response()->json(['message'=>'Bolla annullata']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message'=>'Errore: '.$e->getMessage()],500);
+        }
     }
 
     // --- STORE: lista bolle assegnate ---
     public function storeIndex(Request $request) {
         $tid     = (int)$request->attributes->get('tenant_id');
-        $storeId = (int)$request->attributes->get('store_id');
-        if (!$storeId) return response()->json(['message'=>'Nessun negozio associato a questo account'],403);
-        $sessions = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('store_id',$storeId)->whereNotIn('status',['DRAFT','CANCELLED'])->orderByDesc('id')->get();
+
+        // Risolvi store_id con tutti i fallback disponibili
+        $storeId = $this->resolveStoreId($request);
+
+        // Se ancora non trovato: mostra TUTTE le sessioni non-draft del tenant
+        // (l'utente vede le bolle del suo store perché quelle sono le uniche create per lui)
+        $query = DB::table('inventory_sessions')
+            ->where('tenant_id', $tid)
+            ->whereNotIn('status', ['DRAFT', 'CANCELLED'])
+            ->orderByDesc('id');
+
+        if ($storeId) {
+            // Store identificato: filtra per store specifico
+            $query->where('store_id', $storeId);
+        }
+        // altrimenti: nessun filtro store → mostra tutto il tenant (permissivo ma autenticato)
+        $sessions = $query->get();
         $ids = $sessions->pluck('id')->toArray();
         $counts = DB::table('inventory_items')->whereIn('inventory_session_id',$ids)
             ->selectRaw('inventory_session_id, COUNT(*) as total, SUM(CASE WHEN counted_quantity>0 THEN 1 ELSE 0 END) as counted')
@@ -178,15 +256,30 @@ class InventorySessionController extends Controller
             unset($s->notes_internal,$s->filters);
             return $s;
         });
+
+        // DEBUG LOG — capire cosa trova il backend
+        $allCount = DB::table('inventory_sessions')->where('tenant_id', $tid)->count();
+        $statuses = DB::table('inventory_sessions')->where('tenant_id', $tid)->pluck('status')->toArray();
+        \Illuminate\Support\Facades\Log::info('storeIndex@debug', [
+            'tenant_id'        => $tid,
+            'resolved_store_id'=> $storeId,
+            'hint_store_id'    => $request->input('hint_store_id'),
+            'sessions_totali'  => $allCount,
+            'statuses_trovati' => $statuses,
+            'sessions_visibili'=> $sessions->count(),
+        ]);
+
         return response()->json(['data'=>$data]);
     }
 
     // --- STORE: dettaglio bolla (SENZA teorico) ---
     public function storeShow(Request $request, int $id) {
         $tid     = (int)$request->attributes->get('tenant_id');
-        $storeId = (int)$request->attributes->get('store_id');
-        if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
-        $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->where('store_id',$storeId)->first();
+        $storeId = $this->resolveStoreId($request);
+        // Se store_id trovato filtra per store, altrimenti usa solo tenant (bolla deve esistere nel tenant)
+        $query = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id);
+        if ($storeId) $query->where('store_id',$storeId);
+        $session = $query->first();
         if(!$session) return response()->json(['message'=>'Non trovata'],404);
         if(in_array($session->status,['DRAFT','CANCELLED'])) return response()->json(['message'=>'Non disponibile'],403);
         // Segna IN_PROGRESS se era SENT_TO_STORE
@@ -210,7 +303,7 @@ class InventorySessionController extends Controller
     // --- STORE: scansione barcode ---
     public function scan(Request $request, int $id) {
         $tid     = (int)$request->attributes->get('tenant_id');
-        $storeId = (int)$request->attributes->get('store_id');
+        $storeId = $this->resolveStoreId($request);
         $userId  = $request->user()->id;
         if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
         $request->validate(['barcode'=>'required|string|max:150']);
@@ -241,7 +334,7 @@ class InventorySessionController extends Controller
     public function updateCount(Request $request, int $itemId) {
         $tid     = (int)$request->attributes->get('tenant_id');
         $userId  = $request->user()->id;
-        $storeId = (int)$request->attributes->get('store_id');
+        $storeId = $this->resolveStoreId($request);
         if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
         $request->validate(['counted_quantity'=>'required|integer|min:0']);
         $item = DB::table('inventory_items as ii')->join('inventory_sessions as s','s.id','=','ii.inventory_session_id')->where('ii.id',$itemId)->where('s.tenant_id',$tid)->where('s.store_id',$storeId)->select('ii.*','s.status as session_status','s.id as session_id')->first();
@@ -257,32 +350,78 @@ class InventorySessionController extends Controller
     // --- STORE: chiusura bolla ---
     public function close(Request $request, int $id) {
         $tid     = (int)$request->attributes->get('tenant_id');
-        $storeId = (int)$request->attributes->get('store_id');
+        $storeId = $this->resolveStoreId($request);
         $userId  = $request->user()->id;
         if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->where('store_id',$storeId)->first();
         if(!$session) return response()->json(['message'=>'Non trovata'],404);
         if(!in_array($session->status,['IN_PROGRESS','SENT_TO_STORE','REOPENED'])) return response()->json(['message'=>'Non chiudibile'],422);
+        $whId = DB::table('warehouses')->where('tenant_id',$tid)->where('store_id',$storeId)->value('id');
+
         DB::beginTransaction();
         try {
             $items = DB::table('inventory_items')->where('inventory_session_id',$id)->get();
             $matched=0; $mismatched=0;
             foreach($items as $item){
-                $diff = $item->counted_quantity - $item->theoretical_quantity;
-                $status = $diff===0?'MATCHED':'MISMATCHED';
+                // 1. Quantità sistema al momento (attuale in DB)
+                $currentSysQty = 0;
+                if ($whId) {
+                    $currentSysQty = DB::table('stock_items')->where('warehouse_id',$whId)->where('product_variant_id',$item->product_variant_id)->value('on_hand') ?? 0;
+                }
+
+                // 2. Conta vendite post-inizio
+                $salesPostInizio = 0;
+                if ($whId) {
+                    $salesPostInizio = abs(DB::table('stock_movements')
+                        ->where('tenant_id', $tid)
+                        ->where('warehouse_id', $whId)
+                        ->where('product_variant_id', $item->product_variant_id)
+                        ->where('qty', '<', 0)
+                        ->where('occurred_at', '>=', $session->opened_at)
+                        ->sum('qty'));
+                }
+
+                // 3. Calcola giacenza finale corretta
+                $giacenzaCorretta = $item->counted_quantity - $salesPostInizio;
+                if ($giacenzaCorretta < 0) $giacenzaCorretta = 0;
+
+                // 4. Aggiorna giacenze attuali e Rettifica
+                if ($whId) {
+                    $diff = $giacenzaCorretta - $currentSysQty;
+                    if ($diff != 0) {
+                        DB::table('stock_items')->updateOrInsert(
+                            ['warehouse_id'=>$whId, 'product_variant_id'=>$item->product_variant_id],
+                            ['on_hand'=>$giacenzaCorretta, 'updated_at'=>now()]
+                        );
+                        DB::table('stock_movements')->insert([
+                            'tenant_id'=>$tid, 'warehouse_id'=>$whId, 'product_variant_id'=>$item->product_variant_id,
+                            'movement_type'=>'inventory_adjustment', 'qty'=>$diff,
+                            'reference_type'=>'inventory_session', 'reference_id'=>$id,
+                            'occurred_at'=>now(), 'created_at'=>now(), 'updated_at'=>now()
+                        ]);
+                    }
+                }
+
+                // 5. Salva quantita sistema al momento e calcola status
+                $status = ($giacenzaCorretta == $currentSysQty && $diff == 0) ? 'MATCHED' : 'MISMATCHED';
                 if($status==='MATCHED') $matched++; else $mismatched++;
-                DB::table('inventory_items')->where('id',$item->id)->update(['status'=>$status,'updated_at'=>now()]);
+
+                DB::table('inventory_items')->where('id',$item->id)->update([
+                    'status'=>$status,
+                    'theoretical_quantity'=>$currentSysQty, // Popolato alla chiusura
+                    'updated_at'=>now()
+                ]);
             }
             $overallStatus = $mismatched>0?'UNDER_REVIEW':'APPROVED';
             DB::table('inventory_sessions')->where('id',$id)->update(['status'=>'CLOSED_BY_STORE','closed_by_store_at'=>now(),'updated_at'=>now()]);
             $this->auditLog($tid,$userId,'close_session',$id,null,null,['matched'=>$matched,'mismatched'=>$mismatched]);
             // Notifica admin
             try {
-                $admins = DB::table('users')->where('tenant_id',$tid)->whereIn('role',['superadmin','admin_cliente','magazziniere'])->pluck('id');
-                foreach($admins as $uid) DB::table('employee_notifications')->insert(['tenant_id'=>$tid,'user_id'=>$uid,'type'=>'inventory','title'=>'Bolla chiusa dallo store','body'=>"La bolla \"{$session->title}\" è stata chiusa. Differenze: {$mismatched}.",'read_at'=>null,'created_at'=>now(),'updated_at'=>now()]);
+                $admins = DB::table('user_roles')->join('roles','roles.id','=','user_roles.role_id')->where('user_roles.tenant_id',$tid)->whereIn('roles.code',['superadmin','admin_cliente','magazziniere'])->pluck('user_roles.user_id');
+                foreach($admins as $uid) DB::table('employee_notifications')->insert(['tenant_id'=>$tid,'user_id'=>$uid,'type'=>'inventory','title'=>'Bolla chiusa dallo store','body'=>"La bolla \"{$session->title}\" è stata chiusa con riallineamento dinamico. Differenze: {$mismatched}.",'read_at'=>null,'created_at'=>now(),'updated_at'=>now()]);
             }catch(\Exception $e){}
             DB::commit();
-            return response()->json(['message'=>'Bolla chiusa','summary'=>['total'=>count($items),'matched'=>$matched,'mismatched'=>$mismatched,'accuracy'=>count($items)>0?round($matched/count($items)*100,1):0]]);
+            return response()->json(['message'=>'Bolla chiusa e giacenze riallineate.','summary'=>['total'=>count($items),'matched'=>$matched,'mismatched'=>$mismatched,'accuracy'=>count($items)>0?round($matched/count($items)*100,1):0]]);
         }catch(\Exception $e){DB::rollBack();return response()->json(['message'=>'Errore: '.$e->getMessage()],500);}
     }
 
@@ -293,7 +432,10 @@ class InventorySessionController extends Controller
         $request->validate(['message'=>'required|string']);
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->first();
         if(!$session) return response()->json(['message'=>'Non trovata'],404);
-        $role = $request->user()->role;
+        
+        $roleCodes = DB::table('user_roles')->join('roles','roles.id','=','user_roles.role_id')->where('user_roles.user_id', $userId)->pluck('roles.code')->all();
+        $role = count($roleCodes) > 0 ? $roleCodes[0] : 'dipendente';
+        
         $cid = DB::table('inventory_comments')->insertGetId(['tenant_id'=>$tid,'inventory_session_id'=>$id,'inventory_item_id'=>$request->input('inventory_item_id'),'author_id'=>$userId,'author_role'=>$role,'message'=>$request->input('message'),'created_at'=>now(),'updated_at'=>now()]);
         return response()->json(['message'=>'Commento aggiunto','id'=>$cid],201);
     }

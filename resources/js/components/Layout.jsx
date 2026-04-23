@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { auth, stores, clearApiCache, cashMovements as cashApi, reports, exports_, employees as employeesApi, shifts as shiftsApi } from '../api.jsx';
 import { prefetchRoute, eagerPrefetchAll } from '../routePrefetch.js';
@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast';
 import ChatWidget, { ChatTopbarButtons } from './ChatWidget.jsx';
 import StoreStatsDrawer from './StoreStatsDrawer.jsx';
 import MichelePanelModal from './MichelePanelModal.jsx';
+import FloatingAI from './FloatingAI.jsx';
 import { 
   BarChart3, Package, Warehouse, ClipboardList, ShoppingBag,
   Users, Monitor, Truck, Settings, LogOut, Bell,
@@ -1011,6 +1012,7 @@ export default function Layout({ user, setUser }) {
         </div>
       </nav>
       {showMichelePanel && <MichelePanelModal onClose={() => setShowMichelePanel(false)} />}
+      {(!userRoles.includes('dipendente') || userRoles.some(r => ['project_manager','superadmin','store_manager','admin_cliente','admin'].includes(r))) && <FloatingAI />}
     </div>
   );
 }

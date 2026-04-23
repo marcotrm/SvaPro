@@ -507,6 +507,11 @@ export default function PurchaseOrdersPage() {
                     onClick={() => handleShowDetail(po.id)}>
                     #{po.po_number || po.id}
                   </span>
+                  {po.is_ai_generated && (
+                    <span style={{ marginLeft: 8, padding: '2px 6px', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 800, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      AI 🤖
+                    </span>
+                  )}
                 </td>
                 <td style={{ fontWeight: 600, color: 'var(--text)' }}>{po.supplier_name || '—'}</td>
                 <td><span className={`badge ${statusClass(po.status)}`}><span className="badge-dot" />{statusLabels[po.status] || po.status}</span></td>

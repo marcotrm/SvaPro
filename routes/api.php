@@ -267,16 +267,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/inventory-sessions/{id}', [InventorySessionController::class, 'show']);
         Route::patch('/inventory-sessions/{id}/status', [InventorySessionController::class, 'updateStatus']);
         Route::post('/inventory-sessions/{id}/approve', [InventorySessionController::class, 'approve']);
-        Route::get('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'comments']);
-        Route::post('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'addComment']);
+        Route::delete('/inventory-sessions/{id}', [InventorySessionController::class, 'destroy']);
 
-        // ── Inventory Sessions — Store (senza dati riservati) ──
-        Route::get('/store/inventory-sessions', [InventorySessionController::class, 'storeIndex']);
-        Route::get('/store/inventory-sessions/{id}', [InventorySessionController::class, 'storeShow']);
-        Route::post('/store/inventory-sessions/{id}/scan', [InventorySessionController::class, 'scan']);
-        Route::post('/store/inventory-sessions/{id}/close', [InventorySessionController::class, 'close']);
-        Route::patch('/store/inventory-items/{itemId}/count', [InventorySessionController::class, 'updateCount']);
-
+        // ── Inventory Sessions — Store endpoints moved to dipendente group ──
         // Loyalty Tiers & Redemptions (admin)
         Route::get('/loyalty/tiers', [LoyaltyController::class, 'tiers']);
         Route::post('/loyalty/tiers', [LoyaltyController::class, 'storeTier'])->middleware('permission:loyalty.manage');
@@ -284,6 +277,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::delete('/loyalty/tiers/{tierId}', [LoyaltyController::class, 'deleteTier'])->middleware('permission:loyalty.manage');
         Route::get('/loyalty/redemptions', [LoyaltyController::class, 'redemptionHistory']);
         Route::post('/loyalty/customers/{customerId}/redeem', [LoyaltyController::class, 'redeemPoints'])->middleware('permission:loyalty.manage');
+
+        // AI e Assistenza
+        Route::post('/ai/chiedi-consiglio', [\App\Http\Controllers\Api\AiController::class, 'askAdvice']);
+        Route::post('/ai/proponi-riordino', [\App\Http\Controllers\Api\AiController::class, 'acceptReorder']);
+        Route::get('/ai/test-semplice', [\App\Http\Controllers\Api\AiController::class, 'testSemplice']);
+        Route::get('/chat/rooms', [ChatController::class, 'rooms']);
 
         // Employee KPI Dashboard
         Route::get('/employees/kpi-dashboard', [EmployeeController::class, 'kpiDashboard']);
@@ -343,6 +342,17 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/catalog/categories', [CatalogController::class, 'categories']);
         Route::get('/catalog/tax-classes', [CatalogController::class, 'taxClasses']);
         Route::get('/catalog/products/{productId}', [CatalogController::class, 'show']);
+
+        // ── Inventory Sessions — Store (senza dati riservati) ──
+        Route::get('/store/inventory-sessions', [InventorySessionController::class, 'storeIndex']);
+        Route::get('/store/inventory-sessions/{id}', [InventorySessionController::class, 'storeShow']);
+        Route::post('/store/inventory-sessions/{id}/scan', [InventorySessionController::class, 'scan']);
+        Route::post('/store/inventory-sessions/{id}/close', [InventorySessionController::class, 'close']);
+        Route::patch('/store/inventory-items/{itemId}/count', [InventorySessionController::class, 'updateCount']);
+        
+        // Comments accessibili anche allo store
+        Route::get('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'comments']);
+        Route::post('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'addComment']);
 
         Route::get('/inventory/stock', [InventoryController::class, 'index']);
         Route::get('/inventory/movements', [InventoryController::class, 'movements']);

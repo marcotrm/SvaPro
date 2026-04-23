@@ -40,6 +40,8 @@ export default function InventoryBollaDetailPage(){
       }else{
         const r=await inventorySessions.storeGetOne(id);
         setSession(r.data.data);setItems(r.data.items??[]);
+        const cr=await inventorySessions.getComments(id);
+        setComments(cr.data.data??[]);
       }
     }catch(e){console.error(e);}
     setLoading(false);
@@ -77,8 +79,8 @@ export default function InventoryBollaDetailPage(){
   };
 
   const handleApprove=async()=>{
-    const applyStock=window.confirm('Vuoi anche aggiornare le giacenze ufficiali con i valori riscontrati?');
-    try{await inventorySessions.approve(id,applyStock);alert('Bolla approvata!');load();}
+    if(!window.confirm("Confermi l'approvazione della bolla?"))return;
+    try{await inventorySessions.approve(id,false);alert('Bolla approvata!');load();}
     catch(e){alert(e.response?.data?.message??'Errore');}
   };
 

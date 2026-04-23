@@ -775,14 +775,30 @@ export const inventorySessions = {
   getOne: (id) => api.get(`/inventory-sessions/${id}`),
   updateStatus: (id, status) => api.patch(`/inventory-sessions/${id}/status`, { status }),
   approve: (id, applyStock = false) => api.post(`/inventory-sessions/${id}/approve`, { apply_stock_adjustments: applyStock }),
+  deleteSession: (id) => api.delete(`/inventory-sessions/${id}`),
   getComments: (id) => api.get(`/inventory-sessions/${id}/comments`),
   addComment: (id, data) => api.post(`/inventory-sessions/${id}/comments`, data),
   // Store
-  storeGetAll: () => api.get('/store/inventory-sessions'),
-  storeGetOne: (id) => api.get(`/store/inventory-sessions/${id}`),
-  storeScan: (id, barcode) => api.post(`/store/inventory-sessions/${id}/scan`, { barcode }),
-  storeClose: (id) => api.post(`/store/inventory-sessions/${id}/close`),
-  storeUpdateCount: (itemId, data) => api.patch(`/store/inventory-items/${itemId}/count`, data),
+  // Store — passa sempre lo store_id dal profilo utente (già in localStorage da auth response)
+  storeGetAll: () => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || '{}');
+      const sid = u.employee_store_id || u.store_id || null;
+      return api.get('/store/inventory-sessions', sid ? { params: { hint_store_id: sid } } : {});
+    } catch { return api.get('/store/inventory-sessions'); }
+  },
+  storeGetOne: (id) => {
+    try { const u = JSON.parse(localStorage.getItem('user')||'{}'); const sid = u.employee_store_id||u.store_id||null; return api.get(`/store/inventory-sessions/${id}`, sid ? { params: { hint_store_id: sid } } : {}); } catch { return api.get(`/store/inventory-sessions/${id}`); }
+  },
+  storeScan: (id, barcode) => {
+    try { const u = JSON.parse(localStorage.getItem('user')||'{}'); const sid = u.employee_store_id||u.store_id||null; return api.post(`/store/inventory-sessions/${id}/scan`, { barcode, ...(sid ? { hint_store_id: sid } : {}) }); } catch { return api.post(`/store/inventory-sessions/${id}/scan`, { barcode }); }
+  },
+  storeClose: (id) => {
+    try { const u = JSON.parse(localStorage.getItem('user')||'{}'); const sid = u.employee_store_id||u.store_id||null; return api.post(`/store/inventory-sessions/${id}/close`, sid ? { hint_store_id: sid } : {}); } catch { return api.post(`/store/inventory-sessions/${id}/close`); }
+  },
+  storeUpdateCount: (itemId, data) => {
+    try { const u = JSON.parse(localStorage.getItem('user')||'{}'); const sid = u.employee_store_id||u.store_id||null; return api.patch(`/store/inventory-items/${itemId}/count`, { ...data, ...(sid ? { hint_store_id: sid } : {}) }); } catch { return api.patch(`/store/inventory-items/${itemId}/count`, data); }
+  },
 };
 
 // Report APIs - NO cache: i report sono sempre date-filtered e devono essere freschi
@@ -914,3 +930,8 @@ export const driverDeliveries = {
   updateStatus: (id, tenantCode, data) => driverApi.patch(`/driver/deliveries/${id}/status?tk=${encodeURIComponent(tenantCode)}`, data),
 };
 
+// ── AI Business Intelligence ───────────────────────────────────────
+export const ai = {
+  askAdvice: (question) => api.post('/ai/chiedi-consiglio', { question }),
+  acceptReorder: (ordini) => api.post('/ai/proponi-riordino', { ordini }),
+};

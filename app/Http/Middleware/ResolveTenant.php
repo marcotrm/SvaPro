@@ -69,6 +69,15 @@ class ResolveTenant
                     ->where('tenant_id', $tenantId)
                     ->value('store_id');
             }
+
+            // Fallback finale: hint_store_id dal frontend (validato lato server)
+            if (!$assignedStoreId) {
+                $hint = (int)($request->input('hint_store_id') ?? $request->header('X-Hint-Store-Id', 0));
+                if ($hint > 0) {
+                    $valid = DB::table('stores')->where('id', $hint)->where('tenant_id', $tenantId)->exists();
+                    if ($valid) $assignedStoreId = $hint;
+                }
+            }
             
             if ($assignedStoreId) {
                 // Force X-Store-ID attribute on request so controllers use it
