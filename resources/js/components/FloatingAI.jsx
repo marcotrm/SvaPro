@@ -66,6 +66,21 @@ export default function FloatingAI() {
 
   return (
     <>
+      <style>{`
+        @keyframes spAiPopupIn {
+          0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes spAiPulse {
+          0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4); }
+          70% { box-shadow: 0 0 0 10px rgba(168, 85, 247, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
+        }
+        .ai-markdown p { margin-top: 0; margin-bottom: 0.5em; }
+        .ai-markdown p:last-child { margin-bottom: 0; }
+        .ai-markdown ul { margin: 0; padding-left: 1.2em; }
+        .ai-markdown li { margin-bottom: 0.25em; }
+      `}</style>
       <div 
         style={{
           position: 'fixed',
@@ -89,6 +104,7 @@ export default function FloatingAI() {
             alignItems: 'center',
             justifyContent: 'center',
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+            animation: !isOpen ? 'spAiPulse 2s infinite' : 'none',
           }}
           onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
           onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
@@ -96,7 +112,7 @@ export default function FloatingAI() {
           {isOpen ? (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
           )}
         </button>
 
@@ -107,13 +123,15 @@ export default function FloatingAI() {
             right: '0',
             width: '350px',
             height: '500px',
-            backgroundColor: 'var(--color-surface, #1e1e2d)',
+            backgroundColor: '#f3f4f6',
             borderRadius: '16px',
-            boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
-            border: '1px solid var(--color-border, #333)',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+            border: '1px solid #e5e7eb',
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            animation: 'spAiPopupIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+            transformOrigin: 'bottom right'
           }}>
             {/* Header */}
             <div style={{
@@ -142,19 +160,19 @@ export default function FloatingAI() {
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              background: 'var(--color-bg, #11111a)'
+              background: '#f3f4f6'
             }}>
               {messages.map((msg, i) => (
                 <div key={i} style={{
                   alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  backgroundColor: msg.role === 'user' ? '#a855f7' : 'var(--color-surface, #2a2a3c)',
-                  color: 'white',
+                  backgroundColor: msg.role === 'user' ? '#a855f7' : '#ffffff',
+                  color: msg.role === 'user' ? 'white' : '#1f2937',
                   padding: '10px 14px',
                   borderRadius: '12px',
                   maxWidth: '85%',
                   fontSize: '13px',
                   lineHeight: '1.4',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
                 }}>
                   {msg.role === 'user' ? (
                     msg.content
@@ -166,7 +184,7 @@ export default function FloatingAI() {
                 </div>
               ))}
               {loading && (
-                <div style={{ alignSelf: 'flex-start', color: '#888', fontSize: '12px', padding: '10px' }}>L'AI sta pensando...</div>
+                <div style={{ alignSelf: 'flex-start', color: '#6b7280', fontSize: '12px', padding: '10px' }}>L'AI sta pensando...</div>
               )}
               <div ref={chatEndRef} />
             </div>
@@ -174,8 +192,8 @@ export default function FloatingAI() {
             {/* Input Area */}
             <div style={{
               padding: '12px',
-              borderTop: '1px solid var(--color-border, #333)',
-              backgroundColor: 'var(--color-surface, #1e1e2d)',
+              borderTop: '1px solid #e5e7eb',
+              backgroundColor: '#ffffff',
               display: 'flex',
               gap: '8px'
             }}>
@@ -189,9 +207,9 @@ export default function FloatingAI() {
                   flex: 1,
                   padding: '10px 14px',
                   borderRadius: '20px',
-                  border: '1px solid var(--color-border, #444)',
-                  backgroundColor: 'var(--color-bg, #111)',
-                  color: 'white',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: '#f9fafb',
+                  color: '#1f2937',
                   fontSize: '13px',
                   outline: 'none'
                 }}
@@ -210,8 +228,11 @@ export default function FloatingAI() {
                   opacity: (loading || !input.trim()) ? 0.5 : 1,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  transition: 'transform 0.1s'
                 }}
+                onMouseDown={e => e.currentTarget.style.transform = 'scale(0.9)'}
+                onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
               </button>
