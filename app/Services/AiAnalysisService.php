@@ -92,7 +92,7 @@ $dataJson
 ";
 
         $payload = [
-            'model' => 'llama3-70b-8192',
+            'model' => 'llama-3.3-70b-versatile',
             'temperature' => 0, // Precisone chirurgica
             'response_format' => ['type' => 'json_object'],
             'messages' => [
@@ -160,7 +160,7 @@ Importante: restituisci SOLO ed esclusivamente un oggetto JSON valido, dove la c
         $userPrompt = "Analizza questi dati e fornisci il JSON: \n" . json_encode($payloadData, JSON_UNESCAPED_UNICODE);
 
         $payload = [
-            'model' => 'llama3-70b-8192',
+            'model' => 'llama-3.3-70b-versatile',
             'temperature' => 0, // Precisione per output JSON
             'response_format' => ['type' => 'json_object'],
             'messages' => [
