@@ -62,7 +62,31 @@ class AiAnalysisService
         $systemInstruction = "Sei un Esperto di Logistica e Fiscalità dello Svapo (SvaPro ERP).
 Conosci perfettamente la differenza tra PLI (Prodotti Liquidi da Inalazione con nicotina, soggetti a monopolio) e PL0 (senza nicotina), e l'importanza della tracciabilità dei lotti.
 Il tuo compito è analizzare i dati aggregati di vendite e giacenze forniti e rispondere alla domanda dell'utente in modo professionale, conciso e orientato al business.
-NON menzionare mai dati personali. Formula tabelle in Markdown se necessario per migliorare la leggibilità.
+NON menzionare mai dati personali.
+
+IMPORTANTE: Se l'utente chiede di 'preparare un riordino' o trasferire merce, DEVI rispondere ESCLUSIVAMENTE con un JSON strutturato che segua questo schema (NIENTE markdown, NIENTE testo fuori dal JSON):
+{
+  \"type\": \"action_card\",
+  \"action\": \"proponi_riordino\",
+  \"payload\": {
+    \"motivazione\": \"stringa\",
+    \"ordini\": [
+      {
+        \"from_store_id\": numero intero (es. 1),
+        \"to_store_id\": numero intero,
+        \"product_variant_id\": numero intero,
+        \"quantity\": numero intero,
+        \"notes\": \"stringa\"
+      }
+    ]
+  }
+}
+Se invece è solo una domanda generica o un consiglio, rispondi con un JSON del genere:
+{
+  \"type\": \"text\",
+  \"content\": \"la tua risposta testuale\"
+}
+
 Dati forniti dal sistema:
 $dataJson
 ";
@@ -70,43 +94,11 @@ $dataJson
         $payload = [
             'model' => 'llama3-70b-8192',
             'temperature' => 0, // Precisone chirurgica
+            'response_format' => ['type' => 'json_object'],
             'messages' => [
                 ['role' => 'system', 'content' => $systemInstruction],
                 ['role' => 'user', 'content' => "Domanda dell'utente: $userQuestion"]
-            ],
-            'tools' => [
-                [
-                    'type' => 'function',
-                    'function' => [
-                        'name' => 'proponi_riordino',
-                        'description' => 'Genera una proposta strutturata di riordino merce per trasferire prodotti da un negozio all\'altro.',
-                        'parameters' => [
-                            'type' => 'object',
-                            'properties' => [
-                                'motivazione' => [
-                                    'type' => 'string',
-                                    'description' => 'Motivazione discorsiva per cui stai proponendo questo riordino.'
-                                ],
-                                'ordini' => [
-                                    'type' => 'array',
-                                    'items' => [
-                                        'type' => 'object',
-                                        'properties' => [
-                                            'from_store_id' => ['type' => 'integer', 'description' => 'ID negozio mittente (es. 1 per magazzino centrale)'],
-                                            'to_store_id' => ['type' => 'integer', 'description' => 'ID negozio destinatario'],
-                                            'product_variant_id' => ['type' => 'integer', 'description' => 'ID variante prodotto'],
-                                            'quantity' => ['type' => 'integer', 'description' => 'Quantità da trasferire'],
-                                            'notes' => ['type' => 'string', 'description' => 'Note o nome prodotto']
-                                        ]
-                                    ]
-                                ]
-                            ],
-                            'required' => ['motivazione', 'ordini']
-                        ]
-                    ]
-                ]
-            ],
-            'tool_choice' => 'auto'
+            ]
         ];
 
         try {
@@ -117,26 +109,18 @@ $dataJson
 
             if ($response->successful()) {
                 $result = $response->json();
-                $message = $result['choices'][0]['message'] ?? [];
-
-                // Controlla se c'è un function call
-                if (isset($message['tool_calls']) && is_array($message['tool_calls'])) {
-                    foreach ($message['tool_calls'] as $toolCall) {
-                        if ($toolCall['function']['name'] === 'proponi_riordino') {
-                            $args = json_decode($toolCall['function']['arguments'], true);
-                            return json_encode([
-                                'type' => 'action_card',
-                                'action' => 'proponi_riordino',
-                                'payload' => $args
-                            ]);
-                        }
+                $content = $result['choices'][0]['message']['content'] ?? '';
+                
+                $parsed = json_decode(trim($content), true);
+                if (is_array($parsed)) {
+                    if (isset($parsed['type']) && $parsed['type'] === 'action_card') {
+                        return json_encode($parsed);
+                    }
+                    if (isset($parsed['type']) && $parsed['type'] === 'text') {
+                        return $parsed['content'];
                     }
                 }
-
-                if (isset($message['content'])) {
-                    return $message['content'];
-                }
-                return "Risposta non decifrabile dall'AI.";
+                return $content ?: "Risposta vuota dall'AI.";
             }
 
             Log::error('Groq API Error', ['status' => $response->status(), 'body' => $response->body()]);
@@ -178,6 +162,7 @@ Importante: restituisci SOLO ed esclusivamente un oggetto JSON valido, dove la c
         $payload = [
             'model' => 'llama3-70b-8192',
             'temperature' => 0, // Precisione per output JSON
+            'response_format' => ['type' => 'json_object'],
             'messages' => [
                 ['role' => 'system', 'content' => $systemInstruction],
                 ['role' => 'user', 'content' => $userPrompt]
