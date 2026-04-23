@@ -24,9 +24,9 @@ class AiAnalysisService
             return [['error' => 'Solo le query SELECT sono ammesse.']];
         }
 
-        // Protezione Output: Iniezione automatica del LIMIT 50 se non presente
+        // Protezione Output: Iniezione automatica del LIMIT 15 se non presente (per risparmiare token)
         if (!preg_match('/\bLIMIT\b/i', $sql)) {
-            $sql .= " LIMIT 50";
+            $sql .= " LIMIT 15";
         }
 
         try {
@@ -35,13 +35,12 @@ class AiAnalysisService
             $resultsArray = json_decode(json_encode($results), true);
 
             // Protezione Output fallback
-            if (count($resultsArray) > 50) {
-                $resultsArray = array_slice($resultsArray, 0, 50);
-                $resultsArray[] = ['system_warning' => 'Risultato troppo lungo, mostro solo le prime 50 righe. Specifica meglio la query se serve altro'];
+            if (count($resultsArray) > 15) {
+                $resultsArray = array_slice($resultsArray, 0, 15);
+                $resultsArray[] = ['system_warning' => 'Risultato troppo lungo, mostro solo le prime 15 righe per evitare limiti di memoria.'];
             }
 
             return $resultsArray;
-
         } catch (\Exception $e) {
             $errorMsg = $e->getMessage();
             $hint = '';
@@ -58,7 +57,7 @@ class AiAnalysisService
     /**
      * Invia il prompt a Gemini REST API con Tool Calling (Function Calling).
      */
-    public function askGemini(int $tenantId, string $userQuestion, array $chatHistory = []): string
+    public function askGemini(int $tenantId, string $userQuestion, array $chatHistory = []): string|array
     {
         $apiKey = env('GROQ_API_KEY');
         if (!$apiKey) {
@@ -88,8 +87,10 @@ REGOLE SINTASSI SQL:
 3. Analizza i dati ricevuti e rispondi all'utente in un italiano colloquiale chiaro.
 Se non trovi una tabella, chiedi prima di elencare le tabelle disponibili.
 Se la query restituisce un errore, riprova correggendo la sintassi SQL.
-Se l'utente chiede un riordino, restituisci alla fine un JSON strutturato così:
-{ \"type\": \"action_card\", \"action\": \"proponi_riordino\", \"payload\": { \"motivazione\": \"...\", \"ordini\": [ ... ] } }
+
+IMPORTANTE: Se l'utente chiede 'analizza vendite', 'prevedi scorte', o 'fai un riordino', DEVI restituire alla fine ESATTAMENTE questo JSON:
+{ \"type\": \"action_card\", \"action\": \"proponi_riordino\", \"payload\": { \"motivazione\": \"Spiegazione del riordino...\", \"ordini\": [ { \"from_store_id\": 1, \"to_store_id\": ID_NEGOZIO, \"product_variant_id\": ID_VARIANTE, \"quantity\": QUANTITA_SUGGERITA, \"notes\": \"...\" } ] } }
+
 Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"content\": \"La tua risposta qui...\" }";
 
         $messages = [
@@ -128,6 +129,7 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
         $payload = [
             'model' => 'llama-3.1-8b-instant',
             'temperature' => 0,
+            'max_tokens' => 800,
             'messages' => $messages,
             'tools' => $tools,
             'tool_choice' => 'auto'
@@ -178,6 +180,9 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
                 unset($payload['tools']);
                 unset($payload['tool_choice']);
                 
+                // Forza l'output in JSON per garantire che rispetti sempre il formato action_card o text
+                $payload['response_format'] = ['type' => 'json_object'];
+                
                 // Rinviamo il risultato al modello
                 $finalResponse = Http::withoutVerifying()->withHeaders([
                     'Authorization' => 'Bearer ' . $apiKey,
@@ -187,13 +192,14 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
                 if ($finalResponse->successful()) {
                     $message = $finalResponse->json()['choices'][0]['message'];
                 } else {
-                    Log::error("Errore Groq round " . $rounds, ['status' => $finalResponse->status()]);
+                    Log::error("Errore Groq round " . $rounds, ['status' => $finalResponse->status(), 'body' => $finalResponse->body()]);
                     break;
                 }
                 $rounds++;
             }
 
             $content = $message['content'] ?? '';
+            Log::info("Risposta finale Groq:", ['content' => $content]);
             
             $cleanContent = trim($content);
             if (preg_match('/^```json\s*(.*?)\s*```$/s', $cleanContent, $matches)) {
@@ -205,7 +211,7 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
             $parsed = json_decode($cleanContent, true);
             if (is_array($parsed)) {
                 if (isset($parsed['type']) && in_array($parsed['type'], ['action_card', 'text'])) {
-                    return $parsed['type'] === 'action_card' ? json_encode($parsed) : $parsed['content'];
+                    return $parsed['type'] === 'action_card' ? $parsed : $parsed['content'];
                 }
             }
             return $content ?: "Dato non disponibile nel sistema.";
