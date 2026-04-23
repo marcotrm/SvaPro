@@ -42,7 +42,7 @@ class AiAnalysisService
             ->get();
 
         // Negozi
-        $stores = DB::table('stores')->where('tenant_id', $tenantId)->select('id', 'name', 'type', 'is_central')->get();
+        $stores = DB::table('stores')->where('tenant_id', $tenantId)->select('id', 'name', 'is_main as is_central')->get();
 
         // Fornitori
         $suppliers = DB::table('suppliers')->where('tenant_id', $tenantId)->select('id', 'name', 'lead_time_days')->get();
