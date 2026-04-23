@@ -379,7 +379,9 @@ const AiReorderCard = ({ proposal, setAiAnswer }) => {
       const res = await ai.acceptReorder(proposal.ordini);
       setAiAnswer(`✅ **Operazione completata!**\n\n${res.data.message}`);
     } catch(err) {
-      setAiAnswer(`❌ Errore durante la creazione delle bolle: ${err.message}`);
+      console.error("ERRORE BACKEND DETTAGLIATO:", err.response?.data || err.message);
+      const serverMsg = err.response?.data?.message || err.message;
+      setAiAnswer(`❌ Errore durante la creazione delle bolle: ${serverMsg}`);
     }
     setLoading(false);
   };

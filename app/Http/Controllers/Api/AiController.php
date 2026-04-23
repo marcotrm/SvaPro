@@ -36,22 +36,36 @@ class AiController extends Controller
         $tenantId = (int) $request->attributes->get('tenant_id');
         $userId   = $request->attributes->get('user_id');
 
-        $request->validate([
-            'ordini' => 'required|array',
-            'ordini.*.from_store_id' => 'required|integer',
-            'ordini.*.to_store_id' => 'required|integer',
-            'ordini.*.product_variant_id' => 'required|integer',
-            'ordini.*.quantity' => 'required|integer|min:1',
-        ]);
+        \Illuminate\Support\Facades\Log::info("Dati ricevuti dall'AI per la bolla:", $request->all());
 
-        // Raggruppa gli ordini per [from_store_id, to_store_id]
-        $groups = collect($request->input('ordini'))->groupBy(function ($item) {
-            return $item['from_store_id'] . '-' . $item['to_store_id'];
-        });
-
-        $createdCount = 0;
-        \Illuminate\Support\Facades\DB::beginTransaction();
         try {
+            // Pulizia dei dati se arrivano "sporchi"
+            $ordiniRaw = $request->input('ordini', []);
+            $ordiniPuliti = array_map(function($item) {
+                return [
+                    'from_store_id' => isset($item['from_store_id']) ? (int) $item['from_store_id'] : 1, // Fallback a 1 (magazzino centrale)
+                    'to_store_id' => isset($item['to_store_id']) ? (int) $item['to_store_id'] : 1,
+                    'product_variant_id' => isset($item['product_variant_id']) ? (int) $item['product_variant_id'] : 0,
+                    'quantity' => isset($item['quantity']) ? (int) $item['quantity'] : 1,
+                    'notes' => $item['notes'] ?? 'Proposta AI',
+                ];
+            }, $ordiniRaw);
+
+            // Filtra ordini non validi (es. product_variant_id a 0)
+            $ordiniPuliti = array_filter($ordiniPuliti, fn($o) => $o['product_variant_id'] > 0);
+
+            if (empty($ordiniPuliti)) {
+                return response()->json(['message' => 'Nessun ordine valido trovato nei dati AI.'], 400);
+            }
+
+            // Raggruppa gli ordini per [from_store_id, to_store_id]
+            $groups = collect($ordiniPuliti)->groupBy(function ($item) {
+                return $item['from_store_id'] . '-' . $item['to_store_id'];
+            });
+
+            $createdCount = 0;
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
             foreach ($groups as $key => $items) {
                 list($fromStoreId, $toStoreId) = explode('-', $key);
 
@@ -67,7 +81,7 @@ class AiController extends Controller
                     'from_store_id'   => $fromStoreId,
                     'to_store_id'     => $toStoreId,
                     'status'          => 'draft',
-                    'notes'           => 'Generato automaticamente tramite AI Gemini',
+                    'notes'           => 'Generato automaticamente tramite AI Groq',
                     'created_by'      => $userId,
                     'created_at'      => now(),
                     'updated_at'      => now(),
@@ -78,7 +92,7 @@ class AiController extends Controller
                         'transfer_id'        => $transferId,
                         'product_variant_id' => $item['product_variant_id'],
                         'quantity_sent'      => $item['quantity'],
-                        'notes'              => $item['notes'] ?? null,
+                        'notes'              => $item['notes'],
                         'created_at'         => now(),
                         'updated_at'         => now(),
                     ]);
@@ -88,6 +102,7 @@ class AiController extends Controller
             \Illuminate\Support\Facades\DB::commit();
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Errore creazione bolle AI: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
             return response()->json(['message' => 'Errore creazione bolle AI: ' . $e->getMessage()], 500);
         }
 
