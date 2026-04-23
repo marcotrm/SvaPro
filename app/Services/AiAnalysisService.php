@@ -51,130 +51,100 @@ class AiAnalysisService
      */
     public function askGemini(int $tenantId, string $userQuestion): string
     {
-        $apiKey = env('GEMINI_API_KEY');
+        $apiKey = env('GROQ_API_KEY');
         if (!$apiKey) {
-            return "Errore: Chiave API di Gemini non configurata nel server.";
+            return "Errore: Chiave API di Groq non configurata nel server.";
         }
 
         $data = $this->getAggregatedData($tenantId);
         $dataJson = json_encode($data, JSON_UNESCAPED_UNICODE);
 
-        $systemInstruction = "Sei un Esperto di Logica e Fiscalità dello Svapo (SvaPro ERP).
+        $systemInstruction = "Sei un Esperto di Logistica e Fiscalità dello Svapo (SvaPro ERP).
 Conosci perfettamente la differenza tra PLI (Prodotti Liquidi da Inalazione con nicotina, soggetti a monopolio) e PL0 (senza nicotina), e l'importanza della tracciabilità dei lotti.
 Il tuo compito è analizzare i dati aggregati di vendite e giacenze forniti e rispondere alla domanda dell'utente in modo professionale, conciso e orientato al business.
-NON menzionare mai dati personali (che non ti sono stati comunque forniti). Formula tabelle in Markdown se necessario per migliorare la leggibilità.
-
+NON menzionare mai dati personali. Formula tabelle in Markdown se necessario per migliorare la leggibilità.
 Dati forniti dal sistema:
 $dataJson
 ";
 
         $payload = [
-            'contents' => [
-                [
-                    'role' => 'user',
-                    'parts' => [
-                        ['text' => "Domanda dell'utente: $userQuestion"]
-                    ]
-                ]
-            ],
-            'systemInstruction' => [
-                'role' => 'system',
-                'parts' => [
-                    ['text' => $systemInstruction]
-                ]
-            ],
-            'generationConfig' => [
-                'temperature' => 0.4,
-                'maxOutputTokens' => 1024,
+            'model' => 'llama3-70b-8192',
+            'temperature' => 0, // Precisone chirurgica
+            'messages' => [
+                ['role' => 'system', 'content' => $systemInstruction],
+                ['role' => 'user', 'content' => "Domanda dell'utente: $userQuestion"]
             ],
             'tools' => [
                 [
-                    'functionDeclarations' => [
-                        [
-                            'name' => 'proponi_riordino',
-                            'description' => 'Genera una proposta strutturata di riordino merce. Usa questa funzione quando vuoi proporre all\'utente di creare bolle di trasferimento o ordini. L\'utente vedrà la proposta e potrà accettarla.',
-                            'parameters' => [
-                                'type' => 'OBJECT',
-                                'properties' => [
-                                    'motivazione' => [
-                                        'type' => 'STRING',
-                                        'description' => 'Motivazione discorsiva per cui stai proponendo questo riordino.'
-                                    ],
-                                    'ordini' => [
-                                        'type' => 'ARRAY',
-                                        'items' => [
-                                            'type' => 'OBJECT',
-                                            'properties' => [
-                                                'from_store_id' => ['type' => 'INTEGER', 'description' => 'ID negozio mittente (es. 1 per magazzino centrale)'],
-                                                'to_store_id' => ['type' => 'INTEGER', 'description' => 'ID negozio destinatario'],
-                                                'product_variant_id' => ['type' => 'INTEGER', 'description' => 'ID variante prodotto'],
-                                                'quantity' => ['type' => 'INTEGER', 'description' => 'Quantità da trasferire'],
-                                                'notes' => ['type' => 'STRING', 'description' => 'Note o nome prodotto']
-                                            ]
+                    'type' => 'function',
+                    'function' => [
+                        'name' => 'proponi_riordino',
+                        'description' => 'Genera una proposta strutturata di riordino merce per trasferire prodotti da un negozio all\'altro.',
+                        'parameters' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'motivazione' => [
+                                    'type' => 'string',
+                                    'description' => 'Motivazione discorsiva per cui stai proponendo questo riordino.'
+                                ],
+                                'ordini' => [
+                                    'type' => 'array',
+                                    'items' => [
+                                        'type' => 'object',
+                                        'properties' => [
+                                            'from_store_id' => ['type' => 'integer', 'description' => 'ID negozio mittente (es. 1 per magazzino centrale)'],
+                                            'to_store_id' => ['type' => 'integer', 'description' => 'ID negozio destinatario'],
+                                            'product_variant_id' => ['type' => 'integer', 'description' => 'ID variante prodotto'],
+                                            'quantity' => ['type' => 'integer', 'description' => 'Quantità da trasferire'],
+                                            'notes' => ['type' => 'string', 'description' => 'Note o nome prodotto']
                                         ]
                                     ]
                                 ]
-                            ]
+                            ],
+                            'required' => ['motivazione', 'ordini']
                         ]
                     ]
                 ]
-            ]
+            ],
+            'tool_choice' => 'auto'
         ];
 
-        $maxRetries = 2;
-        $attempt = 0;
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type' => 'application/json',
+            ])->post("https://api.groq.com/openai/v1/chat/completions", $payload);
 
-        while ($attempt < $maxRetries) {
-            $attempt++;
-            try {
-                $response = Http::withHeaders([
-                    'Content-Type' => 'application/json',
-                ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$apiKey}", $payload);
+            if ($response->successful()) {
+                $result = $response->json();
+                $message = $result['choices'][0]['message'] ?? [];
 
-                if ($response->successful()) {
-                    $result = $response->json();
-                    $parts = $result['candidates'][0]['content']['parts'] ?? [];
-                    
-                    // Controlla se c'è un functionCall
-                    foreach ($parts as $part) {
-                        if (isset($part['functionCall'])) {
-                            $call = $part['functionCall'];
-                            if ($call['name'] === 'proponi_riordino') {
-                                return json_encode([
-                                    'type' => 'action_card',
-                                    'action' => 'proponi_riordino',
-                                    'payload' => $call['args']
-                                ]);
-                            }
+                // Controlla se c'è un function call
+                if (isset($message['tool_calls']) && is_array($message['tool_calls'])) {
+                    foreach ($message['tool_calls'] as $toolCall) {
+                        if ($toolCall['function']['name'] === 'proponi_riordino') {
+                            $args = json_decode($toolCall['function']['arguments'], true);
+                            return json_encode([
+                                'type' => 'action_card',
+                                'action' => 'proponi_riordino',
+                                'payload' => $args
+                            ]);
                         }
                     }
-
-                    if (isset($parts[0]['text'])) {
-                        return $parts[0]['text'];
-                    }
-                    return "Risposta non decifrabile dall'AI.";
                 }
 
-                if ($response->status() === 429) {
-                    return "Limite di richieste AI superato (Too Many Requests). Attendi un minuto e riprova.";
+                if (isset($message['content'])) {
+                    return $message['content'];
                 }
-
-                if ($response->status() === 503) {
-                    if ($attempt < $maxRetries) {
-                        sleep(2); // Attendi 2 secondi prima di riprovare
-                        continue;
-                    }
-                    return "I server AI di Google sono momentaneamente sovraccarichi (503). Riprova tra poco.";
-                }
-
-                Log::error('Gemini API Error', ['status' => $response->status(), 'body' => $response->body()]);
-                return "Errore di comunicazione con i server AI (" . $response->status() . ").";
-            } catch (\Exception $e) {
-                Log::error('Gemini API Exception', ['message' => $e->getMessage()]);
-                return "Errore interno durante la richiesta AI.";
+                return "Risposta non decifrabile dall'AI.";
             }
+
+            Log::error('Groq API Error', ['status' => $response->status(), 'body' => $response->body()]);
+            return "Errore di comunicazione con i server AI (" . $response->status() . "). Controlla il log.";
+        } catch (\Exception $e) {
+            Log::error('Groq API Exception', ['message' => $e->getMessage()]);
+            return "Errore interno durante la richiesta AI.";
         }
-        return "Errore imprevisto durante la comunicazione con l'AI.";
     }
 
     /**
@@ -183,12 +153,11 @@ $dataJson
      */
     public function generateReorderMotivations(array $alerts): array
     {
-        $apiKey = env('GEMINI_API_KEY');
+        $apiKey = env('GROQ_API_KEY');
         if (!$apiKey || empty($alerts)) {
             return [];
         }
 
-        // Estrae solo i campi rilevanti per non saturare il token limit
         $payloadData = array_map(function ($a) {
             return [
                 'id' => $a['product_variant_id'],
@@ -207,65 +176,35 @@ Importante: restituisci SOLO ed esclusivamente un oggetto JSON valido, dove la c
         $userPrompt = "Analizza questi dati e fornisci il JSON: \n" . json_encode($payloadData, JSON_UNESCAPED_UNICODE);
 
         $payload = [
-            'contents' => [
-                [
-                    'role' => 'user',
-                    'parts' => [
-                        ['text' => $userPrompt]
-                    ]
-                ]
-            ],
-            'systemInstruction' => [
-                'role' => 'system',
-                'parts' => [
-                    ['text' => $systemInstruction]
-                ]
-            ],
-            'generationConfig' => [
-                'temperature' => 0.2,
-                'maxOutputTokens' => 1024,
+            'model' => 'llama3-70b-8192',
+            'temperature' => 0, // Precisione per output JSON
+            'messages' => [
+                ['role' => 'system', 'content' => $systemInstruction],
+                ['role' => 'user', 'content' => $userPrompt]
             ]
         ];
 
-        $maxRetries = 2;
-        $attempt = 0;
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type' => 'application/json',
+            ])->post("https://api.groq.com/openai/v1/chat/completions", $payload);
 
-        while ($attempt < $maxRetries) {
-            $attempt++;
-            try {
-                $response = Http::withHeaders([
-                    'Content-Type' => 'application/json',
-                ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$apiKey}", $payload);
+            if ($response->successful()) {
+                $result = $response->json();
+                if (isset($result['choices'][0]['message']['content'])) {
+                    $text = trim($result['choices'][0]['message']['content']);
+                    $text = preg_replace('/^```json\s*/', '', $text);
+                    $text = preg_replace('/\s*```$/', '', $text);
 
-                if ($response->successful()) {
-                    $result = $response->json();
-                    if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
-                        $text = trim($result['candidates'][0]['content']['parts'][0]['text']);
-                        // Pulisci eventuale backtick markdown ```json ... ```
-                        $text = preg_replace('/^```json\s*/', '', $text);
-                        $text = preg_replace('/\s*```$/', '', $text);
-
-                        $json = json_decode($text, true);
-                        if (is_array($json)) {
-                            return $json;
-                        }
-                    }
-                    return []; // Success but bad json
-                }
-
-                if ($response->status() === 503) {
-                    if ($attempt < $maxRetries) {
-                        sleep(2);
-                        continue;
+                    $json = json_decode($text, true);
+                    if (is_array($json)) {
+                        return $json;
                     }
                 }
-                
-                // Break on other errors (like 429)
-                break;
-            } catch (\Exception $e) {
-                Log::error('Gemini API Reorder Exception', ['message' => $e->getMessage()]);
-                break;
             }
+        } catch (\Exception $e) {
+            Log::error('Groq API Reorder Exception', ['message' => $e->getMessage()]);
         }
 
         return [];
