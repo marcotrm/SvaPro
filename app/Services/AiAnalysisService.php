@@ -79,13 +79,15 @@ MAPPA OBBLIGATORIA DELLE TABELLE:
 - Se l'utente chiede bolle/trasferimenti, usa la tabella: stock_transfers (e inventory_count_sessions per conteggi inventario).
 - Se l'utente chiede i negozi, usa la tabella: stores.
 
-REGOLE SINTASSI SQL:
+REGOLE SINTASSI E COLONNE SQL:
 - Usa ESCLUSIVAMENTE la sintassi PostgreSQL standard.
+- Usa ESATTAMENTE i nomi delle colonne indicati nello schema. Ad esempio, per le vendite usa `grand_total` (NON total_amount). Non inventare MAI nomi di colonne o tabelle.
 - Per la data di oggi usa CURRENT_DATE.
 - Non usare MAI comandi come SHOW TABLES.
 
 2. ESECUZIONE OBBLIGATORIA DEL TOOL:
 DEVI TASSATIVAMENTE chiamare il tool `execute_readonly_query` per leggere i dati REALI dal database PRIMA di generare la risposta finale. Non inventare MAI i dati! Esegui prima la query!
+Se il tool ti restituisce un errore SQL (es. colonna non trovata), NON fermarti e NON scusarti con l'utente: esegui immediatamente un'altra chiamata al tool con la query corretta!
 
 3. Analizza i dati ricevuti dal database e POI rispondi all'utente.
 NON INVENTARE MAI GLI ORDINI. DEVI PRIMA ESTRARRE I VERI DATI DAL DATABASE (es. prodotti con on_hand < 10)!
@@ -143,7 +145,8 @@ EOT;
             'max_tokens' => 800,
             'messages' => $messages,
             'tools' => $tools,
-            'tool_choice' => 'auto'
+            'tool_choice' => 'auto',
+            'parallel_tool_calls' => false
         ];
 
         // Log del JSON esatto inviato a Groq
@@ -188,13 +191,8 @@ EOT;
                 }
 
                 $payload['messages'] = $messages;
-                unset($payload['tools']);
-                unset($payload['tool_choice']);
                 
-                // Forza l'output in JSON per garantire che rispetti sempre il formato action_card o text
-                $payload['response_format'] = ['type' => 'json_object'];
-                
-                // Rinviamo il risultato al modello
+                // Rinviamo il risultato al modello. NON rimuoviamo i tools così può riprovare se ha sbagliato.
                 $finalResponse = Http::withoutVerifying()->withHeaders([
                     'Authorization' => 'Bearer ' . $apiKey,
                     'Content-Type' => 'application/json',

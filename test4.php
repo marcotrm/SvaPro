@@ -5,7 +5,7 @@ $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 try {
     $ai = app(\App\Services\AiAnalysisService::class);
-    $resp = $ai->askGemini(1, "Prevedi le scorte per i prodotti che stanno finendo.");
+    $resp = $ai->askGemini(1, "Analizza le vendite di questo mese");
     echo "AI Reply:\n";
     print_r($resp);
     echo "\n";
