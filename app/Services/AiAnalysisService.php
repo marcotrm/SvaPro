@@ -9,14 +9,17 @@ use Illuminate\Support\Facades\Log;
 class AiAnalysisService
 {
     /**
-     * Estrae i dati storici (ultimi 30 giorni) e le giacenze per l'AI.
-     * Anonimizza ed aggrega i dati per evitare perdite di info sensibili.
+     * Estrae i dati storici di base (Negozi, Fornitori) per dare contesto generale all'AI.
      */
-    public function getAggregatedData(int $tenantId): array
+    public function getBasicContext(int $tenantId): array
     {
-        // ... codice rimosso poichè ora usiamo function calling dinamico,
-        // ma lo manteniamo per compatibilità con il resto dell'app se serve altrove
-        return [];
+        $stores = DB::table('stores')->where('tenant_id', $tenantId)->select('id', 'name')->get();
+        $suppliers = DB::table('suppliers')->where('tenant_id', $tenantId)->select('id', 'name')->get();
+        
+        return [
+            'negozi_registrati' => $stores,
+            'fornitori_registrati' => $suppliers
+        ];
     }
 
     /**
@@ -75,12 +78,18 @@ class AiAnalysisService
             return "Errore: Chiave API di Groq non configurata nel server.";
         }
 
+        // Recuperiamo il contesto base per l'AI
+        $basicContext = json_encode($this->getBasicContext($tenantId), JSON_UNESCAPED_UNICODE);
+
         $systemInstruction = "Tu sei un analista dati integrato in un ERP (SvaPro).
 La Regola d'Oro: Niente Documenti, Niente Risposta.
-Rispondi SOLO basandoti sui dati ottenuti tramite le tue funzioni (tools). 
+Rispondi SOLO basandoti sui dati ottenuti tramite le tue funzioni (tools) o forniti nel Contesto Base.
+Quando usi una funzione, trasforma il JSON restituito in una frase colloquiale in italiano. Non restituire mai JSON grezzo all'utente.
 NON devi MAI rispondere a domande sui numeri di magazzino o vendite senza prima chiamare una delle funzioni di database.
-Se la risposta non è deducibile dai dati estratti, rispondi: 'Dato non disponibile nel sistema'. Non stimare, non inventare e non usare conoscenze esterne.
-Mostra sempre i calcoli prima di dare un suggerimento.
+Se la risposta non è deducibile, rispondi: 'Dato non disponibile nel sistema'. Non stimare o inventare nulla.
+
+[Contesto Base di SvaPro (Usa queste info per rispondere a domande generiche su quali negozi o fornitori esistono)]
+$basicContext
 
 Hai a disposizione queste funzioni sicure:
 1. get_stock_data: per conoscere le giacenze attuali di un prodotto o negozio.
@@ -92,7 +101,7 @@ Se l'utente chiede di 'preparare un riordino', restituisci alla fine un JSON str
   \"action\": \"proponi_riordino\",
   \"payload\": { \"motivazione\": \"...\", \"ordini\": [ ... ] }
 }
-Altrimenti rispondi SEMPRE con un JSON: { \"type\": \"text\", \"content\": \"...\" }";
+Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"content\": \"La tua risposta colloquiale e discorsiva qui...\" }";
 
         $messages = [
             ['role' => 'system', 'content' => $systemInstruction]
