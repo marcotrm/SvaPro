@@ -264,6 +264,19 @@ class InventorySessionController extends Controller
             unset($s->notes_internal,$s->filters);
             return $s;
         });
+
+        // DEBUG LOG — capire cosa trova il backend
+        $allCount = DB::table('inventory_sessions')->where('tenant_id', $tid)->count();
+        $statuses = DB::table('inventory_sessions')->where('tenant_id', $tid)->pluck('status')->toArray();
+        \Illuminate\Support\Facades\Log::info('storeIndex@debug', [
+            'tenant_id'        => $tid,
+            'resolved_store_id'=> $storeId,
+            'hint_store_id'    => $request->input('hint_store_id'),
+            'sessions_totali'  => $allCount,
+            'statuses_trovati' => $statuses,
+            'sessions_visibili'=> $sessions->count(),
+        ]);
+
         return response()->json(['data'=>$data]);
     }
 
