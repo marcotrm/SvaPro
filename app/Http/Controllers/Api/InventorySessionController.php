@@ -17,6 +17,16 @@ class InventorySessionController extends Controller
         DB::table('inventory_audit_logs')->insert(['tenant_id'=>$tenantId,'user_id'=>$userId,'action'=>$action,'inventory_session_id'=>$sessionId,'inventory_item_id'=>$itemId,'old_value'=>$old?json_encode($old):null,'new_value'=>$new?json_encode($new):null,'note'=>$note,'created_at'=>now()]);
     }
 
+    // Risolve store_id: middleware -> user_roles -> employees (fallback per prod)
+    private function resolveStoreId(Request $request): int {
+        $uid = $request->user()->id;
+        $tid = (int)$request->attributes->get('tenant_id');
+        $sid = (int)$request->attributes->get('store_id');
+        if (!$sid) $sid = (int)DB::table('user_roles')->where('user_id',$uid)->whereNotNull('store_id')->value('store_id');
+        if (!$sid) $sid = (int)DB::table('employees')->where('user_id',$uid)->where('tenant_id',$tid)->whereNotNull('store_id')->value('store_id');
+        return $sid;
+    }
+
     // --- ADMIN: lista bolle ---
     public function index(Request $request) {
         $tid    = (int)$request->attributes->get('tenant_id');
@@ -214,7 +224,16 @@ class InventorySessionController extends Controller
     // --- STORE: lista bolle assegnate ---
     public function storeIndex(Request $request) {
         $tid     = (int)$request->attributes->get('tenant_id');
+        $userId  = $request->user()->id;
+
+        // Prova prima da middleware (user_roles.store_id), poi da employees come fallback
         $storeId = (int)$request->attributes->get('store_id');
+        if (!$storeId) {
+            $storeId = (int)DB::table('user_roles')->where('user_id',$userId)->whereNotNull('store_id')->value('store_id');
+        }
+        if (!$storeId) {
+            $storeId = (int)DB::table('employees')->where('user_id',$userId)->where('tenant_id',$tid)->whereNotNull('store_id')->value('store_id');
+        }
         if (!$storeId) return response()->json(['message'=>'Nessun negozio associato a questo account'],403);
         $sessions = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('store_id',$storeId)->whereNotIn('status',['DRAFT','CANCELLED'])->orderByDesc('id')->get();
         $ids = $sessions->pluck('id')->toArray();
@@ -233,7 +252,7 @@ class InventorySessionController extends Controller
     // --- STORE: dettaglio bolla (SENZA teorico) ---
     public function storeShow(Request $request, int $id) {
         $tid     = (int)$request->attributes->get('tenant_id');
-        $storeId = (int)$request->attributes->get('store_id');
+        $storeId = $this->resolveStoreId($request);
         if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->where('store_id',$storeId)->first();
         if(!$session) return response()->json(['message'=>'Non trovata'],404);
@@ -259,7 +278,7 @@ class InventorySessionController extends Controller
     // --- STORE: scansione barcode ---
     public function scan(Request $request, int $id) {
         $tid     = (int)$request->attributes->get('tenant_id');
-        $storeId = (int)$request->attributes->get('store_id');
+        $storeId = $this->resolveStoreId($request);
         $userId  = $request->user()->id;
         if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
         $request->validate(['barcode'=>'required|string|max:150']);
@@ -290,7 +309,7 @@ class InventorySessionController extends Controller
     public function updateCount(Request $request, int $itemId) {
         $tid     = (int)$request->attributes->get('tenant_id');
         $userId  = $request->user()->id;
-        $storeId = (int)$request->attributes->get('store_id');
+        $storeId = $this->resolveStoreId($request);
         if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
         $request->validate(['counted_quantity'=>'required|integer|min:0']);
         $item = DB::table('inventory_items as ii')->join('inventory_sessions as s','s.id','=','ii.inventory_session_id')->where('ii.id',$itemId)->where('s.tenant_id',$tid)->where('s.store_id',$storeId)->select('ii.*','s.status as session_status','s.id as session_id')->first();
