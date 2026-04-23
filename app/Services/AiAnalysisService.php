@@ -121,45 +121,60 @@ $dataJson
             ]
         ];
 
-        try {
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-            ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", $payload);
+        $maxRetries = 2;
+        $attempt = 0;
 
-            if ($response->successful()) {
-                $result = $response->json();
-                $parts = $result['candidates'][0]['content']['parts'] ?? [];
-                
-                // Controlla se c'è un functionCall
-                foreach ($parts as $part) {
-                    if (isset($part['functionCall'])) {
-                        $call = $part['functionCall'];
-                        if ($call['name'] === 'proponi_riordino') {
-                            return json_encode([
-                                'type' => 'action_card',
-                                'action' => 'proponi_riordino',
-                                'payload' => $call['args']
-                            ]);
+        while ($attempt < $maxRetries) {
+            $attempt++;
+            try {
+                $response = Http::withHeaders([
+                    'Content-Type' => 'application/json',
+                ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", $payload);
+
+                if ($response->successful()) {
+                    $result = $response->json();
+                    $parts = $result['candidates'][0]['content']['parts'] ?? [];
+                    
+                    // Controlla se c'è un functionCall
+                    foreach ($parts as $part) {
+                        if (isset($part['functionCall'])) {
+                            $call = $part['functionCall'];
+                            if ($call['name'] === 'proponi_riordino') {
+                                return json_encode([
+                                    'type' => 'action_card',
+                                    'action' => 'proponi_riordino',
+                                    'payload' => $call['args']
+                                ]);
+                            }
                         }
                     }
+
+                    if (isset($parts[0]['text'])) {
+                        return $parts[0]['text'];
+                    }
+                    return "Risposta non decifrabile dall'AI.";
                 }
 
-                if (isset($parts[0]['text'])) {
-                    return $parts[0]['text'];
+                if ($response->status() === 429) {
+                    return "Limite di richieste AI superato (Too Many Requests). Attendi un minuto e riprova.";
                 }
-                return "Risposta non decifrabile dall'AI.";
-            }
 
-            if ($response->status() === 429) {
-                return "Limite di richieste AI superato (Too Many Requests). Attendi un minuto e riprova.";
-            }
+                if ($response->status() === 503) {
+                    if ($attempt < $maxRetries) {
+                        sleep(2); // Attendi 2 secondi prima di riprovare
+                        continue;
+                    }
+                    return "I server AI di Google sono momentaneamente sovraccarichi (503). Riprova tra poco.";
+                }
 
-            Log::error('Gemini API Error', ['status' => $response->status(), 'body' => $response->body()]);
-            return "Errore di comunicazione con i server AI (" . $response->status() . ").";
-        } catch (\Exception $e) {
-            Log::error('Gemini API Exception', ['message' => $e->getMessage()]);
-            return "Errore interno durante la richiesta AI.";
+                Log::error('Gemini API Error', ['status' => $response->status(), 'body' => $response->body()]);
+                return "Errore di comunicazione con i server AI (" . $response->status() . ").";
+            } catch (\Exception $e) {
+                Log::error('Gemini API Exception', ['message' => $e->getMessage()]);
+                return "Errore interno durante la richiesta AI.";
+            }
         }
+        return "Errore imprevisto durante la comunicazione con l'AI.";
     }
 
     /**
@@ -212,27 +227,45 @@ Importante: restituisci SOLO ed esclusivamente un oggetto JSON valido, dove la c
             ]
         ];
 
-        try {
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-            ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", $payload);
+        $maxRetries = 2;
+        $attempt = 0;
 
-            if ($response->successful()) {
-                $result = $response->json();
-                if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
-                    $text = trim($result['candidates'][0]['content']['parts'][0]['text']);
-                    // Pulisci eventuale backtick markdown ```json ... ```
-                    $text = preg_replace('/^```json\s*/', '', $text);
-                    $text = preg_replace('/\s*```$/', '', $text);
+        while ($attempt < $maxRetries) {
+            $attempt++;
+            try {
+                $response = Http::withHeaders([
+                    'Content-Type' => 'application/json',
+                ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", $payload);
 
-                    $json = json_decode($text, true);
-                    if (is_array($json)) {
-                        return $json;
+                if ($response->successful()) {
+                    $result = $response->json();
+                    if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
+                        $text = trim($result['candidates'][0]['content']['parts'][0]['text']);
+                        // Pulisci eventuale backtick markdown ```json ... ```
+                        $text = preg_replace('/^```json\s*/', '', $text);
+                        $text = preg_replace('/\s*```$/', '', $text);
+
+                        $json = json_decode($text, true);
+                        if (is_array($json)) {
+                            return $json;
+                        }
+                    }
+                    return []; // Success but bad json
+                }
+
+                if ($response->status() === 503) {
+                    if ($attempt < $maxRetries) {
+                        sleep(2);
+                        continue;
                     }
                 }
+                
+                // Break on other errors (like 429)
+                break;
+            } catch (\Exception $e) {
+                Log::error('Gemini API Reorder Exception', ['message' => $e->getMessage()]);
+                break;
             }
-        } catch (\Exception $e) {
-            Log::error('Gemini API Reorder Exception', ['message' => $e->getMessage()]);
         }
 
         return [];
