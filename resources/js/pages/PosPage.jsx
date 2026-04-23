@@ -386,16 +386,8 @@ export default function PosPage() {
   }, [activeCategory, fetchedCats, selectedStoreId]);
 
 
-  // Auto-precompila operatore se l'utente loggato è un dipendente
-  useEffect(() => {
-    if (!user) return;
-    const empId = user.employee_id || (user.role === 'dipendente' ? user.id : null);
-    if (empId && !soldByEmployeeId) {
-      setSoldByEmployeeId(String(empId));
-      const name = `${user.first_name || user.name || ''}`.trim() || `Operatore #${empId}`;
-      setOperatorName(name);
-    }
-  }, [user]);
+  // L'auto-precompilazione dell'operatore è stata rimossa come richiesto
+
 
   // Auto-invio per codice operatore dopo aver finito di digitare (debounce 1 secondo)
   useEffect(() => {
