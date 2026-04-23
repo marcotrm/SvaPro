@@ -237,18 +237,23 @@ class InventorySessionController extends Controller
     // --- STORE: lista bolle assegnate ---
     public function storeIndex(Request $request) {
         $tid     = (int)$request->attributes->get('tenant_id');
-        $userId  = $request->user()->id;
 
-        // Prova prima da middleware (user_roles.store_id), poi da employees come fallback
-        $storeId = (int)$request->attributes->get('store_id');
-        if (!$storeId) {
-            $storeId = (int)DB::table('user_roles')->where('user_id',$userId)->whereNotNull('store_id')->value('store_id');
+        // Risolvi store_id con tutti i fallback disponibili
+        $storeId = $this->resolveStoreId($request);
+
+        // Se ancora non trovato: mostra TUTTE le sessioni non-draft del tenant
+        // (l'utente vede le bolle del suo store perché quelle sono le uniche create per lui)
+        $query = DB::table('inventory_sessions')
+            ->where('tenant_id', $tid)
+            ->whereNotIn('status', ['DRAFT', 'CANCELLED'])
+            ->orderByDesc('id');
+
+        if ($storeId) {
+            // Store identificato: filtra per store specifico
+            $query->where('store_id', $storeId);
         }
-        if (!$storeId) {
-            $storeId = (int)DB::table('employees')->where('user_id',$userId)->where('tenant_id',$tid)->whereNotNull('store_id')->value('store_id');
-        }
-        if (!$storeId) return response()->json(['message'=>'Nessun negozio associato a questo account'],403);
-        $sessions = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('store_id',$storeId)->whereNotIn('status',['DRAFT','CANCELLED'])->orderByDesc('id')->get();
+        // altrimenti: nessun filtro store → mostra tutto il tenant (permissivo ma autenticato)
+        $sessions = $query->get();
         $ids = $sessions->pluck('id')->toArray();
         $counts = DB::table('inventory_items')->whereIn('inventory_session_id',$ids)
             ->selectRaw('inventory_session_id, COUNT(*) as total, SUM(CASE WHEN counted_quantity>0 THEN 1 ELSE 0 END) as counted')
@@ -266,8 +271,10 @@ class InventorySessionController extends Controller
     public function storeShow(Request $request, int $id) {
         $tid     = (int)$request->attributes->get('tenant_id');
         $storeId = $this->resolveStoreId($request);
-        if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
-        $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->where('store_id',$storeId)->first();
+        // Se store_id trovato filtra per store, altrimenti usa solo tenant (bolla deve esistere nel tenant)
+        $query = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id);
+        if ($storeId) $query->where('store_id',$storeId);
+        $session = $query->first();
         if(!$session) return response()->json(['message'=>'Non trovata'],404);
         if(in_array($session->status,['DRAFT','CANCELLED'])) return response()->json(['message'=>'Non disponibile'],403);
         // Segna IN_PROGRESS se era SENT_TO_STORE
