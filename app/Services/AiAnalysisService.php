@@ -66,13 +66,59 @@ class AiAnalysisService
             ->select('stock_transfers.id', 'stock_transfers.ddt_number', 'stock_transfers.status', 'sf.name as from_store', 'st.name as to_store')
             ->get();
 
+        // Prodotti (Catalogo base, top 500)
+        $products = DB::table('products')->where('tenant_id', $tenantId)->select('id', 'name', 'sku', 'product_type')->limit(500)->get();
+
+        // Ultimi ordini di vendita (anonimizzati)
+        $orders = DB::table('sales_orders')
+            ->join('stores as s', 's.id', '=', 'sales_orders.store_id')
+            ->where('sales_orders.tenant_id', $tenantId)
+            ->select('sales_orders.id', 's.name as store_name', 'sales_orders.status', 'sales_orders.grand_total', 'sales_orders.created_at')
+            ->orderByDesc('sales_orders.created_at')
+            ->limit(200)
+            ->get();
+
+        // Sessioni di inventario recenti
+        $inventories = DB::table('inventory_count_sessions')
+            ->join('stores as s', 's.id', '=', 'inventory_count_sessions.warehouse_id')
+            ->where('inventory_count_sessions.tenant_id', $tenantId)
+            ->select('inventory_count_sessions.id', 's.name as store_name', 'inventory_count_sessions.status', 'inventory_count_sessions.created_at', 'inventory_count_sessions.finalized_at')
+            ->orderByDesc('inventory_count_sessions.created_at')
+            ->limit(50)
+            ->get();
+
+        // Resi recenti
+        $returns = DB::table('customer_returns')
+            ->where('tenant_id', $tenantId)
+            ->select('id', 'rma_number', 'status', 'reason', 'refund_amount', 'created_at')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        // Promozioni attive
+        $promotions = DB::table('promotions')
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->where('start_date', '<=', now())
+            ->where(function($q) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+            })
+            ->select('id', 'name', 'type', 'discount_value', 'start_date', 'end_date')
+            ->limit(50)
+            ->get();
+
         return [
+            'prodotti_catalogo' => $products,
             'negozi' => $stores,
             'fornitori' => $suppliers,
             'trasferimenti_attivi' => $transfers,
             'ordini_fornitori_attivi' => $purchaseOrders,
             'vendite_recenti' => $sales,
-            'giacenze' => $stock
+            'giacenze' => $stock,
+            'ultimi_ordini_clienti' => $orders,
+            'inventari_recenti' => $inventories,
+            'resi_recenti' => $returns,
+            'promozioni_attive' => $promotions
         ];
     }
 
