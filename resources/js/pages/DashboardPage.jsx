@@ -424,7 +424,7 @@ const AiReorderCard = ({ proposal, setAiAnswer }) => {
 ══════════════════════════════════════════════════════════════ */
 export default function DashboardPage() {
   const navigate  = useNavigate();
-  const { selectedStoreId } = useOutletContext();
+  const { selectedStoreId, userRoles = [] } = useOutletContext();
 
   const [kpi,          setKpi]          = useState(null);
   const [monthlyChart, setMonthlyChart] = useState([]);
@@ -1077,43 +1077,45 @@ export default function DashboardPage() {
         </button>
 
         {/* AI Assistant Widget */}
-        <div style={{ background:'linear-gradient(135deg, #1C1B2E, #2A2846)', borderRadius:22, padding:22, color:'#fff', display:'flex', flexDirection:'column', gap:12 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
-            <Bot size={22} color={PURPLE_L} />
-            <span style={{ fontSize:15, fontWeight:800 }}>AI Business Intelligence</span>
-          </div>
-          
-          <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:4 }}>
-            {['Analizza vendite mese', 'Prevedi scorte', 'Ottimizza magazzino'].map(q => (
-              <button key={q} onClick={() => setAiQuestion(q)} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:20, padding:'6px 12px', fontSize:11, color:'#C5BEE8', cursor:'pointer', transition:'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.2)'} onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'}>
-                {q}
-              </button>
-            ))}
-          </div>
-
-          {aiAnswer && (
-            <div style={{ background:'rgba(0,0,0,0.2)', padding:14, borderRadius:12, fontSize:13, lineHeight:1.5, maxHeight:300, overflowY:'auto', border:'1px solid rgba(255,255,255,0.05)' }} className="markdown-body-dark">
-              {typeof aiAnswer === 'string' ? (
-                <ReactMarkdown>{aiAnswer}</ReactMarkdown>
-              ) : aiAnswer?.type === 'action_card' && aiAnswer?.action === 'proponi_riordino' ? (
-                <AiReorderCard proposal={aiAnswer.payload} setAiAnswer={setAiAnswer} />
-              ) : null}
+        {(!userRoles.includes('dipendente') || userRoles.some(r => ['project_manager','superadmin','store_manager','admin_cliente','admin'].includes(r))) && (
+          <div style={{ background:'linear-gradient(135deg, #1C1B2E, #2A2846)', borderRadius:22, padding:22, color:'#fff', display:'flex', flexDirection:'column', gap:12 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
+              <Bot size={22} color={PURPLE_L} />
+              <span style={{ fontSize:15, fontWeight:800 }}>AI Business Intelligence</span>
             </div>
-          )}
+            
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:4 }}>
+              {['Analizza vendite mese', 'Prevedi scorte', 'Ottimizza magazzino'].map(q => (
+                <button key={q} onClick={() => setAiQuestion(q)} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:20, padding:'6px 12px', fontSize:11, color:'#C5BEE8', cursor:'pointer', transition:'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.2)'} onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'}>
+                  {q}
+                </button>
+              ))}
+            </div>
 
-          <form onSubmit={handleAskAi} style={{ display:'flex', gap:8, marginTop:4 }}>
-            <input 
-              type="text" 
-              value={aiQuestion} 
-              onChange={e => setAiQuestion(e.target.value)} 
-              placeholder="Chiedi un consiglio..." 
-              style={{ flex:1, padding:'10px 14px', borderRadius:12, border:'none', background:'rgba(255,255,255,0.08)', color:'#fff', fontSize:13, outline:'none' }}
-            />
-            <button type="submit" disabled={aiLoading || !aiQuestion.trim()} style={{ background:PURPLE_D, border:'none', borderRadius:12, width:40, display:'flex', alignItems:'center', justifyContent:'center', cursor:aiLoading||!aiQuestion.trim()?'not-allowed':'pointer', opacity:aiLoading||!aiQuestion.trim()?0.5:1, color:'#fff' }}>
-              {aiLoading ? <div className="sp-spin" style={{ width:16, height:16, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%' }} /> : <Send size={16} />}
-            </button>
-          </form>
-        </div>
+            {aiAnswer && (
+              <div style={{ background:'rgba(0,0,0,0.2)', padding:14, borderRadius:12, fontSize:13, lineHeight:1.5, maxHeight:300, overflowY:'auto', border:'1px solid rgba(255,255,255,0.05)' }} className="markdown-body-dark">
+                {typeof aiAnswer === 'string' ? (
+                  <ReactMarkdown>{aiAnswer}</ReactMarkdown>
+                ) : aiAnswer?.type === 'action_card' && aiAnswer?.action === 'proponi_riordino' ? (
+                  <AiReorderCard proposal={aiAnswer.payload} setAiAnswer={setAiAnswer} />
+                ) : null}
+              </div>
+            )}
+
+            <form onSubmit={handleAskAi} style={{ display:'flex', gap:8, marginTop:4 }}>
+              <input 
+                type="text" 
+                value={aiQuestion} 
+                onChange={e => setAiQuestion(e.target.value)} 
+                placeholder="Chiedi un consiglio..." 
+                style={{ flex:1, padding:'10px 14px', borderRadius:12, border:'none', background:'rgba(255,255,255,0.08)', color:'#fff', fontSize:13, outline:'none' }}
+              />
+              <button type="submit" disabled={aiLoading || !aiQuestion.trim()} style={{ background:PURPLE_D, border:'none', borderRadius:12, width:40, display:'flex', alignItems:'center', justifyContent:'center', cursor:aiLoading||!aiQuestion.trim()?'not-allowed':'pointer', opacity:aiLoading||!aiQuestion.trim()?0.5:1, color:'#fff' }}>
+                {aiLoading ? <div className="sp-spin" style={{ width:16, height:16, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%' }} /> : <Send size={16} />}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
     </div>
