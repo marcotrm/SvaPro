@@ -507,8 +507,28 @@ export default function PosPage() {
   };
   const clearCart = () => setCartLines([]);
 
+  // Totale locale (immediato, per UX reattiva)
   const cartTotal = useMemo(() => cartLines.reduce((s, l) => s + l.price * l.qty, 0), [cartLines]);
   const cartCount = useMemo(() => cartLines.reduce((s, l) => s + l.qty, 0), [cartLines]);
+
+  // Quote validata dal server (Regola 4: calcoli critici sul backend)
+  const [serverQuote, setServerQuote] = useState(null);
+  const quoteTimerRef = useRef(null);
+  useEffect(() => {
+    if (!cartLines.length) { setServerQuote(null); return; }
+    clearTimeout(quoteTimerRef.current);
+    quoteTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await ordersApi.quote({
+          lines: cartLines.map(l => ({ product_variant_id: l.product_variant_id, qty: l.qty })),
+          customer_id: selectedCustomer?.id || null,
+          order_discount_amount: appliedPromo?.discount_amount || 0,
+        });
+        setServerQuote(res.data);
+      } catch { /* fallback al totale locale */ }
+    }, 600); // debounce 600ms
+    return () => clearTimeout(quoteTimerRef.current);
+  }, [cartLines, selectedCustomer?.id, appliedPromo?.discount_amount]); // eslint-disable-line
 
   // ── Funzione: applica codice promo ─────────────────────────────────────────
   const applyPromoCode = async () => {

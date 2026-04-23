@@ -197,7 +197,7 @@ class InventorySessionController extends Controller
         return response()->json(['message'=>'Bolla approvata']);
     }
 
-    // --- ADMIN: elimina bolla (solo DRAFT o CANCELLED) ---
+    // --- ADMIN: elimina bolla (soft delete: status = CANCELLED) ---
     public function destroy(Request $request, int $id) {
         $tid    = (int)$request->attributes->get('tenant_id');
         $userId = $request->user()->id;
@@ -206,15 +206,22 @@ class InventorySessionController extends Controller
         if (in_array($session->status, ['APPROVED','CLOSED_BY_STORE','UNDER_REVIEW'])) {
             return response()->json(['message'=>'Non puoi eliminare una bolla già chiusa o approvata'],422);
         }
+        if ($session->status === 'CANCELLED') {
+            return response()->json(['message'=>'Bolla già annullata'],422);
+        }
         DB::beginTransaction();
         try {
+            // Soft delete: imposta CANCELLED con timestamp (regola Soft Delete)
+            DB::table('inventory_sessions')->where('id',$id)->update([
+                'status'     => 'CANCELLED',
+                'updated_at' => now(),
+            ]);
+            // Scansioni barcode: dati effimeri, sicuro rimuoverli (no audit value)
             DB::table('inventory_scans')->where('inventory_session_id',$id)->delete();
-            DB::table('inventory_items')->where('inventory_session_id',$id)->delete();
-            DB::table('inventory_audit_logs')->where('inventory_session_id',$id)->delete();
-            DB::table('inventory_sessions')->where('id',$id)->delete();
+            // inventory_items: NON eliminati, mantenuti per audit storico
             DB::commit();
-            $this->auditLog($tid,$userId,'delete',$id);
-            return response()->json(['message'=>'Bolla eliminata']);
+            $this->auditLog($tid,$userId,'cancel',$id,null,['previous_status'=>$session->status],['status'=>'CANCELLED'],'Annullata da admin');
+            return response()->json(['message'=>'Bolla annullata']);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message'=>'Errore: '.$e->getMessage()],500);

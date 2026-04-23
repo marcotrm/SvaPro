@@ -326,6 +326,7 @@ export default function InventoryBollePage() {
   const [showCreate, setShowCreate] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     try { const s = localStorage.getItem('user'); if(s) setUser(JSON.parse(s)); } catch {}
@@ -335,6 +336,7 @@ export default function InventoryBollePage() {
 
   const load = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       if (isAdmin) {
         const [kR, sR] = await Promise.all([
@@ -347,7 +349,16 @@ export default function InventoryBollePage() {
         const r = await inventorySessions.storeGetAll();
         setSessions(r.data?.data ?? []);
       }
-    } catch (e) { console.error('InventoryBollePage load error:', e); }
+    } catch (e) {
+      const msg = e.response?.data?.message || e.message || 'Errore caricamento inventari';
+      const status = e.response?.status;
+      if (status === 403) {
+        setLoadError('Nessun negozio associato al tuo account. Contatta un amministratore per assegnarti a un punto vendita.');
+      } else {
+        setLoadError(`Errore ${status ?? ''}: ${msg}`);
+      }
+      console.error('InventoryBollePage load error:', e);
+    }
     setLoading(false);
   };
 
@@ -361,13 +372,14 @@ export default function InventoryBollePage() {
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
-    if (!window.confirm('Eliminare questa bolla? L\'operazione è irreversibile.')) return;
+    if (!window.confirm('Annullare questa bolla? Verr\u00e0 marcata come CANCELLATA e non potr\u00e0 essere riattivata.')) return;
     setDeletingId(id);
     try {
       await inventorySessions.deleteSession(id);
-      setSessions(prev => prev.filter(s => s.id !== id));
+      // Soft delete: aggiorna lo status nella lista locale invece di rimuoverla
+      setSessions(prev => prev.map(s => s.id === id ? { ...s, status: 'CANCELLED' } : s));
     } catch (err) {
-      alert(err.response?.data?.message ?? 'Errore durante l\'eliminazione');
+      alert(err.response?.data?.message ?? 'Errore durante l\'annullamento');
     }
     setDeletingId(null);
   };
@@ -400,6 +412,18 @@ export default function InventoryBollePage() {
           <KpiCard label="In revisione" value={kpi.under_review} color="#F97316" />
           <KpiCard label="Approvate"    value={kpi.approved}     color="#10B981" />
           <KpiCard label="Totale"       value={kpi.total}        color="var(--color-text-secondary)" />
+        </div>
+      )}
+
+      {/* Banner errore */}
+      {loadError && (
+        <div style={{
+          background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.35)',
+          borderRadius:10, padding:'14px 18px', marginBottom:20,
+          color:'#FCA5A5', fontSize:14, display:'flex', alignItems:'center', gap:10
+        }}>
+          <span style={{ fontSize:20 }}>⚠️</span>
+          <span>{loadError}</span>
         </div>
       )}
 
