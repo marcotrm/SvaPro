@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { inventory } from '../api.jsx';
 import { SkeletonHead, SkeletonTable } from '../components/Skeleton.jsx';
 import ErrorAlert from '../components/ErrorAlert.jsx';
@@ -123,7 +123,7 @@ export default function SmartReorderPage() {
       {/* Suggested orders table */}
       <div className="table-card">
         <div className="table-toolbar">
-          <span style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>Ordini Suggeriti</span>
+          <span style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>Ordini Suggeriti dall'AI</span>
           <span className="badge mid" style={{marginLeft:8}}>{suggestedOrders.length}</span>
           {suggestedOrders.length > 0 && (
             <span style={{marginLeft:'auto',fontSize:13,fontWeight:700,color:'var(--gold)',fontFamily:'IBM Plex Mono, monospace'}}>
@@ -138,8 +138,8 @@ export default function SmartReorderPage() {
               <th>Fornitore</th>
               <th>Prodotto</th>
               <th>Quantita</th>
-              <th>Costo unitario</th>
               <th>Totale</th>
+              <th>Motivazione AI</th>
             </tr>
           </thead>
           <tbody>
@@ -149,8 +149,12 @@ export default function SmartReorderPage() {
                 <td style={{color:'var(--muted2)'}}>{order.supplier_name}</td>
                 <td style={{color:'var(--muted2)'}}>{order.product_name}</td>
                 <td><span className="mono" style={{color:'var(--text)'}}>{order.suggested_qty}</span></td>
-                <td><span className="mono" style={{color:'var(--muted2)'}}>€{order.unit_cost?.toFixed(2)}</span></td>
                 <td><span className="mono positive">€{(order.suggested_qty * order.unit_cost)?.toFixed(2)}</span></td>
+                <td>
+                  <span style={{fontSize: 11, padding: '4px 8px', background: 'rgba(123, 111, 208, 0.1)', color: '#C5BEE8', borderRadius: 6, display: 'inline-block'}}>
+                    ✨ {order.ai_motivation || 'Calcolo predittivo'}
+                  </span>
+                </td>
               </tr>
             )) : (
               <tr>

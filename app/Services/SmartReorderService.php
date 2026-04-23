@@ -23,6 +23,7 @@ class SmartReorderService
                 ->join('warehouses as w', 'w.id', '=', 'si.warehouse_id')
                 ->join('product_variants as pv', 'pv.id', '=', 'si.product_variant_id')
                 ->join('products as p', 'p.id', '=', 'pv.product_id')
+                ->leftJoin('suppliers as sup', 'sup.id', '=', 'p.default_supplier_id')
                 ->where('si.tenant_id', $tenantId)
                 ->where('w.store_id', $store->id)
                 ->select([
@@ -40,8 +41,10 @@ class SmartReorderService
                     'p.auto_reorder_enabled',
                     'p.reorder_days',
                     'p.min_stock_qty',
+                    'p.scorta_sicurezza',
                     'pv.sale_price',
                     'pv.cost_price',
+                    'sup.lead_time_medio'
                 ])
                 ->get();
 
@@ -69,11 +72,17 @@ class SmartReorderService
                     continue;
                 }
 
-                $targetStock = max(
-                    $threshold * 4,
-                    (int) $item->safety_stock + $threshold,
-                    $soldQty * 2
-                );
+                $leadTime = max(1, (int) ($item->lead_time_medio ?? 7));
+                $scortaSicurezza = max(0, (int) ($item->scorta_sicurezza ?? 0));
+
+                $ottimizzazione = $this->calculateOptimalStock($tenantId, (int) $store->id, (int) $item->product_variant_id, $leadTime, $scortaSicurezza);
+                
+                $reorderPointDinamico = $ottimizzazione['reorder_point'];
+                $targetStock = $ottimizzazione['qty_21_days'] + $scortaSicurezza; // Per coprire 21 giorni
+
+                if ($available > $reorderPointDinamico) {
+                    continue;
+                }
 
                 $suggestedQty = max(0, $targetStock - $available);
                 if ($suggestedQty === 0) {
@@ -100,14 +109,43 @@ class SmartReorderService
                     'sold_qty_window' => $soldQty,
                     'suggested_qty' => $suggestedQty,
                     'supplier_id' => $item->default_supplier_id,
+                    'supplier_name' => $item->default_supplier_id ? DB::table('suppliers')->where('id', $item->default_supplier_id)->value('name') : 'Nessun Fornitore',
                     'unit_cost' => (float) ($item->cost_price ?? 0),
+                    'ai_motivation' => null, // Segnaposto
                 ];
             }
         }
 
+        // Recupero motivazioni AI in batch
+        $aiService = new AiAnalysisService();
+        $motivations = $aiService->generateReorderMotivations($alerts);
+
+        foreach ($alerts as &$alert) {
+            $vid = $alert['product_variant_id'];
+            if (isset($motivations[$vid])) {
+                $alert['ai_motivation'] = $motivations[$vid];
+            } else {
+                $alert['ai_motivation'] = 'Calcolo previsionale standard';
+            }
+        }
+        unset($alert);
+
+        // Separiamo ordini suggeriti per compatibilità con il controller esistente
+        $suggestedOrders = array_map(function ($a) {
+            return [
+                'store_name' => $a['store_name'],
+                'supplier_name' => $a['supplier_name'],
+                'product_name' => $a['product_name'],
+                'suggested_qty' => $a['suggested_qty'],
+                'unit_cost' => $a['unit_cost'],
+                'ai_motivation' => $a['ai_motivation'],
+            ];
+        }, $alerts);
+
         return [
             'generated_at' => now()->toDateTimeString(),
             'alerts' => $alerts,
+            'suggested_orders' => $suggestedOrders,
         ];
     }
 
@@ -217,6 +255,47 @@ class SmartReorderService
             ->sum('sol.qty');
 
         return (int) $qty;
+    }
+
+    private function calculateOptimalStock(int $tenantId, int $storeId, int $variantId, int $leadTimeMedio, int $scortaSicurezza): array
+    {
+        // Ultimi 60 giorni
+        $sales60 = DB::table('sales_order_lines as sol')
+            ->join('sales_orders as so', 'so.id', '=', 'sol.sales_order_id')
+            ->where('so.tenant_id', $tenantId)
+            ->where('so.store_id', $storeId)
+            ->where('so.status', 'paid')
+            ->where('so.paid_at', '>=', now()->subDays(60))
+            ->where('sol.product_variant_id', $variantId)
+            ->selectRaw('DATE(so.paid_at) as date, SUM(sol.qty) as qty')
+            ->groupBy('date')
+            ->get();
+
+        $total60 = $sales60->sum('qty');
+        $avg60 = $total60 / 60;
+
+        $sales7 = $sales60->filter(function($s) {
+            return $s->date >= now()->subDays(7)->format('Y-m-d');
+        })->sum('qty');
+        $avg7 = $sales7 / 7;
+
+        // Media mobile ponderata (70% per gli ultimi 7gg, 30% per i 60gg)
+        $weightedAvg = ($avg7 * 0.7) + ($avg60 * 0.3);
+
+        // Se non ci sono vendite recenti ma ci sono 60gg, usa quello. Se zero, metti 0.1 di default per non azzerare.
+        if ($weightedAvg == 0 && $total60 > 0) {
+            $weightedAvg = $avg60;
+        } elseif ($weightedAvg == 0) {
+            $weightedAvg = 0.1;
+        }
+
+        $reorderPoint = (int) ceil($weightedAvg * $leadTimeMedio);
+        $qtyFor21Days = (int) ceil($weightedAvg * 21);
+
+        return [
+            'reorder_point' => $reorderPoint,
+            'qty_21_days' => $qtyFor21Days,
+        ];
     }
 
     private function centralSupplierId(): int

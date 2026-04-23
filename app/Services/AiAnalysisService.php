@@ -109,4 +109,80 @@ $dataJson
             return "Errore interno durante la richiesta AI.";
         }
     }
+
+    /**
+     * Chiede a Gemini di generare motivazioni per il riordino logistico.
+     * Si aspetta un array di alert generati dal Replenishment Engine e restituisce una mappa [product_variant_id => "motivazione"].
+     */
+    public function generateReorderMotivations(array $alerts): array
+    {
+        $apiKey = env('GEMINI_API_KEY');
+        if (!$apiKey || empty($alerts)) {
+            return [];
+        }
+
+        // Estrae solo i campi rilevanti per non saturare il token limit
+        $payloadData = array_map(function ($a) {
+            return [
+                'id' => $a['product_variant_id'],
+                'prodotto' => $a['product_name'],
+                'negozio' => $a['store_name'],
+                'disp' => $a['available'],
+                'venduto_30gg' => $a['sold_qty_window'] ?? 0,
+                'suggerito' => $a['suggested_qty'],
+            ];
+        }, $alerts);
+
+        $systemInstruction = "Sei un Esperto di Logistica e Fiscalità dello Svapo.
+Devi analizzare la seguente lista di prodotti in esaurimento (formato JSON) e, per ciascuno, fornire una breve motivazione commerciale/logistica (max 10 parole) sul perché si suggerisce di riordinare quella quantità (es: 'Suggerito +20% per trend di vendita in crescita').
+Importante: restituisci SOLO ed esclusivamente un oggetto JSON valido, dove la chiave è l'id (product_variant_id) e il valore è la stringa della motivazione. Nessun markdown aggiuntivo, nessun blocco di codice.";
+
+        $userPrompt = "Analizza questi dati e fornisci il JSON: \n" . json_encode($payloadData, JSON_UNESCAPED_UNICODE);
+
+        $payload = [
+            'contents' => [
+                [
+                    'role' => 'user',
+                    'parts' => [
+                        ['text' => $userPrompt]
+                    ]
+                ]
+            ],
+            'systemInstruction' => [
+                'role' => 'system',
+                'parts' => [
+                    ['text' => $systemInstruction]
+                ]
+            ],
+            'generationConfig' => [
+                'temperature' => 0.2,
+                'maxOutputTokens' => 1024,
+            ]
+        ];
+
+        try {
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+            ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", $payload);
+
+            if ($response->successful()) {
+                $result = $response->json();
+                if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
+                    $text = trim($result['candidates'][0]['content']['parts'][0]['text']);
+                    // Pulisci eventuale backtick markdown ```json ... ```
+                    $text = preg_replace('/^```json\s*/', '', $text);
+                    $text = preg_replace('/\s*```$/', '', $text);
+
+                    $json = json_decode($text, true);
+                    if (is_array($json)) {
+                        return $json;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Gemini API Reorder Exception', ['message' => $e->getMessage()]);
+        }
+
+        return [];
+    }
 }
