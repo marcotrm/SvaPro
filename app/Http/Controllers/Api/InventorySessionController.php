@@ -136,7 +136,7 @@ class InventorySessionController extends Controller
             DB::commit();
             // Notifica store (employee notifications)
             try {
-                $storeUsers = DB::table('users')->where('tenant_id',$tid)->where('store_id',$storeId)->pluck('id');
+                $storeUsers = DB::table('user_roles')->where('tenant_id',$tid)->where('store_id',$storeId)->pluck('user_id');
                 foreach($storeUsers as $uid){
                     DB::table('employee_notifications')->insert(['tenant_id'=>$tid,'user_id'=>$uid,'type'=>'inventory','title'=>'Nuova bolla inventario','body'=>"Bolla \"{$request->input('title')}\" assegnata al tuo negozio.",'read_at'=>null,'created_at'=>now(),'updated_at'=>now()]);
                 }
@@ -379,7 +379,7 @@ class InventorySessionController extends Controller
             $this->auditLog($tid,$userId,'close_session',$id,null,null,['matched'=>$matched,'mismatched'=>$mismatched]);
             // Notifica admin
             try {
-                $admins = DB::table('users')->where('tenant_id',$tid)->whereIn('role',['superadmin','admin_cliente','magazziniere'])->pluck('id');
+                $admins = DB::table('user_roles')->join('roles','roles.id','=','user_roles.role_id')->where('user_roles.tenant_id',$tid)->whereIn('roles.code',['superadmin','admin_cliente','magazziniere'])->pluck('user_roles.user_id');
                 foreach($admins as $uid) DB::table('employee_notifications')->insert(['tenant_id'=>$tid,'user_id'=>$uid,'type'=>'inventory','title'=>'Bolla chiusa dallo store','body'=>"La bolla \"{$session->title}\" è stata chiusa. Differenze: {$mismatched}.",'read_at'=>null,'created_at'=>now(),'updated_at'=>now()]);
             }catch(\Exception $e){}
             DB::commit();

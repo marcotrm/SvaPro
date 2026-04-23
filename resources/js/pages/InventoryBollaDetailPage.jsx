@@ -40,6 +40,8 @@ export default function InventoryBollaDetailPage(){
       }else{
         const r=await inventorySessions.storeGetOne(id);
         setSession(r.data.data);setItems(r.data.items??[]);
+        const cr=await inventorySessions.getComments(id);
+        setComments(cr.data.data??[]);
       }
     }catch(e){console.error(e);}
     setLoading(false);
