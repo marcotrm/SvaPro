@@ -92,7 +92,7 @@ $dataJson
         try {
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
-            ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={$apiKey}", $payload);
+            ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", $payload);
 
             if ($response->successful()) {
                 $result = $response->json();
@@ -100,6 +100,10 @@ $dataJson
                     return $result['candidates'][0]['content']['parts'][0]['text'];
                 }
                 return "Risposta non decifrabile dall'AI.";
+            }
+
+            if ($response->status() === 429) {
+                return "Limite di richieste AI superato (Too Many Requests). Attendi un minuto e riprova.";
             }
 
             Log::error('Gemini API Error', ['status' => $response->status(), 'body' => $response->body()]);

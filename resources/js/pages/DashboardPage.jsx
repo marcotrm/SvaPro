@@ -330,7 +330,7 @@ const DonutChart = ({ data = [], colors = STORE_COLORS }) => {
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
         <span style={{ fontSize: 11, color: '#9CA3AF' }}>Totale</span>
-        <span style={{ fontSize: 18, fontWeight: 800 }}>{total}</span>
+        <span style={{ fontSize: 18, fontWeight: 800 }}>{total.toLocaleString('it-IT', { maximumFractionDigits: 0 })}</span>
       </div>
     </div>
   );
