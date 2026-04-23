@@ -107,6 +107,26 @@ class AiAnalysisService
     }
 
     /**
+     * Tool: Ottiene le statistiche di vendita giornaliere (scontrini e incassi).
+     */
+    private function get_daily_sales_stats(string $storeName = null, string $date = null): array
+    {
+        $dateStr = $date ?: now()->toDateString();
+        $query = DB::table('sales_orders')
+            ->join('stores as s', 's.id', '=', 'sales_orders.store_id')
+            ->whereDate('sales_orders.created_at', $dateStr)
+            ->where('sales_orders.status', '!=', 'cancelled');
+
+        if ($storeName) {
+            $query->where('s.name', 'like', '%' . $storeName . '%');
+        }
+
+        return $query->selectRaw('s.name as store, COUNT(*) as scontrini, SUM(grand_total) as incasso_totale')
+                     ->groupBy('s.name')
+                     ->get()->toArray();
+    }
+
+    /**
      * Invia il prompt a Gemini REST API con Tool Calling (Function Calling).
      */
     public function askGemini(int $tenantId, string $userQuestion, array $chatHistory = []): string
@@ -123,6 +143,7 @@ class AiAnalysisService
 La Regola d'Oro: Niente Documenti, Niente Risposta.
 Rispondi SOLO basandoti sui dati ottenuti tramite le tue funzioni (tools) o forniti nel Contesto Base.
 Quando usi una funzione, trasforma il JSON restituito in una frase colloquiale in italiano. Non restituire mai JSON grezzo all'utente.
+Non menzionare MAI il nome delle tue funzioni interne (es. get_sales_data, get_stock_data) all'utente.
 NON devi MAI rispondere a domande sui numeri di magazzino o vendite senza prima chiamare una delle funzioni di database.
 Se la risposta non è deducibile, rispondi: 'Dato non disponibile nel sistema'. Non stimare o inventare nulla.
 
@@ -134,6 +155,7 @@ Hai a disposizione queste funzioni sicure:
 2. get_sales_data: per conoscere le vendite di un prodotto in un arco di tempo.
 3. get_inventory_sessions: per conoscere le 'bolle inventario' (sessioni di conteggio e stato).
 4. get_stock_transfers: per conoscere le 'bolle di trasferimento' tra negozi.
+5. get_daily_sales_stats: per conoscere statistiche generiche (incassi, numero di scontrini/ordini) di oggi o di una data specifica.
 
 Se l'utente chiede di 'preparare un riordino', restituisci alla fine un JSON strutturato così:
 {
@@ -211,6 +233,20 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
                         ]
                     ]
                 ]
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_daily_sales_stats',
+                    'description' => 'Usa questa funzione per ottenere statistiche di vendita (incasso totale, numero di scontrini/ordini) di un giorno specifico.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'store_name' => ['type' => 'string', 'description' => 'Nome opzionale del negozio'],
+                            'date' => ['type' => 'string', 'description' => 'Data nel formato YYYY-MM-DD. Se non fornita o non chiara, usa la data di oggi.']
+                        ]
+                    ]
+                ]
             ]
         ];
 
@@ -252,6 +288,8 @@ Altrimenti rispondi SEMPRE con questo formato JSON: { \"type\": \"text\", \"cont
                         $resultData = $this->get_inventory_sessions($args['store_name'] ?? null);
                     } elseif ($toolCall['function']['name'] === 'get_stock_transfers') {
                         $resultData = $this->get_stock_transfers($args['store_name'] ?? null);
+                    } elseif ($toolCall['function']['name'] === 'get_daily_sales_stats') {
+                        $resultData = $this->get_daily_sales_stats($args['store_name'] ?? null, $args['date'] ?? null);
                     }
                     
                     Log::info("Tool eseguito: " . $toolCall['function']['name'], ['args' => $args, 'results_count' => count($resultData)]);
