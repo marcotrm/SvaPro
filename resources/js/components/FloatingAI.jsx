@@ -44,9 +44,16 @@ export default function FloatingAI() {
 
     try {
       // Invia il contesto della rotta corrente per maggiore consapevolezza
+      // Invio solo gli ultimi 5 messaggi come storico per risparmiare token
+      const recentHistory = messages.slice(-5).map(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.content
+      }));
+
       const res = await api.post('/ai/chiedi-consiglio', { 
         question: userMsg,
-        context_url: location.pathname + location.search 
+        context_url: location.pathname + location.search,
+        chat_history: recentHistory
       });
 
       let reply = res.data.answer;

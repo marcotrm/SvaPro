@@ -22,17 +22,19 @@ class AiController extends Controller
         $request->validate([
             'question' => 'required|string|max:1000',
             'context_url' => 'nullable|string',
-            'page_data' => 'nullable|array' // opzionale se il frontend passa dati
+            'page_data' => 'nullable|array',
+            'chat_history' => 'nullable|array'
         ]);
 
         $question = $request->input('question');
         $contextUrl = $request->input('context_url');
+        $chatHistory = $request->input('chat_history', []);
         
         if ($contextUrl) {
             $question = "[CONTESTO: L'utente si trova attualmente nella rotta: $contextUrl]\nDomanda: " . $question;
         }
 
-        $answer = $this->aiService->askGemini($tenantId, $question);
+        $answer = $this->aiService->askGemini($tenantId, $question, $chatHistory);
 
         return response()->json([
             'answer' => $answer

@@ -14,39 +14,38 @@ class AiAnalysisService
      */
     public function getAggregatedData(int $tenantId): array
     {
-        // Vendite recenti
+        // Vendite recenti (aggregate)
         $sales = DB::table('stock_movements')
             ->join('product_variants as pv', 'pv.id', '=', 'stock_movements.product_variant_id')
             ->join('products as p', 'p.id', '=', 'pv.product_id')
-            ->leftJoin('categories as c', 'c.id', '=', 'p.category_id')
             ->join('stores as s', 's.id', '=', 'stock_movements.warehouse_id')
             ->where('stock_movements.tenant_id', $tenantId)
             ->where('stock_movements.qty', '<', 0)
             ->where('stock_movements.occurred_at', '>=', now()->subDays(30))
-            ->selectRaw('s.name as store_name, c.name as category, p.name as product, SUM(ABS(stock_movements.qty)) as total_sold')
-            ->groupBy('s.name', 'c.name', 'p.name')
-            ->orderByDesc('total_sold')
-            ->limit(300)
+            ->selectRaw('s.name as store, p.name as prod, SUM(ABS(stock_movements.qty)) as sold')
+            ->groupBy('s.name', 'p.name')
+            ->orderByDesc('sold')
+            ->limit(100)
             ->get();
 
-        // Giacenze attuali aggregate (top 300)
+        // Giacenze attuali aggregate
         $stock = DB::table('stock_items')
             ->join('product_variants as pv', 'pv.id', '=', 'stock_items.product_variant_id')
             ->join('products as p', 'p.id', '=', 'pv.product_id')
             ->join('stores as s', 's.id', '=', 'stock_items.warehouse_id')
             ->where('p.tenant_id', $tenantId)
             ->where('stock_items.on_hand', '>', 0)
-            ->selectRaw('s.name as store_name, p.name as product, SUM(stock_items.on_hand) as total_stock')
+            ->selectRaw('s.name as store, p.name as prod, SUM(stock_items.on_hand) as qty')
             ->groupBy('s.name', 'p.name')
-            ->orderByDesc('total_stock')
-            ->limit(300)
+            ->orderByDesc('qty')
+            ->limit(100)
             ->get();
 
-        // Negozi
-        $stores = DB::table('stores')->where('tenant_id', $tenantId)->select('id', 'name', 'is_main as is_central')->get();
+        // Negozi (ridotti)
+        $stores = DB::table('stores')->where('tenant_id', $tenantId)->select('id', 'name')->get();
 
-        // Fornitori
-        $suppliers = DB::table('suppliers')->where('tenant_id', $tenantId)->select('id', 'name', 'lead_time_days')->get();
+        // Fornitori (ridotti)
+        $suppliers = DB::table('suppliers')->where('tenant_id', $tenantId)->select('id', 'name', 'lead_time_days as lt')->get();
 
         // Ordini di Acquisto (Bozze o In Attesa)
         $purchaseOrders = DB::table('purchase_orders')
@@ -54,7 +53,7 @@ class AiAnalysisService
             ->join('stores as s', 's.id', '=', 'purchase_orders.store_id')
             ->where('purchase_orders.tenant_id', $tenantId)
             ->whereIn('purchase_orders.status', ['draft', 'sent', 'partial'])
-            ->select('purchase_orders.id', 'purchase_orders.status', 'sup.name as supplier', 's.name as store_name', 'purchase_orders.total_net as total_amount')
+            ->select('purchase_orders.id', 'purchase_orders.status', 'sup.name as sup', 's.name as store', 'purchase_orders.total_net as tot')
             ->get();
 
         // Trasferimenti Merce
@@ -63,36 +62,24 @@ class AiAnalysisService
             ->join('stores as st', 'st.id', '=', 'stock_transfers.to_store_id')
             ->where('stock_transfers.tenant_id', $tenantId)
             ->whereIn('stock_transfers.status', ['draft', 'shipped'])
-            ->select('stock_transfers.id', 'stock_transfers.ddt_number', 'stock_transfers.status', 'sf.name as from_store', 'st.name as to_store')
-            ->get();
-
-        // Prodotti (Catalogo base, top 500)
-        $products = DB::table('products')->where('tenant_id', $tenantId)->select('id', 'name', 'sku', 'product_type')->limit(500)->get();
-
-        // Ultimi ordini di vendita (anonimizzati)
-        $orders = DB::table('sales_orders')
-            ->join('stores as s', 's.id', '=', 'sales_orders.store_id')
-            ->where('sales_orders.tenant_id', $tenantId)
-            ->select('sales_orders.id', 's.name as store_name', 'sales_orders.status', 'sales_orders.grand_total', 'sales_orders.created_at')
-            ->orderByDesc('sales_orders.created_at')
-            ->limit(200)
+            ->select('stock_transfers.id', 'stock_transfers.status', 'sf.name as from', 'st.name as to')
             ->get();
 
         // Sessioni di inventario recenti
         $inventories = DB::table('inventory_count_sessions')
             ->join('stores as s', 's.id', '=', 'inventory_count_sessions.warehouse_id')
             ->where('inventory_count_sessions.tenant_id', $tenantId)
-            ->select('inventory_count_sessions.id', 's.name as store_name', 'inventory_count_sessions.status', 'inventory_count_sessions.created_at', 'inventory_count_sessions.finalized_at')
+            ->select('inventory_count_sessions.id', 's.name as store', 'inventory_count_sessions.status')
             ->orderByDesc('inventory_count_sessions.created_at')
-            ->limit(50)
+            ->limit(10)
             ->get();
 
         // Resi recenti
         $returns = DB::table('customer_returns')
             ->where('tenant_id', $tenantId)
-            ->select('id', 'rma_number', 'status', 'reason', 'refund_amount', 'created_at')
+            ->select('id', 'status', 'reason')
             ->orderByDesc('created_at')
-            ->limit(50)
+            ->limit(10)
             ->get();
 
         // Promozioni attive
@@ -103,29 +90,27 @@ class AiAnalysisService
             ->where(function($q) {
                 $q->whereNull('ends_at')->orWhere('ends_at', '>=', now());
             })
-            ->select('id', 'name', 'type', 'value', 'starts_at', 'ends_at')
-            ->limit(50)
+            ->select('id', 'name', 'type', 'value')
+            ->limit(10)
             ->get();
 
         return [
-            'prodotti_catalogo' => $products,
             'negozi' => $stores,
             'fornitori' => $suppliers,
-            'trasferimenti_attivi' => $transfers,
-            'ordini_fornitori_attivi' => $purchaseOrders,
-            'vendite_recenti' => $sales,
+            'trasferimenti' => $transfers,
+            'ordini_fornitore' => $purchaseOrders,
+            'vendite_30gg' => $sales,
             'giacenze' => $stock,
-            'ultimi_ordini_clienti' => $orders,
-            'inventari_recenti' => $inventories,
-            'resi_recenti' => $returns,
-            'promozioni_attive' => $promotions
+            'inventari' => $inventories,
+            'resi' => $returns,
+            'promo' => $promotions
         ];
     }
 
     /**
      * Invia il prompt a Gemini REST API.
      */
-    public function askGemini(int $tenantId, string $userQuestion): string
+    public function askGemini(int $tenantId, string $userQuestion, array $chatHistory = []): string
     {
         $apiKey = env('GROQ_API_KEY');
         if (!$apiKey) {
@@ -135,46 +120,47 @@ class AiAnalysisService
         $data = $this->getAggregatedData($tenantId);
         $dataJson = json_encode($data, JSON_UNESCAPED_UNICODE);
 
-        $systemInstruction = "Sei un Esperto di Logistica e Fiscalità dello Svapo (SvaPro ERP).
-Conosci perfettamente la differenza tra PLI (Prodotti Liquidi da Inalazione con nicotina, soggetti a monopolio) e PL0 (senza nicotina), e l'importanza della tracciabilità dei lotti.
-Il tuo compito è analizzare i dati aggregati di vendite e giacenze forniti e rispondere alla domanda dell'utente in modo professionale, conciso e orientato al business.
-NON menzionare mai dati personali.
+        $systemInstruction = "Sei SvaPro AI, l'esperto di Logistica e Fiscalità dello Svapo (SvaPro ERP).
+Il tuo compito è analizzare i dati aggregati forniti (giacenze, vendite, resi, promo) e rispondere alla domanda.
+NON menzionare mai dati personali. Sii conciso, professionale e diretto al punto.
 
-IMPORTANTE: Se l'utente chiede di 'preparare un riordino' o trasferire merce, DEVI rispondere ESCLUSIVAMENTE con un JSON strutturato che segua questo schema (NIENTE markdown, NIENTE testo fuori dal JSON):
+Se l'utente chiede di 'preparare un riordino', restituisci ESCLUSIVAMENTE un JSON strutturato così (niente markdown fuori):
 {
   \"type\": \"action_card\",
   \"action\": \"proponi_riordino\",
   \"payload\": {
     \"motivazione\": \"stringa\",
-    \"ordini\": [
-      {
-        \"from_store_id\": numero intero (es. 1),
-        \"to_store_id\": numero intero,
-        \"product_variant_id\": numero intero,
-        \"quantity\": numero intero,
-        \"notes\": \"stringa\"
-      }
-    ]
+    \"ordini\": [ { \"from_store_id\": 1, \"to_store_id\": 2, \"product_variant_id\": 1, \"quantity\": 10, \"notes\": \"\" } ]
   }
 }
-Se invece è solo una domanda generica o un consiglio, rispondi con un JSON del genere:
+Altrimenti rispondi SEMPRE con un JSON:
 {
   \"type\": \"text\",
-  \"content\": \"la tua risposta testuale\"
+  \"content\": \"la tua risposta qui...\"
 }
 
-Dati forniti dal sistema:
-$dataJson
-";
+Dati:
+$dataJson";
+
+        $messages = [
+            ['role' => 'system', 'content' => $systemInstruction]
+        ];
+
+        // Aggiungi gli ultimi messaggi per il contesto (limitato a 5 dal frontend)
+        foreach ($chatHistory as $msg) {
+            $messages[] = [
+                'role' => $msg['role'] === 'user' ? 'user' : 'assistant',
+                'content' => $msg['content']
+            ];
+        }
+
+        $messages[] = ['role' => 'user', 'content' => "Domanda: $userQuestion"];
 
         $payload = [
-            'model' => 'llama-3.3-70b-versatile',
-            'temperature' => 0, // Precisone chirurgica
+            'model' => 'llama-3.1-8b-instant', // Modello veloce per le query del widget
+            'temperature' => 0,
             'response_format' => ['type' => 'json_object'],
-            'messages' => [
-                ['role' => 'system', 'content' => $systemInstruction],
-                ['role' => 'user', 'content' => "Domanda dell'utente: $userQuestion"]
-            ]
+            'messages' => $messages
         ];
 
         try {
@@ -200,7 +186,7 @@ $dataJson
             }
 
             Log::error('Groq API Error', ['status' => $response->status(), 'body' => $response->body()]);
-            return "Errore Groq " . $response->status() . ": " . $response->body();
+            return "Errore Groq " . $response->status();
         } catch (\Exception $e) {
             Log::error('Groq API Exception', ['message' => $e->getMessage()]);
             return "Errore interno durante la richiesta AI.";
@@ -209,7 +195,6 @@ $dataJson
 
     /**
      * Chiede a Gemini di generare motivazioni per il riordino logistico.
-     * Si aspetta un array di alert generati dal Replenishment Engine e restituisce una mappa [product_variant_id => "motivazione"].
      */
     public function generateReorderMotivations(array $alerts): array
     {
@@ -230,14 +215,14 @@ $dataJson
         }, $alerts);
 
         $systemInstruction = "Sei un Esperto di Logistica e Fiscalità dello Svapo.
-Devi analizzare la seguente lista di prodotti in esaurimento (formato JSON) e, per ciascuno, fornire una breve motivazione commerciale/logistica (max 10 parole) sul perché si suggerisce di riordinare quella quantità (es: 'Suggerito +20% per trend di vendita in crescita').
-Importante: restituisci SOLO ed esclusivamente un oggetto JSON valido, dove la chiave è l'id (product_variant_id) e il valore è la stringa della motivazione. Nessun markdown aggiuntivo, nessun blocco di codice.";
+Analizza i prodotti in JSON e fornisci una motivazione di max 10 parole per ogni riordino.
+Restituisci SOLO un JSON: { \"id_prodotto\": \"motivazione\" }.";
 
-        $userPrompt = "Analizza questi dati e fornisci il JSON: \n" . json_encode($payloadData, JSON_UNESCAPED_UNICODE);
+        $userPrompt = "Dati: " . json_encode($payloadData, JSON_UNESCAPED_UNICODE);
 
         $payload = [
-            'model' => 'llama-3.3-70b-versatile',
-            'temperature' => 0, // Precisione per output JSON
+            'model' => 'llama-3.3-70b-versatile', // Modello pesante per analisi logiche
+            'temperature' => 0,
             'response_format' => ['type' => 'json_object'],
             'messages' => [
                 ['role' => 'system', 'content' => $systemInstruction],
@@ -255,13 +240,8 @@ Importante: restituisci SOLO ed esclusivamente un oggetto JSON valido, dove la c
                 $result = $response->json();
                 if (isset($result['choices'][0]['message']['content'])) {
                     $text = trim($result['choices'][0]['message']['content']);
-                    $text = preg_replace('/^```json\s*/', '', $text);
-                    $text = preg_replace('/\s*```$/', '', $text);
-
                     $json = json_decode($text, true);
-                    if (is_array($json)) {
-                        return $json;
-                    }
+                    if (is_array($json)) return $json;
                 }
             }
         } catch (\Exception $e) {
