@@ -24,12 +24,17 @@ class AiAnalysisService
             return [['error' => 'Solo le query SELECT sono ammesse.']];
         }
 
+        // Protezione Output: Iniezione automatica del LIMIT 50 se non presente
+        if (!preg_match('/\bLIMIT\b/i', $sql)) {
+            $sql .= " LIMIT 50";
+        }
+
         try {
             // Esecuzione query
             $results = DB::select($sql);
             $resultsArray = json_decode(json_encode($results), true);
 
-            // Protezione Output: Limite 50 righe
+            // Protezione Output fallback
             if (count($resultsArray) > 50) {
                 $resultsArray = array_slice($resultsArray, 0, 50);
                 $resultsArray[] = ['system_warning' => 'Risultato troppo lungo, mostro solo le prime 50 righe. Specifica meglio la query se serve altro'];
@@ -38,8 +43,15 @@ class AiAnalysisService
             return $resultsArray;
 
         } catch (\Exception $e) {
+            $errorMsg = $e->getMessage();
+            $hint = '';
+            
+            if (stripos($sql, 'SHOW TABLES') !== false) {
+                $hint = " Suggerimento: In PostgreSQL non esiste SHOW TABLES. Consulta lo schema che ti ho fornito (stores, products, stock_items, sales_orders...).";
+            }
+            
             // Error Handling: Rimanda l'errore SQL all'AI
-            return [['error' => 'La query è fallita con questo errore: ' . $e->getMessage() . '. Riprova correggendo la sintassi.']];
+            return [['error' => 'La query è fallita con questo errore: ' . $errorMsg . '. Riprova correggendo la sintassi.' . $hint]];
         }
     }
 
@@ -60,6 +72,18 @@ class AiAnalysisService
 Se l'utente ti chiede degli scontrini, dei venduti o di qualsiasi dato, NON dire che non puoi. Invece:
 1. Ragiona su quale query SQL servirebbe basandoti su questo schema:
 $schemaText
+
+MAPPA OBBLIGATORIA DELLE TABELLE:
+- Se l'utente chiede giacenze/inventario, usa la tabella: stock_items (unita a products e stores).
+- Se l'utente chiede vendite/scontrini/incassi, usa la tabella: sales_orders (e sales_order_lines per il dettaglio).
+- Se l'utente chiede bolle/trasferimenti, usa la tabella: stock_transfers (e inventory_count_sessions per conteggi inventario).
+- Se l'utente chiede i negozi, usa la tabella: stores.
+
+REGOLE SINTASSI SQL:
+- Usa ESCLUSIVAMENTE la sintassi PostgreSQL standard.
+- Per la data di oggi usa CURRENT_DATE.
+- Non usare MAI comandi come SHOW TABLES.
+
 2. Esegui la query tramite il tool execute_readonly_query.
 3. Analizza i dati ricevuti e rispondi all'utente in un italiano colloquiale chiaro.
 Se non trovi una tabella, chiedi prima di elencare le tabelle disponibili.
