@@ -19,17 +19,42 @@ class InventorySessionController extends Controller
 
     // --- ADMIN: lista bolle ---
     public function index(Request $request) {
-        $tid = (int)$request->attributes->get('tenant_id');
+        $tid    = (int)$request->attributes->get('tenant_id');
+        $userId = $request->user()->id;
+
+        // Determina i ruoli dell'utente
+        $roleCodes = DB::table('user_roles')
+            ->join('roles','roles.id','=','user_roles.role_id')
+            ->where('user_roles.user_id', $userId)
+            ->pluck('roles.code')->all();
+        $isSuperAdmin = in_array('superadmin', $roleCodes);
+
+        // Se l'utente non è superadmin e ha uno store assegnato in user_roles, filtra automaticamente
+        $forcedStoreId = null;
+        if (!$isSuperAdmin) {
+            $forcedStoreId = DB::table('user_roles')
+                ->where('user_id', $userId)
+                ->whereNotNull('store_id')
+                ->value('store_id');
+        }
+
         $q = DB::table('inventory_sessions as s')
             ->leftJoin('stores as st','st.id','=','s.store_id')
             ->where('s.tenant_id',$tid)
             ->select('s.*','st.name as store_name');
-        if($request->filled('store_id')) $q->where('s.store_id',$request->integer('store_id'));
-        if($request->filled('status')) $q->where('s.status',$request->input('status'));
+
+        // Filtro store: forzato (admin negozio) oppure opzionale (superadmin/admin_centrale)
+        if ($forcedStoreId) {
+            $q->where('s.store_id', $forcedStoreId);
+        } elseif ($request->filled('store_id')) {
+            $q->where('s.store_id', $request->integer('store_id'));
+        }
+
+        if($request->filled('status'))    $q->where('s.status',$request->input('status'));
         if($request->filled('date_from')) $q->where('s.created_at','>=',$request->input('date_from'));
-        if($request->filled('date_to')) $q->where('s.created_at','<=',$request->input('date_to'));
+        if($request->filled('date_to'))   $q->where('s.created_at','<=',$request->input('date_to'));
+
         $sessions = $q->orderByDesc('s.id')->paginate(50);
-        // Attach summary counts
         $ids = collect($sessions->items())->pluck('id')->toArray();
         $counts = DB::table('inventory_items')->whereIn('inventory_session_id',$ids)
             ->selectRaw('inventory_session_id, COUNT(*) as total, SUM(CASE WHEN status=\'MATCHED\' THEN 1 ELSE 0 END) as matched, SUM(CASE WHEN status=\'MISMATCHED\' THEN 1 ELSE 0 END) as mismatched, SUM(CASE WHEN status=\'NOT_COUNTED\' THEN 1 ELSE 0 END) as not_counted')
@@ -160,6 +185,30 @@ class InventorySessionController extends Controller
         }
         $this->auditLog($tid,$request->user()->id,'approve',$id);
         return response()->json(['message'=>'Bolla approvata']);
+    }
+
+    // --- ADMIN: elimina bolla (solo DRAFT o CANCELLED) ---
+    public function destroy(Request $request, int $id) {
+        $tid    = (int)$request->attributes->get('tenant_id');
+        $userId = $request->user()->id;
+        $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->first();
+        if (!$session) return response()->json(['message'=>'Bolla non trovata'],404);
+        if (!in_array($session->status, ['DRAFT','CANCELLED'])) {
+            return response()->json(['message'=>'Puoi eliminare solo bolle in bozza o annullate'],422);
+        }
+        DB::beginTransaction();
+        try {
+            DB::table('inventory_scans')->where('inventory_session_id',$id)->delete();
+            DB::table('inventory_items')->where('inventory_session_id',$id)->delete();
+            DB::table('inventory_audit_logs')->where('inventory_session_id',$id)->delete();
+            DB::table('inventory_sessions')->where('id',$id)->delete();
+            DB::commit();
+            $this->auditLog($tid,$userId,'delete',$id);
+            return response()->json(['message'=>'Bolla eliminata']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message'=>'Errore: '.$e->getMessage()],500);
+        }
     }
 
     // --- STORE: lista bolle assegnate ---

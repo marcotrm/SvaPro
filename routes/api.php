@@ -267,6 +267,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/inventory-sessions/{id}', [InventorySessionController::class, 'show']);
         Route::patch('/inventory-sessions/{id}/status', [InventorySessionController::class, 'updateStatus']);
         Route::post('/inventory-sessions/{id}/approve', [InventorySessionController::class, 'approve']);
+        Route::delete('/inventory-sessions/{id}', [InventorySessionController::class, 'destroy']);
         Route::get('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'comments']);
         Route::post('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'addComment']);
 

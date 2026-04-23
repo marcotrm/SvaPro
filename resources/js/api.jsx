@@ -775,6 +775,7 @@ export const inventorySessions = {
   getOne: (id) => api.get(`/inventory-sessions/${id}`),
   updateStatus: (id, status) => api.patch(`/inventory-sessions/${id}/status`, { status }),
   approve: (id, applyStock = false) => api.post(`/inventory-sessions/${id}/approve`, { apply_stock_adjustments: applyStock }),
+  deleteSession: (id) => api.delete(`/inventory-sessions/${id}`),
   getComments: (id) => api.get(`/inventory-sessions/${id}/comments`),
   addComment: (id, data) => api.post(`/inventory-sessions/${id}/comments`, data),
   // Store

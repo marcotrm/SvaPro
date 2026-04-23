@@ -101,7 +101,10 @@ function ProductCard({ product, onAdd, onInfo, onNegozi, stockMap, displayMode, 
           boxShadow: inStock ? '0 2px 8px rgba(16,185,129,0.4)' : '0 2px 8px rgba(239,68,68,0.4)',
           letterSpacing: '0.02em',
         }}>
-          {inStock ? onHand : '×'}
+          {isDipendente
+            ? (inStock ? '● Disponibile' : '● Esaurito')
+            : (inStock ? onHand : '×')
+          }
         </div>
 
         {/* QScare badge — visibile solo per hardware con prezzo configurato */}

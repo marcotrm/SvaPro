@@ -325,6 +325,7 @@ export default function InventoryBollePage() {
   const [loading, setLoading]  = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     try { const s = localStorage.getItem('user'); if(s) setUser(JSON.parse(s)); } catch {}
@@ -356,6 +357,19 @@ export default function InventoryBollePage() {
     setShowCreate(false);
     if (sessionId) navigate(`/inventory/bolle/${sessionId}`);
     else load();
+  };
+
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
+    if (!window.confirm('Eliminare questa bolla? L\'operazione è irreversibile.')) return;
+    setDeletingId(id);
+    try {
+      await inventorySessions.deleteSession(id);
+      setSessions(prev => prev.filter(s => s.id !== id));
+    } catch (err) {
+      alert(err.response?.data?.message ?? 'Errore durante l\'eliminazione');
+    }
+    setDeletingId(null);
   };
 
   const FILTER_STATUSES = ['', 'SENT_TO_STORE', 'IN_PROGRESS', 'CLOSED_BY_STORE', 'UNDER_REVIEW', 'APPROVED'];
@@ -488,6 +502,27 @@ export default function InventoryBollePage() {
               )}
 
               <div style={{ color:'var(--color-text-tertiary)', fontSize:20, flexShrink:0 }}>›</div>
+
+              {/* Pulsante elimina — solo DRAFT/CANCELLED */}
+              {isAdmin && ['DRAFT','CANCELLED'].includes(s.status) && (
+                <button
+                  type="button"
+                  onClick={e => handleDelete(e, s.id)}
+                  disabled={deletingId === s.id}
+                  title="Elimina bolla"
+                  style={{
+                    flexShrink:0, background:'none', border:'1.5px solid #EF444460',
+                    borderRadius:8, padding:'6px 10px', cursor:'pointer',
+                    color:'#EF4444', fontSize:13, fontWeight:700,
+                    opacity: deletingId === s.id ? 0.5 : 1,
+                    transition:'all 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#EF444415'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  {deletingId === s.id ? '⏳' : '🗑'}
+                </button>
+              )}
             </div>
           ))}
         </div>
