@@ -281,6 +281,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         // AI e Assistenza
         Route::post('/ai/chiedi-consiglio', [\App\Http\Controllers\Api\AiController::class, 'askAdvice']);
         Route::post('/ai/proponi-riordino', [\App\Http\Controllers\Api\AiController::class, 'acceptReorder']);
+        Route::get('/ai/test-semplice', [\App\Http\Controllers\Api\AiController::class, 'testSemplice']);
         Route::get('/chat/rooms', [ChatController::class, 'rooms']);
 
         // Employee KPI Dashboard

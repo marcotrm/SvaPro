@@ -124,7 +124,7 @@ $dataJson
             }
 
             Log::error('Groq API Error', ['status' => $response->status(), 'body' => $response->body()]);
-            return "Errore di comunicazione con i server AI (" . $response->status() . "). Controlla il log.";
+            return "Errore Groq " . $response->status() . ": " . $response->body();
         } catch (\Exception $e) {
             Log::error('Groq API Exception', ['message' => $e->getMessage()]);
             return "Errore interno durante la richiesta AI.";

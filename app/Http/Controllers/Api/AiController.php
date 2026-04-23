@@ -95,4 +95,30 @@ class AiController extends Controller
             'message' => "Create con successo $createdCount bolle di trasferimento in stato Bozza."
         ]);
     }
+
+    public function testSemplice()
+    {
+        $apiKey = env('GROQ_API_KEY');
+        if (!$apiKey) {
+            return response()->json(['error' => 'Chiave API mancante in .env'], 500);
+        }
+
+        $payload = [
+            'model' => 'llama3-70b-8192',
+            'messages' => [
+                ['role' => 'user', 'content' => 'Ciao']
+            ]
+        ];
+
+        $response = \Illuminate\Support\Facades\Http::withHeaders([
+            'Authorization' => 'Bearer ' . $apiKey,
+            'Content-Type' => 'application/json',
+        ])->post("https://api.groq.com/openai/v1/chat/completions", $payload);
+
+        return response()->json([
+            'status' => $response->status(),
+            'body' => $response->json(),
+            'raw_error' => $response->body()
+        ]);
+    }
 }
