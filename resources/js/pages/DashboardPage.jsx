@@ -377,7 +377,11 @@ const AiReorderCard = ({ proposal, setAiAnswer }) => {
     try {
       const { ai } = await import('../api.jsx');
       const res = await ai.acceptReorder(proposal.ordini);
-      setAiAnswer(`✅ **Operazione completata!**\n\n${res.data.message}`);
+      let answerText = `✅ **Operazione completata!**\n\n${res.data.message}`;
+      if (res.data.created_ids && res.data.created_ids.length > 0) {
+        answerText += `\n\n[Vai a Trasferimenti DDT per vedere e gestire le bolle.](/stock-transfers)`;
+      }
+      setAiAnswer(answerText);
     } catch(err) {
       console.error("ERRORE BACKEND DETTAGLIATO:", err.response?.data || err.message);
       const serverMsg = err.response?.data?.message || err.message;

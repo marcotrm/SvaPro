@@ -64,16 +64,28 @@ class AiController extends Controller
                 return response()->json(['message' => 'Nessun ordine valido trovato nei dati AI.'], 400);
             }
 
-            // Raggruppa gli ordini per [from_store_id, to_store_id]
-            $groups = collect($ordiniPuliti)->groupBy(function ($item) {
-                return $item['from_store_id'] . '-' . $item['to_store_id'];
-            });
+            // Recupera il fornitore (default_supplier_id) per ogni prodotto
+            $variantIds = array_column($ordiniPuliti, 'product_variant_id');
+            $variantsSuppliers = \Illuminate\Support\Facades\DB::table('product_variants')
+                ->join('products', 'products.id', '=', 'product_variants.product_id')
+                ->whereIn('product_variants.id', $variantIds)
+                ->pluck('products.default_supplier_id', 'product_variants.id')
+                ->toArray();
+
+            // Raggruppa gli ordini per [from_store_id, to_store_id, supplier_id]
+            foreach ($ordiniPuliti as &$item) {
+                $supplierId = $variantsSuppliers[$item['product_variant_id']] ?? 0;
+                $item['group_key'] = $item['from_store_id'] . '-' . $item['to_store_id'] . '-' . $supplierId;
+            }
+
+            $groups = collect($ordiniPuliti)->groupBy('group_key');
 
             $createdCount = 0;
+            $createdIds = [];
             \Illuminate\Support\Facades\DB::beginTransaction();
 
             foreach ($groups as $key => $items) {
-                list($fromStoreId, $toStoreId) = explode('-', $key);
+                list($fromStoreId, $toStoreId, $supplierId) = explode('-', $key);
 
                 $lastNum = \Illuminate\Support\Facades\DB::table('stock_transfers')
                     ->where('tenant_id', $tenantId)
@@ -87,11 +99,14 @@ class AiController extends Controller
                     'from_store_id'   => $fromStoreId,
                     'to_store_id'     => $toStoreId,
                     'status'          => 'draft',
-                    'notes'           => 'Generato automaticamente tramite AI Groq',
+                    'notes'           => 'Generato automaticamente tramite AI Groq' . ($supplierId ? " (Fornitore ID: $supplierId)" : ''),
                     'created_by'      => $userId,
+                    'is_ai_generated' => true,
                     'created_at'      => now(),
                     'updated_at'      => now(),
                 ]);
+
+                $createdIds[] = $transferId;
 
                 foreach ($items as $item) {
                     \Illuminate\Support\Facades\DB::table('stock_transfer_items')->insert([
@@ -113,7 +128,8 @@ class AiController extends Controller
         }
 
         return response()->json([
-            'message' => "Create con successo $createdCount bolle di trasferimento in stato Bozza."
+            'message' => "Create con successo $createdCount bolle di trasferimento.",
+            'created_ids' => $createdIds
         ]);
     }
 

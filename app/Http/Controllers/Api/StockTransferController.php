@@ -32,6 +32,7 @@ class StockTransferController extends Controller
                 'ub.name as created_by_name',
                 'ur.name as received_by_name',
             ])
+            ->orderByDesc('t.is_ai_generated')
             ->orderByDesc('t.created_at')
             ->limit(200)
             ->get();
