@@ -358,7 +358,7 @@ class InventorySessionController extends Controller
     // --- STORE: chiusura bolla ---
     public function close(Request $request, int $id) {
         $tid     = (int)$request->attributes->get('tenant_id');
-        $storeId = (int)$request->attributes->get('store_id');
+        $storeId = $this->resolveStoreId($request);
         $userId  = $request->user()->id;
         if (!$storeId) return response()->json(['message'=>'Nessun negozio associato'],403);
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->where('store_id',$storeId)->first();
@@ -394,7 +394,10 @@ class InventorySessionController extends Controller
         $request->validate(['message'=>'required|string']);
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->first();
         if(!$session) return response()->json(['message'=>'Non trovata'],404);
-        $role = $request->user()->role;
+        
+        $roleCodes = DB::table('user_roles')->join('roles','roles.id','=','user_roles.role_id')->where('user_roles.user_id', $userId)->pluck('roles.code')->all();
+        $role = count($roleCodes) > 0 ? $roleCodes[0] : 'dipendente';
+        
         $cid = DB::table('inventory_comments')->insertGetId(['tenant_id'=>$tid,'inventory_session_id'=>$id,'inventory_item_id'=>$request->input('inventory_item_id'),'author_id'=>$userId,'author_role'=>$role,'message'=>$request->input('message'),'created_at'=>now(),'updated_at'=>now()]);
         return response()->json(['message'=>'Commento aggiunto','id'=>$cid],201);
     }

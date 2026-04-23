@@ -268,8 +268,6 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::patch('/inventory-sessions/{id}/status', [InventorySessionController::class, 'updateStatus']);
         Route::post('/inventory-sessions/{id}/approve', [InventorySessionController::class, 'approve']);
         Route::delete('/inventory-sessions/{id}', [InventorySessionController::class, 'destroy']);
-        Route::get('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'comments']);
-        Route::post('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'addComment']);
 
         // ── Inventory Sessions — Store endpoints moved to dipendente group ──
         // Loyalty Tiers & Redemptions (admin)
@@ -345,6 +343,10 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/store/inventory-sessions/{id}/scan', [InventorySessionController::class, 'scan']);
         Route::post('/store/inventory-sessions/{id}/close', [InventorySessionController::class, 'close']);
         Route::patch('/store/inventory-items/{itemId}/count', [InventorySessionController::class, 'updateCount']);
+        
+        // Comments accessibili anche allo store
+        Route::get('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'comments']);
+        Route::post('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'addComment']);
 
         Route::get('/inventory/stock', [InventoryController::class, 'index']);
         Route::get('/inventory/movements', [InventoryController::class, 'movements']);
