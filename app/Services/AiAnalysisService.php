@@ -140,7 +140,7 @@ EOT;
         ];
 
         $payload = [
-            'model' => 'llama-3.1-8b-instant',
+            'model' => 'llama-3.3-70b-versatile',
             'temperature' => 0,
             'max_tokens' => 800,
             'messages' => $messages,
@@ -149,16 +149,20 @@ EOT;
             'parallel_tool_calls' => false
         ];
 
-        // Helper function for API calls with retry
-        $makeApiCall = function($payload) use ($apiKey) {
-            $maxRetries = 2;
-            $retryDelay = 3; // seconds
-            
-            for ($i = 0; $i <= $maxRetries; $i++) {
-                $response = Http::withoutVerifying()->withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey,
-                    'Content-Type' => 'application/json',
-                ])->timeout(30)->post("https://api.groq.com/openai/v1/chat/completions", $payload);
+        // Log del JSON esatto inviato a Groq
+        Log::info("Invio payload a Groq:", ['payload' => json_encode($payload)]);
+
+        try {
+            // Helper function for API calls with retry
+            $makeApiCall = function($payload) use ($apiKey) {
+                $maxRetries = 3;
+                $retryDelay = 4; // seconds
+                
+                for ($i = 0; $i <= $maxRetries; $i++) {
+                    $response = Http::withoutVerifying()->withHeaders([
+                        'Authorization' => 'Bearer ' . $apiKey,
+                        'Content-Type' => 'application/json',
+                    ])->timeout(45)->post("https://api.groq.com/openai/v1/chat/completions", $payload);
 
                 if ($response->successful()) {
                     return $response;
@@ -193,6 +197,7 @@ EOT;
                 Log::info("Groq ha chiamato un tool:", ['tool_calls' => $message['tool_calls']]);
                 $messages[] = $message;
 
+                $hasError = false;
                 foreach ($message['tool_calls'] as $toolCall) {
                     $args = json_decode($toolCall['function']['arguments'], true);
                     $resultData = [];
@@ -201,6 +206,9 @@ EOT;
                         $sqlQuery = $args['sql_query'] ?? '';
                         Log::info("L'AI sta pensando/eseguendo la query:", ['sql' => $sqlQuery]);
                         $resultData = $this->execute_readonly_query($sqlQuery);
+                        if (isset($resultData[0]['error'])) {
+                            $hasError = true;
+                        }
                     }
                     
                     $messages[] = [
@@ -213,7 +221,38 @@ EOT;
 
                 $payload['messages'] = $messages;
                 
-                // Rinviamo il risultato al modello. NON rimuoviamo i tools così può riprovare se ha sbagliato.
+                // Se la query ha avuto successo, o se siamo al limite dei round, forziamo la risposta finale.
+                if (!$hasError || $rounds >= 1) {
+                    unset($payload['tools']);
+                    unset($payload['tool_choice']);
+                    
+                    // Rimuoviamo i messaggi con tool_calls dalla history per non confondere Groq
+                    $cleanMessages = [];
+                    foreach ($payload['messages'] as $m) {
+                        if (isset($m['tool_calls']) || (isset($m['role']) && $m['role'] === 'tool')) {
+                            // Ignoriamo i messaggi tecnici dei tool
+                            continue;
+                        }
+                        $cleanMessages[] = $m;
+                    }
+                    
+                    // Aggiungiamo i dati raw testuali
+                    $cleanMessages[] = [
+                        'role' => 'system',
+                        'content' => "Esito estrazione dati dal DB:\n" . json_encode($resultData, JSON_UNESCAPED_UNICODE) . "\n\nOra DEVI rispondere direttamente all'utente nel formato JSON finale richiesto (OPZIONE A o OPZIONE B)."
+                    ];
+                    
+                    $payload['messages'] = $cleanMessages;
+                    
+                    // Facciamo un'ultima chiamata senza tools per ottenere la risposta
+                    $finalResponse = $makeApiCall($payload);
+                    if ($finalResponse && $finalResponse->successful()) {
+                        $message = $finalResponse->json()['choices'][0]['message'];
+                    }
+                    break; // Usciamo dal loop dei tools
+                }
+                
+                // Se siamo qui, c'è stato un errore e dobbiamo riprovare con i tools
                 $finalResponse = $makeApiCall($payload);
 
                 if ($finalResponse && $finalResponse->successful()) {
@@ -230,9 +269,11 @@ EOT;
             Log::info("Risposta finale Groq:", ['content' => $content]);
             
             $cleanContent = trim($content);
-            if (preg_match('/^```json\s*(.*?)\s*```$/s', $cleanContent, $matches)) {
-                $cleanContent = trim($matches[1]);
-            } elseif (preg_match('/^```\s*(.*?)\s*```$/s', $cleanContent, $matches)) {
+            // Estrazione robusta: cerca l'ultimo blocco JSON che assomigli alla nostra risposta
+            if (preg_match_all('/```(?:json)?\s*(\{.*?"type"\s*:\s*"(?:text|action_card)".*?\})\s*```/s', $cleanContent, $matches)) {
+                // Prendi l'ultimo match (in caso faccia ragionamenti intermedi)
+                $cleanContent = trim(end($matches[1]));
+            } elseif (preg_match('/(\{.*?"type"\s*:\s*"(?:text|action_card)".*?\})/s', $cleanContent, $matches)) {
                 $cleanContent = trim($matches[1]);
             }
 
