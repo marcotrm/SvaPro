@@ -42,12 +42,18 @@ class AiController extends Controller
             // Pulizia dei dati se arrivano "sporchi"
             $ordiniRaw = $request->input('ordini', []);
             $ordiniPuliti = array_map(function($item) {
+                $fromId = !empty($item['from_store_id']) ? (int) $item['from_store_id'] : 1;
+                $toId = !empty($item['to_store_id']) ? (int) $item['to_store_id'] : 1;
+                // Previene l'errore del DB se il DB non ha id 0 per il magazzino centrale
+                if ($fromId === 0) $fromId = 1;
+                if ($toId === 0) $toId = 1;
+
                 return [
-                    'from_store_id' => isset($item['from_store_id']) ? (int) $item['from_store_id'] : 1, // Fallback a 1 (magazzino centrale)
-                    'to_store_id' => isset($item['to_store_id']) ? (int) $item['to_store_id'] : 1,
-                    'product_variant_id' => isset($item['product_variant_id']) ? (int) $item['product_variant_id'] : 0,
-                    'quantity' => isset($item['quantity']) ? (int) $item['quantity'] : 1,
-                    'notes' => $item['notes'] ?? 'Proposta AI',
+                    'from_store_id' => $fromId,
+                    'to_store_id' => $toId,
+                    'product_variant_id' => !empty($item['product_variant_id']) ? (int) $item['product_variant_id'] : 0,
+                    'quantity' => !empty($item['quantity']) ? (int) $item['quantity'] : 1,
+                    'notes' => !empty($item['notes']) ? $item['notes'] : 'Proposta AI',
                 ];
             }, $ordiniRaw);
 
