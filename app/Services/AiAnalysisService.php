@@ -98,12 +98,12 @@ class AiAnalysisService
         // Promozioni attive
         $promotions = DB::table('promotions')
             ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->where('start_date', '<=', now())
+            ->where('active', true)
+            ->where('starts_at', '<=', now())
             ->where(function($q) {
-                $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+                $q->whereNull('ends_at')->orWhere('ends_at', '>=', now());
             })
-            ->select('id', 'name', 'type', 'discount_value', 'start_date', 'end_date')
+            ->select('id', 'name', 'type', 'value', 'starts_at', 'ends_at')
             ->limit(50)
             ->get();
 
