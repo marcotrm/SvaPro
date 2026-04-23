@@ -271,13 +271,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'comments']);
         Route::post('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'addComment']);
 
-        // ── Inventory Sessions — Store (senza dati riservati) ──
-        Route::get('/store/inventory-sessions', [InventorySessionController::class, 'storeIndex']);
-        Route::get('/store/inventory-sessions/{id}', [InventorySessionController::class, 'storeShow']);
-        Route::post('/store/inventory-sessions/{id}/scan', [InventorySessionController::class, 'scan']);
-        Route::post('/store/inventory-sessions/{id}/close', [InventorySessionController::class, 'close']);
-        Route::patch('/store/inventory-items/{itemId}/count', [InventorySessionController::class, 'updateCount']);
-
+        // ── Inventory Sessions — Store endpoints moved to dipendente group ──
         // Loyalty Tiers & Redemptions (admin)
         Route::get('/loyalty/tiers', [LoyaltyController::class, 'tiers']);
         Route::post('/loyalty/tiers', [LoyaltyController::class, 'storeTier'])->middleware('permission:loyalty.manage');
@@ -344,6 +338,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::get('/catalog/categories', [CatalogController::class, 'categories']);
         Route::get('/catalog/tax-classes', [CatalogController::class, 'taxClasses']);
         Route::get('/catalog/products/{productId}', [CatalogController::class, 'show']);
+
+        // ── Inventory Sessions — Store (senza dati riservati) ──
+        Route::get('/store/inventory-sessions', [InventorySessionController::class, 'storeIndex']);
+        Route::get('/store/inventory-sessions/{id}', [InventorySessionController::class, 'storeShow']);
+        Route::post('/store/inventory-sessions/{id}/scan', [InventorySessionController::class, 'scan']);
+        Route::post('/store/inventory-sessions/{id}/close', [InventorySessionController::class, 'close']);
+        Route::patch('/store/inventory-items/{itemId}/count', [InventorySessionController::class, 'updateCount']);
 
         Route::get('/inventory/stock', [InventoryController::class, 'index']);
         Route::get('/inventory/movements', [InventoryController::class, 'movements']);

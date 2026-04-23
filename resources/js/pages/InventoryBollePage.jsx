@@ -348,12 +348,8 @@ export default function InventoryBollePage() {
         setKpi(kR.data?.data ?? null);
         setSessions(sR.data?.data ?? []);
       } else {
-        // Dipendente: usa lo stesso endpoint admin che già funziona.
-        // Non dipende da store_id — vede le bolle del suo tenant filtrate per status.
-        const r = await inventorySessions.getAll({});
-        const all = r.data?.data ?? [];
-        // Filtra solo sessioni visibili al negozio (no DRAFT, no CANCELLED)
-        setSessions(all.filter(s => STORE_VISIBLE_STATUSES.includes(s.status)));
+        const r = await inventorySessions.storeGetAll();
+        setSessions(r.data?.data ?? []);
       }
     } catch (e) {
       const msg = e.response?.data?.message || e.message || 'Errore caricamento inventari';
