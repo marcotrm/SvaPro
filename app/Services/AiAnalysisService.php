@@ -14,35 +14,64 @@ class AiAnalysisService
      */
     public function getAggregatedData(int $tenantId): array
     {
-        // Vendite degli ultimi 30 giorni aggregate per prodotto e magazzino
+        // Vendite recenti
         $sales = DB::table('stock_movements')
             ->join('product_variants as pv', 'pv.id', '=', 'stock_movements.product_variant_id')
             ->join('products as p', 'p.id', '=', 'pv.product_id')
             ->leftJoin('categories as c', 'c.id', '=', 'p.category_id')
             ->where('stock_movements.tenant_id', $tenantId)
-            ->where('stock_movements.qty', '<', 0) // Uscite/Vendite
+            ->where('stock_movements.qty', '<', 0)
             ->where('stock_movements.occurred_at', '>=', now()->subDays(30))
             ->selectRaw('c.name as category, p.name as product, SUM(ABS(stock_movements.qty)) as total_sold')
             ->groupBy('c.name', 'p.name')
             ->orderByDesc('total_sold')
-            ->limit(100) // Limitiamo ai top 100 per non eccedere il context limit
+            ->limit(300)
             ->get();
 
-        // Giacenze attuali aggregate
+        // Giacenze attuali aggregate (top 300)
         $stock = DB::table('stock_items')
             ->join('product_variants as pv', 'pv.id', '=', 'stock_items.product_variant_id')
             ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->join('stores as s', 's.id', '=', 'stock_items.warehouse_id')
             ->where('p.tenant_id', $tenantId)
             ->where('stock_items.on_hand', '>', 0)
-            ->selectRaw('p.name as product, SUM(stock_items.on_hand) as total_stock')
-            ->groupBy('p.name')
+            ->selectRaw('s.name as store_name, p.name as product, SUM(stock_items.on_hand) as total_stock')
+            ->groupBy('s.name', 'p.name')
             ->orderByDesc('total_stock')
-            ->limit(100)
+            ->limit(300)
+            ->get();
+
+        // Negozi
+        $stores = DB::table('stores')->where('tenant_id', $tenantId)->select('id', 'name', 'type', 'is_central')->get();
+
+        // Fornitori
+        $suppliers = DB::table('suppliers')->where('tenant_id', $tenantId)->select('id', 'name', 'lead_time_days')->get();
+
+        // Ordini di Acquisto (Bozze o In Attesa)
+        $purchaseOrders = DB::table('purchase_orders')
+            ->join('suppliers as sup', 'sup.id', '=', 'purchase_orders.supplier_id')
+            ->join('stores as s', 's.id', '=', 'purchase_orders.store_id')
+            ->where('purchase_orders.tenant_id', $tenantId)
+            ->whereIn('purchase_orders.status', ['draft', 'sent', 'partial'])
+            ->select('purchase_orders.id', 'purchase_orders.status', 'sup.name as supplier', 's.name as store_name', 'purchase_orders.total_net as total_amount')
+            ->get();
+
+        // Trasferimenti Merce
+        $transfers = DB::table('stock_transfers')
+            ->join('stores as sf', 'sf.id', '=', 'stock_transfers.from_store_id')
+            ->join('stores as st', 'st.id', '=', 'stock_transfers.to_store_id')
+            ->where('stock_transfers.tenant_id', $tenantId)
+            ->whereIn('stock_transfers.status', ['draft', 'shipped'])
+            ->select('stock_transfers.id', 'stock_transfers.ddt_number', 'stock_transfers.status', 'sf.name as from_store', 'st.name as to_store')
             ->get();
 
         return [
-            'vendite_ultimi_30_giorni_top_100' => $sales,
-            'giacenze_attuali_top_100' => $stock
+            'negozi' => $stores,
+            'fornitori' => $suppliers,
+            'trasferimenti_attivi' => $transfers,
+            'ordini_fornitori_attivi' => $purchaseOrders,
+            'vendite_recenti' => $sales,
+            'giacenze' => $stock
         ];
     }
 
