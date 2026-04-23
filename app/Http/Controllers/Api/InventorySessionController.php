@@ -190,15 +190,7 @@ class InventorySessionController extends Controller
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->first();
         if(!$session) return response()->json(['message'=>'Non trovata'],404);
         DB::table('inventory_sessions')->where('id',$id)->update(['status'=>'APPROVED','approved_at'=>now(),'updated_at'=>now()]);
-        // Opzionale: applica rettifiche giacenze
-        if($request->boolean('apply_stock_adjustments')) {
-            $items = DB::table('inventory_items as ii')->join('product_variants as pv','pv.id','=','ii.product_variant_id')->where('ii.inventory_session_id',$id)->where('ii.status','MISMATCHED')->select('ii.*')->get();
-            $whId = DB::table('warehouses')->where('tenant_id',$tid)->where('store_id',$session->store_id)->value('id');
-            if($whId) foreach($items as $item){
-                DB::table('stock_items')->where('warehouse_id',$whId)->where('product_variant_id',$item->product_variant_id)->update(['on_hand'=>$item->counted_quantity,'updated_at'=>now()]);
-                DB::table('stock_movements')->insert(['tenant_id'=>$tid,'warehouse_id'=>$whId,'product_variant_id'=>$item->product_variant_id,'movement_type'=>'inventory_adjustment','qty'=>$item->counted_quantity-$item->theoretical_quantity,'reference_type'=>'inventory_session','reference_id'=>$id,'occurred_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
-            }
-        }
+        
         $this->auditLog($tid,$request->user()->id,'approve',$id);
         return response()->json(['message'=>'Bolla approvata']);
     }
@@ -364,15 +356,61 @@ class InventorySessionController extends Controller
         $session = DB::table('inventory_sessions')->where('tenant_id',$tid)->where('id',$id)->where('store_id',$storeId)->first();
         if(!$session) return response()->json(['message'=>'Non trovata'],404);
         if(!in_array($session->status,['IN_PROGRESS','SENT_TO_STORE','REOPENED'])) return response()->json(['message'=>'Non chiudibile'],422);
+        $whId = DB::table('warehouses')->where('tenant_id',$tid)->where('store_id',$storeId)->value('id');
+
         DB::beginTransaction();
         try {
             $items = DB::table('inventory_items')->where('inventory_session_id',$id)->get();
             $matched=0; $mismatched=0;
             foreach($items as $item){
-                $diff = $item->counted_quantity - $item->theoretical_quantity;
-                $status = $diff===0?'MATCHED':'MISMATCHED';
+                // 1. Quantità sistema al momento (attuale in DB)
+                $currentSysQty = 0;
+                if ($whId) {
+                    $currentSysQty = DB::table('stock_items')->where('warehouse_id',$whId)->where('product_variant_id',$item->product_variant_id)->value('on_hand') ?? 0;
+                }
+
+                // 2. Conta vendite post-inizio
+                $salesPostInizio = 0;
+                if ($whId) {
+                    $salesPostInizio = abs(DB::table('stock_movements')
+                        ->where('tenant_id', $tid)
+                        ->where('warehouse_id', $whId)
+                        ->where('product_variant_id', $item->product_variant_id)
+                        ->where('qty', '<', 0)
+                        ->where('occurred_at', '>=', $session->opened_at)
+                        ->sum('qty'));
+                }
+
+                // 3. Calcola giacenza finale corretta
+                $giacenzaCorretta = $item->counted_quantity - $salesPostInizio;
+                if ($giacenzaCorretta < 0) $giacenzaCorretta = 0;
+
+                // 4. Aggiorna giacenze attuali e Rettifica
+                if ($whId) {
+                    $diff = $giacenzaCorretta - $currentSysQty;
+                    if ($diff != 0) {
+                        DB::table('stock_items')->updateOrInsert(
+                            ['warehouse_id'=>$whId, 'product_variant_id'=>$item->product_variant_id],
+                            ['on_hand'=>$giacenzaCorretta, 'updated_at'=>now()]
+                        );
+                        DB::table('stock_movements')->insert([
+                            'tenant_id'=>$tid, 'warehouse_id'=>$whId, 'product_variant_id'=>$item->product_variant_id,
+                            'movement_type'=>'inventory_adjustment', 'qty'=>$diff,
+                            'reference_type'=>'inventory_session', 'reference_id'=>$id,
+                            'occurred_at'=>now(), 'created_at'=>now(), 'updated_at'=>now()
+                        ]);
+                    }
+                }
+
+                // 5. Salva quantita sistema al momento e calcola status
+                $status = ($giacenzaCorretta == $currentSysQty && $diff == 0) ? 'MATCHED' : 'MISMATCHED';
                 if($status==='MATCHED') $matched++; else $mismatched++;
-                DB::table('inventory_items')->where('id',$item->id)->update(['status'=>$status,'updated_at'=>now()]);
+
+                DB::table('inventory_items')->where('id',$item->id)->update([
+                    'status'=>$status,
+                    'theoretical_quantity'=>$currentSysQty, // Popolato alla chiusura
+                    'updated_at'=>now()
+                ]);
             }
             $overallStatus = $mismatched>0?'UNDER_REVIEW':'APPROVED';
             DB::table('inventory_sessions')->where('id',$id)->update(['status'=>'CLOSED_BY_STORE','closed_by_store_at'=>now(),'updated_at'=>now()]);
@@ -380,10 +418,10 @@ class InventorySessionController extends Controller
             // Notifica admin
             try {
                 $admins = DB::table('user_roles')->join('roles','roles.id','=','user_roles.role_id')->where('user_roles.tenant_id',$tid)->whereIn('roles.code',['superadmin','admin_cliente','magazziniere'])->pluck('user_roles.user_id');
-                foreach($admins as $uid) DB::table('employee_notifications')->insert(['tenant_id'=>$tid,'user_id'=>$uid,'type'=>'inventory','title'=>'Bolla chiusa dallo store','body'=>"La bolla \"{$session->title}\" è stata chiusa. Differenze: {$mismatched}.",'read_at'=>null,'created_at'=>now(),'updated_at'=>now()]);
+                foreach($admins as $uid) DB::table('employee_notifications')->insert(['tenant_id'=>$tid,'user_id'=>$uid,'type'=>'inventory','title'=>'Bolla chiusa dallo store','body'=>"La bolla \"{$session->title}\" è stata chiusa con riallineamento dinamico. Differenze: {$mismatched}.",'read_at'=>null,'created_at'=>now(),'updated_at'=>now()]);
             }catch(\Exception $e){}
             DB::commit();
-            return response()->json(['message'=>'Bolla chiusa','summary'=>['total'=>count($items),'matched'=>$matched,'mismatched'=>$mismatched,'accuracy'=>count($items)>0?round($matched/count($items)*100,1):0]]);
+            return response()->json(['message'=>'Bolla chiusa e giacenze riallineate.','summary'=>['total'=>count($items),'matched'=>$matched,'mismatched'=>$mismatched,'accuracy'=>count($items)>0?round($matched/count($items)*100,1):0]]);
         }catch(\Exception $e){DB::rollBack();return response()->json(['message'=>'Errore: '.$e->getMessage()],500);}
     }
 
