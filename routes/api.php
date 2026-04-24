@@ -55,20 +55,27 @@ Route::get('/test-report-serale', function() {
 });
 
 Route::get('/prestashop/wipe-all-products', function() {
-    try { \Illuminate\Support\Facades\DB::statement('SET session_replication_role = replica;'); } catch (\Exception $e) {}
-    try { \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0;'); } catch (\Exception $e) {}
-
     $count = \Illuminate\Support\Facades\DB::table('products')->count();
     
-    \Illuminate\Support\Facades\DB::table('order_items')->delete();
-    \Illuminate\Support\Facades\DB::table('inventories')->delete();
-    \Illuminate\Support\Facades\DB::table('inventory_movements')->delete();
-    \Illuminate\Support\Facades\DB::table('store_product_variants')->delete();
-    \Illuminate\Support\Facades\DB::table('product_variants')->delete();
-    \Illuminate\Support\Facades\DB::table('products')->delete();
+    // Ignoriamo gli errori su tabelle mancanti usando catch
+    $tablesToWipe = [
+        'delivery_note_items',
+        'restock_order_items',
+        'inventory_items',
+        'purchase_order_lines',
+        'stock_movements',
+        'stock_items',
+        'product_variants',
+        'products'
+    ];
 
-    try { \Illuminate\Support\Facades\DB::statement('SET session_replication_role = origin;'); } catch (\Exception $e) {}
-    try { \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1;'); } catch (\Exception $e) {}
+    foreach ($tablesToWipe as $table) {
+        try {
+            \Illuminate\Support\Facades\DB::table($table)->delete();
+        } catch (\Exception $e) {
+            // Ignora errori se la tabella non esiste o ha vincoli
+        }
+    }
 
     return response()->json([
         'success' => true,
