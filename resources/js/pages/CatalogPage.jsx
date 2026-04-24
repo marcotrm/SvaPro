@@ -7,7 +7,7 @@ import CatalogModal from '../components/CatalogModal.jsx';
 import ProductInventoryModal from '../components/ProductInventoryModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import BulkExciseModal from '../components/BulkExciseModal.jsx';
-import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star, Trash2, DollarSign } from 'lucide-react';
+import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star, Trash2, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function CatalogPage() {
@@ -29,6 +29,15 @@ export default function CatalogPage() {
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [showBulkExcise, setShowBulkExcise] = useState(false);
   const [inventoryProduct, setInventoryProduct] = useState(null);
+  
+  // Paginazione
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 100;
+
+  // Resetta la pagina quando cambiano i filtri
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, categoryFilter]);
 
   useEffect(() => { fetchData(); }, [selectedStoreId]);
 
@@ -58,6 +67,9 @@ export default function CatalogPage() {
     const matchCat = categoryFilter === 'all' || p.category_id === parseInt(categoryFilter);
     return matchSearch && matchCat;
   });
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const currentFiltered = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const lowStockCount = products.filter(p => {
     const qty = p.variants?.[0]?.stock_quantity ?? 0;
@@ -290,7 +302,7 @@ export default function CatalogPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length > 0 ? filtered.map(product => {
+            {currentFiltered.length > 0 ? currentFiltered.map(product => {
               const variant = product.variants?.[0];
               const priceNet = parseFloat(variant?.sale_price) || 0;
               const vatMap = { '1': 22, '2': 10, '3': 4 };
@@ -434,6 +446,43 @@ export default function CatalogPage() {
             )}
           </tbody>
         </table>
+        
+        {/* Paginazione */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+              Pagina {currentPage} di {totalPages}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                style={{ 
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', 
+                  borderRadius: 6, border: '1px solid var(--color-border)', 
+                  background: currentPage === 1 ? 'transparent' : 'var(--color-surface)', 
+                  color: currentPage === 1 ? 'var(--color-text-tertiary)' : 'var(--color-text)',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <ChevronLeft size={16} /> Precedente
+              </button>
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                style={{ 
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', 
+                  borderRadius: 6, border: '1px solid var(--color-border)', 
+                  background: currentPage === totalPages ? 'transparent' : 'var(--color-surface)', 
+                  color: currentPage === totalPages ? 'var(--color-text-tertiary)' : 'var(--color-text)',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Successiva <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {showBulkExcise && (
