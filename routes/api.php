@@ -55,6 +55,7 @@ Route::get('/test-report-serale', function() {
 });
 
 Route::get('/prestashop/wipe-all-products', function() {
+    set_time_limit(0);
     $count = \Illuminate\Support\Facades\DB::table('products')->count();
     
     // Ignoriamo gli errori su tabelle mancanti usando catch

@@ -74,6 +74,8 @@ class PrestashopController extends Controller
     /** Importa tutti i prodotti da PrestaShop */
     public function import(Request $request): JsonResponse
     {
+        set_time_limit(0);
+
         $validator = Validator::make($request->all(), [
             'url'     => ['required', 'url'],
             'api_key' => ['required', 'string'],
