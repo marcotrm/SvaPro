@@ -49,8 +49,11 @@ class CatalogController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        try {
         $tenantId = (int) $request->attributes->get('tenant_id');
-        $storeId = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
+        $storeId  = $request->filled('store_id') ? (int) $request->integer('store_id') : null;
+        // slim=1 (default) → non carica assigned_stores per ogni variante (molto più veloce)
+        $slim = !$request->filled('include_stores') || $request->boolean('include_stores') === false;
 
         if ($storeId !== null) {
             $storeExists = DB::table('stores')
@@ -74,10 +77,7 @@ class CatalogController extends Controller
         if ($request->filled('search') || $request->filled('barcode')) {
             $term = $request->input('search') ?: $request->input('barcode');
             $term = strtolower(trim($term));
-            
-            // Per il search esteso, join con product_variants e store_product_variants non conviene qui, 
-            // ma faremo una sottoquery o exists su varianti.
-            // La ricerca in products la facciamo su nome e sku
+
             $query->where(function ($q) use ($term, $tenantId) {
                 $q->where(DB::raw('LOWER(name)'), 'like', "%{$term}%")
                   ->orWhere(DB::raw('LOWER(sku)'), 'like', "%{$term}%")
@@ -95,7 +95,6 @@ class CatalogController extends Controller
             });
         }
 
-        // Ordinamento top-selling: ordina per numero di vendite negli ultimi 90 giorni
         $sort = $request->input('sort', 'newest');
         if ($sort === 'top_selling') {
             $cutoff = now()->subDays(90)->toDateTimeString();
@@ -121,24 +120,21 @@ class CatalogController extends Controller
             $query->orderByDesc('id');
         }
 
-        $products = $query
-            ->limit((int) $request->input('limit', 500))
+        // Limite ridotto a 100 per default per evitare response enormi (4900+ prodotti su prod)
+        $limit = min((int) $request->input('limit', 100), 500);
 
-            ->get();
-
+        $products   = $query->limit($limit)->get();
         $productIds = $products->pluck('id')->all();
 
         $variants = DB::table('product_variants')
             ->where('product_variants.tenant_id', $tenantId)
             ->whereIn('product_id', $productIds ?: [0])
             ->when($storeId !== null, function ($query) use ($tenantId, $storeId) {
-                // LEFT JOIN: prodotti senza record spv rimangono visibili (compatibilità backward)
                 $query->leftJoin('store_product_variants as spv', function ($join) use ($tenantId, $storeId) {
                     $join->on('spv.product_variant_id', '=', 'product_variants.id')
                         ->where('spv.tenant_id', '=', $tenantId)
                         ->where('spv.store_id', '=', $storeId);
                 })
-                // Mostra varianti senza record spv (NULL) OPPURE con is_enabled=true
                 ->where(function ($q) {
                     $q->whereNull('spv.id')
                       ->orWhere('spv.is_enabled', true);
@@ -148,17 +144,22 @@ class CatalogController extends Controller
             ->get()
             ->groupBy('product_id');
 
-        $assignedStores = DB::table('store_product_variants as spv')
-            ->join('stores as s', 's.id', '=', 'spv.store_id')
-            ->where('spv.tenant_id', $tenantId)
-            ->whereIn('spv.product_variant_id', $variants->flatten(1)->pluck('id')->all() ?: [0])
-            ->where('spv.is_enabled', true)
-            ->select(['spv.product_variant_id', 's.id as store_id', 's.name as store_name'])
-            ->get()
-            ->groupBy('product_variant_id');
-
-        // Stock per variante (somma su tutti i magazzini del tenant)
         $allVariantIds = $variants->flatten(1)->pluck('id')->all() ?: [0];
+
+        // assigned_stores: caricato solo se richiesto esplicitamente (es. pagina dettaglio prodotto)
+        $assignedStores = collect();
+        if (!$slim) {
+            $assignedStores = DB::table('store_product_variants as spv')
+                ->join('stores as s', 's.id', '=', 'spv.store_id')
+                ->where('spv.tenant_id', $tenantId)
+                ->whereIn('spv.product_variant_id', $allVariantIds)
+                ->where('spv.is_enabled', true)
+                ->select(['spv.product_variant_id', 's.id as store_id', 's.name as store_name'])
+                ->get()
+                ->groupBy('product_variant_id');
+        }
+
+        // Stock per variante
         $stockByVariant = DB::table('stock_items')
             ->where('tenant_id', $tenantId)
             ->whereIn('product_variant_id', $allVariantIds)
@@ -171,9 +172,13 @@ class CatalogController extends Controller
             ->get()
             ->keyBy('product_variant_id');
 
-        $data = $products->map(function ($product) use ($variants, $assignedStores, $stockByVariant) {
-            $productVariants = $variants->get($product->id, collect())->values()->map(function ($variant) use ($assignedStores, $stockByVariant) {
-                $variant->assigned_stores = $assignedStores->get($variant->id, collect())->values();
+        $data = $products->map(function ($product) use ($variants, $assignedStores, $stockByVariant, $slim) {
+            $productVariants = $variants->get($product->id, collect())->values()->map(function ($variant) use ($assignedStores, $stockByVariant, $slim) {
+                if (!$slim) {
+                    $variant->assigned_stores = $assignedStores->get($variant->id, collect())->values();
+                } else {
+                    $variant->assigned_stores = [];
+                }
                 $stock = $stockByVariant->get($variant->id);
                 $variant->on_hand        = $stock ? (int) $stock->total_on_hand : 0;
                 $variant->stock_quantity = $stock ? max(0, (int) $stock->total_on_hand - (int) $stock->total_reserved) : 0;
@@ -181,16 +186,22 @@ class CatalogController extends Controller
             });
 
             $product->variants = $productVariants;
-            $product->store_count = $productVariants
+            $product->store_count = $slim ? null : $productVariants
                 ->flatMap(fn ($variant) => collect($variant->assigned_stores ?? []))
                 ->pluck('store_id')
                 ->unique()
                 ->count();
             return $product;
-        // Includi sempre i prodotti con varianti in DB (indipendentemente da spv)
         })->filter(fn ($product) => $product->variants->count() > 0)->values();
 
         return response()->json(['data' => $data]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('CatalogController::index error: ' . $e->getMessage() . ' — ' . $e->getFile() . ':' . $e->getLine());
+            return response()->json([
+                'message' => 'Errore interno catalogo: ' . $e->getMessage(),
+                'data'    => [],
+            ], 500);
+        }
     }
 
     public function import(Request $request): JsonResponse
