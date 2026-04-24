@@ -76,72 +76,74 @@ class PrestashopController extends Controller
     {
         set_time_limit(0);
 
-        $validator = Validator::make($request->all(), [
-            'url'     => ['required', 'url'],
-            'api_key' => ['required', 'string'],
-        ]);
-        if ($validator->fails()) {
-            return response()->json(['message' => 'URL e API Key richiesti.'], 422);
-        }
-
-        $tenantId = (int) $request->attributes->get('tenant_id');
-        $url      = rtrim($request->input('url'), '/');
-        $apiKey   = $request->input('api_key');
-
-        // --- 1. Recupera tutti gli ID prodotti ---
         try {
-            $idsRes = Http::timeout(30)
-                ->get("{$url}/api/products", [
-                    'ws_key'        => $apiKey,
-                    'output_format' => 'JSON',
-                    'display'       => '[id]',
-                    'limit'         => '10000',
-                ]);
-            if (!$idsRes->successful()) {
-                return response()->json(['message' => "PrestaShop ha risposto con errore {$idsRes->status()}."], 422);
+            $validator = Validator::make($request->all(), [
+                'url'     => ['required', 'url'],
+                'api_key' => ['required', 'string'],
+            ]);
+            if ($validator->fails()) {
+                return response()->json(['message' => 'URL e API Key richiesti.'], 422);
             }
-        } catch (\Throwable $e) {
-            return response()->json(['message' => "Connessione fallita: {$e->getMessage()}"], 422);
-        }
 
-        $ids = collect($idsRes->json('products') ?? [])->pluck('id')->all();
-        $total   = count($ids);
-        $imported = 0;
-        $errors   = 0;
-        $batchSize = 50; // Importa in batch da 50 prodotti
+            $tenantId = (int) $request->attributes->get('tenant_id');
+            $url      = rtrim($request->input('url'), '/');
+            $apiKey   = $request->input('api_key');
 
-        // --- Recupera categorie tenant ---
-        $catMap = DB::table('categories')
-            ->where('tenant_id', $tenantId)
-            ->pluck('id', 'name');
-
-        // Recupera gli store del tenant per assegnare i prodotti
-        $storeIds = DB::table('stores')
-            ->where('tenant_id', $tenantId)
-            ->pluck('id')
-            ->all();
-
-        // --- Recupera tax_class: usa la prima disponibile (IVA 22%) ---
-        $defaultTaxClassId = DB::table('tax_classes')
-            ->where('tenant_id', $tenantId)
-            ->value('id');
-
-        // --- 2. Importa batch per batch ---
-        foreach (array_chunk($ids, $batchSize) as $batchIds) {
+            // --- 1. Recupera tutti gli ID prodotti ---
             try {
-                $batchRes = Http::timeout(30)
+                $idsRes = Http::timeout(120)
                     ->get("{$url}/api/products", [
                         'ws_key'        => $apiKey,
                         'output_format' => 'JSON',
-                        'display'       => 'full',
-                        'filter[id]'    => '[' . implode('|', $batchIds) . ']',
-                        'limit'         => (string) count($batchIds),
+                        'display'       => '[id]',
+                        'limit'         => '10000',
                     ]);
-
-                if (!$batchRes->successful()) {
-                    $errors += count($batchIds);
-                    continue;
+                if (!$idsRes->successful()) {
+                    return response()->json(['message' => "PrestaShop ha risposto con errore {$idsRes->status()}."], 422);
                 }
+            } catch (\Throwable $e) {
+                return response()->json(['message' => "Connessione fallita: {$e->getMessage()}"], 422);
+            }
+
+            $ids = collect($idsRes->json('products') ?? [])->pluck('id')->all();
+            $total   = count($ids);
+            $imported = 0;
+            $errors   = 0;
+            $batchSize = 50; // Importa in batch da 50 prodotti
+            $firstError = null;
+
+            // --- Recupera categorie tenant ---
+            $catMap = DB::table('categories')
+                ->where('tenant_id', $tenantId)
+                ->pluck('id', 'name');
+
+            // Recupera gli store del tenant per assegnare i prodotti
+            $storeIds = DB::table('stores')
+                ->where('tenant_id', $tenantId)
+                ->pluck('id')
+                ->all();
+
+            // --- Recupera tax_class: usa la prima disponibile (IVA 22%) ---
+            $defaultTaxClassId = DB::table('tax_classes')
+                ->where('tenant_id', $tenantId)
+                ->value('id');
+
+            // --- 2. Importa batch per batch ---
+            foreach (array_chunk($ids, $batchSize) as $batchIds) {
+                try {
+                    $batchRes = Http::timeout(120)
+                        ->get("{$url}/api/products", [
+                            'ws_key'        => $apiKey,
+                            'output_format' => 'JSON',
+                            'display'       => 'full',
+                            'filter[id]'    => '[' . implode('|', $batchIds) . ']',
+                            'limit'         => (string) count($batchIds),
+                        ]);
+
+                    if (!$batchRes->successful()) {
+                        $errors += count($batchIds);
+                        continue;
+                    }
 
                 $psProducts = $batchRes->json('products') ?? [];
             } catch (\Throwable) {
@@ -161,15 +163,20 @@ class PrestashopController extends Controller
                     $errors++;
                 }
             }
-        }
+            }
 
-        return response()->json([
-            'success'  => true,
-            'total'    => $total,
-            'imported' => $imported,
-            'errors'   => $errors,
-            'first_error' => $firstError ?? null,
-        ]);
+            return response()->json([
+                'success'  => true,
+                'total'    => $total,
+                'imported' => $imported,
+                'errors'   => $errors,
+                'first_error' => $firstError ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => "Errore generale server: " . $e->getMessage() . " alla linea " . $e->getLine()
+            ], 500);
+        }
     }
 
     /**
