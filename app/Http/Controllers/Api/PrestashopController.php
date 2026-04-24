@@ -32,9 +32,9 @@ class PrestashopController extends Controller
 
         try {
             $start = microtime(true);
-            $res = Http::withBasicAuth($apiKey, '')
-                ->timeout(10)
+            $res = Http::timeout(10)
                 ->get("{$url}/api/products", [
+                    'ws_key'        => $apiKey,
                     'output_format' => 'JSON',
                     'limit'         => '1',
                     'display'       => '[id]',
@@ -49,9 +49,9 @@ class PrestashopController extends Controller
             $elapsedMs = (int) round((microtime(true) - $start) * 1000);
 
             // Contiamo il totale prodotti
-            $countRes = Http::withBasicAuth($apiKey, '')
-                ->timeout(10)
+            $countRes = Http::timeout(10)
                 ->get("{$url}/api/products", [
+                    'ws_key'        => $apiKey,
                     'output_format' => 'JSON',
                     'display'       => '[id]',
                     'limit'         => '1000000',
@@ -88,9 +88,9 @@ class PrestashopController extends Controller
 
         // --- 1. Recupera tutti gli ID prodotti ---
         try {
-            $idsRes = Http::withBasicAuth($apiKey, '')
-                ->timeout(30)
+            $idsRes = Http::timeout(30)
                 ->get("{$url}/api/products", [
+                    'ws_key'        => $apiKey,
                     'output_format' => 'JSON',
                     'display'       => '[id]',
                     'limit'         => '10000',
@@ -127,9 +127,9 @@ class PrestashopController extends Controller
         // --- 2. Importa batch per batch ---
         foreach (array_chunk($ids, $batchSize) as $batchIds) {
             try {
-                $batchRes = Http::withBasicAuth($apiKey, '')
-                    ->timeout(30)
+                $batchRes = Http::timeout(30)
                     ->get("{$url}/api/products", [
+                        'ws_key'        => $apiKey,
                         'output_format' => 'JSON',
                         'display'       => 'full',
                         'filter[id]'    => '[' . implode('|', $batchIds) . ']',
