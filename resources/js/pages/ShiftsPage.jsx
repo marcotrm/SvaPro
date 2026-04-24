@@ -1355,7 +1355,7 @@ function AllStoresOverview({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ShiftsPage() {
-  const { selectedStoreId, userRoles = [], user } = useOutletContext?.() || {};
+  const { selectedStoreId, userRoles = [], user, storesList = [] } = useOutletContext?.() || {};
 
   // Ruoli turni
   const isDipendente     = userRoles.includes('dipendente') && !userRoles.includes('project_manager') && !userRoles.includes('superadmin');
@@ -2063,7 +2063,7 @@ export default function ShiftsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto', paddingRight: 4 }}>
 
             {/* ── ORARIO PERSONALIZZATO ── */}
-            {isProjectManager && (
+            {(isProjectManager || isSuperAdmin) && (
               <div style={{ borderRadius: 12, overflow: 'hidden', background: 'linear-gradient(135deg, #0284c7, #0ea5e9)', marginBottom: 2 }}>
                 <button
                   onClick={() => { setCustOpen(o => !o); }}
@@ -2911,7 +2911,7 @@ export default function ShiftsPage() {
 
       {/* Modal template */}
       {showTemplatesModal && (
-        <ShiftTemplateModal storeId={storeId} onClose={() => { setShowTemplatesModal(false); loadData(); }} />
+        <ShiftTemplateModal storeId={storeId} stores={storesList} onClose={() => { setShowTemplatesModal(false); loadData(); }} />
       )}
 
       {/* Modal assenza */}
