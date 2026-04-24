@@ -2555,8 +2555,15 @@ export default function ShiftsPage() {
       )}
 
       {(isDipendente || isSuperAdmin || isProjectManager) && isWeekConfirmed && (
-        <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#10B981', fontWeight: 700 }}>
-          <span style={{ fontSize: 18 }}>✅</span> Turni confermati dal Project Manager. Settimana definitiva.
+        <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#10B981', fontWeight: 700 }}>
+            <span style={{ fontSize: 18 }}>✅</span> Turni confermati dal Project Manager. Settimana definitiva.
+          </div>
+          {(isSuperAdmin || isProjectManager) && (
+            <button onClick={handleUnlockWeek} disabled={lockLoading} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.12)', color: '#10B981', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+              {lockLoading ? 'Sblocco...' : '🔓 Sblocca'}
+            </button>
+          )}
         </div>
       )}
 

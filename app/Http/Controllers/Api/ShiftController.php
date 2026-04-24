@@ -380,6 +380,14 @@ class ShiftController extends Controller
             ->where('week_start', $request->input('week_start'))
             ->delete();
 
+        $weekEndDate = \Carbon\Carbon::parse($request->input('week_start'))->addDays(6)->format('Y-m-d');
+        DB::table('employee_shifts')
+            ->where('tenant_id', $tenantId)
+            ->where('store_id', $request->integer('store_id'))
+            ->whereBetween('date', [$request->input('week_start'), $weekEndDate])
+            ->where('status', 'confirmed')
+            ->update(['status' => 'proposed']);
+
         return response()->json(['message' => 'Turni sbloccati.']);
     }
 
