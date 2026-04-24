@@ -704,15 +704,20 @@ function PrestashopImportModal({ onClose, onImported }) {
       });
       const ids = res.data.ids || [];
       const total = res.data.total || 0;
+      const skipped = res.data.skipped || 0;
       
+      if (skipped > 0) {
+        addLog(`Saltati ${skipped} prodotti già presenti in SvaPro.`);
+      }
+
       if (total === 0) {
-        addLog('Nessun prodotto trovato.', 'info');
+        addLog('Nessun nuovo prodotto da importare.', 'info');
         setStatus('idle');
         return;
       }
       
       setProgress({ imported: 0, total: total, errors: 0 });
-      addLog(`Trovati ${total} prodotti. Inizio download super-veloce a blocchi di 50...`);
+      addLog(`Trovati ${total} nuovi prodotti. Inizio download con immagini a blocchi di 50...`);
 
       const batchSize = 50;
       let importedCount = 0;

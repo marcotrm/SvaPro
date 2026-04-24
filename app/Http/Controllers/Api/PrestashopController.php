@@ -84,13 +84,14 @@ class PrestashopController extends Controller
 
         $url      = rtrim($request->input('url'), '/');
         $apiKey   = $request->input('api_key');
+        $tenantId = (int) $request->attributes->get('tenant_id');
 
         try {
-            $idsRes = Http::timeout(30)
+            $idsRes = Http::timeout(60)
                 ->get("{$url}/api/products", [
                     'ws_key'        => $apiKey,
                     'output_format' => 'JSON',
-                    'display'       => '[id]',
+                    'display'       => '[id,reference]', // <-- get id and reference
                     'limit'         => '10000',
                 ]);
             if (!$idsRes->successful()) {
@@ -100,11 +101,39 @@ class PrestashopController extends Controller
             return response()->json(['message' => "Connessione fallita: {$e->getMessage()}"], 422);
         }
 
-        $ids = collect($idsRes->json('products') ?? [])->pluck('id')->all();
+        $psProducts = $idsRes->json('products') ?? [];
         
+        // Find existing SKUs in SvaPro for this tenant
+        $existingSkus = DB::table('products')
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('sku')
+            ->pluck('sku')
+            ->toArray();
+            
+        $ids = [];
+        $skipped = 0;
+        foreach ($psProducts as $p) {
+            if (!isset($p['id'])) continue;
+            
+            // Check if product already exists by SKU (reference)
+            $ref = trim($p['reference'] ?? '');
+            if ($ref && in_array($ref, $existingSkus)) {
+                $skipped++;
+                continue; // Skip already imported product
+            }
+            // Fallback for empty reference -> checks PS-ID
+            if (!$ref && in_array("PS-{$p['id']}", $existingSkus)) {
+                $skipped++;
+                continue;
+            }
+            
+            $ids[] = $p['id'];
+        }
+
         return response()->json([
             'success' => true,
             'total'   => count($ids),
+            'skipped' => $skipped,
             'ids'     => $ids,
         ]);
     }
@@ -169,7 +198,7 @@ class PrestashopController extends Controller
 
             foreach ($psProducts as $psp) {
                 try {
-                    $this->upsertProduct($psp, $tenantId, $storeIds, $catMap, $defaultTaxClassId);
+                    $this->upsertProduct($psp, $tenantId, $storeIds, $catMap, $defaultTaxClassId, $url, $apiKey);
                     $imported++;
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::error('PS Import Error for ID ' . ($psp['id'] ?? '??') . ': ' . $e->getMessage());
@@ -196,7 +225,7 @@ class PrestashopController extends Controller
     /**
      * Inserisce o aggiorna un prodotto PrestaShop nel catalogo SvaPro.
      */
-    private function upsertProduct(array $psp, int $tenantId, array $storeIds, $catMap, ?int $defaultTaxClassId): void
+    private function upsertProduct(array $psp, int $tenantId, array $storeIds, $catMap, ?int $defaultTaxClassId, string $url = '', string $apiKey = ''): void
     {
         $psId   = (int) ($psp['id'] ?? 0);
         $sku    = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
@@ -204,6 +233,25 @@ class PrestashopController extends Controller
         $desc   = $this->extractLangValue($psp['description_short'] ?? null);
         $price  = (float) ($psp['price'] ?? 0);
         $active = (int) ($psp['active'] ?? 1) === 1;
+
+        // Image logic
+        $imageUrl = null;
+        if (!empty($psp['id_default_image']) && $url && $apiKey) {
+            $psImageId = $psp['id_default_image'];
+            try {
+                // Fetch image from Prestashop API
+                $imgResponse = Http::timeout(10)->get("{$url}/api/images/products/{$psId}/{$psImageId}", [
+                    'ws_key' => $apiKey,
+                ]);
+                if ($imgResponse->successful() && str_starts_with($imgResponse->header('Content-Type'), 'image/')) {
+                    $mime = $imgResponse->header('Content-Type');
+                    $base64 = base64_encode($imgResponse->body());
+                    $imageUrl = "data:{$mime};base64,{$base64}";
+                }
+            } catch (\Exception $e) {
+                // Ignore image fetch errors to not block product import
+            }
+        }
 
         // Categoria
         $psCatName = $this->extractLangValue($psp['associations']['categories'][0]['id'] ?? null);
@@ -218,11 +266,15 @@ class PrestashopController extends Controller
         $now = now();
 
         if ($existingProduct) {
-            DB::table('products')->where('id', $existingProduct->id)->update([
+            $updateData = [
                 'name'        => $name,
                 'is_active'   => $active,
                 'updated_at'  => $now,
-            ]);
+            ];
+            if ($imageUrl) {
+                $updateData['image_url'] = $imageUrl;
+            }
+            DB::table('products')->where('id', $existingProduct->id)->update($updateData);
             $productId = $existingProduct->id;
         } else {
             $productId = DB::table('products')->insertGetId([
@@ -231,6 +283,7 @@ class PrestashopController extends Controller
                 'name'         => $name,
                 'product_type' => 'liquid', // default SvaPro
                 'category_id'  => $categoryId,
+                'image_url'    => $imageUrl,
                 'is_active'    => $active,
                 'created_at'   => $now,
                 'updated_at'   => $now,
