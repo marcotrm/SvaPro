@@ -468,8 +468,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
         Route::patch('/shifts/{id}/confirm', [\App\Http\Controllers\Api\ShiftController::class, 'confirmShift'])->middleware('permission:employees.manage');
         Route::post('/shifts/confirm-all', [\App\Http\Controllers\Api\ShiftController::class, 'confirmAll'])->middleware('permission:employees.manage');
         Route::get('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'getTemplates']);
-        Route::post('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'saveTemplate'])->middleware('permission:employees.manage');
-        Route::delete('/shifts/templates/{id}', [\App\Http\Controllers\Api\ShiftController::class, 'deleteTemplate'])->middleware('permission:employees.manage');
+        Route::post('/shifts/templates', [\App\Http\Controllers\Api\ShiftController::class, 'saveTemplate']);
+        Route::delete('/shifts/templates/{id}', [\App\Http\Controllers\Api\ShiftController::class, 'deleteTemplate']);
 
         // Shift week lock/confirm workflow
         Route::post('/shifts/lock-week', [\App\Http\Controllers\Api\ShiftController::class, 'lockWeek']);

@@ -2619,7 +2619,7 @@ export default function ShiftsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 24 }}>
               {days.map(([dayLabel, ranges]) => (
                 <div key={dayLabel} style={{ fontSize: 12, color: '#92400e', display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                  <strong style={{ minWidth: 160 }}>{dayLabel}</strong>
+                  <strong style={{ minWidth: 70 }}>{dayLabel}</strong>
                   <span>nessun dipendente nelle fasce: {ranges.join(' e ')}</span>
                 </div>
               ))}
