@@ -485,6 +485,46 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
             ]);
         });
 
+        Route::get('/debug-catalog', function (\Illuminate\Http\Request $request) {
+            $tenantId = (int) $request->attributes->get('tenant_id');
+            try {
+                $productCount = \Illuminate\Support\Facades\DB::table('products')->where('tenant_id', $tenantId)->count();
+                $variantCount = \Illuminate\Support\Facades\DB::table('product_variants')->where('tenant_id', $tenantId)->count();
+                $spvCount     = \Illuminate\Support\Facades\DB::table('store_product_variants')->where('tenant_id', $tenantId)->count();
+                $stockCount   = \Illuminate\Support\Facades\DB::table('stock_items')->where('tenant_id', $tenantId)->count();
+
+                // Try the actual catalog query to catch the exact SQL error
+                $products = \Illuminate\Support\Facades\DB::table('products')
+                    ->where('tenant_id', $tenantId)
+                    ->orderByDesc('id')
+                    ->limit(5)
+                    ->get();
+                $productIds = $products->pluck('id')->all();
+                $variants = \Illuminate\Support\Facades\DB::table('product_variants')
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('product_id', $productIds ?: [0])
+                    ->select('product_variants.*')
+                    ->get();
+
+                return response()->json([
+                    'tenant_id'     => $tenantId,
+                    'product_count' => $productCount,
+                    'variant_count' => $variantCount,
+                    'spv_count'     => $spvCount,
+                    'stock_count'   => $stockCount,
+                    'sample_products' => $products->take(3),
+                    'sample_variants' => $variants->take(3),
+                    'status' => 'OK — nessun errore rilevato nella query catalog',
+                ]);
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'error'   => $e->getMessage(),
+                    'file'    => $e->getFile(),
+                    'line'    => $e->getLine(),
+                ], 500);
+            }
+        });
+
         // Reports — accessibili anche ai dipendenti (filtrati automaticamente al proprio store)
         Route::get('/reports/summary', [ReportController::class, 'summary']);
         Route::get('/reports/revenue-trend', [ReportController::class, 'revenueTrend']);
