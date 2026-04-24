@@ -86,6 +86,63 @@ Route::get('/prestashop/wipe-all-products', function() {
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
 
+// ── Endpoints di diagnostica temporanei (pubblici) ───────────────────────────
+Route::get('/run-cleanup', function () {
+    \Illuminate\Support\Facades\Artisan::call('app:cleanup-dummy-employees');
+    return response()->json([
+        'message' => 'Pulizia eseguita sul server live!',
+        'output'  => \Illuminate\Support\Facades\Artisan::output()
+    ]);
+});
+
+Route::get('/debug-catalog', function () {
+    try {
+        $db = \Illuminate\Support\Facades\DB::connection()->getPdo();
+        $driver = \Illuminate\Support\Facades\DB::getDriverName();
+
+        // Conteggi base
+        $productCount = \Illuminate\Support\Facades\DB::table('products')->count();
+        $variantCount = \Illuminate\Support\Facades\DB::table('product_variants')->count();
+        $spvCount     = \Illuminate\Support\Facades\DB::table('store_product_variants')->count();
+        $stockCount   = \Illuminate\Support\Facades\DB::table('stock_items')->count();
+
+        // Colonne reali in product_variants (per scoprire colonne mancanti)
+        if ($driver === 'pgsql') {
+            $cols = \Illuminate\Support\Facades\DB::select(
+                "SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name='product_variants' ORDER BY ordinal_position"
+            );
+        } else {
+            $cols = \Illuminate\Support\Facades\DB::select("PRAGMA table_info(product_variants)");
+        }
+
+        // Prova la query reale del catalog
+        $products = \Illuminate\Support\Facades\DB::table('products')->orderByDesc('id')->limit(3)->get();
+        $pids = $products->pluck('id')->all();
+        $variants = \Illuminate\Support\Facades\DB::table('product_variants')
+            ->whereIn('product_id', $pids ?: [0])
+            ->select('product_variants.*')
+            ->get();
+
+        return response()->json([
+            'driver'        => $driver,
+            'product_count' => $productCount,
+            'variant_count' => $variantCount,
+            'spv_count'     => $spvCount,
+            'stock_count'   => $stockCount,
+            'variant_columns' => $cols,
+            'sample_variants' => $variants->take(2),
+            'status'        => 'OK',
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'file'  => basename($e->getFile()),
+            'line'  => $e->getLine(),
+        ], 500);
+    }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── Vista Corriere: endpoint pubblici autenticati via tenant code (?tk=CODE)
 Route::get('/driver/deliveries', [StoreDeliveryController::class, 'driverIndex']);
 Route::patch('/driver/deliveries/{id}/status', [StoreDeliveryController::class, 'driverUpdate']);
@@ -477,52 +534,9 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
         Route::get('/shifts/week-locks', [\App\Http\Controllers\Api\ShiftController::class, 'getWeekLocks']);
         Route::post('/shifts/confirm-week', [\App\Http\Controllers\Api\ShiftController::class, 'confirmWeek']);
         
-        Route::get('/run-cleanup', function () {
+        Route::get('/run-cleanup-internal', function () {
             \Illuminate\Support\Facades\Artisan::call('app:cleanup-dummy-employees');
-            return response()->json([
-                'message' => 'Pulizia eseguita sul server live!',
-                'output' => \Illuminate\Support\Facades\Artisan::output()
-            ]);
-        });
-
-        Route::get('/debug-catalog', function (\Illuminate\Http\Request $request) {
-            $tenantId = (int) $request->attributes->get('tenant_id');
-            try {
-                $productCount = \Illuminate\Support\Facades\DB::table('products')->where('tenant_id', $tenantId)->count();
-                $variantCount = \Illuminate\Support\Facades\DB::table('product_variants')->where('tenant_id', $tenantId)->count();
-                $spvCount     = \Illuminate\Support\Facades\DB::table('store_product_variants')->where('tenant_id', $tenantId)->count();
-                $stockCount   = \Illuminate\Support\Facades\DB::table('stock_items')->where('tenant_id', $tenantId)->count();
-
-                // Try the actual catalog query to catch the exact SQL error
-                $products = \Illuminate\Support\Facades\DB::table('products')
-                    ->where('tenant_id', $tenantId)
-                    ->orderByDesc('id')
-                    ->limit(5)
-                    ->get();
-                $productIds = $products->pluck('id')->all();
-                $variants = \Illuminate\Support\Facades\DB::table('product_variants')
-                    ->where('tenant_id', $tenantId)
-                    ->whereIn('product_id', $productIds ?: [0])
-                    ->select('product_variants.*')
-                    ->get();
-
-                return response()->json([
-                    'tenant_id'     => $tenantId,
-                    'product_count' => $productCount,
-                    'variant_count' => $variantCount,
-                    'spv_count'     => $spvCount,
-                    'stock_count'   => $stockCount,
-                    'sample_products' => $products->take(3),
-                    'sample_variants' => $variants->take(3),
-                    'status' => 'OK — nessun errore rilevato nella query catalog',
-                ]);
-            } catch (\Throwable $e) {
-                return response()->json([
-                    'error'   => $e->getMessage(),
-                    'file'    => $e->getFile(),
-                    'line'    => $e->getLine(),
-                ], 500);
-            }
+            return response()->json(['output' => \Illuminate\Support\Facades\Artisan::output()]);
         });
 
         // Reports — accessibili anche ai dipendenti (filtrati automaticamente al proprio store)
