@@ -460,6 +460,7 @@ class ShiftController extends Controller
             DB::table('employee_notifications')->insert([
                 'tenant_id'  => $tenantId,
                 'user_id'    => $lock->locked_by,
+                'type'       => 'shift_confirmed',
                 'title'      => "✅ Turni confermati — {$storeName}",
                 'body'       => "I turni della settimana {$weekLabel} sono stati confermati dal Project Manager.",
                 'is_read'    => false,

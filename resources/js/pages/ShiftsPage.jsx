@@ -2543,7 +2543,7 @@ export default function ShiftsPage() {
                 onClick={() => {
                   shiftsApi.confirmWeek({ store_id: Number(storeId), week_start: weekStartStr, user_id: user?.id })
                     .then(() => { toast.success('✅ Turni confermati!'); loadData(); })
-                    .catch(() => toast.error('Errore durante la conferma.'));
+                    .catch((err) => toast.error(err?.response?.data?.message || 'Errore durante la conferma.'));
                 }} 
                 style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #10B981, #059669)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}
               >
@@ -2637,9 +2637,11 @@ export default function ShiftsPage() {
         {/* ── Orari Apertura Store (selezionato) ── */}
         {currentStoreData?.opening_hours && !globalEmp && (() => {
           const days = ['mon','tue','wed','thu','fri','sat','sun'];
-          const activeDay = days.find(d => !currentStoreData.opening_hours[d]?.closed);
+          // Trova il primo giorno con orari configurati (non chiuso e con orario di apertura)
+          const activeDay = days.find(d => currentStoreData.opening_hours[d]?.open && !currentStoreData.opening_hours[d]?.closed);
           const th = activeDay ? currentStoreData.opening_hours[activeDay] : null;
-          if (!th) return null;
+          // Se non ha orari configurati per nessun giorno, non mostrare nulla
+          if (!th || !th.open) return null;
           return (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
