@@ -4,7 +4,7 @@ import { X, Plus, Trash2, Clock, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ConfirmModal from './ConfirmModal.jsx';
 
-export default function ShiftTemplateModal({ onClose }) {
+export default function ShiftTemplateModal({ onClose, storeId }) {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -16,7 +16,7 @@ export default function ShiftTemplateModal({ onClose }) {
 
   const loadTemplates = async () => {
     try {
-      const res = await shifts.getTemplates();
+      const res = await shifts.getTemplates({ store_id: storeId });
       setTemplates(res.data?.data || []);
     } catch {
       toast.error('Errore nel caricamento dei template');
@@ -33,7 +33,7 @@ export default function ShiftTemplateModal({ onClose }) {
     }
     try {
       setAdding(true);
-      await shifts.saveTemplate(form);
+      await shifts.saveTemplate({ ...form, store_id: storeId });
       clearApiCache();
       toast.success('Template creato con successo');
       setForm({ name: '', start_time: '09:00', end_time: '18:00', color: '#10B981' });

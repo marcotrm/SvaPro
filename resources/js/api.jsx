@@ -835,7 +835,7 @@ export const shifts = {
   // Shift manager conferma uno o tutti i turni proposed
   confirmShift:   (id)          => api.patch(`/shifts/${id}/confirm`),
   confirmAll:     (params = {}) => api.post('/shifts/confirm-all', params),
-  getTemplates:   ()            => api.get('/shifts/templates'),
+  getTemplates:   (params = {}) => api.get('/shifts/templates', { params }),
   saveTemplate:   (data)        => api.post('/shifts/templates', data),
   deleteTemplate: (id)          => api.delete(`/shifts/templates/${id}`),
   // Week lock/confirm workflow

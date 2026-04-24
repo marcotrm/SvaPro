@@ -128,7 +128,17 @@ class ShiftController extends Controller
             return response()->json(['data' => []]);
         }
         $tenantId = (int)$request->attributes->get('tenant_id');
-        $templates = ShiftTemplate::where('tenant_id', $tenantId)->get();
+        $storeId = $request->input('store_id');
+        
+        $query = ShiftTemplate::where('tenant_id', $tenantId);
+        
+        if ($storeId) {
+            $query->where(function($q) use ($storeId) {
+                $q->where('store_id', $storeId)->orWhereNull('store_id');
+            });
+        }
+        
+        $templates = $query->get();
         return response()->json(['data' => $templates]);
     }
 
@@ -140,10 +150,12 @@ class ShiftController extends Controller
         $tenantId = (int)$request->attributes->get('tenant_id');
         $request->validate([
             'name' => 'required|string|max:255',
+            'store_id' => 'nullable|integer'
         ]);
 
         $template = ShiftTemplate::create([
             'tenant_id' => $tenantId,
+            'store_id' => $request->input('store_id'),
             'name' => $request->input('name'),
             'start_time' => $request->input('start_time'),
             'end_time' => $request->input('end_time'),

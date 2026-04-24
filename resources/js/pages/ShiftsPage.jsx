@@ -1685,7 +1685,7 @@ export default function ShiftsPage() {
         [empRes, shRes, tplRes, storeRes] = await Promise.all([
           employeesApi.getEmployees({ store_id: storeId, per_page: 200 }),
           shiftsApi.getAll(shiftParams),
-          shiftsApi.getTemplates(),
+          shiftsApi.getTemplates({ store_id: storeId }),
           stores.getStore(storeId),
         ]);
         if (storeRes?.data?.data) {
@@ -1700,7 +1700,7 @@ export default function ShiftsPage() {
           empRes = await attendance.getEmployeesKiosk({ store_id: storeId });
         } catch {}
         try { shRes = await shiftsApi.getAll(shiftParams); } catch {}
-        try { tplRes = await shiftsApi.getTemplates(); } catch {}
+        try { tplRes = await shiftsApi.getTemplates({ store_id: storeId }); } catch {}
       }
 
       // Normalizza sempre: assicura che ogni employee abbia .name (usato in tutta la UI)
@@ -2063,41 +2063,43 @@ export default function ShiftsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto', paddingRight: 4 }}>
 
             {/* ── ORARIO PERSONALIZZATO ── */}
-            <div style={{ borderRadius: 12, overflow: 'hidden', background: 'linear-gradient(135deg, #0d9488, #14b8a6)', marginBottom: 2 }}>
-              <button
-                onClick={() => { setCustOpen(o => !o); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer' }}
-              >
-                <span style={{ fontSize: 20 }}>✏️</span>
-                <div style={{ flex: 1, textAlign: 'left' }}>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>Orario Personalizzato</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>{custOpen ? 'Scegli orario inizio e fine' : 'Usa e getta — non salvato nei template'}</div>
-                </div>
-                <span style={{ color: '#fff', fontWeight: 900, fontSize: 16 }}>{custOpen ? '▲' : '▼'}</span>
-              </button>
-              {custOpen && (
-                <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(0,0,0,0.08)' }}>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', display: 'block', marginBottom: 4 }}>INIZIO</label>
-                      <input type="time" value={custStart} onChange={e => setCustStart(e.target.value)}
-                        style={{ width: '100%', padding: '9px', borderRadius: 8, border: '2px solid rgba(255,255,255,0.4)', fontSize: 15, fontWeight: 700, color: '#0f766e', background: '#fff', boxSizing: 'border-box' }} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', display: 'block', marginBottom: 4 }}>FINE</label>
-                      <input type="time" value={custEnd} onChange={e => setCustEnd(e.target.value)}
-                        style={{ width: '100%', padding: '9px', borderRadius: 8, border: '2px solid rgba(255,255,255,0.4)', fontSize: 15, fontWeight: 700, color: '#0f766e', background: '#fff', boxSizing: 'border-box' }} />
-                    </div>
+            {isProjectManager && (
+              <div style={{ borderRadius: 12, overflow: 'hidden', background: 'linear-gradient(135deg, #0284c7, #0ea5e9)', marginBottom: 2 }}>
+                <button
+                  onClick={() => { setCustOpen(o => !o); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                >
+                  <span style={{ fontSize: 20 }}>✏️</span>
+                  <div style={{ flex: 1, textAlign: 'left' }}>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>Orario Personalizzato</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>{custOpen ? 'Scegli orario inizio e fine' : 'Usa e getta — non salvato nei template'}</div>
                   </div>
-                  <button
-                    onClick={() => applyTemplate(empId, dateStr, { start_time: custStart, end_time: custEnd, name: 'Personalizzato', color: '#14b8a6' })}
-                    style={{ padding: '11px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 14, fontWeight: 900, cursor: 'pointer' }}
-                  >
-                    ✓ Applica {custStart} → {custEnd}
-                  </button>
-                </div>
-              )}
-            </div>
+                  <span style={{ color: '#fff', fontWeight: 900, fontSize: 16 }}>{custOpen ? '▲' : '▼'}</span>
+                </button>
+                {custOpen && (
+                  <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(0,0,0,0.08)' }}>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', display: 'block', marginBottom: 4 }}>INIZIO</label>
+                        <input type="time" value={custStart} onChange={e => setCustStart(e.target.value)}
+                          style={{ width: '100%', padding: '9px', borderRadius: 8, border: '2px solid rgba(255,255,255,0.4)', fontSize: 15, fontWeight: 700, color: '#0284c7', background: '#fff', boxSizing: 'border-box' }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', display: 'block', marginBottom: 4 }}>FINE</label>
+                        <input type="time" value={custEnd} onChange={e => setCustEnd(e.target.value)}
+                          style={{ width: '100%', padding: '9px', borderRadius: 8, border: '2px solid rgba(255,255,255,0.4)', fontSize: 15, fontWeight: 700, color: '#0284c7', background: '#fff', boxSizing: 'border-box' }} />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => applyTemplate(empId, dateStr, { start_time: custStart, end_time: custEnd, name: 'Personalizzato', color: '#0ea5e9' })}
+                      style={{ padding: '11px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 14, fontWeight: 900, cursor: 'pointer' }}
+                    >
+                      ✓ Applica {custStart} → {custEnd}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {templates.length > 0 && <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />}
 
@@ -2497,7 +2499,7 @@ export default function ShiftsPage() {
           })()}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {canEditGrid && canEditShifts ? (
+          {!isGridReadOnly ? (
             <button onClick={() => setShowTemplatesModal(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'var(--color-surface)', color:'var(--color-text)', border:'1px solid var(--color-border)', padding:'10px 16px', borderRadius:12, fontWeight:600, cursor:'pointer' }}>
               <Clock size={16} /> Modelli Orari
             </button>
@@ -3008,7 +3010,7 @@ export default function ShiftsPage() {
 
       {/* Modal template */}
       {showTemplatesModal && (
-        <ShiftTemplateModal onClose={() => { setShowTemplatesModal(false); loadData(); }} />
+        <ShiftTemplateModal storeId={storeId} onClose={() => { setShowTemplatesModal(false); loadData(); }} />
       )}
 
       {/* Modal assenza */}
