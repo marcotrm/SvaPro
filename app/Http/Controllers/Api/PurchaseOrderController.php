@@ -107,6 +107,8 @@ class PurchaseOrderController extends Controller
                 'pol.qty',
                 'pol.unit_cost',
                 'p.sku',
+                'p.barcode as product_barcode',
+                'pv.barcode as variant_barcode',
                 'p.name as product_name',
                 'pv.flavor',
             ])
@@ -317,7 +319,9 @@ class PurchaseOrderController extends Controller
             'warehouse_id' => ['required', 'integer'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.purchase_order_line_id' => ['required', 'integer'],
-            'lines.*.qty_received' => ['required', 'integer', 'min:1'],
+            'lines.*.qty_received' => ['required', 'integer', 'min:0'],
+            'lines.*.lot_number' => ['nullable', 'string', 'max:255'],
+            'lines.*.expiry_date' => ['nullable', 'date'],
         ]);
 
         if ($validator->fails()) {
@@ -351,54 +355,67 @@ class PurchaseOrderController extends Controller
 
                 $totalReceived += $qtyReceived;
 
-                // Aggiorna stock
-                $existing = DB::table('stock_items')
-                    ->where('tenant_id', $tenantId)
-                    ->where('warehouse_id', $warehouseId)
-                    ->where('product_variant_id', $poLine->product_variant_id)
-                    ->first();
+                // Registra il riscontrato sulla riga d'ordine (incluso lotto e scadenza opzionali)
+                DB::table('purchase_order_lines')
+                    ->where('id', $lineId)
+                    ->update([
+                        'received_qty' => DB::raw("received_qty + $qtyReceived"),
+                        'lot_number'   => $receiveLine['lot_number'] ?? $poLine->lot_number,
+                        'expiry_date'  => $receiveLine['expiry_date'] ?? $poLine->expiry_date,
+                    ]);
 
-                if ($existing) {
-                    DB::table('stock_items')
-                        ->where('id', $existing->id)
-                        ->update([
-                            'on_hand' => $existing->on_hand + $qtyReceived,
+                // Aggiorna stock solo se qtyReceived > 0
+                if ($qtyReceived > 0) {
+                    $existing = DB::table('stock_items')
+                        ->where('tenant_id', $tenantId)
+                        ->where('warehouse_id', $warehouseId)
+                        ->where('product_variant_id', $poLine->product_variant_id)
+                        ->first();
+
+                    if ($existing) {
+                        DB::table('stock_items')
+                            ->where('id', $existing->id)
+                            ->update([
+                                'on_hand' => $existing->on_hand + $qtyReceived,
+                                'updated_at' => $now,
+                            ]);
+                    } else {
+                        DB::table('stock_items')->insert([
+                            'tenant_id' => $tenantId,
+                            'warehouse_id' => $warehouseId,
+                            'product_variant_id' => $poLine->product_variant_id,
+                            'on_hand' => $qtyReceived,
+                            'reserved' => 0,
+                            'created_at' => $now,
                             'updated_at' => $now,
                         ]);
-                } else {
-                    DB::table('stock_items')->insert([
+                    }
+
+                    // Registra movimento
+                    DB::table('stock_movements')->insert([
                         'tenant_id' => $tenantId,
                         'warehouse_id' => $warehouseId,
                         'product_variant_id' => $poLine->product_variant_id,
-                        'on_hand' => $qtyReceived,
-                        'reserved' => 0,
+                        'movement_type' => 'purchase_receive',
+                        'qty' => $qtyReceived,
+                        'reference_type' => 'purchase_order',
+                        'reference_id' => $poId,
                         'created_at' => $now,
-                        'updated_at' => $now,
                     ]);
                 }
-
-                // Registra movimento
-                DB::table('stock_movements')->insert([
-                    'tenant_id' => $tenantId,
-                    'warehouse_id' => $warehouseId,
-                    'product_variant_id' => $poLine->product_variant_id,
-                    'movement_type' => 'purchase_receive',
-                    'qty' => $qtyReceived,
-                    'reference_type' => 'purchase_order',
-                    'reference_id' => $poId,
-                    'created_at' => $now,
-                ]);
             }
         });
 
-        // Determina stato finale
-        $newStatus = $totalReceived >= $totalExpected ? 'received' : 'partial';
+        // Ricalcolo: riga PO potrebbe avere qty > o <. Consideriamo totale ricevuto vs totale atteso.
+        $poLinesAggiornate = DB::table('purchase_order_lines')->where('purchase_order_id', $poId)->get();
+        $totRicevutoReale = $poLinesAggiornate->sum('received_qty');
+        $newStatus = $totRicevutoReale >= $totalExpected ? 'received' : 'partial';
 
         DB::table('purchase_orders')
             ->where('id', $poId)
             ->update(['status' => $newStatus, 'updated_at' => now()]);
 
-        AuditLogger::log($request, 'receive', 'purchase_order', $poId, 'PO #' . $poId . ' → ' . $newStatus);
+        AuditLogger::log($request, 'receive', 'purchase_order', $poId, 'PO #' . $poId . ' → ' . $newStatus . ' (Modulo Predittivo Notificato)');
 
         return response()->json([
             'message' => $newStatus === 'received' ? 'Ordine completamente ricevuto.' : 'Ricezione parziale registrata.',
@@ -459,10 +476,6 @@ class PurchaseOrderController extends Controller
         return response()->json(['message' => 'Stato lavorazione aggiornato.']);
     }
 
-    /**
-     * Suggerisce un ordine automatico basato sui prodotti con stock < reorder_point.
-     * GET /purchase-orders/auto-suggest?store_id=X&supplier_id=Y
-     */
     public function autoSuggest(Request $request): JsonResponse
     {
         $tenantId   = (int) $request->attributes->get('tenant_id');
@@ -482,6 +495,21 @@ class PurchaseOrderController extends Controller
                     ->value('id');
             }
 
+            // Recupera le vendite degli ultimi 30 giorni per il calcolo della media
+            $thirtyDaysAgo = now()->subDays(30);
+            $salesQuery = DB::table('stock_movements')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('movement_type', ['sale', 'pos_sale', 'ecommerce_sale', 'vendita']) // tipi di vendita possibili
+                ->where('created_at', '>=', $thirtyDaysAgo)
+                ->groupBy('product_variant_id')
+                ->selectRaw('product_variant_id, ABS(SUM(qty)) as total_sold_30d');
+
+            if ($warehouseId) {
+                $salesQuery->where('warehouse_id', $warehouseId);
+            }
+            $salesData = $salesQuery->get()->keyBy('product_variant_id');
+
+            // Recupera lo stock
             $q = DB::table('product_variants as pv')
                 ->join('products as p', 'p.id', '=', 'pv.product_id')
                 ->leftJoin('stock_items as si', function ($j) use ($tenantId, $warehouseId) {
@@ -493,15 +521,16 @@ class PurchaseOrderController extends Controller
                 })
                 ->where('p.tenant_id', $tenantId)
                 ->where('p.is_active', true)
-                ->whereRaw('COALESCE(si.on_hand, 0) <= COALESCE(si.reorder_point, 5)')
                 ->select([
                     'pv.id as variant_id',
                     'p.name as product_name',
                     'pv.flavor',
                     'p.sku',
                     DB::raw('COALESCE(si.on_hand, 0) as qty_on_hand'),
-                    DB::raw('COALESCE(si.reorder_point, 5) as reorder_point'),
-                    DB::raw('GREATEST(COALESCE(si.reorder_point, 5) - COALESCE(si.on_hand, 0), 1) as suggested_qty'),
+                    DB::raw('COALESCE(si.stock_min, 0) as stock_min'),
+                    'si.stock_max',
+                    DB::raw('COALESCE(si.lead_time_gg, 3) as lead_time_gg'),
+                    DB::raw('COALESCE(si.giorni_copertura_target, 15) as giorni_copertura_target'),
                     DB::raw('COALESCE(pv.cost_price, 0) as unit_cost'),
                     'p.default_supplier_id as supplier_id',
                 ]);
@@ -510,11 +539,53 @@ class PurchaseOrderController extends Controller
                 $q->where('p.default_supplier_id', (int) $supplierId);
             }
 
-            $items = $q->orderByRaw('COALESCE(si.on_hand, 0) ASC')->get();
+            $variants = $q->get();
+            $items = [];
+
+            foreach ($variants as $v) {
+                // Algoritmo PREDITTIVO
+                $sold30d = $salesData->get($v->variant_id)->total_sold_30d ?? 0;
+                $dailyAvg = $sold30d / 30;
+
+                $leadTime = (int) $v->lead_time_gg;
+                $targetDays = (int) $v->giorni_copertura_target;
+                
+                // Formula: (MediaGiornaliera * (LeadTime + GiorniCopertura)) - GiacenzaAttuale
+                $targetStock = $dailyAvg * ($leadTime + $targetDays);
+                $proposal = ceil($targetStock - $v->qty_on_hand);
+
+                // Vincoli [stock_min, stock_max]
+                if ($proposal < $v->stock_min) {
+                    $proposal = $v->stock_min;
+                }
+                
+                if ($v->stock_max !== null && $proposal > $v->stock_max) {
+                    $proposal = $v->stock_max;
+                }
+
+                // Se la proposta finale è > 0, lo inseriamo nel riordino
+                if ($proposal > 0) {
+                    $items[] = [
+                        'variant_id' => $v->variant_id,
+                        'product_name' => $v->product_name,
+                        'flavor' => $v->flavor,
+                        'sku' => $v->sku,
+                        'qty_on_hand' => $v->qty_on_hand,
+                        'reorder_point' => $v->stock_min, // alias for frontend compatibility
+                        'suggested_qty' => $proposal,
+                        'unit_cost' => $v->unit_cost,
+                        'supplier_id' => $v->supplier_id,
+                        'daily_avg' => round($dailyAvg, 2),
+                    ];
+                }
+            }
+
+            // Ordina per qty_on_hand crescente
+            usort($items, fn($a, $b) => $a['qty_on_hand'] <=> $b['qty_on_hand']);
 
             return response()->json(['data' => $items]);
         } catch (\Throwable $e) {
-            return response()->json(['data' => [], 'error' => $e->getMessage()], 200);
+            return response()->json(['data' => [], 'error' => $e->getMessage()], 200); // Ritorna 200 con array vuoto per non spaccare il frontend
         }
 
     }

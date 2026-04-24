@@ -26,6 +26,7 @@ export default function PurchaseOrdersPage() {
   const [receiveLines, setReceiveLines] = useState([]);
   const [receiveSaving, setReceiveSaving] = useState(false);
   const [receiveError, setReceiveError] = useState('');
+  const [receiveTogglePending, setReceiveTogglePending] = useState(false);
   const [lastReceived, setLastReceived] = useState(null); // po data after receive for DDT print
 
   const [form, setForm] = useState({
@@ -91,16 +92,16 @@ export default function PurchaseOrdersPage() {
     } finally { setActionLoading(null); }
   };
 
-  // Open receive modal: load PO detail first
-  const openReceive = async (po) => {
+    const openReceive = async (po) => {
     try {
       setReceiveError('');
       const res = await purchaseOrders.getOne(po.id);
       const detail = res.data?.data || null;
       if (!detail) { setError('Impossibile caricare dettaglio PO.'); return; }
       setReceiveModal({ ...po, lines: detail.lines || [] });
-      setReceiveLines((detail.lines || []).map(l => ({ ...l, qty_received: l.qty ?? 1 })));
+      setReceiveLines((detail.lines || []).map(l => ({ ...l, qty_received: 0, lot_number: '', expiry_date: '' })));
       setReceiveWarehouseId(warehousesList[0]?.id || '');
+      setReceiveTogglePending(true);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     }
@@ -108,8 +109,8 @@ export default function PurchaseOrdersPage() {
 
   const handleReceive = async () => {
     if (!receiveWarehouseId) { setReceiveError('Seleziona il magazzino di destinazione.'); return; }
-    if (receiveLines.some(l => !l.qty_received || l.qty_received < 1)) {
-      setReceiveError('Inserisci quantità valide per tutte le righe.');
+    if (receiveLines.every(l => !l.qty_received || l.qty_received < 1)) {
+      setReceiveError('Inserisci almeno una quantità ricevuta > 0 per salvare.');
       return;
     }
     try {
@@ -118,7 +119,9 @@ export default function PurchaseOrdersPage() {
         warehouse_id: receiveWarehouseId,
         lines: receiveLines.map(l => ({
           purchase_order_line_id: l.id,
-          qty_received: parseInt(l.qty_received),
+          qty_received: parseInt(l.qty_received) || 0,
+          lot_number: l.lot_number,
+          expiry_date: l.expiry_date,
         })),
       });
       // Save for DDT printing
@@ -337,44 +340,114 @@ export default function PurchaseOrdersPage() {
               <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 2 }}>Fornitore: {receiveModal.supplier_name}</div>
             </div>
 
-            <div style={{ padding: '20px 24px' }}>
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', height: 'calc(90vh - 140px)' }}>
               {receiveError && <div style={{ background: '#ef4444', color: '#fff', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 13 }}>{receiveError}</div>}
 
-              {/* Warehouse selector */}
-              <div style={{ marginBottom: 18 }}>
-                <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-                  Magazzino Destinazione *
-                </label>
-                <select className="field-input" value={receiveWarehouseId} onChange={e => setReceiveWarehouseId(e.target.value)}>
-                  <option value="">— seleziona magazzino —</option>
-                  {warehousesList.map(wh => <option key={wh.id} value={wh.id}>{wh.name}</option>)}
-                  {warehousesList.length === 0 && <option value="1">Magazzino Centrale (ID 1)</option>}
-                </select>
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'flex-end' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                    Magazzino Destinazione *
+                  </label>
+                  <select className="field-input" value={receiveWarehouseId} onChange={e => setReceiveWarehouseId(e.target.value)}>
+                    <option value="">— seleziona magazzino —</option>
+                    {warehousesList.map(wh => <option key={wh.id} value={wh.id}>{wh.name}</option>)}
+                    {warehousesList.length === 0 && <option value="1">Magazzino Centrale (ID 1)</option>}
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                    Spara Barcode Pistola
+                  </label>
+                  <input
+                    type="text"
+                    className="field-input"
+                    placeholder="Spara qui il barcode..."
+                    autoFocus
+                    onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                            const barcode = e.target.value.trim();
+                            if (!barcode) return;
+                            const idx = receiveLines.findIndex(l => l.variant_barcode === barcode || l.product_barcode === barcode || l.sku === barcode);
+                            if (idx >= 0) {
+                                const ls = [...receiveLines];
+                                ls[idx].qty_received = (parseInt(ls[idx].qty_received) || 0) + 1;
+                                setReceiveLines(ls);
+                                toast.success(`+1 ${ls[idx].product_name}`);
+                            } else {
+                                toast.error('Barcode non trovato in questo ordine.');
+                            }
+                            e.target.value = '';
+                        }
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 10 }}>
+                    <input type="checkbox" id="togglePending" checked={receiveTogglePending} onChange={e => setReceiveTogglePending(e.target.checked)} style={{ accentColor: 'var(--color-accent)' }} />
+                    <label htmlFor="togglePending" style={{ color: '#fff', fontSize: 13, cursor: 'pointer' }}>Mostra solo da evadere</label>
+                </div>
               </div>
 
-              {/* Lines */}
-              <div>
-                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
-                  Prodotti da ricevere
-                </div>
-                {receiveLines.map((line, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px', gap: 10, marginBottom: 8, alignItems: 'center' }}>
-                    <div style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>
-                      {line.product_name || `Variante #${line.product_variant_id}`}
-                      {line.flavor && <span style={{ color: 'rgba(255,255,255,0.45)', marginLeft: 6 }}>— {line.flavor}</span>}
-                    </div>
-                    <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, textAlign: 'center' }}>
-                      Ordinato: <strong style={{ color: 'rgba(255,255,255,0.7)' }}>{line.qty}</strong>
-                    </div>
-                    <div>
-                      <input type="number" min="0" max={line.qty} value={line.qty_received}
-                        onChange={e => { const ls = [...receiveLines]; ls[idx] = { ...ls[idx], qty_received: parseInt(e.target.value) || 0 }; setReceiveLines(ls); }}
-                        style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '8px 12px', color: '#fff', width: '100%', fontSize: 14, fontWeight: 700 }}
-                        placeholder="Qtà ricevuta"
-                      />
-                    </div>
-                  </div>
-                ))}
+              {/* Lines Table */}
+              <div style={{ flex: 1, overflowY: 'auto', background: 'rgba(255,255,255,0.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)' }}>
+                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#252542', zIndex: 10 }}>
+                        <tr>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: 'rgba(255,255,255,0.6)', fontSize: 11, textTransform: 'uppercase' }}>Prodotto</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: 11, textTransform: 'uppercase' }}>Atteso</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: 11, textTransform: 'uppercase' }}>Riscontrato</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: 'rgba(255,255,255,0.6)', fontSize: 11, textTransform: 'uppercase' }}>Lotto</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: 'rgba(255,255,255,0.6)', fontSize: 11, textTransform: 'uppercase' }}>Scadenza</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {receiveLines.map((line, idx) => {
+                            if (receiveTogglePending && line.qty_received >= line.qty) return null;
+                            return (
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                onDoubleClick={() => {
+                                    const ls = [...receiveLines];
+                                    ls[idx].qty_received = (parseInt(ls[idx].qty_received) || 0) + 1;
+                                    setReceiveLines(ls);
+                                }}
+                                title="Doppio click per fare +1"
+                            >
+                                <td style={{ padding: '10px 14px', fontWeight: 600, color: '#fff', userSelect: 'none' }}>
+                                    {line.product_name} {line.flavor ? <span style={{ color: 'rgba(255,255,255,0.45)' }}>— {line.flavor}</span> : ''}
+                                </td>
+                                <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, color: 'rgba(255,255,255,0.6)', userSelect: 'none' }}>
+                                    {line.qty}
+                                </td>
+                                <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                        <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 16 }} onClick={() => {
+                                            const ls = [...receiveLines];
+                                            ls[idx].qty_received = Math.max(0, (parseInt(ls[idx].qty_received) || 0) - 1);
+                                            setReceiveLines(ls);
+                                        }}>−</button>
+                                        <input type="number" min="0" value={line.qty_received}
+                                            onChange={e => { const ls = [...receiveLines]; ls[idx].qty_received = parseInt(e.target.value) || 0; setReceiveLines(ls); }}
+                                            style={{ width: 60, textAlign: 'center', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '4px 6px', color: '#fff', fontWeight: 800 }}
+                                        />
+                                    </div>
+                                </td>
+                                <td style={{ padding: '10px 14px' }}>
+                                    <input type="text" placeholder="Es. L1234" value={line.lot_number || ''}
+                                        onChange={e => { const ls = [...receiveLines]; ls[idx].lot_number = e.target.value; setReceiveLines(ls); }}
+                                        style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '4px 8px', color: '#fff' }}
+                                    />
+                                </td>
+                                <td style={{ padding: '10px 14px' }}>
+                                    <input type="date" value={line.expiry_date || ''}
+                                        onChange={e => { const ls = [...receiveLines]; ls[idx].expiry_date = e.target.value; setReceiveLines(ls); }}
+                                        style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '4px 8px', color: '#fff' }}
+                                    />
+                                </td>
+                            </tr>
+                        )})}
+                    </tbody>
+                </table>
               </div>
             </div>
 
