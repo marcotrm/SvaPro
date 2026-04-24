@@ -2647,7 +2647,7 @@ export default function ShiftsPage() {
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Orari Store</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', marginTop: 2 }}>
-                    {th.open?.slice(0,5)} / {th.close?.slice(0,5)}
+                    {th.open?.slice(0,5) || '-'} / {th.close?.slice(0,5) || '-'}
                   </div>
                 </div>
               </div>

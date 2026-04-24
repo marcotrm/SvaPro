@@ -625,9 +625,19 @@ class StoreController extends Controller
             $day = strtolower($now->format('D')); // mon, tue, ...
             $todayHours = $oh[$day] ?? null;
             if ($todayHours && !($todayHours['closed'] ?? false)) {
-                $openTime  = Carbon::createFromFormat('H:i', $todayHours['open']  ?? '00:00', $tz);
-                $closeTime = Carbon::createFromFormat('H:i', $todayHours['close'] ?? '23:59', $tz);
-                $isOpenNow = $now->between($openTime, $closeTime);
+                try {
+                    $openStr = $todayHours['open'] ?? '00:00';
+                    $closeStr = $todayHours['close'] ?? '23:59';
+                    // Fallback se passano stringhe vuote
+                    if (empty(trim($openStr))) $openStr = '00:00';
+                    if (empty(trim($closeStr))) $closeStr = '23:59';
+                    
+                    $openTime  = Carbon::parse($openStr, $tz);
+                    $closeTime = Carbon::parse($closeStr, $tz);
+                    $isOpenNow = $now->between($openTime, $closeTime);
+                } catch (\Throwable $e) {
+                    $isOpenNow = false;
+                }
             }
         }
 

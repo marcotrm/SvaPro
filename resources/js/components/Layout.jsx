@@ -598,7 +598,7 @@ export default function Layout({ user, setUser }) {
           <div className="sp-topbar-actions">
             {storesList.length > 0 && (
               <select 
-                className="sp-select sp-desktop-only" 
+                className="sp-select" 
                 style={{ width: 200 }}
                 value={selectedStoreId} 
                 onChange={(e) => handleStoreChange(e.target.value)}
