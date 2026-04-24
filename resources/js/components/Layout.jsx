@@ -563,7 +563,7 @@ export default function Layout({ user, setUser }) {
                   borderLeft: active ? '3px solid #6366f1' : '3px solid transparent',
                   boxSizing: 'border-box',
                 }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                onMouseEnter={e => { prefetchRoute(item.href); if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
                 onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? 'rgba(99,102,241,0.18)' : 'transparent'; }}
               >
                 <Icon size={16} style={{ flexShrink: 0, opacity: active ? 1 : 0.6 }} />
