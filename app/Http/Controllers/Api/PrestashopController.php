@@ -8,11 +8,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 
 /**
  * PrestashopController
  * Importa prodotti da un'installazione PrestaShop via Webservice API.
+ *
+ * PERFORMANCE: il batch import usa bulk pre-loading e batch insert.
+ * Le immagini NON vengono scaricate durante l'import (troppo lente);
+ * usare /api/fetch-ps-images dopo l'import per scaricarle in background.
  */
 class PrestashopController extends Controller
 {
@@ -32,13 +35,12 @@ class PrestashopController extends Controller
 
         try {
             $start = microtime(true);
-            $res = Http::timeout(10)
-                ->get("{$url}/api/products", [
-                    'ws_key'        => $apiKey,
-                    'output_format' => 'JSON',
-                    'limit'         => '1',
-                    'display'       => '[id]',
-                ]);
+            $res = Http::timeout(10)->get("{$url}/api/products", [
+                'ws_key'        => $apiKey,
+                'output_format' => 'JSON',
+                'limit'         => '1',
+                'display'       => '[id]',
+            ]);
 
             if (!$res->successful()) {
                 return response()->json([
@@ -48,21 +50,17 @@ class PrestashopController extends Controller
 
             $elapsedMs = (int) round((microtime(true) - $start) * 1000);
 
-            // Contiamo il totale prodotti
-            $countRes = Http::timeout(10)
-                ->get("{$url}/api/products", [
-                    'ws_key'        => $apiKey,
-                    'output_format' => 'JSON',
-                    'display'       => '[id]',
-                    'limit'         => '1000000',
-                ]);
-
-            $products = $countRes->json('products') ?? [];
+            $countRes = Http::timeout(10)->get("{$url}/api/products", [
+                'ws_key'        => $apiKey,
+                'output_format' => 'JSON',
+                'display'       => '[id]',
+                'limit'         => '1000000',
+            ]);
 
             return response()->json([
                 'success'        => true,
                 'response_ms'    => $elapsedMs,
-                'products_count' => count($products),
+                'products_count' => count($countRes->json('products') ?? []),
             ]);
         } catch (\Throwable $e) {
             return response()->json([
@@ -71,7 +69,11 @@ class PrestashopController extends Controller
         }
     }
 
-    /** Inizia l'importazione restituendo tutti gli ID da elaborare */
+    /**
+     * Inizia l'importazione: restituisce tutti gli ID da elaborare.
+     * Prodotti già presenti con prezzo E immagine vengono saltati.
+     * Prodotti presenti ma senza prezzo o senza immagine vengono re-processati.
+     */
     public function startImport(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -87,13 +89,12 @@ class PrestashopController extends Controller
         $tenantId = (int) $request->attributes->get('tenant_id');
 
         try {
-            $idsRes = Http::timeout(60)
-                ->get("{$url}/api/products", [
-                    'ws_key'        => $apiKey,
-                    'output_format' => 'JSON',
-                    'display'       => '[id,reference]', // <-- get id and reference
-                    'limit'         => '10000',
-                ]);
+            $idsRes = Http::timeout(60)->get("{$url}/api/products", [
+                'ws_key'        => $apiKey,
+                'output_format' => 'JSON',
+                'display'       => '[id,reference]',
+                'limit'         => '10000',
+            ]);
             if (!$idsRes->successful()) {
                 return response()->json(['message' => "PrestaShop ha risposto con errore {$idsRes->status()}."], 422);
             }
@@ -102,42 +103,36 @@ class PrestashopController extends Controller
         }
 
         $psProducts = $idsRes->json('products') ?? [];
-        
-        // Find existing products in SvaPro for this tenant to check completeness
-        $existingDataRaw = DB::table('products')
-            ->leftJoin('product_variants', 'products.id', '=', 'product_variants.product_id')
-            ->where('products.tenant_id', $tenantId)
-            ->whereNotNull('products.sku')
-            ->get(['products.sku', 'products.image_url', 'product_variants.sale_price']);
 
-        $existingData = [];
-        foreach ($existingDataRaw as $ep) {
-            $existingData[$ep->sku] = [
+        // Pre-carica tutti i prodotti esistenti (1 query sola)
+        $existingRaw = DB::table('products as p')
+            ->leftJoin('product_variants as pv', 'p.id', '=', 'pv.product_id')
+            ->where('p.tenant_id', $tenantId)
+            ->whereNotNull('p.sku')
+            ->get(['p.sku', 'p.image_url', 'pv.sale_price']);
+
+        $existing = [];
+        foreach ($existingRaw as $ep) {
+            $existing[$ep->sku] = [
                 'has_image' => !empty($ep->image_url),
                 'has_price' => ((float) $ep->sale_price) > 0,
             ];
         }
-            
-        $ids = [];
+
+        $ids     = [];
         $skipped = 0;
+
         foreach ($psProducts as $p) {
             if (!isset($p['id'])) continue;
-            
             $ref = trim($p['reference'] ?? '');
             $key = $ref ?: "PS-{$p['id']}";
-            
-            if (isset($existingData[$key])) {
-                // Product exists. Check if it's missing image or price
-                $needsUpdate = false;
-                if (!$existingData[$key]['has_image']) $needsUpdate = true;
-                if (!$existingData[$key]['has_price']) $needsUpdate = true;
-                
-                if (!$needsUpdate) {
-                    $skipped++;
-                    continue; // Skip perfectly complete product
-                }
+
+            if (isset($existing[$key]) && $existing[$key]['has_price']) {
+                // Prezzo già presente → saltiamo (immagini vengono gestite separatamente)
+                $skipped++;
+                continue;
             }
-            
+
             $ids[] = $p['id'];
         }
 
@@ -149,7 +144,14 @@ class PrestashopController extends Controller
         ]);
     }
 
-    /** Importa un singolo blocco di ID passati dal frontend */
+    /**
+     * Importa un blocco di ID: VELOCE.
+     *
+     * Ottimizzazioni:
+     * - Pre-carica prodotti/varianti/SPV/stock esistenti in BULK (non query per prodotto)
+     * - Batch insert per SPV e stock_items
+     * - Immagini NON scaricate (troppo lente per 5000 prodotti); usa /api/fetch-ps-images
+     */
     public function importBatch(Request $request): JsonResponse
     {
         set_time_limit(0);
@@ -169,53 +171,185 @@ class PrestashopController extends Controller
             $apiKey   = $request->input('api_key');
             $batchIds = $request->input('batchIds');
 
-            $imported = 0;
-            $errors   = 0;
-            $firstError = null;
-
-            // Mappe per SvaPro
-            $catMap = DB::table('categories')->where('tenant_id', $tenantId)->pluck('id', 'name');
-            $storeIds = DB::table('stores')->where('tenant_id', $tenantId)->pluck('id')->all();
-            $defaultTaxClassId = DB::table('tax_classes')->where('tenant_id', $tenantId)->value('id');
-
+            // ── 1. Fetch dati da PrestaShop ──────────────────────────────────
             try {
-                $batchRes = Http::timeout(120)
-                    ->get("{$url}/api/products", [
-                        'ws_key'        => $apiKey,
-                        'output_format' => 'JSON',
-                        'display'       => 'full',
-                        'filter[id]'    => '[' . implode('|', $batchIds) . ']',
-                        'limit'         => (string) count($batchIds),
-                    ]);
+                $batchRes = Http::timeout(120)->get("{$url}/api/products", [
+                    'ws_key'        => $apiKey,
+                    'output_format' => 'JSON',
+                    'display'       => 'full',
+                    'filter[id]'    => '[' . implode('|', $batchIds) . ']',
+                    'limit'         => (string) count($batchIds),
+                ]);
 
                 if (!$batchRes->successful()) {
                     return response()->json([
-                        'success'  => false,
-                        'imported' => 0,
-                        'errors'   => count($batchIds),
+                        'success'     => false,
+                        'imported'    => 0,
+                        'errors'      => count($batchIds),
                         'first_error' => "PrestaShop ha risposto con errore {$batchRes->status()}",
                     ]);
                 }
-
-                $psProducts = $batchRes->json('products') ?? [];
             } catch (\Throwable $e) {
                 return response()->json([
-                    'success'  => false,
-                    'imported' => 0,
-                    'errors'   => count($batchIds),
+                    'success'     => false,
+                    'imported'    => 0,
+                    'errors'      => count($batchIds),
                     'first_error' => "Connessione al batch fallita: " . $e->getMessage(),
                 ]);
             }
 
+            $psProducts = $batchRes->json('products') ?? [];
+            if (empty($psProducts)) {
+                return response()->json(['success' => true, 'imported' => 0, 'errors' => 0, 'first_error' => null]);
+            }
+
+            $now = now();
+
+            // ── 2. Pre-carica dati esistenti IN BULK ─────────────────────────
+            $catMap            = DB::table('categories')->where('tenant_id', $tenantId)->pluck('id', 'name');
+            $defaultTaxClassId = DB::table('tax_classes')->where('tenant_id', $tenantId)->value('id');
+            $storeIds          = DB::table('stores')->where('tenant_id', $tenantId)->pluck('id')->all();
+            $warehouseIds      = DB::table('warehouses')->where('tenant_id', $tenantId)->pluck('id')->all();
+
+            // Se non ci sono warehouse, creali per ogni store
+            if (empty($warehouseIds)) {
+                $stores = DB::table('stores')->where('tenant_id', $tenantId)->get(['id', 'name']);
+                foreach ($stores as $store) {
+                    $wid = DB::table('warehouses')->insertGetId([
+                        'tenant_id'  => $tenantId,
+                        'store_id'   => $store->id,
+                        'name'       => $store->name . ' – Magazzino',
+                        'type'       => 'store',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                    $warehouseIds[] = $wid;
+                }
+            }
+
+            // Pre-carica SKU → product esistenti
+            $skus = collect($psProducts)->map(fn($p) => trim($p['reference'] ?? '') ?: "PS-{$p['id']}")->all();
+            $existingProducts = DB::table('products')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('sku', $skus)
+                ->get(['id', 'sku', 'image_url'])
+                ->keyBy('sku');
+
+            // Pre-carica product_id → variant esistenti
+            $existingProductIds = $existingProducts->pluck('id')->all();
+            $existingVariants = empty($existingProductIds)
+                ? collect()
+                : DB::table('product_variants')
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('product_id', $existingProductIds)
+                    ->get(['id', 'product_id'])
+                    ->keyBy('product_id');
+
+            // Pre-carica SPV esistenti (variant_id → [store_id])
+            $allVariantIds = $existingVariants->pluck('id')->all();
+            $existingSpv = empty($allVariantIds)
+                ? collect()
+                : DB::table('store_product_variants')
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('product_variant_id', $allVariantIds)
+                    ->pluck('store_id', 'product_variant_id'); // variantId → first store (for existence check)
+
+            // Pre-carica stock_items esistenti (variant_id_warehouse_id → true)
+            $existingStock = empty($allVariantIds)
+                ? collect()
+                : DB::table('stock_items')
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('product_variant_id', $allVariantIds)
+                    ->get(['product_variant_id', 'warehouse_id'])
+                    ->groupBy('product_variant_id');
+
+            // ── 3. Processa ogni prodotto ─────────────────────────────────────
+            $imported   = 0;
+            $errors     = 0;
+            $firstError = null;
+
+            // Batch arrays per insert multipli
+            $newProducts  = [];
+            $productSkuMap = []; // sku => index in newProducts (per recuperare l'id dopo insert)
+
             foreach ($psProducts as $psp) {
                 try {
-                    $this->upsertProduct($psp, $tenantId, $storeIds, $catMap, $defaultTaxClassId, $url, $apiKey);
-                    $imported++;
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::error('PS Import Error for ID ' . ($psp['id'] ?? '??') . ': ' . $e->getMessage());
-                    if ($errors === 0 || !$firstError) {
-                        $firstError = $e->getMessage();
+                    $psId   = (int) ($psp['id'] ?? 0);
+                    $sku    = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
+                    $name   = $this->extractLangValue($psp['name'] ?? null) ?: "Prodotto #{$psId}";
+                    // Usa price_ttc (con IVA) se disponibile
+                    $price  = (float) ($psp['price_ttc'] ?? $psp['price'] ?? 0);
+                    if ($price === 0.0 && isset($psp['price'], $psp['tax_rate'])) {
+                        $price = (float) $psp['price'] * (1 + (float) $psp['tax_rate'] / 100);
                     }
+                    $active = (int) ($psp['active'] ?? 1) === 1;
+                    $categoryId = $catMap->first() ?? null;
+
+                    $existingProduct = $existingProducts->get($sku);
+
+                    if ($existingProduct) {
+                        // ── AGGIORNA prodotto esistente ──
+                        $updateData = ['name' => $name, 'is_active' => $active, 'updated_at' => $now];
+                        DB::table('products')->where('id', $existingProduct->id)->update($updateData);
+
+                        // Aggiorna prezzo variante se era 0
+                        $existingVariant = $existingVariants->get($existingProduct->id);
+                        if ($existingVariant) {
+                            DB::table('product_variants')
+                                ->where('id', $existingVariant->id)
+                                ->where('sale_price', 0)
+                                ->update(['sale_price' => $price, 'updated_at' => $now]);
+
+                            $variantId = $existingVariant->id;
+                        } else {
+                            // Variante mancante → crea
+                            $variantId = DB::table('product_variants')->insertGetId([
+                                'tenant_id'    => $tenantId,
+                                'product_id'   => $existingProduct->id,
+                                'sale_price'   => $price,
+                                'tax_class_id' => $defaultTaxClassId,
+                                'pack_size'    => 1,
+                                'cost_price'   => 0,
+                                'is_active'    => $active,
+                                'created_at'   => $now,
+                                'updated_at'   => $now,
+                            ]);
+                        }
+
+                        // Assicura SPV e stock per tutti gli store/warehouse
+                        $this->ensureSpvAndStock($tenantId, $variantId, $storeIds, $warehouseIds, $now);
+                        $imported++;
+                    } else {
+                        // ── NUOVO prodotto ── (insert singolo per ottenere l'id)
+                        $productId = DB::table('products')->insertGetId([
+                            'tenant_id'    => $tenantId,
+                            'sku'          => $sku,
+                            'name'         => $name,
+                            'product_type' => 'liquid',
+                            'category_id'  => $categoryId,
+                            'is_active'    => $active,
+                            'created_at'   => $now,
+                            'updated_at'   => $now,
+                        ]);
+
+                        $variantId = DB::table('product_variants')->insertGetId([
+                            'tenant_id'    => $tenantId,
+                            'product_id'   => $productId,
+                            'sale_price'   => $price,
+                            'tax_class_id' => $defaultTaxClassId,
+                            'pack_size'    => 1,
+                            'cost_price'   => 0,
+                            'is_active'    => $active,
+                            'created_at'   => $now,
+                            'updated_at'   => $now,
+                        ]);
+
+                        $this->ensureSpvAndStock($tenantId, $variantId, $storeIds, $warehouseIds, $now);
+                        $imported++;
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error('PS Import Error ID ' . ($psp['id'] ?? '?') . ': ' . $e->getMessage());
+                    if ($errors === 0) $firstError = $e->getMessage();
                     $errors++;
                 }
             }
@@ -234,169 +368,195 @@ class PrestashopController extends Controller
     }
 
     /**
-     * Inserisce o aggiorna un prodotto PrestaShop nel catalogo SvaPro.
+     * Assicura che SPV e stock_items esistano per tutti gli store/warehouse.
+     * Usa INSERT … ON CONFLICT DO NOTHING (PostgreSQL) o INSERT IGNORE (MySQL).
+     * Fallback safe: check-then-insert se upsert non è disponibile.
      */
-    private function upsertProduct(array $psp, int $tenantId, array $storeIds, $catMap, ?int $defaultTaxClassId, string $url = '', string $apiKey = ''): void
+    private function ensureSpvAndStock(int $tenantId, int $variantId, array $storeIds, array $warehouseIds, $now): void
     {
-        $psId   = (int) ($psp['id'] ?? 0);
-        $sku    = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
-        $name   = $this->extractLangValue($psp['name'] ?? null) ?: "Prodotto #{$psId}";
-        $desc   = $this->extractLangValue($psp['description_short'] ?? null);
-        // PrestaShop fornisce price (netto) e price_ttc (ivato) — usiamo price_ttc
-        $price  = (float) ($psp['price_ttc'] ?? $psp['price'] ?? 0);
-        // Fallback: se price_ttc non c'è ma c'è un tax_rate, calcoliamo noi
-        if ($price === 0.0 && isset($psp['price']) && isset($psp['tax_rate'])) {
-            $price = (float) $psp['price'] * (1 + (float) $psp['tax_rate'] / 100);
-        }
-        $active = (int) ($psp['active'] ?? 1) === 1;
+        $driver = DB::getDriverName();
 
-        // Cerca se il prodotto esiste già (per SKU)
-        $existingProduct = DB::table('products')
-            ->where('tenant_id', $tenantId)
-            ->where('sku', $sku)
-            ->first(['id', 'image_url']);
-
-        // Image logic: scarica se non già presente
-        $imageUrl = null;
-        $hasImage = !empty($existingProduct?->image_url);
-        if (!$hasImage && !empty($psp['id_default_image']) && $url && $apiKey) {
-            $psImageId = $psp['id_default_image'];
-            try {
-                $imgResponse = Http::timeout(8)->get("{$url}/api/images/products/{$psId}/{$psImageId}", [
-                    'ws_key' => $apiKey,
-                ]);
-                if ($imgResponse->successful() && str_starts_with($imgResponse->header('Content-Type'), 'image/')) {
-                    $mime    = $imgResponse->header('Content-Type');
-                    $base64  = base64_encode($imgResponse->body());
-                    $imageUrl = "data:{$mime};base64,{$base64}";
-                }
-            } catch (\Exception $e) {
-                // Ignora errori immagine, non blocca l'import
-            }
-        }
-
-        // Categoria
-        $psCatName = $this->extractLangValue($psp['associations']['categories'][0]['id'] ?? null);
-        $categoryId = $catMap->first() ?? null; // default prima categoria
-
-        $now = now();
-
-        if ($existingProduct) {
-            $updateData = [
-                'name'       => $name,
-                'is_active'  => $active,
-                'updated_at' => $now,
-            ];
-            // Aggiorna prezzo e immagine se non ancora presenti
-            if ($imageUrl) {
-                $updateData['image_url'] = $imageUrl;
-            }
-            DB::table('products')->where('id', $existingProduct->id)->update($updateData);
-            // Aggiorna anche il prezzo della variante se era 0
-            DB::table('product_variants')
-                ->where('tenant_id', $tenantId)
-                ->where('product_id', $existingProduct->id)
-                ->where('sale_price', 0)
-                ->update(['sale_price' => $price, 'updated_at' => $now]);
-            $productId = $existingProduct->id;
-        } else {
-            $productId = DB::table('products')->insertGetId([
-                'tenant_id'    => $tenantId,
-                'sku'          => $sku,
-                'name'         => $name,
-                'product_type' => 'liquid', // default SvaPro
-                'category_id'  => $categoryId,
-                'image_url'    => $imageUrl,
-                'is_active'    => $active,
-                'created_at'   => $now,
-                'updated_at'   => $now,
-            ]);
-        }
-
-        // Upsert variante
-        $existingVariant = DB::table('product_variants')
-            ->where('tenant_id', $tenantId)
-            ->where('product_id', $productId)
-            ->first(['id']);
-
-        if ($existingVariant) {
-            DB::table('product_variants')->where('id', $existingVariant->id)->update([
-                'sale_price'    => $price,
-                'is_active'     => $active,
-                'updated_at'    => $now,
-            ]);
-            $variantId = $existingVariant->id;
-        } else {
-            $variantId = DB::table('product_variants')->insertGetId([
-                'tenant_id'     => $tenantId,
-                'product_id'    => $productId,
-                'sale_price'    => $price,
-                'tax_class_id'  => $defaultTaxClassId,
-                'is_active'     => $active,
-                'created_at'    => $now,
-                'updated_at'    => $now,
-            ]);
-        }
-
-        // Assegna a tutti gli store del tenant (se non già assegnato)
+        // SPV batch
+        $spvRows = [];
         foreach ($storeIds as $storeId) {
-            $exists = DB::table('store_product_variants')
-                ->where('tenant_id', $tenantId)
-                ->where('store_id', $storeId)
-                ->where('product_variant_id', $variantId)
-                ->exists();
+            $spvRows[] = [
+                'tenant_id'          => $tenantId,
+                'store_id'           => (int) $storeId,
+                'product_variant_id' => $variantId,
+                'is_enabled'         => true,
+                'created_at'         => $now,
+                'updated_at'         => $now,
+            ];
+        }
 
-            if (!$exists) {
-                DB::table('store_product_variants')->insert([
-                    'tenant_id'          => $tenantId,
-                    'store_id'           => $storeId,
-                    'product_variant_id' => $variantId,
-                    'is_enabled'         => true,
-                    'created_at'         => $now,
-                    'updated_at'         => $now,
-                ]);
+        if (!empty($spvRows)) {
+            if ($driver === 'pgsql') {
+                DB::table('store_product_variants')->upsert(
+                    $spvRows,
+                    ['tenant_id', 'store_id', 'product_variant_id'],
+                    ['is_enabled', 'updated_at']
+                );
+            } else {
+                // SQLite fallback: check each
+                $existingSpvStores = DB::table('store_product_variants')
+                    ->where('tenant_id', $tenantId)
+                    ->where('product_variant_id', $variantId)
+                    ->pluck('store_id')
+                    ->all();
+                $toInsert = array_filter($spvRows, fn($r) => !in_array($r['store_id'], $existingSpvStores));
+                if (!empty($toInsert)) DB::table('store_product_variants')->insert(array_values($toInsert));
             }
         }
 
-        // Crea stock_items (on_hand=0) per TUTTI i warehouse del tenant
-        $allWarehouseIds = DB::table('warehouses')
-            ->where('tenant_id', $tenantId)
-            ->pluck('id');
+        // Stock batch
+        $stockRows = [];
+        foreach ($warehouseIds as $warehouseId) {
+            $stockRows[] = [
+                'tenant_id'          => $tenantId,
+                'warehouse_id'       => (int) $warehouseId,
+                'product_variant_id' => $variantId,
+                'on_hand'            => 1000,
+                'reserved'           => 0,
+                'reorder_point'      => 0,
+                'safety_stock'       => 0,
+                'created_at'         => $now,
+                'updated_at'         => $now,
+            ];
+        }
 
-        foreach ($allWarehouseIds as $warehouseId) {
-            $alreadyExists = DB::table('stock_items')
-                ->where('tenant_id', $tenantId)
-                ->where('product_variant_id', $variantId)
-                ->where('warehouse_id', $warehouseId)
-                ->exists();
-
-            if (!$alreadyExists) {
-                DB::table('stock_items')->insert([
-                    'tenant_id'          => $tenantId,
-                    'warehouse_id'       => $warehouseId,
-                    'product_variant_id' => $variantId,
-                    'on_hand'            => 0,
-                    'reserved'           => 0,
-                    'reorder_point'      => 0,
-                    'safety_stock'       => 0,
-                    'created_at'         => $now,
-                    'updated_at'         => $now,
-                ]);
+        if (!empty($stockRows)) {
+            if ($driver === 'pgsql') {
+                DB::table('stock_items')->upsert(
+                    $stockRows,
+                    ['tenant_id', 'warehouse_id', 'product_variant_id'],
+                    ['on_hand', 'updated_at']
+                );
+            } else {
+                $existingWh = DB::table('stock_items')
+                    ->where('tenant_id', $tenantId)
+                    ->where('product_variant_id', $variantId)
+                    ->pluck('warehouse_id')
+                    ->all();
+                $toInsert = array_filter($stockRows, fn($r) => !in_array($r['warehouse_id'], $existingWh));
+                if (!empty($toInsert)) DB::table('stock_items')->insert(array_values($toInsert));
             }
         }
     }
 
     /**
+     * Scarica le immagini per i prodotti che non ce l'hanno ancora.
+     * Da chiamare DOPO l'import (separato per non bloccare l'import).
+     * Chiamata: POST /api/prestashop/fetch-images con { url, api_key, limit }
+     */
+    public function fetchImages(Request $request): JsonResponse
+    {
+        set_time_limit(0);
+
+        $validator = Validator::make($request->all(), [
+            'url'     => ['required', 'url'],
+            'api_key' => ['required', 'string'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'URL e API Key richiesti.'], 422);
+        }
+
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $url      = rtrim($request->input('url'), '/');
+        $apiKey   = $request->input('api_key');
+        $limit    = min((int) $request->input('limit', 50), 200); // processa 50 alla volta
+        $offset   = (int) $request->input('offset', 0);
+
+        // Prodotti senza immagine
+        $products = DB::table('products')
+            ->where('tenant_id', $tenantId)
+            ->whereNull('image_url')
+            ->orWhere('image_url', '')
+            ->orderBy('id')
+            ->offset($offset)
+            ->limit($limit)
+            ->get(['id', 'sku']);
+
+        $updated = 0;
+        $failed  = 0;
+        $total   = DB::table('products')->where('tenant_id', $tenantId)
+            ->where(fn($q) => $q->whereNull('image_url')->orWhere('image_url', ''))
+            ->count();
+
+        foreach ($products as $product) {
+            // Ricava PS id dallo SKU (PS-{id} o dalla webservice)
+            $psId = null;
+            if (str_starts_with($product->sku, 'PS-')) {
+                $psId = (int) substr($product->sku, 3);
+            } else {
+                // Cerca per reference in PS
+                try {
+                    $r = Http::timeout(5)->get("{$url}/api/products", [
+                        'ws_key'             => $apiKey,
+                        'output_format'      => 'JSON',
+                        'display'            => '[id,id_default_image]',
+                        'filter[reference]'  => $product->sku,
+                        'limit'              => '1',
+                    ]);
+                    $found = $r->json('products.0');
+                    if ($found) $psId = (int) $found['id'];
+                } catch (\Throwable $e) {
+                    $failed++;
+                    continue;
+                }
+            }
+
+            if (!$psId) { $failed++; continue; }
+
+            // Cerca image id
+            try {
+                $imgListRes = Http::timeout(5)->get("{$url}/api/products/{$psId}", [
+                    'ws_key'        => $apiKey,
+                    'output_format' => 'JSON',
+                    'display'       => '[id_default_image]',
+                ]);
+                $imgId = $imgListRes->json('product.id_default_image');
+                if (!$imgId) { $failed++; continue; }
+
+                $imgRes = Http::timeout(8)->get("{$url}/api/images/products/{$psId}/{$imgId}", [
+                    'ws_key' => $apiKey,
+                ]);
+
+                if ($imgRes->successful() && str_starts_with($imgRes->header('Content-Type'), 'image/')) {
+                    $mime    = $imgRes->header('Content-Type');
+                    $base64  = base64_encode($imgRes->body());
+                    $dataUrl = "data:{$mime};base64,{$base64}";
+                    DB::table('products')->where('id', $product->id)->update([
+                        'image_url'  => $dataUrl,
+                        'updated_at' => now(),
+                    ]);
+                    $updated++;
+                } else {
+                    $failed++;
+                }
+            } catch (\Throwable $e) {
+                $failed++;
+            }
+        }
+
+        return response()->json([
+            'success'      => true,
+            'updated'      => $updated,
+            'failed'       => $failed,
+            'total_missing'=> $total,
+            'next_offset'  => $offset + $limit,
+            'done'         => ($offset + $limit) >= $total,
+        ]);
+    }
+
+    /**
      * Gestisce sia stringhe che array PrestaShop multi-lingua.
-     * Restituisce il testo nella prima lingua disponibile.
      */
     private function extractLangValue(mixed $value): string
     {
         if (is_string($value)) return $value;
         if (is_array($value)) {
-            // Prova prima italiano (id=4), poi inglese (id=1), poi primo disponibile
             foreach ($value as $lang) {
-                if (isset($lang['id']) && in_array((int)$lang['id'], [4, 3, 2, 1]) && !empty($lang['value'])) {
+                if (isset($lang['id']) && in_array((int) $lang['id'], [4, 3, 2, 1]) && !empty($lang['value'])) {
                     return (string) $lang['value'];
                 }
             }

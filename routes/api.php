@@ -240,6 +240,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
         Route::post('/prestashop/test', [PrestashopController::class, 'test']);
         Route::post('/prestashop/import/start', [PrestashopController::class, 'startImport']);
         Route::post('/prestashop/import/batch', [PrestashopController::class, 'importBatch']);
+        Route::post('/prestashop/fetch-images', [PrestashopController::class, 'fetchImages']);
 
         Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.manage');
         Route::put('/customers/{customerId}', [CustomerController::class, 'update'])->middleware('permission:customers.manage');
