@@ -242,30 +242,36 @@ class PrestashopController extends Controller
         $sku    = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
         $name   = $this->extractLangValue($psp['name'] ?? null) ?: "Prodotto #{$psId}";
         $desc   = $this->extractLangValue($psp['description_short'] ?? null);
-        $price  = (float) ($psp['price'] ?? 0);
+        // PrestaShop fornisce price (netto) e price_ttc (ivato) — usiamo price_ttc
+        $price  = (float) ($psp['price_ttc'] ?? $psp['price'] ?? 0);
+        // Fallback: se price_ttc non c'è ma c'è un tax_rate, calcoliamo noi
+        if ($price === 0.0 && isset($psp['price']) && isset($psp['tax_rate'])) {
+            $price = (float) $psp['price'] * (1 + (float) $psp['tax_rate'] / 100);
+        }
         $active = (int) ($psp['active'] ?? 1) === 1;
+
         // Cerca se il prodotto esiste già (per SKU)
         $existingProduct = DB::table('products')
             ->where('tenant_id', $tenantId)
             ->where('sku', $sku)
             ->first(['id', 'image_url']);
 
-        // Image logic
+        // Image logic: scarica se non già presente
         $imageUrl = null;
-        if (empty($existingProduct->image_url) && !empty($psp['id_default_image']) && $url && $apiKey) {
+        $hasImage = !empty($existingProduct?->image_url);
+        if (!$hasImage && !empty($psp['id_default_image']) && $url && $apiKey) {
             $psImageId = $psp['id_default_image'];
             try {
-                // Fetch image from Prestashop API
-                $imgResponse = Http::timeout(10)->get("{$url}/api/images/products/{$psId}/{$psImageId}", [
+                $imgResponse = Http::timeout(8)->get("{$url}/api/images/products/{$psId}/{$psImageId}", [
                     'ws_key' => $apiKey,
                 ]);
                 if ($imgResponse->successful() && str_starts_with($imgResponse->header('Content-Type'), 'image/')) {
-                    $mime = $imgResponse->header('Content-Type');
-                    $base64 = base64_encode($imgResponse->body());
+                    $mime    = $imgResponse->header('Content-Type');
+                    $base64  = base64_encode($imgResponse->body());
                     $imageUrl = "data:{$mime};base64,{$base64}";
                 }
             } catch (\Exception $e) {
-                // Ignore image fetch errors to not block product import
+                // Ignora errori immagine, non blocca l'import
             }
         }
 
@@ -277,14 +283,21 @@ class PrestashopController extends Controller
 
         if ($existingProduct) {
             $updateData = [
-                'name'        => $name,
-                'is_active'   => $active,
-                'updated_at'  => $now,
+                'name'       => $name,
+                'is_active'  => $active,
+                'updated_at' => $now,
             ];
+            // Aggiorna prezzo e immagine se non ancora presenti
             if ($imageUrl) {
                 $updateData['image_url'] = $imageUrl;
             }
             DB::table('products')->where('id', $existingProduct->id)->update($updateData);
+            // Aggiorna anche il prezzo della variante se era 0
+            DB::table('product_variants')
+                ->where('tenant_id', $tenantId)
+                ->where('product_id', $existingProduct->id)
+                ->where('sale_price', 0)
+                ->update(['sale_price' => $price, 'updated_at' => $now]);
             $productId = $existingProduct->id;
         } else {
             $productId = DB::table('products')->insertGetId([

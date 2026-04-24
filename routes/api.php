@@ -143,6 +143,32 @@ Route::get('/debug-catalog', function () {
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
+Route::get('/bulk-set-stock', function () {
+    try {
+        // Setta on_hand=1000 per TUTTI i stock_items di tutti i prodotti
+        $updated = \Illuminate\Support\Facades\DB::table('stock_items')
+            ->update([
+                'on_hand'    => 1000,
+                'reserved'   => 0,
+                'updated_at' => now(),
+            ]);
+
+        // Assicura che ogni variante sia abilitata (is_enabled=true) in tutti gli store
+        $spvUpdated = \Illuminate\Support\Facades\DB::table('store_product_variants')
+            ->where('is_enabled', false)
+            ->update(['is_enabled' => true, 'updated_at' => now()]);
+
+        return response()->json([
+            'success'        => true,
+            'stock_rows_updated' => $updated,
+            'spv_re_enabled'     => $spvUpdated,
+            'message'        => "Stock impostato a 1000 per {$updated} righe. {$spvUpdated} store_product_variants riabilitati.",
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+});
+
 // ── Vista Corriere: endpoint pubblici autenticati via tenant code (?tk=CODE)
 Route::get('/driver/deliveries', [StoreDeliveryController::class, 'driverIndex']);
 Route::patch('/driver/deliveries/{id}/status', [StoreDeliveryController::class, 'driverUpdate']);

@@ -120,8 +120,8 @@ class CatalogController extends Controller
             $query->orderByDesc('id');
         }
 
-        // Limite ridotto a 100 per default per evitare response enormi (4900+ prodotti su prod)
-        $limit = min((int) $request->input('limit', 100), 500);
+        // Slim mode: nessun assignedStores → possiamo servire tutti i prodotti senza timeout
+        $limit = min((int) $request->input('limit', 10000), 10000);
 
         $products   = $query->limit($limit)->get();
         $productIds = $products->pluck('id')->all();
