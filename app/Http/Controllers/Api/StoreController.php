@@ -486,7 +486,7 @@ class StoreController extends Controller
             ->join('roles as r', 'r.id', '=', 'ur.role_id')
             ->join('users as u', 'u.id', '=', 'ur.user_id')
             ->where('u.tenant_id', $tenantId)
-            ->whereIn('r.code', ['superadmin', 'admin_cliente', 'admin', 'shift_manager'])
+            ->whereIn('r.code', ['superadmin', 'admin_cliente', 'admin', 'shift_manager', 'project_manager'])
             ->where('u.status', 'active')
             ->pluck('ur.user_id')
             ->unique();

@@ -341,6 +341,7 @@ class ShiftController extends Controller
                     DB::table('employee_notifications')->insert([
                         'tenant_id'  => $tenantId,
                         'user_id'    => $pmId,
+                        'type'       => 'shift_locked',
                         'title'      => "🔒 Turni bloccati — {$storeName}",
                         'body'       => "I turni della settimana {$weekLabel} sono stati bloccati e sono in attesa di conferma.",
                         'is_read'    => false,
@@ -445,6 +446,14 @@ class ShiftController extends Controller
         if (!$updated) {
             return response()->json(['message' => 'Nessun blocco trovato da confermare.'], 404);
         }
+
+        // Segna tutti i turni di quella settimana come confermati
+        $weekEndDate = Carbon::parse($request->input('week_start'))->addDays(6)->format('Y-m-d');
+        DB::table('shifts')
+            ->where('tenant_id', $tenantId)
+            ->where('store_id', $request->integer('store_id'))
+            ->whereBetween('date', [$request->input('week_start'), $weekEndDate])
+            ->update(['status' => 'confirmed']);
 
         // Notifica allo store manager che ha bloccato
         $lock = DB::table('shift_week_locks')

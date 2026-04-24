@@ -347,23 +347,35 @@ class EmployeeController extends Controller
     public function notifications(Request $request, int $employeeId): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
+        $userId   = $request->user()?->id;
 
-        if (! DB::table('employees')->where('tenant_id', $tenantId)->where('id', $employeeId)->exists()) {
+        if ($employeeId > 0 && ! DB::table('employees')->where('tenant_id', $tenantId)->where('id', $employeeId)->exists()) {
             return response()->json(['message' => 'Dipendente non trovato.'], 404);
         }
 
-        $svc = new EmployeeNotificationService();
-        $unread = $svc->getUnread($tenantId, $employeeId, 50);
+        $query = DB::table('employee_notifications')->where('tenant_id', $tenantId);
+        
+        if ($employeeId > 0 && $userId) {
+            $query->where(function($q) use ($employeeId, $userId) {
+                $q->where('employee_id', $employeeId)->orWhere('user_id', $userId);
+            });
+        } elseif ($employeeId > 0) {
+            $query->where('employee_id', $employeeId);
+        } elseif ($userId) {
+            $query->where('user_id', $userId);
+        } else {
+            return response()->json(['message' => 'Utente non valido.'], 400);
+        }
 
-        $all = DB::table('employee_notifications')
-            ->where('tenant_id', $tenantId)
-            ->where('employee_id', $employeeId)
+        $all = (clone $query)
             ->orderByDesc('created_at')
             ->limit(50)
             ->get();
+            
+        $unreadCount = (clone $query)->where('is_read', false)->count();
 
         return response()->json([
-            'unread_count' => count($unread),
+            'unread_count' => $unreadCount,
             'data' => $all,
         ]);
     }
@@ -371,9 +383,23 @@ class EmployeeController extends Controller
     public function markNotificationRead(Request $request, int $employeeId, int $notificationId): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
+        $userId   = $request->user()?->id;
 
-        $svc = new EmployeeNotificationService();
-        $marked = $svc->markAsRead($tenantId, $employeeId, $notificationId);
+        $query = DB::table('employee_notifications')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $notificationId);
+
+        if ($employeeId > 0 && $userId) {
+            $query->where(function($q) use ($employeeId, $userId) {
+                $q->where('employee_id', $employeeId)->orWhere('user_id', $userId);
+            });
+        } elseif ($employeeId > 0) {
+            $query->where('employee_id', $employeeId);
+        } elseif ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        $marked = $query->update(['is_read' => true, 'updated_at' => now()]);
 
         if (! $marked) {
             return response()->json(['message' => 'Notifica non trovata.'], 404);
@@ -385,9 +411,25 @@ class EmployeeController extends Controller
     public function markAllNotificationsRead(Request $request, int $employeeId): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
+        $userId   = $request->user()?->id;
 
-        $svc = new EmployeeNotificationService();
-        $count = $svc->markAllAsRead($tenantId, $employeeId);
+        $query = DB::table('employee_notifications')
+            ->where('tenant_id', $tenantId)
+            ->where('is_read', false);
+
+        if ($employeeId > 0 && $userId) {
+            $query->where(function($q) use ($employeeId, $userId) {
+                $q->where('employee_id', $employeeId)->orWhere('user_id', $userId);
+            });
+        } elseif ($employeeId > 0) {
+            $query->where('employee_id', $employeeId);
+        } elseif ($userId) {
+            $query->where('user_id', $userId);
+        } else {
+            return response()->json(['message' => '0 notifiche segnate come lette.']);
+        }
+
+        $count = $query->update(['is_read' => true, 'updated_at' => now()]);
 
         return response()->json(['message' => $count . ' notifiche segnate come lette.']);
     }

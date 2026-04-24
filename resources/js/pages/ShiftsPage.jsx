@@ -1440,8 +1440,8 @@ export default function ShiftsPage() {
   const isWeekLocked = weekLockStatus?.locked_at && !weekLockStatus?.confirmed_at;
   const isWeekConfirmed = !!weekLockStatus?.confirmed_at;
   // Dipendenti: possono editare solo se NON bloccati e NON confermati
-  // PM/Superadmin: possono editare sempre (anche se bloccati)
-  const isGridReadOnly = isDipendente && (isWeekLocked || isWeekConfirmed);
+  // PM/Superadmin: non possono editare se confermato (settimana definitiva)
+  const isGridReadOnly = isWeekConfirmed || (isDipendente && isWeekLocked);
   const canEditGrid = !isGridReadOnly;
 
   useEffect(() => {
@@ -2972,16 +2972,20 @@ export default function ShiftsPage() {
                           {hasShift ? (
                             <div style={{ background: `${shiftColor}15`, border: `1px solid ${shiftColor}40`, borderLeft: `4px solid ${shiftColor}`, borderRadius: 8, padding: '6px 8px', cursor: 'pointer' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
-                                <input type="time" value={shift.start_time || ''} onChange={e => { e.stopPropagation(); onCellChange(emp.id, day.dateStr, { start_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '3px', fontSize: 11, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
+                                <input type="time" value={shift.start_time || ''} readOnly={isGridReadOnly} onChange={e => { e.stopPropagation(); if (!isGridReadOnly) onCellChange(emp.id, day.dateStr, { start_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '3px', fontSize: 11, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
                                 <span style={{ fontSize: 11 }}>-</span>
-                                <input type="time" value={shift.end_time || ''} onChange={e => { e.stopPropagation(); onCellChange(emp.id, day.dateStr, { end_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '3px', fontSize: 11, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
+                                <input type="time" value={shift.end_time || ''} readOnly={isGridReadOnly} onChange={e => { e.stopPropagation(); if (!isGridReadOnly) onCellChange(emp.id, day.dateStr, { end_time: e.target.value }); }} style={{ flex: 1, width: 0, padding: '3px', fontSize: 11, fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)' }} />
                               </div>
                               <div style={{ fontSize: 9, color: '#8B5CF6', textAlign: 'center', fontWeight: 800, textTransform: 'uppercase' }}>Ospite</div>
                             </div>
                           ) : (
-                            <div style={{ height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(139,92,246,0.3)', borderRadius: 8, color: 'rgba(139,92,246,0.5)', fontSize: 12, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.05)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                              + Assegna
-                            </div>
+                            !isGridReadOnly ? (
+                              <div style={{ height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(139,92,246,0.3)', borderRadius: 8, color: 'rgba(139,92,246,0.5)', fontSize: 12, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.05)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                                + Assegna
+                              </div>
+                            ) : (
+                              <div style={{ height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 12 }}>-</div>
+                            )
                           )}
                           {renderCellMenu(emp.id, day.dateStr)}
                         </td>

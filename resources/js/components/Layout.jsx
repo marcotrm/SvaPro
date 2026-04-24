@@ -341,10 +341,9 @@ export default function Layout({ user, setUser }) {
 
   // Poll notifiche dipendente (pacco monete, ecc.) ogni 30s
   useEffect(() => {
-    const isRealDipendente = userRoles.includes('dipendente') && !userRoles.includes('project_manager') && !userRoles.includes('superadmin') && !userRoles.includes('admin_cliente') && !userRoles.includes('store_manager');
-    if (!isRealDipendente) return;
-    const empId = user?.employee_id;
-    if (!empId) return;
+    // Dipendenti o Admin/PM possono avere notifiche
+    const empId = user?.employee_id || 0;
+    if (!user) return;
     const pollEmpNotifs = async () => {
       try {
         const res = await employeesApi.getNotifications(empId, { is_read: 0 });
@@ -395,9 +394,10 @@ export default function Layout({ user, setUser }) {
   const openNotifPanel = () => {
     setShowNotifPanel(v => !v);
     setUnreadAlerts(0);
-    // Marca come lette le notifiche dipendente
-    if (unreadEmpNotifs > 0 && user?.employee_id) {
-      employeesApi.markAllNotificationsRead(user.employee_id).catch(() => {});
+    // Marca come lette le notifiche
+    const empId = user?.employee_id || 0;
+    if (unreadEmpNotifs > 0 && user) {
+      employeesApi.markAllNotificationsRead(empId).catch(() => {});
       setUnreadEmpNotifs(0);
     }
     // Reset contatore turni proposti
