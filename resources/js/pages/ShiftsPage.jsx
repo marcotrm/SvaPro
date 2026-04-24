@@ -1124,6 +1124,7 @@ function AllStoresOverview({
   weekDays, weekStart, setWeekStart,
   pmStoresList, pmWeekLocks, pmLoading, pmShiftCounts = {}, pmProposedCounts = {},
   onConfirmStore,
+  onSelectStore,
   globalRef, globalSearch, setGlobalSearch,
   globalResults, globalSearchLoading, showGlobalDrop, setShowGlobalDrop,
   loadGlobalEmpShifts, globalEmp, setGlobalEmp, setGlobalShifts, globalShifts,
@@ -1285,14 +1286,17 @@ function AllStoresOverview({
                 const statusLabel = isConfirmed ? '✅ Confermati' : isLocked ? '🔒 In Attesa' : proposed > 0 ? '📋 Turni Proposti' : '⏳ Non Inviati';
                 const cardBorder  = isLocked ? 'rgba(245,158,11,0.35)' : proposed > 0 ? 'rgba(99,102,241,0.3)' : 'var(--color-border)';
                 return (
-                  <div key={store.id} style={{
+                  <div key={store.id}
+                  onClick={() => onSelectStore && onSelectStore(store.id)}
+                  style={{
                     background: 'var(--color-surface)', borderRadius: 16, padding: '18px 20px',
                     border: `1.5px solid ${cardBorder}`,
                     boxShadow: isLocked ? '0 0 0 2px rgba(245,158,11,0.1)' : proposed > 0 ? '0 0 0 2px rgba(99,102,241,0.08)' : 'none',
-                    transition: 'box-shadow 0.18s',
+                    transition: 'box-shadow 0.18s, transform 0.18s',
+                    cursor: onSelectStore ? 'pointer' : 'default',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)'}
-                  onMouseLeave={e => e.currentTarget.style.boxShadow = isLocked ? '0 0 0 2px rgba(245,158,11,0.1)' : proposed > 0 ? '0 0 0 2px rgba(99,102,241,0.08)' : 'none'}>
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 8px 28px rgba(0,0,0,0.13)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow = isLocked ? '0 0 0 2px rgba(245,158,11,0.1)' : proposed > 0 ? '0 0 0 2px rgba(99,102,241,0.08)' : 'none'; e.currentTarget.style.transform = 'translateY(0)'; }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
                       <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--color-text)' }}>{store.name}</div>
                       <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${statusColor}18`, color: statusColor, whiteSpace: 'nowrap', marginLeft: 8 }}>
@@ -2141,6 +2145,7 @@ export default function ShiftsPage() {
       onConfirmStore={handlePmConfirm}
       onPmPreview={isShiftManager ? handlePmPreview : undefined}
       onPmConfirm={isShiftManager ? handlePmConfirm : undefined}
+      onSelectStore={(id) => { setStoreId(String(id)); localStorage.setItem('selectedStoreId', String(id)); }}
       globalRef={globalRef}
       globalSearch={globalSearch}
       setGlobalSearch={setGlobalSearch}
