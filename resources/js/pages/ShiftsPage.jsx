@@ -206,14 +206,38 @@ function _minsToStr(m) {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
-// Orario standard punto vendita
+// Orario standard punto vendita (fallback)
 const STORE_OPEN_MINS  = _toMins('09:00');
 const STORE_CLOSE_MINS = _toMins('20:00');
 
-function detectGaps(shiftsMap, weekDays) {
+function detectGaps(shiftsMap, weekDays, currentStore = null) {
   const alerts = [];
   weekDays.forEach((day, index) => {
-    const isSunday = index === 6; // index 6 è Domenica (settimana inizia di Lunedì)
+    // 1. Determina gli orari di apertura previsti per il negozio in questo giorno
+    let expectedOpenMins = STORE_OPEN_MINS;
+    let expectedCloseMins = STORE_CLOSE_MINS;
+    let isStoreClosed = false;
+
+    if (currentStore && currentStore.opening_hours) {
+      const d = new Date(day.dateStr);
+      const dayName = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][d.getDay()];
+      const th = currentStore.opening_hours[dayName];
+      if (th && th.closed) {
+        isStoreClosed = true;
+      } else {
+        const slots = th?.slots || (th?.open ? [{ open: th.open, close: th.close }] : null);
+        if (slots && slots.length > 0) {
+          expectedOpenMins = _toMins(slots[0].open);
+          expectedCloseMins = _toMins(slots[slots.length - 1].close);
+        }
+      }
+    } else {
+      // Default: domenica chiuso se non c'è config store
+      if (index === 6) isStoreClosed = true;
+    }
+
+    if (isStoreClosed) return; // Niente buchi se il negozio è chiuso
+
     const intervals = [];
     
     Object.entries(shiftsMap).forEach(([key, s]) => {
@@ -227,11 +251,9 @@ function detectGaps(shiftsMap, weekDays) {
       intervals.push({ startMins, endMins });
     });
 
-    // Se non ci sono turni, segnala buco per tutta la giornata (tranne la domenica, se chiusa default)
+    // Se non ci sono turni in questo giorno, l'utente non vuole che appaia l'errore "buco"
+    // Questo permette di lasciare i giorni vuoti finché non si compila il turno.
     if (intervals.length === 0) {
-      if (!isSunday) {
-        alerts.push({ day: day.label, from: '09:00', to: '20:00' });
-      }
       return;
     }
 
@@ -248,9 +270,9 @@ function detectGaps(shiftsMap, weekDays) {
       }
     }
 
-    // 1. Controlla copertura all'Apertura (09:00)
-    if (merged[0].startMins > STORE_OPEN_MINS) {
-      alerts.push({ day: day.label, from: _minsToStr(STORE_OPEN_MINS), to: _minsToStr(merged[0].startMins) });
+    // 1. Controlla copertura all'Apertura
+    if (merged[0].startMins > expectedOpenMins) {
+      alerts.push({ day: day.label, from: _minsToStr(expectedOpenMins), to: _minsToStr(merged[0].startMins) });
     }
 
     // 2. Controlla gap intermedi (tra intervalli uniti)
@@ -258,13 +280,12 @@ function detectGaps(shiftsMap, weekDays) {
       alerts.push({ day: day.label, from: _minsToStr(merged[i].endMins), to: _minsToStr(merged[i+1].startMins) });
     }
 
-    // 3. Controlla copertura alla Chiusura (20:00)
+    // 3. Controlla copertura alla Chiusura
     const lastMerged = merged[merged.length - 1];
-    if (lastMerged.endMins < STORE_CLOSE_MINS) {
-      alerts.push({ day: day.label, from: _minsToStr(lastMerged.endMins), to: _minsToStr(STORE_CLOSE_MINS) });
+    if (lastMerged.endMins < expectedCloseMins) {
+      alerts.push({ day: day.label, from: _minsToStr(lastMerged.endMins), to: _minsToStr(expectedCloseMins) });
     }
   });
-
   return alerts;
 }
 
@@ -1445,7 +1466,8 @@ export default function ShiftsPage() {
   }, []);
 
   // ── Gap detection (ricalcola ogni volta che shifts cambia) ──────────────────
-  const gapAlerts = useMemo(() => detectGaps(shifts, weekDays), [shifts, weekDays]);
+  const currentStoreData = useMemo(() => pmStoresList.find(s => String(s.id) === String(storeId)) || null, [pmStoresList, storeId]);
+  const gapAlerts = useMemo(() => detectGaps(shifts, weekDays, currentStoreData), [shifts, weekDays, currentStoreData]);
 
   // ── Carica stato lock della settimana ──
   const weekStartStr = formatDate(weekStart);
