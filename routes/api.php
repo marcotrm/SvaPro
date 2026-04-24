@@ -476,6 +476,14 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
         Route::post('/shifts/unlock-week', [\App\Http\Controllers\Api\ShiftController::class, 'unlockWeek']);
         Route::get('/shifts/week-locks', [\App\Http\Controllers\Api\ShiftController::class, 'getWeekLocks']);
         Route::post('/shifts/confirm-week', [\App\Http\Controllers\Api\ShiftController::class, 'confirmWeek']);
+        
+        Route::get('/run-cleanup', function () {
+            \Illuminate\Support\Facades\Artisan::call('app:cleanup-dummy-employees');
+            return response()->json([
+                'message' => 'Pulizia eseguita sul server live!',
+                'output' => \Illuminate\Support\Facades\Artisan::output()
+            ]);
+        });
 
         // Reports — accessibili anche ai dipendenti (filtrati automaticamente al proprio store)
         Route::get('/reports/summary', [ReportController::class, 'summary']);
