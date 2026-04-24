@@ -652,6 +652,24 @@ function PrestashopImportModal({ onClose, onImported }) {
 
   const cleanUrl = (u) => u.trim().replace(/\/$/, '');
 
+  const wipeCatalog = async () => {
+    if (!window.confirm("Sei SICURO di voler CANCELLARE TUTTO IL CATALOGO e azzerare tutte le giacenze? L'operazione è irreversibile!")) return;
+    setStatus('testing');
+    addLog('Svuotamento catalogo in corso...', 'warn');
+    try {
+      const res = await api.get('/prestashop/wipe-all-products');
+      toast.success(res.data?.message || 'Catalogo svuotato con successo!');
+      addLog('🗑 Catalogo e giacenze svuotati completamente.', 'success');
+      onImported();
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Errore durante lo svuotamento';
+      toast.error(msg);
+      addLog(`❌ ${msg}`, 'error');
+    } finally {
+      setStatus('idle');
+    }
+  };
+
   const testConnection = async () => {
     if (!psUrl || !apiKey) { toast.error('Inserisci URL PrestaShop e API Key'); return; }
     setStatus('testing'); setTestOk(false); setLog([]);
@@ -796,8 +814,16 @@ function PrestashopImportModal({ onClose, onImported }) {
             </button>
           ) : (
             <>
+              <button
+                className="sp-btn"
+                onClick={wipeCatalog}
+                disabled={isBusy}
+                style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', marginRight: 'auto' }}
+              >
+                <Trash2 size={14} /> Svuota Catalogo
+              </button>
               <button className="sp-btn sp-btn-secondary" onClick={testConnection} disabled={isBusy || !psUrl || !apiKey}>
-                {status === 'testing' ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Test...</> : 'Testa connessione'}
+                {status === 'testing' ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Attendere...</> : 'Testa connessione'}
               </button>
               <button
                 className="sp-btn sp-btn-primary"
