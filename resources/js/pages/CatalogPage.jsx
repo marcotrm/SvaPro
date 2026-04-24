@@ -40,7 +40,7 @@ export default function CatalogPage() {
       // Catalogo admin: mostra SEMPRE tutti i prodotti del tenant (no filtro store_id)
       // L'assegnazione per negozio è già inclusa in variant.assigned_stores nella risposta
       const [pRes, sRes, cRes] = await Promise.all([
-        catalog.getProducts({ limit: 500 }),
+        catalog.getProducts({ limit: 10000 }),
         suppliers.getAll().catch(() => ({ data: { data: [] } })),
         catalog.getCategories()
       ]);
@@ -712,9 +712,9 @@ function PrestashopImportModal({ onClose, onImported }) {
       }
       
       setProgress({ imported: 0, total: total, errors: 0 });
-      addLog(`Trovati ${total} prodotti. Inizio download super-veloce a blocchi di 250...`);
+      addLog(`Trovati ${total} prodotti. Inizio download super-veloce a blocchi di 50...`);
 
-      const batchSize = 250;
+      const batchSize = 50;
       let importedCount = 0;
       let errorCount = 0;
 
