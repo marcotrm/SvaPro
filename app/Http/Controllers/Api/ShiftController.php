@@ -449,7 +449,7 @@ class ShiftController extends Controller
 
         // Segna tutti i turni di quella settimana come confermati
         $weekEndDate = Carbon::parse($request->input('week_start'))->addDays(6)->format('Y-m-d');
-        DB::table('shifts')
+        DB::table('employee_shifts')
             ->where('tenant_id', $tenantId)
             ->where('store_id', $request->integer('store_id'))
             ->whereBetween('date', [$request->input('week_start'), $weekEndDate])
