@@ -420,76 +420,67 @@ class PrestashopController extends Controller
 
     /**
      * Assicura che SPV e stock_items esistano per tutti gli store/warehouse.
-     * Usa INSERT … ON CONFLICT DO NOTHING (PostgreSQL) o INSERT IGNORE (MySQL).
-     * Fallback safe: check-then-insert se upsert non è disponibile.
+     * NON usa upsert() (richiede unique constraint che potrebbe non esistere).
+     * Approccio sicuro: pre-carica esistenti → inserisce solo quelli mancanti.
      */
     private function ensureSpvAndStock(int $tenantId, int $variantId, array $storeIds, array $warehouseIds, $now): void
     {
-        $driver = DB::getDriverName();
+        // ── SPV: inserisci solo gli store non ancora presenti ─────────────────
+        if (!empty($storeIds)) {
+            $existingStoreIds = DB::table('store_product_variants')
+                ->where('tenant_id', $tenantId)
+                ->where('product_variant_id', $variantId)
+                ->pluck('store_id')
+                ->map(fn($id) => (int) $id)
+                ->all();
 
-        // SPV batch
-        $spvRows = [];
-        foreach ($storeIds as $storeId) {
-            $spvRows[] = [
-                'tenant_id'          => $tenantId,
-                'store_id'           => (int) $storeId,
-                'product_variant_id' => $variantId,
-                'is_enabled'         => true,
-                'created_at'         => $now,
-                'updated_at'         => $now,
-            ];
-        }
+            $missingSpv = [];
+            foreach ($storeIds as $storeId) {
+                if (!in_array((int) $storeId, $existingStoreIds, true)) {
+                    $missingSpv[] = [
+                        'tenant_id'          => $tenantId,
+                        'store_id'           => (int) $storeId,
+                        'product_variant_id' => $variantId,
+                        'is_enabled'         => true,
+                        'created_at'         => $now,
+                        'updated_at'         => $now,
+                    ];
+                }
+            }
 
-        if (!empty($spvRows)) {
-            if ($driver === 'pgsql') {
-                DB::table('store_product_variants')->upsert(
-                    $spvRows,
-                    ['tenant_id', 'store_id', 'product_variant_id'],
-                    ['is_enabled', 'updated_at']
-                );
-            } else {
-                // SQLite fallback: check each
-                $existingSpvStores = DB::table('store_product_variants')
-                    ->where('tenant_id', $tenantId)
-                    ->where('product_variant_id', $variantId)
-                    ->pluck('store_id')
-                    ->all();
-                $toInsert = array_filter($spvRows, fn($r) => !in_array($r['store_id'], $existingSpvStores));
-                if (!empty($toInsert)) DB::table('store_product_variants')->insert(array_values($toInsert));
+            if (!empty($missingSpv)) {
+                DB::table('store_product_variants')->insert($missingSpv);
             }
         }
 
-        // Stock batch
-        $stockRows = [];
-        foreach ($warehouseIds as $warehouseId) {
-            $stockRows[] = [
-                'tenant_id'          => $tenantId,
-                'warehouse_id'       => (int) $warehouseId,
-                'product_variant_id' => $variantId,
-                'on_hand'            => 1000,
-                'reserved'           => 0,
-                'reorder_point'      => 0,
-                'safety_stock'       => 0,
-                'created_at'         => $now,
-                'updated_at'         => $now,
-            ];
-        }
+        // ── Stock: inserisci solo i warehouse non ancora presenti ─────────────
+        if (!empty($warehouseIds)) {
+            $existingWhIds = DB::table('stock_items')
+                ->where('tenant_id', $tenantId)
+                ->where('product_variant_id', $variantId)
+                ->pluck('warehouse_id')
+                ->map(fn($id) => (int) $id)
+                ->all();
 
-        if (!empty($stockRows)) {
-            if ($driver === 'pgsql') {
-                DB::table('stock_items')->upsert(
-                    $stockRows,
-                    ['tenant_id', 'warehouse_id', 'product_variant_id'],
-                    ['on_hand', 'updated_at']
-                );
-            } else {
-                $existingWh = DB::table('stock_items')
-                    ->where('tenant_id', $tenantId)
-                    ->where('product_variant_id', $variantId)
-                    ->pluck('warehouse_id')
-                    ->all();
-                $toInsert = array_filter($stockRows, fn($r) => !in_array($r['warehouse_id'], $existingWh));
-                if (!empty($toInsert)) DB::table('stock_items')->insert(array_values($toInsert));
+            $missingStock = [];
+            foreach ($warehouseIds as $warehouseId) {
+                if (!in_array((int) $warehouseId, $existingWhIds, true)) {
+                    $missingStock[] = [
+                        'tenant_id'          => $tenantId,
+                        'warehouse_id'       => (int) $warehouseId,
+                        'product_variant_id' => $variantId,
+                        'on_hand'            => 1000,
+                        'reserved'           => 0,
+                        'reorder_point'      => 0,
+                        'safety_stock'       => 0,
+                        'created_at'         => $now,
+                        'updated_at'         => $now,
+                    ];
+                }
+            }
+
+            if (!empty($missingStock)) {
+                DB::table('stock_items')->insert($missingStock);
             }
         }
     }
