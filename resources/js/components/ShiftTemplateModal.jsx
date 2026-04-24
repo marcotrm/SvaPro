@@ -4,7 +4,8 @@ import { X, Plus, Trash2, Clock, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ConfirmModal from './ConfirmModal.jsx';
 
-export default function ShiftTemplateModal({ onClose, storeId }) {
+export default function ShiftTemplateModal({ onClose, storeId, stores = [] }) {
+  const [activeStoreId, setActiveStoreId] = useState(storeId || (stores.length > 0 ? stores[0].id : ''));
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -12,11 +13,16 @@ export default function ShiftTemplateModal({ onClose, storeId }) {
   const [form, setForm] = useState({ name: '', start_time: '09:00', end_time: '18:00', color: '#10B981' });
   const [confirmToDelete, setConfirmToDelete] = useState(null);
 
-  useEffect(() => { loadTemplates(); }, []);
+  useEffect(() => { loadTemplates(); }, [activeStoreId]);
 
   const loadTemplates = async () => {
+    if (!activeStoreId && stores.length === 0 && !storeId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
-      const res = await shifts.getTemplates({ store_id: storeId });
+      const res = await shifts.getTemplates({ store_id: activeStoreId || storeId });
       setTemplates(res.data?.data || []);
     } catch {
       toast.error('Errore nel caricamento dei template');
@@ -31,9 +37,14 @@ export default function ShiftTemplateModal({ onClose, storeId }) {
       toast.error('Compila tutti i campi obbligatori');
       return;
     }
+    const targetStoreId = activeStoreId || storeId;
+    if (!targetStoreId) {
+      toast.error('Seleziona uno store');
+      return;
+    }
     try {
       setAdding(true);
-      await shifts.saveTemplate({ ...form, store_id: storeId });
+      await shifts.saveTemplate({ ...form, store_id: targetStoreId });
       clearApiCache();
       toast.success('Template creato con successo');
       setForm({ name: '', start_time: '09:00', end_time: '18:00', color: '#10B981' });
@@ -75,6 +86,22 @@ export default function ShiftTemplateModal({ onClose, storeId }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}><X size={24} /></button>
         </div>
 
+        {stores && stores.length > 1 && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 4, display: 'block' }}>Store di appartenenza</label>
+            <select
+              value={activeStoreId}
+              onChange={e => setActiveStoreId(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)', outline: 'none', fontWeight: 600 }}
+            >
+              <option value="">-- Seleziona Store --</option>
+              {stores.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <form onSubmit={handleCreate} style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap', background: 'var(--color-surface)', padding: 16, borderRadius: 16 }}>
           <div style={{ flex: '1 1 100%' }}>
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 4, display: 'block' }}>Nome Modello (es. Mattina)</label>
@@ -103,7 +130,7 @@ export default function ShiftTemplateModal({ onClose, storeId }) {
           {loading ? (
             <div style={{ textAlign: 'center', padding: 20 }}><Loader size={24} className="animate-spin" style={{ opacity: 0.5 }} /></div>
           ) : templates.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--color-text-tertiary)', padding: 30, fontSize: 14 }}>Nessun modello salvato. Creane uno qui sopra.</div>
+            <div style={{ textAlign: 'center', color: 'var(--color-text-tertiary)', padding: 30, fontSize: 14 }}>Nessun modello salvato per questo store.</div>
           ) : (
             templates.map(t => (
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--color-surface)', borderRadius: 12, borderLeft: `6px solid ${t.color || '#10B981'}` }}>

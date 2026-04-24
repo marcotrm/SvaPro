@@ -596,7 +596,7 @@ export default function Layout({ user, setUser }) {
             </div>
           </div>
           <div className="sp-topbar-actions">
-            {storesList.length > 0 && (
+            {!(user?.roles?.includes('dipendente') && !user?.roles?.some(r => ['project_manager','superadmin','store_manager','admin_cliente','admin'].includes(r))) && storesList.length > 1 ? (
               <select 
                 className="sp-select" 
                 style={{ width: 200 }}
@@ -608,7 +608,11 @@ export default function Layout({ user, setUser }) {
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
-            )}
+            ) : storesList.length === 1 ? (
+              <div className="sp-desktop-only" style={{ fontSize: 13, fontWeight: 700, padding: '0 12px', color: 'var(--color-text-secondary)', background: 'var(--color-surface)', borderRadius: 8, height: 38, display: 'flex', alignItems: 'center' }}>
+                {storesList[0].name}
+              </div>
+            ) : null}
             {/* Bottone Panoramica Generale */}
              <button
               onClick={() => navigate('/dashboard')}
@@ -888,7 +892,7 @@ export default function Layout({ user, setUser }) {
             </div>
 
             {/* Store selector in drawer */}
-            {storesList.length > 0 && (
+            {!(user?.roles?.includes('dipendente') && !user?.roles?.some(r => ['project_manager','superadmin','store_manager','admin_cliente','admin'].includes(r))) && storesList.length > 1 ? (
               <div style={{ padding: '12px 16px', borderBottom: '1px solid #1a1a1a' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 6 }}>Negozio Attivo</div>
                 <select
@@ -901,7 +905,12 @@ export default function Layout({ user, setUser }) {
                   {storesList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
-            )}
+            ) : storesList.length === 1 ? (
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid #1a1a1a' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#555', marginBottom: 6 }}>Negozio Attivo</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{storesList[0].name}</div>
+              </div>
+            ) : null}
 
             {/* Navigation */}
             <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 10px' }}>
