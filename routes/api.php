@@ -54,6 +54,28 @@ Route::get('/test-report-serale', function() {
     ]);
 });
 
+Route::get('/prestashop/wipe-all-products', function() {
+    try { \Illuminate\Support\Facades\DB::statement('SET session_replication_role = replica;'); } catch (\Exception $e) {}
+    try { \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0;'); } catch (\Exception $e) {}
+
+    $count = \Illuminate\Support\Facades\DB::table('products')->count();
+    
+    \Illuminate\Support\Facades\DB::table('order_items')->delete();
+    \Illuminate\Support\Facades\DB::table('inventories')->delete();
+    \Illuminate\Support\Facades\DB::table('inventory_movements')->delete();
+    \Illuminate\Support\Facades\DB::table('store_product_variants')->delete();
+    \Illuminate\Support\Facades\DB::table('product_variants')->delete();
+    \Illuminate\Support\Facades\DB::table('products')->delete();
+
+    try { \Illuminate\Support\Facades\DB::statement('SET session_replication_role = origin;'); } catch (\Exception $e) {}
+    try { \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1;'); } catch (\Exception $e) {}
+
+    return response()->json([
+        'success' => true,
+        'message' => "Successfully wiped $count products and all their dependencies!"
+    ]);
+});
+
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
 
 // ── Vista Corriere: endpoint pubblici autenticati via tenant code (?tk=CODE)
