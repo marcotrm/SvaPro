@@ -103,28 +103,39 @@ class PrestashopController extends Controller
 
         $psProducts = $idsRes->json('products') ?? [];
         
-        // Find existing SKUs in SvaPro for this tenant
-        $existingSkus = DB::table('products')
-            ->where('tenant_id', $tenantId)
-            ->whereNotNull('sku')
-            ->pluck('sku')
-            ->toArray();
+        // Find existing products in SvaPro for this tenant to check completeness
+        $existingDataRaw = DB::table('products')
+            ->leftJoin('product_variants', 'products.id', '=', 'product_variants.product_id')
+            ->where('products.tenant_id', $tenantId)
+            ->whereNotNull('products.sku')
+            ->get(['products.sku', 'products.image_url', 'product_variants.sale_price']);
+
+        $existingData = [];
+        foreach ($existingDataRaw as $ep) {
+            $existingData[$ep->sku] = [
+                'has_image' => !empty($ep->image_url),
+                'has_price' => ((float) $ep->sale_price) > 0,
+            ];
+        }
             
         $ids = [];
         $skipped = 0;
         foreach ($psProducts as $p) {
             if (!isset($p['id'])) continue;
             
-            // Check if product already exists by SKU (reference)
             $ref = trim($p['reference'] ?? '');
-            if ($ref && in_array($ref, $existingSkus)) {
-                $skipped++;
-                continue; // Skip already imported product
-            }
-            // Fallback for empty reference -> checks PS-ID
-            if (!$ref && in_array("PS-{$p['id']}", $existingSkus)) {
-                $skipped++;
-                continue;
+            $key = $ref ?: "PS-{$p['id']}";
+            
+            if (isset($existingData[$key])) {
+                // Product exists. Check if it's missing image or price
+                $needsUpdate = false;
+                if (!$existingData[$key]['has_image']) $needsUpdate = true;
+                if (!$existingData[$key]['has_price']) $needsUpdate = true;
+                
+                if (!$needsUpdate) {
+                    $skipped++;
+                    continue; // Skip perfectly complete product
+                }
             }
             
             $ids[] = $p['id'];
@@ -233,10 +244,15 @@ class PrestashopController extends Controller
         $desc   = $this->extractLangValue($psp['description_short'] ?? null);
         $price  = (float) ($psp['price'] ?? 0);
         $active = (int) ($psp['active'] ?? 1) === 1;
+        // Cerca se il prodotto esiste già (per SKU)
+        $existingProduct = DB::table('products')
+            ->where('tenant_id', $tenantId)
+            ->where('sku', $sku)
+            ->first(['id', 'image_url']);
 
         // Image logic
         $imageUrl = null;
-        if (!empty($psp['id_default_image']) && $url && $apiKey) {
+        if (empty($existingProduct->image_url) && !empty($psp['id_default_image']) && $url && $apiKey) {
             $psImageId = $psp['id_default_image'];
             try {
                 // Fetch image from Prestashop API
@@ -256,12 +272,6 @@ class PrestashopController extends Controller
         // Categoria
         $psCatName = $this->extractLangValue($psp['associations']['categories'][0]['id'] ?? null);
         $categoryId = $catMap->first() ?? null; // default prima categoria
-
-        // Cerca se il prodotto esiste già (per SKU)
-        $existingProduct = DB::table('products')
-            ->where('tenant_id', $tenantId)
-            ->where('sku', $sku)
-            ->first(['id']);
 
         $now = now();
 
