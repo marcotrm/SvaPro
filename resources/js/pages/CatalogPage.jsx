@@ -712,9 +712,9 @@ function PrestashopImportModal({ onClose, onImported }) {
       }
       
       setProgress({ imported: 0, total: total, errors: 0 });
-      addLog(`Trovati ${total} prodotti. Inizio download a blocchi di 50...`);
+      addLog(`Trovati ${total} prodotti. Inizio download super-veloce a blocchi di 250...`);
 
-      const batchSize = 50;
+      const batchSize = 250;
       let importedCount = 0;
       let errorCount = 0;
 
