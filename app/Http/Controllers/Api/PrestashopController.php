@@ -153,7 +153,11 @@ class PrestashopController extends Controller
                 try {
                     $this->upsertProduct($psp, $tenantId, $storeIds, $catMap, $defaultTaxClassId);
                     $imported++;
-                } catch (\Throwable) {
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error('PS Import Error for ID ' . ($psp['id'] ?? '??') . ': ' . $e->getMessage());
+                    if ($errors === 0) {
+                        $firstError = $e->getMessage();
+                    }
                     $errors++;
                 }
             }
@@ -164,6 +168,7 @@ class PrestashopController extends Controller
             'total'    => $total,
             'imported' => $imported,
             'errors'   => $errors,
+            'first_error' => $firstError ?? null,
         ]);
     }
 
@@ -194,7 +199,6 @@ class PrestashopController extends Controller
         if ($existingProduct) {
             DB::table('products')->where('id', $existingProduct->id)->update([
                 'name'        => $name,
-                'description' => $desc,
                 'is_active'   => $active,
                 'updated_at'  => $now,
             ]);
@@ -204,7 +208,6 @@ class PrestashopController extends Controller
                 'tenant_id'    => $tenantId,
                 'sku'          => $sku,
                 'name'         => $name,
-                'description'  => $desc,
                 'product_type' => 'liquid', // default SvaPro
                 'category_id'  => $categoryId,
                 'is_active'    => $active,
@@ -252,6 +255,33 @@ class PrestashopController extends Controller
                     'store_id'           => $storeId,
                     'product_variant_id' => $variantId,
                     'is_enabled'         => true,
+                    'created_at'         => $now,
+                    'updated_at'         => $now,
+                ]);
+            }
+        }
+
+        // Crea stock_items (on_hand=0) per TUTTI i warehouse del tenant
+        $allWarehouseIds = DB::table('warehouses')
+            ->where('tenant_id', $tenantId)
+            ->pluck('id');
+
+        foreach ($allWarehouseIds as $warehouseId) {
+            $alreadyExists = DB::table('stock_items')
+                ->where('tenant_id', $tenantId)
+                ->where('product_variant_id', $variantId)
+                ->where('warehouse_id', $warehouseId)
+                ->exists();
+
+            if (!$alreadyExists) {
+                DB::table('stock_items')->insert([
+                    'tenant_id'          => $tenantId,
+                    'warehouse_id'       => $warehouseId,
+                    'product_variant_id' => $variantId,
+                    'on_hand'            => 0,
+                    'reserved'           => 0,
+                    'reorder_point'      => 0,
+                    'safety_stock'       => 0,
                     'created_at'         => $now,
                     'updated_at'         => $now,
                 ]);
