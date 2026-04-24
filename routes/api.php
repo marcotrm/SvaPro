@@ -91,7 +91,7 @@ Route::get('/driver/deliveries', [StoreDeliveryController::class, 'driverIndex']
 Route::patch('/driver/deliveries/{id}/status', [StoreDeliveryController::class, 'driverUpdate']);
 
 
-Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function () {
+Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
