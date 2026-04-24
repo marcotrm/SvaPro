@@ -2507,9 +2507,7 @@ export default function ShiftsPage() {
               <Upload size={16} /> Importa Excel
             </button>
           )}
-          <button onClick={() => setShowExport(true)} style={{ display:'flex', alignItems:'center', gap:8, background:'#6366F1', color:'#fff', border:'none', padding:'10px 16px', borderRadius:12, fontWeight:700, cursor:'pointer' }}>
-            <Download size={16} /> Esporta Excel
-          </button>
+
           {canSaveShifts && canEditGrid && (() => {
             const pendingCount = Object.values(shifts).filter(s => s.status === 'proposed').length;
             return (
@@ -2637,24 +2635,25 @@ export default function ShiftsPage() {
         </div>
 
         {/* ── Orari Apertura Store (selezionato) ── */}
-        {currentStoreData?.opening_hours && !globalEmp && (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
-            {['mon','tue','wed','thu','fri','sat','sun'].map(day => {
-              const th = currentStoreData.opening_hours[day];
-              if (!th) return null;
-              const isClosed = th.closed;
-              const label = { mon:'Lun', tue:'Mar', wed:'Mer', thu:'Gio', fri:'Ven', sat:'Sab', sun:'Dom' }[day];
-              return (
-                <div key={day} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '4px 8px', minWidth: 55, flexShrink: 0 }}>
-                  <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>{label}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: isClosed ? 'var(--color-text-tertiary)' : 'var(--color-text)', marginTop: 2 }}>
-                    {isClosed ? 'Chiuso' : `${th.open?.slice(0,5) || '-'} / ${th.close?.slice(0,5) || '-'}`}
+        {currentStoreData?.opening_hours && !globalEmp && (() => {
+          const days = ['mon','tue','wed','thu','fri','sat','sun'];
+          const activeDay = days.find(d => !currentStoreData.opening_hours[d]?.closed);
+          const th = activeDay ? currentStoreData.opening_hours[activeDay] : null;
+          if (!th) return null;
+          return (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Clock size={16} color="var(--color-accent)" />
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Orari Store</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', marginTop: 2 }}>
+                    {th.open?.slice(0,5)} / {th.close?.slice(0,5)}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </div>
+            </div>
+          );
+        })()}
 
         {globalEmp && (
           <div style={{ flex: 1, background: 'rgba(99,102,241,0.06)', border: '1.5px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>

@@ -343,7 +343,7 @@ class ShiftController extends Controller
                         'user_id'    => $pmId,
                         'title'      => "🔒 Turni bloccati — {$storeName}",
                         'body'       => "I turni della settimana {$weekLabel} sono stati bloccati e sono in attesa di conferma.",
-                        'read'       => false,
+                        'is_read'    => false,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
@@ -462,7 +462,7 @@ class ShiftController extends Controller
                 'user_id'    => $lock->locked_by,
                 'title'      => "✅ Turni confermati — {$storeName}",
                 'body'       => "I turni della settimana {$weekLabel} sono stati confermati dal Project Manager.",
-                'read'       => false,
+                'is_read'    => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

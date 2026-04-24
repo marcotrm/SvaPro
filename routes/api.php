@@ -173,17 +173,6 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/customers/bulk/whatsapp', [CustomerController::class, 'bulkWhatsapp']);
         Route::post('/customers/bulk/email', [CustomerController::class, 'bulkEmail']);
 
-        Route::get('/employees', [EmployeeController::class, 'index']);
-        Route::get('/employees/global-list', [EmployeeController::class, 'globalList']);
-        Route::get('/employees/analytics/top-performers', [EmployeeController::class, 'topPerformers']);
-        Route::post('/employees', [EmployeeController::class, 'store'])->middleware('permission:employees.manage');
-        Route::put('/employees/{employeeId}', [EmployeeController::class, 'update'])->middleware('permission:employees.manage');
-        Route::delete('/employees/{employeeId}', [EmployeeController::class, 'destroy'])->middleware('permission:employees.manage');
-        Route::post('/employees/{employeeId}/photo', [EmployeeController::class, 'uploadPhoto'])->middleware('permission:employees.manage');
-        Route::get('/employees/{employeeId}/notifications', [EmployeeController::class, 'notifications']);
-        Route::post('/employees/{employeeId}/notifications/{notificationId}/read', [EmployeeController::class, 'markNotificationRead']);
-        Route::post('/employees/{employeeId}/notifications/read-all', [EmployeeController::class, 'markAllNotificationsRead']);
-
         // Suppliers
         Route::get('/suppliers', [SupplierController::class, 'index']);
         Route::get('/suppliers/{supplierId}', [SupplierController::class, 'show']);
@@ -450,8 +439,17 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
         Route::post('/chat/messages', [ChatController::class, 'store']);
         Route::post('/chat/messages/read', [ChatController::class, 'markRead']);
 
-        // Employee barcode lookup — usato dalla chat per verificare il codice operatore
+        // Dipendenti
         Route::get('/employees', [EmployeeController::class, 'index']);
+        Route::get('/employees/global-list', [EmployeeController::class, 'globalList']);
+        Route::get('/employees/analytics/top-performers', [EmployeeController::class, 'topPerformers']);
+        Route::post('/employees', [EmployeeController::class, 'store'])->middleware('permission:employees.manage');
+        Route::put('/employees/{employeeId}', [EmployeeController::class, 'update'])->middleware('permission:employees.manage');
+        Route::delete('/employees/{employeeId}', [EmployeeController::class, 'destroy'])->middleware('permission:employees.manage');
+        Route::post('/employees/{employeeId}/photo', [EmployeeController::class, 'uploadPhoto'])->middleware('permission:employees.manage');
+        Route::get('/employees/{employeeId}/notifications', [EmployeeController::class, 'notifications']);
+        Route::post('/employees/{employeeId}/notifications/{notificationId}/read', [EmployeeController::class, 'markNotificationRead']);
+        Route::post('/employees/{employeeId}/notifications/read-all', [EmployeeController::class, 'markAllNotificationsRead']);
 
 
         // Gamification
