@@ -155,7 +155,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:120,1'])->group(function 
 
         // PrestaShop Import - solo admin
         Route::post('/prestashop/test', [PrestashopController::class, 'test']);
-        Route::post('/prestashop/import', [PrestashopController::class, 'import']);
+        Route::post('/prestashop/import/start', [PrestashopController::class, 'startImport']);
+        Route::post('/prestashop/import/batch', [PrestashopController::class, 'importBatch']);
 
         Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.manage');
         Route::put('/customers/{customerId}', [CustomerController::class, 'update'])->middleware('permission:customers.manage');

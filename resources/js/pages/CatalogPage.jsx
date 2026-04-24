@@ -695,22 +695,75 @@ function PrestashopImportModal({ onClose, onImported }) {
     abortRef.current = false;
     setStatus('importing');
     setProgress({ imported: 0, total: 0, errors: 0 });
-    addLog('Avvio importazione da PrestaShop...');
+    addLog('Calcolo dei prodotti da importare...');
+
     try {
-      const res = await api.post('/prestashop/import', {
+      const res = await api.post('/prestashop/import/start', {
         url: cleanUrl(psUrl),
         api_key: apiKey,
       });
-      const result = res.data;
-      setProgress({ imported: result.imported ?? 0, total: result.total ?? 0, errors: result.errors ?? 0 });
-      addLog(`✅ Importazione completata: ${result.imported} prodotti importati su ${result.total} totali.`, 'success');
-      if (result.errors > 0) addLog(`⚠ ${result.errors} prodotti non importati (duplicati SKU o dati incompleti).`, 'warn');
-      setStatus('done');
-      toast.success(`Importati ${result.imported} prodotti da PrestaShop!`);
+      const ids = res.data.ids || [];
+      const total = res.data.total || 0;
+      
+      if (total === 0) {
+        addLog('Nessun prodotto trovato.', 'info');
+        setStatus('idle');
+        return;
+      }
+      
+      setProgress({ imported: 0, total: total, errors: 0 });
+      addLog(`Trovati ${total} prodotti. Inizio download a blocchi di 50...`);
+
+      const batchSize = 50;
+      let importedCount = 0;
+      let errorCount = 0;
+
+      for (let i = 0; i < ids.length; i += batchSize) {
+        if (abortRef.current) {
+            addLog('⚠ Importazione annullata dall\'utente.', 'warn');
+            break;
+        }
+
+        const batchIds = ids.slice(i, i + batchSize);
+        addLog(`Elaborazione blocco ${Math.floor(i/batchSize)+1}/${Math.ceil(total/batchSize)}...`);
+        
+        try {
+            const batchRes = await api.post('/prestashop/import/batch', {
+                url: cleanUrl(psUrl),
+                api_key: apiKey,
+                batchIds: batchIds
+            });
+            
+            const data = batchRes.data;
+            importedCount += data.imported || 0;
+            errorCount += data.errors || 0;
+            
+            setProgress({ imported: importedCount, total: total, errors: errorCount });
+            
+            if (data.errors > 0 && data.first_error) {
+                addLog(`⚠ Errore nel blocco: ${data.first_error}`, 'error');
+            }
+        } catch (batchErr) {
+            errorCount += batchIds.length;
+            setProgress({ imported: importedCount, total: total, errors: errorCount });
+            const msg = batchErr.response?.data?.message || batchErr.message || 'Errore sconosciuto';
+            addLog(`❌ Fallimento fatale blocco: ${msg}`, 'error');
+        }
+      }
+
+      if (errorCount > 0) {
+        addLog(`⚠ ${errorCount} prodotti non importati (duplicati SKU o dati incompleti).`, 'warn');
+      }
+      
+      addLog(`✅ Importazione completata: ${importedCount} prodotti importati su ${total} totali.`, 'success');
+      toast.success('Importazione completata!');
+      onImported();
     } catch (err) {
-      const msg = err.response?.data?.message || 'Errore durante l\'importazione';
+      const msg = err.response?.data?.message || err.message || 'Errore di connessione a SvaPro';
+      toast.error(msg);
       addLog(`❌ ${msg}`, 'error');
-      setStatus('error');
+    } finally {
+      setStatus('idle');
     }
   };
 
