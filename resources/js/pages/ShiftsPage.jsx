@@ -1427,6 +1427,7 @@ export default function ShiftsPage() {
   const [weekLockStatus, setWeekLockStatus] = useState(null); // { locked_at, confirmed_at, ... }
   const [lockLoading, setLockLoading]       = useState(false);
   const [pmStoresList, setPmStoresList]     = useState([]);
+  const [loadedStoreData, setLoadedStoreData] = useState(null);
   const [pmWeekLocks, setPmWeekLocks]       = useState([]);
   const [pmLoading, setPmLoading]           = useState(false);
   const [pmPreviewStore, setPmPreviewStore] = useState(null);
@@ -1466,7 +1467,7 @@ export default function ShiftsPage() {
   }, []);
 
   // ── Gap detection (ricalcola ogni volta che shifts cambia) ──────────────────
-  const currentStoreData = useMemo(() => pmStoresList.find(s => String(s.id) === String(storeId)) || null, [pmStoresList, storeId]);
+  const currentStoreData = useMemo(() => loadedStoreData || pmStoresList.find(s => String(s.id) === String(storeId)) || null, [pmStoresList, storeId, loadedStoreData]);
   const gapAlerts = useMemo(() => detectGaps(shifts, weekDays, currentStoreData), [shifts, weekDays, currentStoreData]);
 
   // ── Carica stato lock della settimana ──
@@ -1571,7 +1572,8 @@ export default function ShiftsPage() {
       // Notifica toast SOLO se arrivano nuovi negozi bloccati rispetto al giro precedente
       const newLocked = newLocks.filter(l => l.locked_at && !l.confirmed_at).length;
       if (silent && newLocked > prevLockedCountRef.current) {
-        toast('🔔 Nuovi turni proposti in attesa di approvazione!', { duration: 5000 });
+        // Rimosso toast locale, il PM riceve la notifica nella campanella
+        // toast('⏳ Nuovi turni proposti in attesa di approvazione!', { duration: 5000 });
       }
       prevLockedCountRef.current = newLocked;
     } catch {}
@@ -1676,15 +1678,21 @@ export default function ShiftsPage() {
       const shiftParams = { store_id: storeId, start_date: startDateStr, end_date: endDateStr };
       
       // Chiama le API separatamente per isolare gli errori
-      let empRes = null, shRes = null, tplRes = null;
+      let empRes = null, shRes = null, tplRes = null, storeRes = null;
       try {
         // Usa getEmployees (tutti i dipendenti dello store) invece di getEmployeesKiosk
         // che restituisce solo chi ha fatto check-in oggi
-        [empRes, shRes, tplRes] = await Promise.all([
+        [empRes, shRes, tplRes, storeRes] = await Promise.all([
           employeesApi.getEmployees({ store_id: storeId, per_page: 200 }),
           shiftsApi.getAll(shiftParams),
           shiftsApi.getTemplates(),
+          stores.getStore(storeId),
         ]);
+        if (storeRes?.data?.data) {
+          setLoadedStoreData(storeRes.data.data);
+        } else if (storeRes?.data) {
+          setLoadedStoreData(storeRes.data);
+        }
       } catch (apiErr) {
         console.error('[ShiftsPage] API error:', apiErr?.response?.data || apiErr.message);
         // Fallback: kiosk endpoint
@@ -1771,9 +1779,10 @@ export default function ShiftsPage() {
 
   // Ricerca globale dipendenti — filtro locale su allEmployeesGlobal (cross-store, già caricata)
   useEffect(() => {
-    if (!globalSearch || globalSearch.trim().length < 2) { setGlobalResults([]); setShowGlobalDrop(false); return; }
-    const q = globalSearch.trim().toLowerCase();
+    if (!showGlobalDrop && (!globalSearch || globalSearch.trim().length === 0)) { setGlobalResults([]); return; }
+    const q = (globalSearch || '').trim().toLowerCase();
     const results = allEmployeesGlobal.filter(em => {
+      if (!q) return true;
       const full = ((em.first_name || '') + ' ' + (em.last_name || '')).toLowerCase();
       return (
         full.includes(q) ||
@@ -1781,10 +1790,9 @@ export default function ShiftsPage() {
         (em.employee_code && em.employee_code.toLowerCase().includes(q)) ||
         String(em.id).includes(q)
       );
-    }).slice(0, 8);
+    }).slice(0, 50);
     setGlobalResults(results);
-    setShowGlobalDrop(results.length > 0);
-  }, [globalSearch, allEmployeesGlobal]);
+  }, [globalSearch, allEmployeesGlobal, showGlobalDrop]);
 
   // Click-outside per chiudere il dropdown della ricerca globale
   useEffect(() => {
@@ -2529,9 +2537,21 @@ export default function ShiftsPage() {
             <span style={{ fontSize: 18 }}>🔒</span> Turni bloccati — in attesa di conferma dal Project Manager.
           </div>
           {(isSuperAdmin || isProjectManager) && (
-            <button onClick={handleUnlockWeek} disabled={lockLoading} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.12)', color: '#D97706', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-              {lockLoading ? 'Sblocco...' : '🔓 Sblocca'}
-            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={handleUnlockWeek} disabled={lockLoading} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.12)', color: '#D97706', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                {lockLoading ? 'Sblocco...' : '🔓 Sblocca'}
+              </button>
+              <button 
+                onClick={() => {
+                  shiftsApi.confirmWeek({ store_id: Number(storeId), week_start: weekStartStr, user_id: user?.id })
+                    .then(() => { toast.success('✅ Turni confermati!'); loadData(); })
+                    .catch(() => toast.error('Errore durante la conferma.'));
+                }} 
+                style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #10B981, #059669)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}
+              >
+                ✅ Conferma Settimana
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -2615,6 +2635,27 @@ export default function ShiftsPage() {
             </div>
           )}
         </div>
+
+        {/* ── Orari Apertura Store (selezionato) ── */}
+        {currentStoreData?.opening_hours && !globalEmp && (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
+            {['mon','tue','wed','thu','fri','sat','sun'].map(day => {
+              const th = currentStoreData.opening_hours[day];
+              if (!th) return null;
+              const isClosed = th.closed;
+              const label = { mon:'Lun', tue:'Mar', wed:'Mer', thu:'Gio', fri:'Ven', sat:'Sab', sun:'Dom' }[day];
+              return (
+                <div key={day} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '4px 8px', minWidth: 55, flexShrink: 0 }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>{label}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: isClosed ? 'var(--color-text-tertiary)' : 'var(--color-text)', marginTop: 2 }}>
+                    {isClosed ? 'Chiuso' : `${th.open?.slice(0,5) || '-'} / ${th.close?.slice(0,5) || '-'}`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {globalEmp && (
           <div style={{ flex: 1, background: 'rgba(99,102,241,0.06)', border: '1.5px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1 }}>
