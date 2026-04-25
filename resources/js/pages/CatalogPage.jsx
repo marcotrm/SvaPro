@@ -708,10 +708,11 @@ function CsvImportModal({ onClose, onImported }) {
 function PrestashopImportModal({ onClose, onImported }) {
   const [psUrl, setPsUrl]       = useState('');
   const [apiKey, setApiKey]     = useState('');
-  const [status, setStatus]     = useState('idle'); // idle | testing | importing | done | error
+  const [status, setStatus]     = useState('idle');
   const [progress, setProgress] = useState({ imported: 0, total: 0, errors: 0 });
   const [log, setLog]           = useState([]);
   const [testOk, setTestOk]     = useState(false);
+  const [importMode, setImportMode] = useState('full'); // 'full' | 'price_barcode'
   const abortRef = useRef(false);
 
   const addLog = (msg, type = 'info') => setLog(prev => [...prev, { msg, type, ts: Date.now() }]);
@@ -802,7 +803,8 @@ function PrestashopImportModal({ onClose, onImported }) {
             const batchRes = await api.post('/prestashop/import/batch', {
                 url: cleanUrl(psUrl),
                 api_key: apiKey,
-                batchIds: batchIds
+                batchIds: batchIds,
+                mode: importMode,
             });
             
             const data = batchRes.data;
@@ -887,6 +889,28 @@ function PrestashopImportModal({ onClose, onImported }) {
               Vai su PrestaShop → Parametri Avanzati → Webservice → Aggiungi chiave con permesso <strong>prodotti GET</strong>
             </div>
           </div>
+
+          {/* Modalità import */}
+          {!isBusy && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {[
+                { value: 'full',          label: '📦 Importazione Completa',   desc: 'Nome, immagine, categoria, prezzo, barcode' },
+                { value: 'price_barcode', label: '💰 Solo Prezzo + Barcode',    desc: 'Aggiorna solo sale_price ed ean13 sui prodotti esistenti' },
+              ].map(opt => (
+                <div
+                  key={opt.value}
+                  onClick={() => setImportMode(opt.value)}
+                  style={{
+                    padding: '10px 14px', borderRadius: 10, cursor: 'pointer', border: `2px solid ${importMode === opt.value ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                    background: importMode === opt.value ? 'rgba(99,102,241,0.07)' : 'var(--color-background)', transition: 'all .15s',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-text)', marginBottom: 3 }}>{opt.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{opt.desc}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Progress bar */}
           {status === 'importing' && (

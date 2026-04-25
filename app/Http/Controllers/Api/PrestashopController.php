@@ -133,6 +133,7 @@ class PrestashopController extends Controller
                 'url'      => ['required', 'url'],
                 'api_key'  => ['required', 'string'],
                 'batchIds' => ['required', 'array'],
+                'mode'     => ['nullable', 'string', 'in:full,price_barcode'],
             ]);
             if ($validator->fails()) {
                 return response()->json(['message' => 'Dati batch non validi.'], 422);
@@ -142,6 +143,7 @@ class PrestashopController extends Controller
             $url      = rtrim($request->input('url'), '/');
             $apiKey   = $request->input('api_key');
             $batchIds = $request->input('batchIds');
+            $mode     = $request->input('mode', 'full'); // 'full' | 'price_barcode'
 
             // ── 1. Fetch dati da PrestaShop ──────────────────────────────────
             try {
@@ -294,7 +296,25 @@ class PrestashopController extends Controller
                     }
 
                     if ($existingProduct) {
-                        // ── AGGIORNA prodotto esistente ──
+                        if ($mode === 'price_barcode') {
+                            // ── MODALITÀ SOLO PREZZO + BARCODE ──────────────────
+                            // Aggiorna SOLO sale_price e barcode. Niente nome, immagine, categoria.
+                            if ($barcode) {
+                                DB::table('products')
+                                    ->where('id', $existingProduct->id)
+                                    ->update(['barcode' => $barcode, 'updated_at' => $now]);
+                            }
+                            $existingVariant = $existingVariants->get($existingProduct->id);
+                            if ($existingVariant) {
+                                $vUpd = ['sale_price' => $price, 'updated_at' => $now];
+                                if ($barcode) $vUpd['barcode'] = $barcode;
+                                DB::table('product_variants')->where('id', $existingVariant->id)->update($vUpd);
+                            }
+                            $imported++;
+                            continue; // salta tutto il resto (immagini, SPV, stock)
+                        }
+
+                        // ── MODALITÀ FULL: AGGIORNA prodotto esistente ──────────
                         $updateData = ['name' => $name, 'is_active' => $active, 'updated_at' => $now];
                         if ($barcode) $updateData['barcode'] = $barcode;
                         DB::table('products')->where('id', $existingProduct->id)->update($updateData);
@@ -341,7 +361,12 @@ class PrestashopController extends Controller
                         }
                         $imported++;
                     } else {
-                        // ── NUOVO prodotto ── (insert singolo per ottenere l'id)
+                        // ── NUOVO prodotto ──
+                        // In modalità price_barcode saltiamo i nuovi prodotti (aggiorniamo solo gli esistenti)
+                        if ($mode === 'price_barcode') {
+                            continue;
+                        }
+
                         $productId = DB::table('products')->insertGetId([
                             'tenant_id'    => $tenantId,
                             'sku'          => $sku,
