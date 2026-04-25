@@ -18,7 +18,20 @@ class SmartInventoryController extends Controller
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
 
-        return response()->json($this->service->previewForTenant($tenantId));
+        try {
+            return response()->json($this->service->previewForTenant($tenantId));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('SmartReorder preview error: ' . $e->getMessage(), [
+                'tenant' => $tenantId,
+                'trace'  => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'alerts'          => [],
+                'suggested_orders'=> [],
+                'generated_at'    => now()->toDateTimeString(),
+                '_error'          => $e->getMessage(),  // visibile in console per debug
+            ], 200); // 200 per non far crashare il frontend
+        }
     }
 
     public function run(Request $request): JsonResponse

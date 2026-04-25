@@ -90,13 +90,13 @@ class SmartReorderService
                      AND sales7.store_id = s.id
 
             WHERE si.tenant_id = :tid4
-              AND s.auto_reorder_enabled = true
-              AND p.auto_reorder_enabled = true
+              AND s.tenant_id  = :tid5
         ", [
             'tid1' => $tenantId, 'c30'  => $cutoff30,
             'tid2' => $tenantId, 'c60'  => $cutoff60,
             'tid3' => $tenantId, 'c7'   => now()->subDays(7)->toDateTimeString(),
             'tid4' => $tenantId,
+            'tid5' => $tenantId,
         ]);
 
         $alerts = [];
