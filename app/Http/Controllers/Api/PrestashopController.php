@@ -262,6 +262,32 @@ class PrestashopController extends Controller
                         $rawUpc  = trim($psp['upc'] ?? '');
                         $barcode = ($rawUpc !== '' && $rawUpc !== '0') ? $rawUpc : null;
                     }
+                    // Per prodotti con Combinazioni (varianti PS), il barcode è sulla combinazione
+                    // default, non sul prodotto padre — fetch aggiuntiva se ean13 padre è vuoto
+                    if (!$barcode && ($psp['product_type'] ?? '') === 'combinations') {
+                        $defaultCombId = (int) ($psp['id_default_combination'] ?? 0);
+                        if ($defaultCombId > 0) {
+                            try {
+                                $combRes = Http::timeout(8)->get("{$url}/api/combinations/{$defaultCombId}", [
+                                    'ws_key'        => $apiKey,
+                                    'output_format' => 'JSON',
+                                    'display'       => '[ean13,upc,reference]',
+                                ]);
+                                if ($combRes->successful()) {
+                                    $comb    = $combRes->json('combination') ?? [];
+                                    $rawComb = trim($comb['ean13'] ?? '');
+                                    if ($rawComb !== '' && $rawComb !== '0' && $rawComb !== '0000000000000') {
+                                        $barcode = $rawComb;
+                                    } elseif (!$barcode) {
+                                        $rawCombUpc = trim($comb['upc'] ?? '');
+                                        $barcode = ($rawCombUpc !== '' && $rawCombUpc !== '0') ? $rawCombUpc : null;
+                                    }
+                                }
+                            } catch (\Throwable) {
+                                // Ignora errori sulla fetch combinazione: il barcode rimarrà null
+                            }
+                        }
+                    }
 
                     // PS con display=full può restituire il prezzo con nomi diversi a seconda
                     // della versione: price_ttc, price_tax_incl, specific_prices, o solo price (netto).
