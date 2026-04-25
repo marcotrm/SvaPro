@@ -519,6 +519,20 @@ export const inventory = {
   getCrossStore: (params = {}) => api.get('/inventory/cross-store', { params }),
 };
 
+// Smart Restocking APIs (Cabina di Regia Acquisti)
+export const smartRestocking = {
+  status:       ()           => api.get('/smart-restocking/status'),
+  networkNeeds: ()           => api.get('/smart-restocking/network-needs'),
+  depotNeeds:   ()           => api.get('/smart-restocking/depot-needs'),
+  brandMatrix:  ()           => api.get('/smart-restocking/brand-matrix'),
+  calculate:    ()           => api.post('/smart-restocking/calculate'),
+  approveDdt:   (id)         => api.post(`/smart-restocking/approve-ddt/${id}`),
+  generatePo:   (data)       => api.post('/smart-restocking/generate-po', data),
+  upsertBrand:  (data)       => api.put('/smart-restocking/brand-matrix', data),
+  removeBrand:  (data)       => api.delete('/smart-restocking/brand-matrix', { data }),
+};
+
+
 // Customer APIs
 export const customers = {
   getCustomers: (params = {}) => cachedGet('/customers', params, 30000, 300000),

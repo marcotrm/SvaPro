@@ -39,6 +39,8 @@ use App\Http\Controllers\Api\GamificationController;
 use App\Http\Controllers\Api\PrestashopController;
 use App\Http\Controllers\Api\AdmController;
 use App\Http\Controllers\Api\AutoReorderController;
+use App\Http\Controllers\Api\SmartRestockingController;
+
 use App\Http\Controllers\Api\StoreDeliveryController;
 use App\Http\Controllers\Api\InventorySessionController;
 use Illuminate\Support\Facades\Route;
@@ -322,8 +324,20 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
     Route::get('/inventory/smart-reorder/export-pdf', [SmartInventoryController::class, 'exportPdf']);
     Route::get('/inventory/forecast', [SmartInventoryController::class, 'forecast']);
 
+    // ── Smart Restocking (Cabina di Regia Acquisti) ────────────────────
+    Route::get('/smart-restocking/status', [SmartRestockingController::class, 'status']);
+    Route::get('/smart-restocking/network-needs', [SmartRestockingController::class, 'networkNeeds']);
+    Route::get('/smart-restocking/depot-needs', [SmartRestockingController::class, 'depotNeeds']);
+    Route::get('/smart-restocking/brand-matrix', [SmartRestockingController::class, 'brandMatrix']);
 
     Route::middleware('role:superadmin,admin_cliente')->group(function () {
+        // Smart Restocking — azioni di scrittura (solo admin)
+        Route::post('/smart-restocking/calculate', [SmartRestockingController::class, 'calculate']);
+        Route::post('/smart-restocking/approve-ddt/{transferId}', [SmartRestockingController::class, 'approveDdt']);
+        Route::post('/smart-restocking/generate-po', [SmartRestockingController::class, 'generatePo']);
+        Route::put('/smart-restocking/brand-matrix', [SmartRestockingController::class, 'upsertBrandMatrix']);
+        Route::delete('/smart-restocking/brand-matrix', [SmartRestockingController::class, 'removeBrandMatrix']);
+
         Route::get('/tenants', [StoreController::class, 'tenants']);
         Route::get('/tenants/health', [StoreController::class, 'tenantHealth']);
         Route::get('/audit-logs', [AuditController::class, 'index']);
