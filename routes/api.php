@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\DailyCashReportController;
 use App\Http\Controllers\Api\GamificationController;
 use App\Http\Controllers\Api\PrestashopController;
 use App\Http\Controllers\Api\AdmController;
+use App\Http\Controllers\Api\AutoReorderController;
 use App\Http\Controllers\Api\StoreDeliveryController;
 use App\Http\Controllers\Api\InventorySessionController;
 use Illuminate\Support\Facades\Route;
@@ -358,6 +359,14 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
         Route::post('/inventory/smart-reorder/run-auto', [SmartInventoryController::class, 'runAutoToCentral'])->middleware('permission:inventory.manage');
         Route::get('/inventory/smart-reorder/export-pdf', [SmartInventoryController::class, 'exportPdf']);
         Route::post('/inventory/smart-reorder/email-supplier', [SmartInventoryController::class, 'emailSupplier']);
+
+        // ── Riordino Automatico Fornitori (nuovo modulo) ──────────────────────
+        Route::post('/reorder-drafts/generate', [AutoReorderController::class, 'generate'])->middleware('permission:purchase_orders.create');
+        Route::get('/reorder-drafts', [AutoReorderController::class, 'index']);
+        Route::get('/reorder-drafts/{id}', [AutoReorderController::class, 'show']);
+        Route::patch('/reorder-drafts/{id}/lines/{lineId}', [AutoReorderController::class, 'updateLine'])->middleware('permission:purchase_orders.create');
+        Route::post('/reorder-drafts/{id}/approve', [AutoReorderController::class, 'approve'])->middleware('permission:purchase_orders.create');
+        Route::post('/reorder-drafts/{id}/discard', [AutoReorderController::class, 'discard'])->middleware('permission:purchase_orders.create');
         Route::get('/inventory/forecast', [SmartInventoryController::class, 'forecast']);
 
         // ── ReplenishmentEngine (DRP + MRP) ──────────────────────────────

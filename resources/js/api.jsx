@@ -691,6 +691,16 @@ export const purchaseOrders = {
   autoSuggest:      (params = {}) => api.get('/purchase-orders/auto-suggest', { params }),
 };
 
+// Riordino Automatico Fornitori — Bozze
+export const reorderDrafts = {
+  generate:    (data = {})         => api.post('/reorder-drafts/generate', data),
+  getAll:      (params = {})       => api.get('/reorder-drafts', { params }),
+  getOne:      (id)                => api.get(`/reorder-drafts/${id}`),
+  updateLine:  (id, lineId, data)  => api.patch(`/reorder-drafts/${id}/lines/${lineId}`, data),
+  approve:     (id)                => api.post(`/reorder-drafts/${id}/approve`),
+  discard:     (id)                => api.post(`/reorder-drafts/${id}/discard`),
+};
+
 // Returns APIs
 export const returns = {
   getAll: (params = {}) => cachedGet('/returns', params, 15000, 120000),
