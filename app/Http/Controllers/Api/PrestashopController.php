@@ -104,42 +104,14 @@ class PrestashopController extends Controller
 
         $psProducts = $idsRes->json('products') ?? [];
 
-        // Pre-carica tutti i prodotti esistenti (1 query sola)
-        $existingRaw = DB::table('products as p')
-            ->leftJoin('product_variants as pv', 'p.id', '=', 'pv.product_id')
-            ->where('p.tenant_id', $tenantId)
-            ->whereNotNull('p.sku')
-            ->get(['p.sku', 'p.image_url', 'pv.sale_price']);
-
-        $existing = [];
-        foreach ($existingRaw as $ep) {
-            $existing[$ep->sku] = [
-                'has_image' => !empty($ep->image_url),
-                'has_price' => ((float) $ep->sale_price) > 0,
-            ];
-        }
-
-        $ids     = [];
-        $skipped = 0;
-
-        foreach ($psProducts as $p) {
-            if (!isset($p['id'])) continue;
-            $ref = trim($p['reference'] ?? '');
-            $key = $ref ?: "PS-{$p['id']}";
-
-            if (isset($existing[$key]) && $existing[$key]['has_price']) {
-                // Prezzo già presente → saltiamo (immagini vengono gestite separatamente)
-                $skipped++;
-                continue;
-            }
-
-            $ids[] = $p['id'];
-        }
+        // Estrai tutti gli ID da processare — NESSUNO viene saltato.
+        // L'import aggiorna sempre prezzo e immagine anche per i prodotti esistenti.
+        $ids = array_values(array_filter(array_column($psProducts, 'id')));
 
         return response()->json([
             'success' => true,
             'total'   => count($ids),
-            'skipped' => $skipped,
+            'skipped' => 0,
             'ids'     => $ids,
         ]);
     }
@@ -276,17 +248,35 @@ class PrestashopController extends Controller
                     $psId   = (int) ($psp['id'] ?? 0);
                     $sku    = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
                     $name   = $this->extractLangValue($psp['name'] ?? null) ?: "Prodotto #{$psId}";
-                    // Usa price_ttc (con IVA) se disponibile
-                    $price  = (float) ($psp['price_ttc'] ?? $psp['price'] ?? 0);
-                    if ($price === 0.0 && isset($psp['price'], $psp['tax_rate'])) {
-                        $price = (float) $psp['price'] * (1 + (float) $psp['tax_rate'] / 100);
+
+                    // price_ttc: PrestaShop lo restituisce come stringa o come campo computato
+                    // Proviamo price_ttc prima, poi calcoliamo da price + tax_rate
+                    $price = (float) ($psp['price_ttc'] ?? 0);
+                    if ($price === 0.0) {
+                        $rawPrice   = (float) ($psp['price'] ?? 0);
+                        $taxRate    = (float) ($psp['tax_rate'] ?? 0);
+                        if ($rawPrice > 0) {
+                            $price = $taxRate > 0
+                                ? round($rawPrice * (1 + $taxRate / 100), 6)
+                                : $rawPrice;
+                        }
                     }
-                    $active = (int) ($psp['active'] ?? 1) === 1;
+
+                    $active     = (int) ($psp['active'] ?? 1) === 1;
                     $categoryId = $catMap->first() ?? null;
 
                     $existingProduct = $existingProducts->get($sku);
-                    // PS image info (per il pool parallelo dopo)
-                    $psImgId = $psp['id_default_image'] ?? null;
+
+                    // PS image id: può essere intero, stringa, o oggetto {attrs:..., value:"123"}
+                    $psImgRaw = $psp['id_default_image'] ?? null;
+                    $psImgId  = null;
+                    if (!empty($psImgRaw)) {
+                        if (is_array($psImgRaw)) {
+                            $psImgId = (int) ($psImgRaw['value'] ?? $psImgRaw[0] ?? 0) ?: null;
+                        } else {
+                            $psImgId = (int) $psImgRaw ?: null;
+                        }
+                    }
 
                     if ($existingProduct) {
                         // ── AGGIORNA prodotto esistente ──

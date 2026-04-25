@@ -169,6 +169,37 @@ Route::get('/bulk-set-stock', function () {
     }
 });
 
+// Debug: mostra la struttura grezza di UN prodotto PS (per capire price_ttc e id_default_image)
+// Chiamata: /api/debug-ps-product?url=https://...&api_key=KEY&ps_id=123
+Route::get('/debug-ps-product', function (\Illuminate\Http\Request $request) {
+    $url    = rtrim($request->input('url', ''), '/');
+    $apiKey = $request->input('api_key', '');
+    $psId   = (int) $request->input('ps_id', 1);
+    if (!$url || !$apiKey) {
+        return response()->json(['error' => 'Passa ?url=...&api_key=...&ps_id=123']);
+    }
+    try {
+        $res = \Illuminate\Support\Facades\Http::timeout(15)->get("{$url}/api/products/{$psId}", [
+            'ws_key'        => $apiKey,
+            'output_format' => 'JSON',
+            'display'       => 'full',
+        ]);
+        $product = $res->json('product') ?? $res->json();
+        return response()->json([
+            'id'               => $product['id'] ?? null,
+            'reference'        => $product['reference'] ?? null,
+            'price'            => $product['price'] ?? null,
+            'price_ttc'        => $product['price_ttc'] ?? '⚠ MANCANTE',
+            'tax_rate'         => $product['tax_rate'] ?? '⚠ MANCANTE',
+            'id_default_image' => $product['id_default_image'] ?? '⚠ MANCANTE',
+            'active'           => $product['active'] ?? null,
+            'assoc_images'     => $product['associations']['images'] ?? null,
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+});
+
 // ── Vista Corriere: endpoint pubblici autenticati via tenant code (?tk=CODE)
 Route::get('/driver/deliveries', [StoreDeliveryController::class, 'driverIndex']);
 Route::patch('/driver/deliveries/{id}/status', [StoreDeliveryController::class, 'driverUpdate']);
