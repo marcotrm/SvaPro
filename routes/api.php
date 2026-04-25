@@ -380,6 +380,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
         Route::patch('/catalog/products/{productId}/featured', [CatalogController::class, 'toggleFeatured'])->middleware('permission:catalog.manage');
         Route::post('/catalog/bulk-excise', [CatalogController::class, 'bulkExcise'])->middleware('permission:catalog.manage');
         Route::patch('/catalog/products/bulk-update', \App\Http\Controllers\Api\ProductBulkUpdateController::class)->middleware('permission:catalog.manage');
+        Route::patch('/catalog/products/bulk-barcodes', [\App\Http\Controllers\Api\ProductBulkBarcodeController::class, 'updateBarcodes'])->middleware('permission:catalog.manage');
 
         Route::post('/catalog/categories', [CatalogController::class, 'storeCategory'])->middleware('permission:catalog.manage');
         Route::put('/catalog/categories/{categoryId}', [CatalogController::class, 'updateCategory'])->middleware('permission:catalog.manage');

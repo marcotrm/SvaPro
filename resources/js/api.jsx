@@ -469,6 +469,7 @@ export const catalog = {
   },
   deleteProduct: (id) => api.delete(`/catalog/products/${id}`),
   importProducts: (formData) => api.post('/catalog/products/import', formData),
+  bulkBarcodes: (data) => api.patch('/catalog/products/bulk-barcodes', data),
   toggleFeatured: (id, isFeatured) => api.patch(`/catalog/products/${id}/featured`, { is_featured: isFeatured }),
   toggleOnline: (id, isOnline) => api.patch(`/catalog/products/${id}`, { is_online: isOnline }),
   bulkExcise: (data) => api.post('/catalog/bulk-excise', data),

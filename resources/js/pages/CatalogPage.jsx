@@ -569,19 +569,82 @@ function CsvImportModal({ onClose, onImported }) {
   const startImport = async () => {
     if (!file) { toast.error('Seleziona un file CSV prima'); return; }
     setStatus('uploading');
-    const fd = new FormData();
-    fd.append('file', file);
-    try {
-      const res = await catalog.importProducts(fd);
-      const data = res.data;
-      setResult(data);
-      setStatus('done');
-      toast.success(`${data.imported ?? 0} prodotti importati dal CSV!`);
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Errore durante l\'importazione CSV';
-      setStatus('error');
-      setResult({ error: msg });
-      toast.error(msg);
+
+    // Funzione helper per l'importazione CSV classica
+    const doClassicImport = async () => {
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await catalog.importProducts(fd);
+        const data = res.data;
+        setResult({
+           imported: data.imported ?? 0,
+           skipped: data.skipped ?? 0,
+           errors: data.errors ?? 0
+        });
+        setStatus('done');
+        toast.success(`${data.imported ?? 0} prodotti importati dal CSV!`);
+      } catch (err) {
+        const msg = err.response?.data?.message || 'Errore durante l\'importazione CSV';
+        setStatus('error');
+        setResult({ error: msg });
+        toast.error(msg);
+      }
+    };
+
+    // Usiamo PapaParse per leggere le intestazioni e capire il tipo di file
+    const doparse = () => {
+      window.Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: async (res) => {
+          if (!res.data?.length) { 
+             setStatus('error'); setResult({ error: 'Il CSV è vuoto o non valido' }); toast.error('Il CSV è vuoto'); return; 
+          }
+          const headers = res.meta.fields || [];
+          const hasBarcodeCols = headers.some(h => h.toLowerCase().trim() === 'barcode') && 
+                                 headers.some(h => h.toLowerCase().trim() === 'id');
+
+          if (hasBarcodeCols) {
+            // È un aggiornamento massivo di Barcode
+            const bcodeKey = headers.find(h => h.toLowerCase().trim() === 'barcode');
+            const idKey = headers.find(h => h.toLowerCase().trim() === 'id');
+            
+            const payload = res.data.map(row => ({
+               match_id: row[idKey],
+               barcode: row[bcodeKey]
+            })).filter(r => r.match_id && r.barcode);
+
+            if (!payload.length) {
+               setStatus('error'); setResult({ error: 'Nessuna riga valida con ID e BarCode' }); toast.error('Nessuna riga valida trovata'); return;
+            }
+
+            try {
+              const apiRes = await catalog.bulkBarcodes({ rows: payload });
+              const data = apiRes.data;
+              setResult({ imported: data.updated ?? 0, skipped: 0, errors: 0 });
+              setStatus('done');
+              toast.success(`Aggiornati ${data.updated ?? 0} barcode con successo!`);
+            } catch (err) {
+              const msg = err.response?.data?.message || 'Errore durante l\'aggiornamento massivo dei barcode';
+              setStatus('error');
+              setResult({ error: msg });
+              toast.error(msg);
+            }
+          } else {
+             // Non ci sono le colonne Barcode, fallback all'import classico
+             doClassicImport();
+          }
+        },
+        error: () => {
+          setStatus('error'); setResult({ error: 'Errore nel parsing del CSV' }); toast.error('Errore lettura CSV');
+        }
+      });
+    };
+
+    if (window.Papa) { doparse(); } else {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js';
+      s.onload = doparse; document.head.appendChild(s);
     }
   };
 
@@ -615,15 +678,20 @@ function CsvImportModal({ onClose, onImported }) {
           {/* Format instructions */}
           <div style={{ background: 'var(--color-bg)', borderRadius: 10, padding: 14 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Formato CSV richiesto
+              Formato CSV richiesto (Creazione)
             </div>
             <code style={{ fontSize: 11, fontFamily: 'monospace', color: '#22C55E', display: 'block', marginBottom: 6 }}>{CSV_FORMAT}</code>
             <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>Esempio:</div>
             <pre style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--color-text-secondary)', margin: 0, whiteSpace: 'pre-wrap' }}>{CSV_EXAMPLE}</pre>
-            <div style={{ marginTop: 8, fontSize: 10, color: 'var(--color-text-tertiary)' }}>
-              • <strong>type_code</strong>: liquid / hardware / accessori / pod<br/>
-              • <strong>price</strong>: usa il punto come separatore decimale (es. 18.00)<br/>
-              • <strong>stock</strong>: quantità iniziale (opzionale, default 0)
+            
+            <div style={{ marginTop: 12, borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
+               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Oppure: Aggiornamento Massivo Barcode
+               </div>
+               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                  Carica un file CSV con le colonne <strong style={{color:'var(--color-text)'}}>BarCode</strong> e <strong style={{color:'var(--color-text)'}}>ID</strong>. 
+                  Il sistema lo rileverà in automatico ed eseguirà un bulk update ultra-rapido.
+               </div>
             </div>
           </div>
 
