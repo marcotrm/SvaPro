@@ -39,6 +39,8 @@ class ProductBulkUpdateController extends Controller
 
     public function __invoke(Request $request): JsonResponse
     {
+        set_time_limit(1800); // 30 minuti per l'aggiornamento massivo
+        
         $tenantId = (int) $request->attributes->get('tenant_id');
 
         // ── Validazione struttura payload ───────────────────────────────────

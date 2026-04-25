@@ -23,6 +23,8 @@ class ProductBulkBarcodeController extends Controller
      */
     public function updateBarcodes(Request $request): JsonResponse
     {
+        set_time_limit(1800); // 30 minuti
+        
         $tenantId = (int) $request->attributes->get('tenant_id');
 
         $request->validate([
