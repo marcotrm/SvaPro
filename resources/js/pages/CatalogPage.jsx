@@ -7,7 +7,7 @@ import CatalogModal from '../components/CatalogModal.jsx';
 import ProductInventoryModal from '../components/ProductInventoryModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import BulkExciseModal from '../components/BulkExciseModal.jsx';
-import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star, Trash2, DollarSign, ChevronLeft, ChevronRight, FileEdit, ArrowRight, AlertCircle } from 'lucide-react';
+import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star, Trash2, DollarSign, ChevronLeft, ChevronRight, FileEdit, ArrowRight, AlertCircle, ScanBarcode } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function CatalogPage() {
@@ -29,6 +29,7 @@ export default function CatalogPage() {
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [showBulkExcise, setShowBulkExcise] = useState(false);
   const [showCsvBulkUpdate, setShowCsvBulkUpdate] = useState(false);
+  const [showCsvBarcodeUpdate, setShowCsvBarcodeUpdate] = useState(false);
   const [inventoryProduct, setInventoryProduct] = useState(null);
   
   // Paginazione
@@ -48,7 +49,7 @@ export default function CatalogPage() {
       // Invalida la cache ogni volta per avere sempre dati aggiornati
       clearApiCache();
       // Catalogo admin: mostra SEMPRE tutti i prodotti del tenant (no filtro store_id)
-      // L'assegnazione per negozio è già inclusa in variant.assigned_stores nella risposta
+      // L'assegnazione per negozio Ã¨ giÃ  inclusa in variant.assigned_stores nella risposta
       const [pRes, sRes, cRes] = await Promise.all([
         catalog.getProducts({ limit: 10000 }),
         suppliers.getAll().catch(() => ({ data: { data: [] } })),
@@ -85,7 +86,7 @@ export default function CatalogPage() {
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_featured: newVal } : p));
     try {
       await catalog.toggleFeatured(product.id, newVal);
-      toast.success(newVal ? `⭐ "${product.name}" messo in evidenza nel POS` : `"${product.name}" rimosso dall'evidenza`, { duration: 2000 });
+      toast.success(newVal ? `â­ "${product.name}" messo in evidenza nel POS` : `"${product.name}" rimosso dall'evidenza`, { duration: 2000 });
     } catch (err) {
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_featured: !newVal } : p));
       toast.error('Errore nell\'aggiornamento');
@@ -97,7 +98,7 @@ export default function CatalogPage() {
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_online: newVal } : p));
     try {
       await catalog.toggleOnline(product.id, newVal);
-      toast.success(newVal ? `🌐 "${product.name}" attivo online` : `🚫 "${product.name}" nascosto online`, { duration: 2000 });
+      toast.success(newVal ? `ðŸŒ "${product.name}" attivo online` : `ðŸš« "${product.name}" nascosto online`, { duration: 2000 });
     } catch (err) {
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_online: !newVal } : p));
       toast.error(err.response?.data?.message || 'Errore nell\'aggiornamento');
@@ -147,7 +148,7 @@ export default function CatalogPage() {
       };
 
       await catalog.createProduct(payload);
-      toast.success(`«${product.name}» duplicato con SKU ${newSku}`, { duration: 3000 });
+      toast.success(`Â«${product.name}Â» duplicato con SKU ${newSku}`, { duration: 3000 });
       fetchData();
     } catch (err) {
       const msg = err.response?.data?.message
@@ -167,7 +168,7 @@ export default function CatalogPage() {
     if (!confirmToDelete) return;
     try {
       await catalog.deleteProduct(confirmToDelete.id);
-      toast.success(`«${confirmToDelete.name}» eliminato`);
+      toast.success(`Â«${confirmToDelete.name}Â» eliminato`);
       setConfirmToDelete(null);
       fetchData();
     } catch (err) {
@@ -184,7 +185,7 @@ export default function CatalogPage() {
 
   if (isDipendente) return (
     <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>ðŸ”’</div>
       <div style={{ fontSize: 18, fontWeight: 700 }}>Sezione non disponibile</div>
       <div style={{ fontSize: 13, marginTop: 8 }}>Contatta un amministratore per informazioni sui prodotti.</div>
     </div>
@@ -195,7 +196,7 @@ export default function CatalogPage() {
     <ConfirmModal
       isOpen={!!confirmToDelete}
       title="Elimina prodotto"
-      message={`Stai per eliminare definitivamente «${confirmToDelete?.name}». Tutte le varianti e i dati di stock associati verranno rimossi.`}
+      message={`Stai per eliminare definitivamente Â«${confirmToDelete?.name}Â». Tutte le varianti e i dati di stock associati verranno rimossi.`}
       onConfirm={doDelete}
       onCancel={() => setConfirmToDelete(null)}
     />
@@ -206,7 +207,7 @@ export default function CatalogPage() {
           <h1 className="sp-page-title">Catalogo Prodotti</h1>
           <p className="sp-page-subtitle">
             <Package size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
-            {products.length} referenze{selectedStore ? ` — ${selectedStore.name}` : ''}
+            {products.length} referenze{selectedStore ? ` â€” ${selectedStore.name}` : ''}
           </p>
         </div>
         <div className="sp-page-actions">
@@ -232,10 +233,18 @@ export default function CatalogPage() {
           <button
             className="sp-btn sp-btn-secondary"
             onClick={() => setShowCsvBulkUpdate(true)}
-            title="Aggiorna campi prodotti esistenti da CSV (Barcode, Prezzi, Accise...)"
+            title="Aggiorna campi prodotti esistenti da CSV (Prezzi, Accise, Nomi...)"
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
             <FileEdit size={16} /> Aggiorna da CSV
+          </button>
+          <button
+            className="sp-btn sp-btn-secondary"
+            onClick={() => setShowCsvBarcodeUpdate(true)}
+            title="Aggiornamento rapido Barcode massivo (solo ID/SKU e BarCode)"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(99,102,241,0.1)', color: '#6366f1', borderColor: 'rgba(99,102,241,0.2)' }}
+          >
+            <ScanBarcode size={16} /> Barcode Rapido
           </button>
           <button
             className="sp-btn sp-btn-secondary"
@@ -305,8 +314,8 @@ export default function CatalogPage() {
               <th>Prezzo</th>
               <th>Stock</th>
               <th>Stato</th>
-              <th style={{ textAlign: 'center' }}>POS ⭐</th>
-              <th style={{ textAlign: 'center' }}>Online 🌐</th>
+              <th style={{ textAlign: 'center' }}>POS â­</th>
+              <th style={{ textAlign: 'center' }}>Online ðŸŒ</th>
               <th></th>
             </tr>
           </thead>
@@ -335,24 +344,24 @@ export default function CatalogPage() {
                     </div>
                     <span>{product.name}</span>
                   </td>
-                  <td className="sp-cell-secondary sp-font-mono">{product.sku || '—'}</td>
+                  <td className="sp-cell-secondary sp-font-mono">{product.sku || 'â€”'}</td>
                   <td>
                     {category ? (
                       <span className="sp-badge sp-badge-neutral">{category.name}</span>
-                    ) : <span className="sp-cell-secondary">—</span>}
+                    ) : <span className="sp-cell-secondary">â€”</span>}
                   </td>
                   <td>
                     {location ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--color-text-secondary)' }}>
                         <MapPin size={12} /> {location}
                       </span>
-                    ) : <span className="sp-cell-secondary">—</span>}
+                    ) : <span className="sp-cell-secondary">â€”</span>}
                   </td>
                   <td style={{ fontWeight: 700 }}>
                     {fmt(priceGross)}
                     {vatRate > 0 && (
                       <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 500 }}>
-                        IVA {vatRate}% incl. · netto {fmt(priceNet)}
+                        IVA {vatRate}% incl. Â· netto {fmt(priceNet)}
                       </div>
                     )}
                   </td>
@@ -394,7 +403,7 @@ export default function CatalogPage() {
                   <td style={{ textAlign: 'center' }}>
                     {/* Toggle Online */}
                     <button
-                      title={product.is_online ? 'Visibile online — clicca per nascondere' : 'Nascosto online — clicca per attivare'}
+                      title={product.is_online ? 'Visibile online â€” clicca per nascondere' : 'Nascosto online â€” clicca per attivare'}
                       onClick={() => handleToggleOnline(product)}
                       style={{
                         background: product.is_online ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.08)',
@@ -405,7 +414,7 @@ export default function CatalogPage() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {product.is_online ? '🌐 Online' : '🚫 Offline'}
+                      {product.is_online ? 'ðŸŒ Online' : 'ðŸš« Offline'}
                     </button>
                   </td>
                   <td>
@@ -537,6 +546,12 @@ export default function CatalogPage() {
           onDone={() => { setShowCsvBulkUpdate(false); fetchData(); }}
         />
       )}
+      {showCsvBarcodeUpdate && (
+        <CsvBarcodeUpdateModal
+          onClose={() => setShowCsvBarcodeUpdate(false)}
+          onDone={() => { setShowCsvBarcodeUpdate(false); fetchData(); }}
+        />
+      )}
 
       {/* Modal Giacenze Cross-Store */}
       {inventoryProduct && <ProductInventoryModal product={inventoryProduct} onClose={() => setInventoryProduct(null)} />}
@@ -547,7 +562,7 @@ export default function CatalogPage() {
 
 
 
-/* ─── Modale Importa da CSV ─────────────────────────────────────────────── */
+/* â”€â”€â”€ Modale Importa da CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function CsvImportModal({ onClose, onImported }) {
   const [file, setFile]       = useState(null);
   const [status, setStatus]   = useState('idle'); // idle | uploading | done | error
@@ -598,14 +613,14 @@ function CsvImportModal({ onClose, onImported }) {
         header: true, skipEmptyLines: true,
         complete: async (res) => {
           if (!res.data?.length) { 
-             setStatus('error'); setResult({ error: 'Il CSV è vuoto o non valido' }); toast.error('Il CSV è vuoto'); return; 
+             setStatus('error'); setResult({ error: 'Il CSV Ã¨ vuoto o non valido' }); toast.error('Il CSV Ã¨ vuoto'); return; 
           }
           const headers = res.meta.fields || [];
           const hasBarcodeCols = headers.some(h => h.toLowerCase().trim() === 'barcode') && 
                                  headers.some(h => h.toLowerCase().trim() === 'id');
 
           if (hasBarcodeCols) {
-            // È un aggiornamento massivo di Barcode
+            // Ãˆ un aggiornamento massivo di Barcode
             const bcodeKey = headers.find(h => h.toLowerCase().trim() === 'barcode');
             const idKey = headers.find(h => h.toLowerCase().trim() === 'id');
             
@@ -690,7 +705,7 @@ function CsvImportModal({ onClose, onImported }) {
                </div>
                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                   Carica un file CSV con le colonne <strong style={{color:'var(--color-text)'}}>BarCode</strong> e <strong style={{color:'var(--color-text)'}}>ID</strong>. 
-                  Il sistema lo rileverà in automatico ed eseguirà un bulk update ultra-rapido.
+                  Il sistema lo rileverÃ  in automatico ed eseguirÃ  un bulk update ultra-rapido.
                </div>
             </div>
           </div>
@@ -715,7 +730,7 @@ function CsvImportModal({ onClose, onImported }) {
                 <CheckCircle size={24} style={{ marginBottom: 6 }} />
                 <div style={{ fontSize: 14 }}>{file.name}</div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-                  {(file.size / 1024).toFixed(1)} KB · Clicca per cambiare
+                  {(file.size / 1024).toFixed(1)} KB Â· Clicca per cambiare
                 </div>
               </div>
             ) : (
@@ -734,14 +749,14 @@ function CsvImportModal({ onClose, onImported }) {
               <div>
                 <div style={{ fontWeight: 700, fontSize: 14, color: '#22C55E' }}>Importazione completata!</div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                  {result.imported ?? 0} prodotti importati · {result.skipped ?? 0} saltati (duplicati) · {result.errors ?? 0} errori
+                  {result.imported ?? 0} prodotti importati Â· {result.skipped ?? 0} saltati (duplicati) Â· {result.errors ?? 0} errori
                 </div>
               </div>
             </div>
           )}
           {result && status === 'error' && (
             <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#EF4444' }}>
-              ❌ {result.error}
+              âŒ {result.error}
             </div>
           )}
         </div>
@@ -772,7 +787,7 @@ function CsvImportModal({ onClose, onImported }) {
     </div>
   );
 }
-/* ─── Modale Importa da PrestaShop ───────────────────────────────────────── */
+/* â”€â”€â”€ Modale Importa da PrestaShop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function PrestashopImportModal({ onClose, onImported }) {
   const [psUrl, setPsUrl]       = useState('');
   const [apiKey, setApiKey]     = useState('');
@@ -788,18 +803,18 @@ function PrestashopImportModal({ onClose, onImported }) {
   const cleanUrl = (u) => u.trim().replace(/\/$/, '');
 
   const wipeCatalog = async () => {
-    if (!window.confirm("Sei SICURO di voler CANCELLARE TUTTO IL CATALOGO e azzerare tutte le giacenze? L'operazione è irreversibile!")) return;
+    if (!window.confirm("Sei SICURO di voler CANCELLARE TUTTO IL CATALOGO e azzerare tutte le giacenze? L'operazione Ã¨ irreversibile!")) return;
     setStatus('testing');
     addLog('Svuotamento catalogo in corso...', 'warn');
     try {
       const res = await api.get('/prestashop/wipe-all-products');
       toast.success(res.data?.message || 'Catalogo svuotato con successo!');
-      addLog('🗑 Catalogo e giacenze svuotati completamente.', 'success');
+      addLog('ðŸ—‘ Catalogo e giacenze svuotati completamente.', 'success');
       onImported();
     } catch (err) {
       const msg = err.response?.data?.message || 'Errore durante lo svuotamento';
       toast.error(msg);
-      addLog(`❌ ${msg}`, 'error');
+      addLog(`âŒ ${msg}`, 'error');
     } finally {
       setStatus('idle');
     }
@@ -814,13 +829,13 @@ function PrestashopImportModal({ onClose, onImported }) {
         url: cleanUrl(psUrl),
         api_key: apiKey,
       });
-      addLog(`✅ Connessione riuscita! (tempo: ${res.data?.response_ms ?? '?'}ms)`, 'success');
+      addLog(`âœ… Connessione riuscita! (tempo: ${res.data?.response_ms ?? '?'}ms)`, 'success');
       addLog(`Trovati ${res.data?.products_count ?? '?'} prodotti nel catalogo PrestaShop.`, 'info');
       setTestOk(true);
       setStatus('idle');
     } catch (err) {
       const msg = err.response?.data?.message || 'Impossibile connettersi a PrestaShop';
-      addLog(`❌ ${msg}`, 'error');
+      addLog(`âŒ ${msg}`, 'error');
       setStatus('error');
     }
   };
@@ -842,7 +857,7 @@ function PrestashopImportModal({ onClose, onImported }) {
       const skipped = res.data.skipped || 0;
       
       if (skipped > 0) {
-        addLog(`Saltati ${skipped} prodotti già presenti in SvaPro.`);
+        addLog(`Saltati ${skipped} prodotti giÃ  presenti in SvaPro.`);
       }
 
       if (total === 0) {
@@ -852,7 +867,7 @@ function PrestashopImportModal({ onClose, onImported }) {
       }
       
       setProgress({ imported: 0, total: total, errors: 0 });
-      addLog(`Trovati ${total} prodotti. Importazione a blocchi di 10 (ottimizzato per velocità)...`);
+      addLog(`Trovati ${total} prodotti. Importazione a blocchi di 10 (ottimizzato per velocitÃ )...`);
 
       const batchSize = 10;
       let importedCount = 0;
@@ -860,7 +875,7 @@ function PrestashopImportModal({ onClose, onImported }) {
 
       for (let i = 0; i < ids.length; i += batchSize) {
         if (abortRef.current) {
-            addLog('⚠ Importazione annullata dall\'utente.', 'warn');
+            addLog('âš  Importazione annullata dall\'utente.', 'warn');
             break;
         }
 
@@ -882,27 +897,27 @@ function PrestashopImportModal({ onClose, onImported }) {
             setProgress({ imported: importedCount, total: total, errors: errorCount });
             
             if (data.errors > 0 && data.first_error) {
-                addLog(`⚠ Errore nel blocco: ${data.first_error}`, 'error');
+                addLog(`âš  Errore nel blocco: ${data.first_error}`, 'error');
             }
         } catch (batchErr) {
             errorCount += batchIds.length;
             setProgress({ imported: importedCount, total: total, errors: errorCount });
             const msg = batchErr.response?.data?.message || batchErr.message || 'Errore sconosciuto';
-            addLog(`❌ Fallimento fatale blocco: ${msg}`, 'error');
+            addLog(`âŒ Fallimento fatale blocco: ${msg}`, 'error');
         }
       }
 
       if (errorCount > 0) {
-        addLog(`⚠ ${errorCount} prodotti non importati (duplicati SKU o dati incompleti).`, 'warn');
+        addLog(`âš  ${errorCount} prodotti non importati (duplicati SKU o dati incompleti).`, 'warn');
       }
       
-      addLog(`✅ Importazione completata: ${importedCount} prodotti importati su ${total} totali.`, 'success');
+      addLog(`âœ… Importazione completata: ${importedCount} prodotti importati su ${total} totali.`, 'success');
       toast.success('Importazione completata!');
       onImported();
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Errore di connessione a SvaPro';
       toast.error(msg);
-      addLog(`❌ ${msg}`, 'error');
+      addLog(`âŒ ${msg}`, 'error');
     } finally {
       setStatus('idle');
     }
@@ -954,16 +969,16 @@ function PrestashopImportModal({ onClose, onImported }) {
               type="password"
             />
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-              Vai su PrestaShop → Parametri Avanzati → Webservice → Aggiungi chiave con permesso <strong>prodotti GET</strong>
+              Vai su PrestaShop â†’ Parametri Avanzati â†’ Webservice â†’ Aggiungi chiave con permesso <strong>prodotti GET</strong>
             </div>
           </div>
 
-          {/* Modalità import */}
+          {/* ModalitÃ  import */}
           {!isBusy && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {[
-                { value: 'full',          label: '📦 Importazione Completa',   desc: 'Nome, immagine, categoria, prezzo, barcode' },
-                { value: 'price_barcode', label: '💰 Solo Prezzo + Barcode',    desc: 'Aggiorna solo sale_price ed ean13 sui prodotti esistenti' },
+                { value: 'full',          label: 'ðŸ“¦ Importazione Completa',   desc: 'Nome, immagine, categoria, prezzo, barcode' },
+                { value: 'price_barcode', label: 'ðŸ’° Solo Prezzo + Barcode',    desc: 'Aggiorna solo sale_price ed ean13 sui prodotti esistenti' },
               ].map(opt => (
                 <div
                   key={opt.value}
@@ -1015,7 +1030,7 @@ function PrestashopImportModal({ onClose, onImported }) {
               <div>
                 <div style={{ fontWeight: 700, fontSize: 14, color: '#10b981' }}>Importazione completata!</div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                  {progress.imported} prodotti importati · {progress.errors} errori
+                  {progress.imported} prodotti importati Â· {progress.errors} errori
                 </div>
               </div>
             </div>
@@ -1059,17 +1074,17 @@ function PrestashopImportModal({ onClose, onImported }) {
   );
 }
 
-/* ─── Modale Aggiornamento Massivo da CSV (3 Step) ─────────────────────── */
+/* â”€â”€â”€ Modale Aggiornamento Massivo da CSV (3 Step) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const DB_FIELDS = [
-  { key: '__skip__',               label: '— Ignora colonna —' },
+  { key: '__skip__',               label: 'â€” Ignora colonna â€”' },
   { key: 'sku',                    label: 'SKU (chiave match) *' },
   { key: 'barcode',                label: 'Barcode / EAN' },
   { key: 'category_name',          label: 'Categoria (per nome)' },
-  { key: 'cost_price',             label: 'Prezzo Costo (€)' },
-  { key: 'sale_price',             label: 'Prezzo Vendita (€)' },
-  { key: 'price_list_2',           label: 'Listino 2 (€)' },
-  { key: 'price_list_3',           label: 'Listino 3 (€)' },
-  { key: 'excise_tax',             label: 'Accisa (€)' },
+  { key: 'cost_price',             label: 'Prezzo Costo (â‚¬)' },
+  { key: 'sale_price',             label: 'Prezzo Vendita (â‚¬)' },
+  { key: 'price_list_2',           label: 'Listino 2 (â‚¬)' },
+  { key: 'price_list_3',           label: 'Listino 3 (â‚¬)' },
+  { key: 'excise_tax',             label: 'Accisa (â‚¬)' },
   { key: 'fiscal_group',           label: 'Gruppo Fiscale' },
   { key: 'prevalence',             label: 'Prevalenza' },
   { key: 'min_stock_qty',          label: 'Stock Alert (min qty)' },
@@ -1103,7 +1118,7 @@ function CsvBulkUpdateModal({ onClose, onDone }) {
       window.Papa.parse(file, {
         header: true, skipEmptyLines: true,
         complete: (res) => {
-          if (!res.data?.length) { toast.error('Il CSV è vuoto o non valido'); return; }
+          if (!res.data?.length) { toast.error('Il CSV Ã¨ vuoto o non valido'); return; }
           const h = res.meta.fields || [];
           setHeaders(h); setRows(res.data);
           const autoMap = {};
@@ -1152,7 +1167,7 @@ function CsvBulkUpdateModal({ onClose, onDone }) {
         <div style={{padding:'20px 24px 16px',borderBottom:'1px solid var(--color-border)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div>
             <div style={{fontWeight:800,fontSize:16,color:'var(--color-text)',display:'flex',alignItems:'center',gap:8}}><FileEdit size={18}/> Aggiornamento Massivo da CSV</div>
-            <div style={{fontSize:12,color:'var(--color-text-secondary)',marginTop:2}}>Solo i campi presenti nel CSV vengono aggiornati — gli altri rimangono invariati</div>
+            <div style={{fontSize:12,color:'var(--color-text-secondary)',marginTop:2}}>Solo i campi presenti nel CSV vengono aggiornati â€” gli altri rimangono invariati</div>
           </div>
           <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'var(--color-text-secondary)',padding:4}}><X size={20}/></button>
         </div>
@@ -1176,7 +1191,7 @@ function CsvBulkUpdateModal({ onClose, onDone }) {
                 style={{border:`2px dashed ${dragOver?'var(--color-accent)':'var(--color-border)'}`,borderRadius:12,padding:48,textAlign:'center',cursor:'pointer',background:dragOver?'rgba(99,102,241,0.06)':'transparent',transition:'all .2s'}}>
                 <Upload size={36} style={{color:'var(--color-text-secondary)',marginBottom:12}}/>
                 <div style={{fontWeight:600,fontSize:14}}>Trascina il CSV qui o clicca per selezionare</div>
-                <div style={{fontSize:11,marginTop:4,color:'var(--color-text-secondary)'}}>Supporta .csv e .txt — qualsiasi separatore</div>
+                <div style={{fontSize:11,marginTop:4,color:'var(--color-text-secondary)'}}>Supporta .csv e .txt â€” qualsiasi separatore</div>
               </div>
               <input ref={fileRef} type="file" accept=".csv,.txt" style={{display:'none'}} onChange={e=>parseFile(e.target.files?.[0])}/>
               <div style={{marginTop:16,padding:12,background:'rgba(99,102,241,0.07)',borderRadius:8,fontSize:12,color:'var(--color-text-secondary)'}}>
@@ -1186,7 +1201,7 @@ function CsvBulkUpdateModal({ onClose, onDone }) {
           )}
           {step===2&&(
             <div>
-              <div style={{marginBottom:12,fontSize:13,color:'var(--color-text-secondary)'}}>File: <strong style={{color:'var(--color-text)'}}>{fileName}</strong> — {rows.length} righe</div>
+              <div style={{marginBottom:12,fontSize:13,color:'var(--color-text-secondary)'}}>File: <strong style={{color:'var(--color-text)'}}>{fileName}</strong> â€” {rows.length} righe</div>
               {!skuMapped&&(<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:8,marginBottom:12,fontSize:12,color:'#f59e0b'}}>
                 <AlertCircle size={14}/> Mappa almeno una colonna su <strong style={{marginLeft:4}}>SKU (chiave match)</strong>
               </div>)}
@@ -1206,14 +1221,14 @@ function CsvBulkUpdateModal({ onClose, onDone }) {
           )}
           {step===3&&!result&&(
             <div>
-              <div style={{marginBottom:12,fontSize:13}}><strong style={{color:'var(--color-text)'}}>{totalValid}</strong><span style={{color:'var(--color-text-secondary)'}}> righe con SKU valido — anteprima prime 5:</span></div>
+              <div style={{marginBottom:12,fontSize:13}}><strong style={{color:'var(--color-text)'}}>{totalValid}</strong><span style={{color:'var(--color-text-secondary)'}}> righe con SKU valido â€” anteprima prime 5:</span></div>
               <div style={{overflowX:'auto',borderRadius:8,border:'1px solid var(--color-border)'}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
                   <thead><tr style={{background:'var(--color-background)'}}>
                     {mappedCols.map(([col,dbKey])=>(<th key={col} style={{padding:'6px 10px',textAlign:'left',borderBottom:'1px solid var(--color-border)',fontWeight:600,whiteSpace:'nowrap'}}>{DB_FIELDS.find(f=>f.key===dbKey)?.label||dbKey}</th>))}
                   </tr></thead>
                   <tbody>{previewRows.map((r,i)=>(<tr key={i} style={{borderBottom:'1px solid var(--color-border)'}}>
-                    {mappedCols.map(([,dbKey])=>(<td key={dbKey} style={{padding:'5px 10px',color:'var(--color-text-secondary)'}}>{r[dbKey]??'—'}</td>))}
+                    {mappedCols.map(([,dbKey])=>(<td key={dbKey} style={{padding:'5px 10px',color:'var(--color-text-secondary)'}}>{r[dbKey]??'â€”'}</td>))}
                   </tr>))}</tbody>
                 </table>
               </div>
@@ -1235,7 +1250,7 @@ function CsvBulkUpdateModal({ onClose, onDone }) {
           )}
         </div>
         <div style={{padding:'12px 24px',borderTop:'1px solid var(--color-border)',display:'flex',justifyContent:'flex-end',gap:8}}>
-          {!result&&(<button className="sp-btn sp-btn-secondary" onClick={step===1?onClose:()=>setStep(s=>s-1)}>{step===1?'Annulla':'← Indietro'}</button>)}
+          {!result&&(<button className="sp-btn sp-btn-secondary" onClick={step===1?onClose:()=>setStep(s=>s-1)}>{step===1?'Annulla':'â† Indietro'}</button>)}
           {step===1&&<span style={{fontSize:12,color:'var(--color-text-secondary)',alignSelf:'center'}}>Carica un file per continuare</span>}
           {step===2&&(<button className="sp-btn sp-btn-primary" disabled={!skuMapped} onClick={()=>setStep(3)} style={{opacity:skuMapped?1:0.5}}>Anteprima <ArrowRight size={14}/></button>)}
           {step===3&&!result&&(<button className="sp-btn sp-btn-primary" onClick={handleSubmit} disabled={loading}>
@@ -1243,6 +1258,106 @@ function CsvBulkUpdateModal({ onClose, onDone }) {
           </button>)}
           {result&&<button className="sp-btn sp-btn-primary" onClick={onDone}><CheckCircle size={14}/> Chiudi</button>}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* --- Modale Importazione Rapida Barcode --------------------------------- */
+function CsvBarcodeUpdateModal({ onClose, onDone }) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const fileRef = useRef();
+
+  const handleFile = (file) => {
+    if (!file) return;
+    if (!file.name.match(/\.(csv|txt)$/i)) { toast.error('Carica un file CSV'); return; }
+    
+    setLoading(true);
+    const doparse = () => {
+      window.Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: async (res) => {
+          if (!res.data?.length) { toast.error('Il CSV è vuoto'); setLoading(false); return; }
+          
+          const headers = res.meta.fields.map(f => f.trim());
+          const idCol = headers.find(h => /^(id|sku|match_id)$/i.test(h));
+          const barcodeCol = headers.find(h => /^(barcode|ean|codice a barre)$/i.test(h));
+          
+          if (!idCol || !barcodeCol) {
+            toast.error(`Colonne mancanti. Trovate: ${headers.join(', ')}. Servono "ID" e "BarCode".`);
+            setLoading(false);
+            return;
+          }
+
+          const payload = res.data
+            .map(row => ({ match_id: String(row[idCol]), barcode: String(row[barcodeCol]) }))
+            .filter(r => r.match_id && r.barcode);
+
+          if (!payload.length) {
+            toast.error("Nessuna riga valida trovata.");
+            setLoading(false); return;
+          }
+
+          try {
+            const resp = await api.patch('/catalog/products/bulk-barcodes', { rows: payload });
+            setResult(resp.data);
+          } catch (err) {
+            toast.error(err.response?.data?.message || 'Errore durante l\'aggiornamento dei barcode');
+          } finally {
+            setLoading(false);
+          }
+        },
+        error: () => { toast.error('Errore lettura file'); setLoading(false); }
+      });
+    };
+
+    if (window.Papa) { doparse(); } else {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js';
+      s.onload = doparse; document.head.appendChild(s);
+    }
+  };
+
+  const overlayStyle = { position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16 };
+  const modalStyle   = { background:'var(--color-surface)',borderRadius:16,width:'100%',maxWidth:500,padding: 24, boxShadow:'0 24px 64px rgba(0,0,0,0.45)' };
+
+  return (
+    <div style={overlayStyle} onClick={e => e.target===e.currentTarget && onClose()}>
+      <div style={modalStyle}>
+        <div style={{fontWeight:800,fontSize:18,marginBottom:8,display:'flex',alignItems:'center',gap:8}}>
+          <ScanBarcode size={20} color="#6366f1" /> Aggiornamento Barcode Rapido
+        </div>
+        <div style={{fontSize:13,color:'var(--color-text-secondary)',marginBottom:20}}>
+          Il CSV viene analizzato automaticamente e spedito al database in blocco unico. 
+          Deve avere una colonna intitolata <strong>ID</strong> (o SKU) e una colonna <strong>BarCode</strong>.
+        </div>
+
+        {!result ? (
+          <div>
+            <div 
+              onClick={() => !loading && fileRef.current?.click()}
+              style={{ border: `2px dashed var(--color-border)`, borderRadius: 12, padding: 40, textAlign: 'center', cursor: loading ? 'wait' : 'pointer', background: 'rgba(99,102,241,0.05)', transition: 'all 0.2s' }}
+            >
+              {loading ? <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: '#6366f1', margin: '0 auto' }}/> : <Upload size={32} style={{color: '#6366f1', margin: '0 auto'}}/>}
+              <div style={{ marginTop: 12, fontWeight: 700, color: 'var(--color-text)' }}>
+                {loading ? 'Elaborazione in corso...' : 'Carica il CSV dei Barcode'}
+              </div>
+            </div>
+            <input ref={fileRef} type="file" accept=".csv,.txt" style={{display:'none'}} onChange={e=>handleFile(e.target.files?.[0])}/>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+              <button className="sp-btn sp-btn-secondary" onClick={onClose} disabled={loading}>Annulla</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{textAlign:'center',padding: '20px 0 0'}}>
+            <CheckCircle size={48} style={{color:'#10b981',margin:'0 auto 12px'}}/>
+            <div style={{fontWeight:800,fontSize:18,color:'var(--color-text)'}}>Aggiornamento completato!</div>
+            <div style={{fontSize:32,fontWeight:900,color:'#10b981',marginTop:16}}>{result.updated}</div>
+            <div style={{fontSize:13,color:'var(--color-text-secondary)'}}>Prodotti aggiornati con successo</div>
+            <button className="sp-btn sp-btn-primary" onClick={onDone} style={{width:'100%',justifyContent:'center',marginTop:24}}>Chiudi e Aggiorna</button>
+          </div>
+        )}
       </div>
     </div>
   );
