@@ -317,12 +317,13 @@ export default function CatalogPage() {
                   <td className="sp-cell-primary" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {product.image_url ? (
                       <img src={getImageUrl(product.image_url)} alt={product.name}
-                        style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)' }} />
-                    ) : (
-                      <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--color-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid var(--color-border)' }}>
-                        <Package size={16} style={{ opacity: 0.3 }} />
-                      </div>
-                    )}
+                        style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)' }}
+                        onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                      />
+                    ) : null}
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--color-bg)', display: product.image_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid var(--color-border)' }}>
+                      <Package size={16} style={{ opacity: 0.3 }} />
+                    </div>
                     <span>{product.name}</span>
                   </td>
                   <td className="sp-cell-secondary sp-font-mono">{product.sku || '—'}</td>

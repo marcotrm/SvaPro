@@ -304,12 +304,10 @@ class PrestashopController extends Controller
                         // Assicura SPV e stock per tutti gli store/warehouse
                         $this->ensureSpvAndStock($tenantId, $variantId, $storeIds, $warehouseIds, $now);
 
-                        // URL immagine pubblica PS: /img/p/{digits}/{imgId}-large_default.jpg
-                        // Non usa il WebService (niente auth, niente CF block)
+                        // URL immagine via WebService PS — il browser carica <img src> direttamente
+                        // CF non blocca le richieste immagine dal browser (solo le HTML)
                         if (!empty($psImgId)) {
-                            $digits   = str_split((string) $psImgId);
-                            $imgPath  = implode('/', $digits);
-                            $imageUrl = "{$url}/img/p/{$imgPath}/{$psImgId}-large_default.jpg";
+                            $imageUrl = "{$url}/api/images/products/{$psId}/{$psImgId}?ws_key={$apiKey}";
                             DB::table('products')->where('id', $existingProduct->id)->update([
                                 'image_url'  => $imageUrl,
                                 'updated_at' => $now,
@@ -344,11 +342,9 @@ class PrestashopController extends Controller
 
                         $this->ensureSpvAndStock($tenantId, $variantId, $storeIds, $warehouseIds, $now);
 
-                        // URL immagine pubblica PS: /img/p/{digits}/{imgId}-large_default.jpg
+                        // URL immagine via WebService PS
                         if (!empty($psImgId)) {
-                            $digits   = str_split((string) $psImgId);
-                            $imgPath  = implode('/', $digits);
-                            $imageUrl = "{$url}/img/p/{$imgPath}/{$psImgId}-large_default.jpg";
+                            $imageUrl = "{$url}/api/images/products/{$psId}/{$psImgId}?ws_key={$apiKey}";
                             DB::table('products')->where('id', $productId)->update([
                                 'image_url'  => $imageUrl,
                                 'updated_at' => $now,
