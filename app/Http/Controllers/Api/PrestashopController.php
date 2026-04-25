@@ -247,9 +247,11 @@ class PrestashopController extends Controller
 
             foreach ($psProducts as $psp) {
                 try {
-                    $psId   = (int) ($psp['id'] ?? 0);
-                    $sku    = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
-                    $name   = $this->extractLangValue($psp['name'] ?? null) ?: "Prodotto #{$psId}";
+                    $psId    = (int) ($psp['id'] ?? 0);
+                    $sku     = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
+                    $name    = $this->extractLangValue($psp['name'] ?? null) ?: "Prodotto #{$psId}";
+                    // Barcode EAN-13 (campo standard PS, usato da Tenpro)
+                    $barcode = trim($psp['ean13'] ?? '') ?: null;
 
                     // PS con display=full può restituire il prezzo con nomi diversi a seconda
                     // della versione: price_ttc, price_tax_incl, specific_prices, o solo price (netto).
@@ -294,14 +296,17 @@ class PrestashopController extends Controller
                     if ($existingProduct) {
                         // ── AGGIORNA prodotto esistente ──
                         $updateData = ['name' => $name, 'is_active' => $active, 'updated_at' => $now];
+                        if ($barcode) $updateData['barcode'] = $barcode;
                         DB::table('products')->where('id', $existingProduct->id)->update($updateData);
 
-                        // Aggiorna SEMPRE il prezzo della variante
+                        // Aggiorna SEMPRE il prezzo e il barcode della variante
                         $existingVariant = $existingVariants->get($existingProduct->id);
                         if ($existingVariant) {
+                            $variantUpdate = ['sale_price' => $price, 'updated_at' => $now];
+                            if ($barcode) $variantUpdate['barcode'] = $barcode;
                             DB::table('product_variants')
                                 ->where('id', $existingVariant->id)
-                                ->update(['sale_price' => $price, 'updated_at' => $now]);
+                                ->update($variantUpdate);
 
                             $variantId = $existingVariant->id;
                         } else {
@@ -343,6 +348,7 @@ class PrestashopController extends Controller
                             'name'         => $name,
                             'product_type' => 'liquid',
                             'category_id'  => $categoryId,
+                            'barcode'      => $barcode,
                             'is_active'    => $active,
                             'created_at'   => $now,
                             'updated_at'   => $now,
@@ -352,6 +358,7 @@ class PrestashopController extends Controller
                             'tenant_id'    => $tenantId,
                             'product_id'   => $productId,
                             'sale_price'   => $price,
+                            'barcode'      => $barcode,
                             'tax_class_id' => $defaultTaxClassId,
                             'pack_size'    => 1,
                             'cost_price'   => 0,
