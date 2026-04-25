@@ -17,8 +17,8 @@ export default function SuppliersPage() {
   const [form, setForm] = useState({
     name: '', code: '', email: '', phone: '', vat_number: '',
     address: '', city: '', province: '', zip: '', country: 'IT', notes: '',
-    // Logistica riordino (lot_size è sul prodotto, non sul fornitore)
-    lead_time_giorni: '', moq: '',
+    // Logistica riordino
+    lead_time_giorni: '', min_stock_days: '', max_stock_days: '', moq: '',
   });
   const [confirmToDelete, setConfirmToDelete] = useState(null);
 
@@ -46,6 +46,8 @@ export default function SuppliersPage() {
       vat_number: item.vat_number || '', address: item.address || '', city: item.city || '',
       province: item.province || '', zip: item.zip || '', country: item.country || 'IT', notes: item.notes || '',
       lead_time_giorni: item.lead_time_giorni ?? '',
+      min_stock_days:   item.min_stock_days ?? '',
+      max_stock_days:   item.max_stock_days ?? '',
       moq:              item.moq ?? '',
     });
     setEditing(item);
@@ -136,6 +138,22 @@ export default function SuppliersPage() {
               <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>Usato nella formula di riordino: vendite/giorno × giorni</div>
             </div>
             <div>
+              <label className="field-label">Giorni Scorta Min. (Trigger)</label>
+              <input className="field-input" type="number" min="1" max="365"
+                placeholder="es. 20"
+                value={form.min_stock_days}
+                onChange={e => setForm({ ...form, min_stock_days: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="field-label">Giorni Scorta Max. (Target)</label>
+              <input className="field-input" type="number" min="1" max="365"
+                placeholder="es. 30"
+                value={form.max_stock_days}
+                onChange={e => setForm({ ...form, max_stock_days: e.target.value })}
+              />
+            </div>
+            <div>
               <label className="field-label">MOQ — Minimo d'Ordine (pz)</label>
               <input className="field-input" type="number" min="1"
                 placeholder="es. 6"
@@ -167,6 +185,7 @@ export default function SuppliersPage() {
               <th>P.IVA</th>
               <th>Città</th>
               <th>Lead Time</th>
+              <th>Min/Max (gg)</th>
               <th style={{ textAlign: 'center' }}>MOQ</th>
               <th style={{ textAlign: 'right' }}>Azioni</th>
             </tr>
@@ -184,6 +203,11 @@ export default function SuppliersPage() {
                   {s.lead_time_giorni
                     ? <span style={{ background: '#ede9fe', color: '#6d28d9', borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>{s.lead_time_giorni}gg</span>
                     : <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>}
+                </td>
+                <td>
+                  {s.min_stock_days || s.max_stock_days
+                    ? <span style={{ fontSize: 12, fontWeight: 600 }}>{s.min_stock_days || '20'}/{s.max_stock_days || '30'}</span>
+                    : <span style={{ color: 'var(--muted)', fontSize: 12 }}>Standard</span>}
                 </td>
                 <td style={{ textAlign: 'center' }}>
                   {s.moq ? <span style={{ fontSize: 12, fontWeight: 600 }}>{s.moq} pz</span> : <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>}

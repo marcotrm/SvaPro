@@ -91,6 +91,8 @@ class SupplierController extends Controller
             'zip'               => $request->input('zip'),
             'notes'             => $request->input('notes'),
             'lead_time_giorni'  => $request->input('lead_time_giorni') !== null ? (int) $request->input('lead_time_giorni') : null,
+            'min_stock_days'    => $request->input('min_stock_days') !== null ? (int) $request->input('min_stock_days') : null,
+            'max_stock_days'    => $request->input('max_stock_days') !== null ? (int) $request->input('max_stock_days') : null,
             'moq'               => $request->input('moq') !== null ? (int) $request->input('moq') : null,
             'created_at'        => $now,
             'updated_at'        => $now,
@@ -138,6 +140,8 @@ class SupplierController extends Controller
                 'zip'              => $request->input('zip'),
                 'notes'            => $request->input('notes'),
                 'lead_time_giorni' => $request->input('lead_time_giorni') !== null ? (int) $request->input('lead_time_giorni') : null,
+                'min_stock_days'   => $request->input('min_stock_days') !== null ? (int) $request->input('min_stock_days') : null,
+                'max_stock_days'   => $request->input('max_stock_days') !== null ? (int) $request->input('max_stock_days') : null,
                 'moq'              => $request->input('moq') !== null ? (int) $request->input('moq') : null,
                 'updated_at'       => now(),
             ]);
@@ -197,6 +201,8 @@ class SupplierController extends Controller
             'zip'              => ['nullable', 'string', 'max:20'],
             'notes'            => ['nullable', 'string'],
             'lead_time_giorni' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'min_stock_days'   => ['nullable', 'integer', 'min:1', 'max:365'],
+            'max_stock_days'   => ['nullable', 'integer', 'min:1', 'max:365'],
             'moq'              => ['nullable', 'integer', 'min:1'],
             // lot_size NON è del fornitore — è specifico per prodotto
         ];

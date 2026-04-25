@@ -117,6 +117,8 @@ const normalizeProductFlat = (product, storesList, selectedStoreId = '') => {
     prevalence: product?.prevalence || '',
     min_stock_qty: product?.min_stock_qty ?? 0,
     reorder_days: product?.reorder_days ?? 30,
+    min_stock_days: product?.min_stock_days ?? '',
+    max_stock_days: product?.max_stock_days ?? '',
     auto_reorder_enabled: product?.auto_reorder_enabled ?? true,
     description: product?.description || '',
     store_ids: storeIds.length > 0 ? storeIds : defaultStoreIds,
@@ -408,10 +410,26 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               </div>
 
               <div>
-                <label className="sp-label">Stock Min. Alert</label>
+                <label className="sp-label">Stock Min. Alert (Pz)</label>
                 <input className="sp-input" type="number" min="0" name="min_stock_qty" value={formData.min_stock_qty} onChange={handleChange} />
               </div>
 
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>
+              <div>
+                <label className="sp-label" style={{ color: '#6366f1' }}>Giorni Scorta Min (Override)</label>
+                <input className="sp-input" type="number" min="1" max="365" name="min_stock_days" value={formData.min_stock_days} onChange={handleChange} placeholder="es. 20" style={{ borderColor: 'rgba(99,102,241,0.2)' }} />
+              </div>
+              <div>
+                <label className="sp-label" style={{ color: '#6366f1' }}>Giorni Scorta Max (Override)</label>
+                <input className="sp-input" type="number" min="1" max="365" name="max_stock_days" value={formData.max_stock_days} onChange={handleChange} placeholder="es. 30" style={{ borderColor: 'rgba(99,102,241,0.2)' }} />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 24, fontStyle: 'italic' }}>
+                  * Questi campi sovrascrivono i giorni di scorta predefiniti del fornitore per il Magazzino Centrale.
+                </p>
+              </div>
             </div>
           </div>
 

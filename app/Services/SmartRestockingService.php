@@ -277,7 +277,11 @@ class SmartRestockingService
                 pv.flavor,
                 pv.cost_price,
                 COALESCE(sup.lead_time_medio, 7) as lead_time_medio,
-                COALESCE(s30.sold_qty, 0) as sold_30d
+                COALESCE(s30.sold_qty, 0) as sold_30d,
+                p.min_stock_days as product_min_days,
+                p.max_stock_days as product_max_days,
+                sup.min_stock_days as supplier_min_days,
+                sup.max_stock_days as supplier_max_days
             FROM product_variants pv
             JOIN products p ON p.id = pv.product_id
             LEFT JOIN brands b ON b.id = p.brand_id
@@ -301,8 +305,10 @@ class SmartRestockingService
             if ($dailyBurn <= 0) continue; 
 
             $leadTime = max(1, (int) $r->lead_time_medio);
-            $minDays = 20; // Giorni minimi di copertura
-            $maxDays = 30; // Giorni massimi target da ripristinare
+            
+            // Gerarchia (Fallback): Prodotto -> Fornitore -> Default
+            $minDays = $r->product_min_days ?? $r->supplier_min_days ?? 20;
+            $maxDays = $r->product_max_days ?? $r->supplier_max_days ?? 30;
 
             $reorderPoint = (int) ceil(($leadTime + $minDays) * $dailyBurn);
             $targetStock  = (int) ceil(($leadTime + $maxDays) * $dailyBurn);
