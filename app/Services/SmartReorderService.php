@@ -11,114 +11,145 @@ class SmartReorderService
 {
     public function previewForTenant(int $tenantId): array
     {
+        // ── UNICA QUERY SQL — tutto il calcolo avviene in PostgreSQL, 0 loop N+1 ──
+        $cutoff30  = now()->subDays(30)->toDateTimeString();
+        $cutoff60  = now()->subDays(60)->toDateTimeString();
+
+        $rows = DB::select("
+            SELECT
+                si.id,
+                si.warehouse_id,
+                si.product_variant_id,
+                si.on_hand,
+                si.reserved,
+                COALESCE(si.reorder_point, 0)                              AS reorder_point,
+                COALESCE(si.safety_stock, 0)                               AS safety_stock,
+                w.name                                                     AS warehouse_name,
+                s.id                                                       AS store_id,
+                s.name                                                     AS store_name,
+                COALESCE(s.smart_reorder_threshold, 0)                     AS smart_reorder_threshold,
+                COALESCE(s.smart_reorder_max_qty, 0)                       AS smart_reorder_max_qty,
+                p.id                                                       AS product_id,
+                p.name                                                     AS product_name,
+                p.default_supplier_id,
+                COALESCE(p.auto_reorder_enabled, false)                    AS auto_reorder_enabled,
+                COALESCE(p.reorder_days, 30)                               AS reorder_days,
+                COALESCE(p.min_stock_qty, 0)                               AS min_stock_qty,
+                COALESCE(p.scorta_sicurezza, 0)                            AS scorta_sicurezza,
+                pv.cost_price,
+                COALESCE(sup.lead_time_medio, 7)                           AS lead_time_medio,
+                sup.name                                                   AS supplier_name,
+
+                -- Vendite 30gg (per filtro iniziale)
+                COALESCE(sales30.qty, 0)                                   AS sold_30d,
+                -- Vendite 60gg e 7gg (per formula ponderata)
+                COALESCE(sales60.qty, 0)                                   AS sold_60d,
+                COALESCE(sales7.qty, 0)                                    AS sold_7d
+
+            FROM stock_items si
+            JOIN warehouses w        ON w.id = si.warehouse_id
+            JOIN stores s            ON s.id = w.store_id
+            JOIN product_variants pv ON pv.id = si.product_variant_id
+            JOIN products p          ON p.id = pv.product_id
+            LEFT JOIN suppliers sup  ON sup.id = p.default_supplier_id
+
+            -- Vendite aggregare 30gg
+            LEFT JOIN (
+                SELECT sol.product_variant_id, so.store_id, SUM(sol.qty) AS qty
+                FROM sales_order_lines sol
+                JOIN sales_orders so ON so.id = sol.sales_order_id
+                WHERE so.tenant_id = :tid1
+                  AND so.status = 'paid'
+                  AND so.paid_at >= :c30
+                GROUP BY sol.product_variant_id, so.store_id
+            ) sales30 ON sales30.product_variant_id = si.product_variant_id
+                      AND sales30.store_id = s.id
+
+            -- Vendite aggregare 60gg
+            LEFT JOIN (
+                SELECT sol.product_variant_id, so.store_id, SUM(sol.qty) AS qty
+                FROM sales_order_lines sol
+                JOIN sales_orders so ON so.id = sol.sales_order_id
+                WHERE so.tenant_id = :tid2
+                  AND so.status = 'paid'
+                  AND so.paid_at >= :c60
+                GROUP BY sol.product_variant_id, so.store_id
+            ) sales60 ON sales60.product_variant_id = si.product_variant_id
+                      AND sales60.store_id = s.id
+
+            -- Vendite aggregare 7gg
+            LEFT JOIN (
+                SELECT sol.product_variant_id, so.store_id, SUM(sol.qty) AS qty
+                FROM sales_order_lines sol
+                JOIN sales_orders so ON so.id = sol.sales_order_id
+                WHERE so.tenant_id = :tid3
+                  AND so.status = 'paid'
+                  AND so.paid_at >= :c7
+                GROUP BY sol.product_variant_id, so.store_id
+            ) sales7 ON sales7.product_variant_id = si.product_variant_id
+                     AND sales7.store_id = s.id
+
+            WHERE si.tenant_id = :tid4
+              AND s.auto_reorder_enabled = true
+              AND p.auto_reorder_enabled = true
+        ", [
+            'tid1' => $tenantId, 'c30'  => $cutoff30,
+            'tid2' => $tenantId, 'c60'  => $cutoff60,
+            'tid3' => $tenantId, 'c7'   => now()->subDays(7)->toDateTimeString(),
+            'tid4' => $tenantId,
+        ]);
+
         $alerts = [];
 
-        $stores = DB::table('stores')
-            ->where('tenant_id', $tenantId)
-            ->where('auto_reorder_enabled', true)
-            ->get();
+        foreach ($rows as $r) {
+            $available = (int) $r->on_hand - (int) $r->reserved;
+            $threshold = max((int) $r->smart_reorder_threshold, (int) $r->reorder_point, (int) $r->min_stock_qty);
 
-        foreach ($stores as $store) {
-            $items = DB::table('stock_items as si')
-                ->join('warehouses as w', 'w.id', '=', 'si.warehouse_id')
-                ->join('product_variants as pv', 'pv.id', '=', 'si.product_variant_id')
-                ->join('products as p', 'p.id', '=', 'pv.product_id')
-                ->leftJoin('suppliers as sup', 'sup.id', '=', 'p.default_supplier_id')
-                ->where('si.tenant_id', $tenantId)
-                ->where('w.store_id', $store->id)
-                ->select([
-                    'si.id',
-                    'si.warehouse_id',
-                    'si.product_variant_id',
-                    'si.on_hand',
-                    'si.reserved',
-                    'si.reorder_point',
-                    'si.safety_stock',
-                    'w.name as warehouse_name',
-                    'p.id as product_id',
-                    'p.name as product_name',
-                    'p.default_supplier_id',
-                    'p.auto_reorder_enabled',
-                    'p.reorder_days',
-                    'p.min_stock_qty',
-                    'p.scorta_sicurezza',
-                    'pv.sale_price',
-                    'pv.cost_price',
-                    'sup.lead_time_medio',
-                    'sup.name as supplier_name',
-                ])
-                ->get();
-
-            foreach ($items as $item) {
-                if (! $item->auto_reorder_enabled) {
-                    continue;
-                }
-
-                $reorderDays = max(1, (int) ($item->reorder_days ?? 30));
-                $soldQty = $this->soldQuantityForVariant(
-                    $tenantId,
-                    (int) $store->id,
-                    (int) $item->product_variant_id,
-                    $reorderDays
-                );
-
-                $available = (int) $item->on_hand - (int) $item->reserved;
-                $threshold = max(
-                    (int) $store->smart_reorder_threshold,
-                    (int) $item->reorder_point,
-                    (int) ($item->min_stock_qty ?? 0)
-                );
-
-                if ($soldQty <= 0 || $available > $threshold) {
-                    continue;
-                }
-
-                $leadTime = max(1, (int) ($item->lead_time_medio ?? 7));
-                $scortaSicurezza = max(0, (int) ($item->scorta_sicurezza ?? 0));
-
-                $ottimizzazione = $this->calculateOptimalStock($tenantId, (int) $store->id, (int) $item->product_variant_id, $leadTime, $scortaSicurezza);
-                
-                $reorderPointDinamico = $ottimizzazione['reorder_point'];
-                $targetStock = $ottimizzazione['qty_21_days'] + $scortaSicurezza; // Per coprire 21 giorni
-
-                if ($available > $reorderPointDinamico) {
-                    continue;
-                }
-
-                $suggestedQty = max(0, $targetStock - $available);
-                if ($suggestedQty === 0) {
-                    continue;
-                }
-
-                // Cap massimo configurabile per negozio o prodotto
-                $maxQty = (int) ($store->smart_reorder_max_qty ?? 0);
-                if ($maxQty > 0) {
-                    $suggestedQty = min($suggestedQty, $maxQty);
-                }
-
-                $alerts[] = [
-                    'store_id'           => (int) $store->id,
-                    'store_name'         => $store->name,
-                    'warehouse_id'       => (int) $item->warehouse_id,
-                    'warehouse_name'     => $item->warehouse_name,
-                    'product_id'         => (int) $item->product_id,
-                    'product_variant_id' => (int) $item->product_variant_id,
-                    'product_name'       => $item->product_name,
-                    'available'          => $available,
-                    'threshold'          => $threshold,
-                    'reorder_days'       => $reorderDays,
-                    'sold_qty_window'    => $soldQty,
-                    'suggested_qty'      => $suggestedQty,
-                    'supplier_id'        => $item->default_supplier_id,
-                    'supplier_name'      => $item->supplier_name ?? 'Nessun Fornitore',
-                    'unit_cost'          => (float) ($item->cost_price ?? 0),
-                    'ai_motivation'      => 'Calcolo previsionale standard',
-                ];
+            if ($r->sold_30d <= 0 || $available > $threshold) {
+                continue;
             }
+
+            // Formula ponderata: 70% peso ultimi 7gg, 30% ultimi 60gg
+            $avg60 = max((float) $r->sold_60d / 60, 0);
+            $avg7  = max((float) $r->sold_7d  /  7, 0);
+            $wAvg  = ($avg7 * 0.7) + ($avg60 * 0.3);
+            if ($wAvg <= 0) $wAvg = $avg60 > 0 ? $avg60 : 0.1;
+
+            $leadTime        = max(1, (int) $r->lead_time_medio);
+            $scortaSicurezza = max(0, (int) $r->scorta_sicurezza);
+            $reorderPoint    = (int) ceil($wAvg * $leadTime);
+            $targetStock     = (int) ceil($wAvg * 21) + $scortaSicurezza;
+
+            if ($available > $reorderPoint) {
+                continue;
+            }
+
+            $suggestedQty = max(0, $targetStock - $available);
+            if ($suggestedQty === 0) continue;
+
+            $maxQty = (int) $r->smart_reorder_max_qty;
+            if ($maxQty > 0) $suggestedQty = min($suggestedQty, $maxQty);
+
+            $alerts[] = [
+                'store_id'           => (int) $r->store_id,
+                'store_name'         => $r->store_name,
+                'warehouse_id'       => (int) $r->warehouse_id,
+                'warehouse_name'     => $r->warehouse_name,
+                'product_id'         => (int) $r->product_id,
+                'product_variant_id' => (int) $r->product_variant_id,
+                'product_name'       => $r->product_name,
+                'available'          => $available,
+                'threshold'          => $threshold,
+                'reorder_days'       => (int) $r->reorder_days,
+                'sold_qty_window'    => (int) $r->sold_30d,
+                'suggested_qty'      => $suggestedQty,
+                'supplier_id'        => $r->default_supplier_id,
+                'supplier_name'      => $r->supplier_name ?? 'Nessun Fornitore',
+                'unit_cost'          => (float) ($r->cost_price ?? 0),
+                'ai_motivation'      => 'Calcolo previsionale standard',
+            ];
         }
 
-        // AI motivations disabilitate nel preview per evitare timeout (30s Railway)
-        // Vengono usate solo nell'export PDF/email dove il tempo non è vincolato.
 
         // Separiamo ordini suggeriti per compatibilità con il controller esistente
         $suggestedOrders = array_map(function ($a) {
