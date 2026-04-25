@@ -144,6 +144,25 @@ Route::get('/debug-catalog', function () {
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Debug SmartReorder: espone l'errore reale senza wrapping ──────────────────
+Route::get('/debug-smart-reorder', function () {
+    try {
+        $tenantId = (int) \Illuminate\Support\Facades\DB::table('tenants')->value('id');
+        $service  = app(\App\Services\SmartReorderService::class);
+        $result   = $service->previewForTenant($tenantId);
+        return response()->json(['ok' => true, 'alerts' => count($result['alerts'] ?? [])]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'error'   => $e->getMessage(),
+            'class'   => get_class($e),
+            'file'    => str_replace(base_path(), '', $e->getFile()),
+            'line'    => $e->getLine(),
+        ], 500);
+    }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
+
 Route::get('/bulk-set-stock', function () {
     try {
         // Setta on_hand=1000 per TUTTI i stock_items di tutti i prodotti
