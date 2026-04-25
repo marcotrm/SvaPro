@@ -680,6 +680,45 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
             ]);
         })->middleware('role:superadmin,admin_cliente');
 
+        // ── Bulk Stock Split: metà prodotti attivi → 1000, metà → 0 ──
+        // USO: GET /api/v1/dev/seed-stock-split   (solo superadmin / admin_cliente)
+        Route::get('/dev/seed-stock-split', function (\Illuminate\Http\Request $request) {
+            $tenantId = (int) $request->attributes->get('tenant_id');
+            $now      = now();
+
+            // Tutti gli stock_items dei prodotti attivi, ordinati per ID (deterministico)
+            $activeVariantIds = \Illuminate\Support\Facades\DB::table('product_variants as pv')
+                ->join('products as p', 'p.id', '=', 'pv.product_id')
+                ->where('pv.tenant_id', $tenantId)
+                ->where('p.is_active', true)
+                ->orderBy('pv.id')
+                ->pluck('pv.id');
+
+            $total    = $activeVariantIds->count();
+            $half     = (int) ceil($total / 2);
+
+            $firstHalf  = $activeVariantIds->take($half)->values();
+            $secondHalf = $activeVariantIds->skip($half)->values();
+
+            $updated1000 = \Illuminate\Support\Facades\DB::table('stock_items')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('product_variant_id', $firstHalf->all())
+                ->update(['on_hand' => 1000, 'reserved' => 0, 'updated_at' => $now]);
+
+            $updated0 = \Illuminate\Support\Facades\DB::table('stock_items')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('product_variant_id', $secondHalf->all())
+                ->update(['on_hand' => 0, 'reserved' => 0, 'updated_at' => $now]);
+
+            return response()->json([
+                'success'       => true,
+                'total_active'  => $total,
+                'set_to_1000'   => $updated1000,
+                'set_to_0'      => $updated0,
+                'message'       => "Split completato: {$updated1000} stock_items → 1000 pz | {$updated0} → 0 pz",
+            ]);
+        })->middleware('role:superadmin,admin_cliente');
+
         // Reports — accessibili anche ai dipendenti (filtrati automaticamente al proprio store)
         Route::get('/reports/summary', [ReportController::class, 'summary']);
         Route::get('/reports/revenue-trend', [ReportController::class, 'revenueTrend']);

@@ -16,9 +16,15 @@ function ReorderFornitori() {
     setLoading(true); setError(null);
     try {
       const res = await inventory.getSmartReorderPreview();
+      // Il backend può tornare HTTP 200 con _error se la query SQL fallisce
+      if (res.data?._error) {
+        setError('Errore server: ' + res.data._error);
+        setPreview(null);
+        return;
+      }
       setPreview(res.data);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Errore caricamento preview');
+      setError(e?.response?.data?.message || e?.message || 'Errore caricamento preview');
     } finally { setLoading(false); }
   }, []);
 
