@@ -7,7 +7,7 @@ import CatalogModal from '../components/CatalogModal.jsx';
 import ProductInventoryModal from '../components/ProductInventoryModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import BulkExciseModal from '../components/BulkExciseModal.jsx';
-import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star, Trash2, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, Package, Layers, AlertTriangle, MapPin, Edit3, Copy, Upload, X, CheckCircle, Loader2, ShoppingBag, Star, Trash2, DollarSign, ChevronLeft, ChevronRight, FileEdit, ArrowRight, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function CatalogPage() {
@@ -28,6 +28,7 @@ export default function CatalogPage() {
   const [showPsImport, setShowPsImport] = useState(false);
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [showBulkExcise, setShowBulkExcise] = useState(false);
+  const [showCsvBulkUpdate, setShowCsvBulkUpdate] = useState(false);
   const [inventoryProduct, setInventoryProduct] = useState(null);
   
   // Paginazione
@@ -227,6 +228,14 @@ export default function CatalogPage() {
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
             <Upload size={16} /> Importa CSV
+          </button>
+          <button
+            className="sp-btn sp-btn-secondary"
+            onClick={() => setShowCsvBulkUpdate(true)}
+            title="Aggiorna campi prodotti esistenti da CSV (Barcode, Prezzi, Accise...)"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <FileEdit size={16} /> Aggiorna da CSV
           </button>
           <button
             className="sp-btn sp-btn-secondary"
@@ -519,6 +528,13 @@ export default function CatalogPage() {
         <CsvImportModal
           onClose={() => setShowCsvImport(false)}
           onImported={() => { setShowCsvImport(false); fetchData(); }}
+        />
+      )}
+
+      {showCsvBulkUpdate && (
+        <CsvBulkUpdateModal
+          onClose={() => setShowCsvBulkUpdate(false)}
+          onDone={() => { setShowCsvBulkUpdate(false); fetchData(); }}
         />
       )}
 
@@ -945,6 +961,195 @@ function PrestashopImportModal({ onClose, onImported }) {
               </button>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Modale Aggiornamento Massivo da CSV (3 Step) ─────────────────────── */
+const DB_FIELDS = [
+  { key: '__skip__',               label: '— Ignora colonna —' },
+  { key: 'sku',                    label: 'SKU (chiave match) *' },
+  { key: 'barcode',                label: 'Barcode / EAN' },
+  { key: 'category_name',          label: 'Categoria (per nome)' },
+  { key: 'cost_price',             label: 'Prezzo Costo (€)' },
+  { key: 'sale_price',             label: 'Prezzo Vendita (€)' },
+  { key: 'price_list_2',           label: 'Listino 2 (€)' },
+  { key: 'price_list_3',           label: 'Listino 3 (€)' },
+  { key: 'excise_tax',             label: 'Accisa (€)' },
+  { key: 'fiscal_group',           label: 'Gruppo Fiscale' },
+  { key: 'prevalence',             label: 'Prevalenza' },
+  { key: 'min_stock_qty',          label: 'Stock Alert (min qty)' },
+  { key: 'flavor',                 label: 'Gusto' },
+  { key: 'nicotine_strength',      label: 'Nicotina (mg)' },
+  { key: 'volume_ml',              label: 'Volume (ml)' },
+  { key: 'pli_code',               label: 'Codice PLI' },
+  { key: 'denominazione_prodotto', label: 'Denominazione ADM' },
+];
+const NUM_FIELDS = new Set(['cost_price','sale_price','price_list_2','price_list_3','excise_tax','min_stock_qty','nicotine_strength','volume_ml']);
+function normalizeValue(key, raw) {
+  if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+  if (NUM_FIELDS.has(key)) { const n = parseFloat(String(raw).replace(',','.')); return isNaN(n) ? null : n; }
+  return String(raw).trim() || null;
+}
+function CsvBulkUpdateModal({ onClose, onDone }) {
+  const [step, setStep]         = useState(1);
+  const [headers, setHeaders]   = useState([]);
+  const [rows, setRows]         = useState([]);
+  const [mapping, setMapping]   = useState({});
+  const [loading, setLoading]   = useState(false);
+  const [result, setResult]     = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const fileRef = useRef();
+  const parseFile = (file) => {
+    if (!file) return;
+    if (!file.name.match(/\.(csv|txt)$/i)) { toast.error('Carica un file CSV o TXT'); return; }
+    setFileName(file.name);
+    const doparse = () => {
+      window.Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: (res) => {
+          if (!res.data?.length) { toast.error('Il CSV è vuoto o non valido'); return; }
+          const h = res.meta.fields || [];
+          setHeaders(h); setRows(res.data);
+          const autoMap = {};
+          h.forEach(col => {
+            const lower = col.toLowerCase().trim();
+            const match = DB_FIELDS.find(f => f.key !== '__skip__' && f.key.toLowerCase() === lower);
+            if (match) autoMap[col] = match.key;
+          });
+          setMapping(autoMap); setStep(2);
+        },
+        error: () => toast.error('Errore nel parsing del CSV'),
+      });
+    };
+    if (window.Papa) { doparse(); } else {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js';
+      s.onload = doparse; document.head.appendChild(s);
+    }
+  };
+  const handleFileDrop = (e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer?.files?.[0]; if (f) parseFile(f); };
+  const buildPayload = () => rows.map(row => {
+    const obj = {};
+    headers.forEach(col => { const k = mapping[col]; if (!k || k === '__skip__') return; const v = normalizeValue(k, row[col]); if (v !== null) obj[k] = v; });
+    return obj;
+  }).filter(r => r.sku);
+  const skuMapped = Object.values(mapping).includes('sku');
+  const totalValid = buildPayload().length;
+  const previewRows = buildPayload().slice(0, 5);
+  const mappedCols = Object.entries(mapping).filter(([,v]) => v !== '__skip__');
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const payload = buildPayload();
+      if (!payload.length) { toast.error('Nessuna riga con SKU valido'); setLoading(false); return; }
+      const res = await api.patch('/catalog/products/bulk-update', { rows: payload });
+      setResult(res.data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || JSON.stringify(err.response?.data?.errors ?? {}) || 'Errore durante il bulk update');
+    } finally { setLoading(false); }
+  };
+  const overlayStyle = { position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16 };
+  const modalStyle   = { background:'var(--color-surface)',borderRadius:16,width:'100%',maxWidth:700,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 24px 64px rgba(0,0,0,0.45)' };
+  return (
+    <div style={overlayStyle} onClick={e => e.target===e.currentTarget && onClose()}>
+      <div style={modalStyle}>
+        <div style={{padding:'20px 24px 16px',borderBottom:'1px solid var(--color-border)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <div style={{fontWeight:800,fontSize:16,color:'var(--color-text)',display:'flex',alignItems:'center',gap:8}}><FileEdit size={18}/> Aggiornamento Massivo da CSV</div>
+            <div style={{fontSize:12,color:'var(--color-text-secondary)',marginTop:2}}>Solo i campi presenti nel CSV vengono aggiornati — gli altri rimangono invariati</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'var(--color-text-secondary)',padding:4}}><X size={20}/></button>
+        </div>
+        <div style={{display:'flex',padding:'12px 24px',gap:8,alignItems:'center',borderBottom:'1px solid var(--color-border)'}}>
+          {[['1','Carica CSV'],['2','Mappa colonne'],['3','Conferma']].map(([n,label],i) => (
+            <React.Fragment key={n}>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <div style={{width:26,height:26,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:'#fff',background:step>i+1?'#10b981':step===i+1?'var(--color-accent)':'var(--color-border)'}}>
+                  {step>i+1?<CheckCircle size={14}/>:n}
+                </div>
+                <span style={{fontSize:12,fontWeight:step===i+1?700:400,color:step===i+1?'var(--color-text)':'var(--color-text-secondary)'}}>{label}</span>
+              </div>
+              {i<2&&<ArrowRight size={14} style={{color:'var(--color-text-secondary)',opacity:0.4}}/>}
+            </React.Fragment>
+          ))}
+        </div>
+        <div style={{padding:24}}>
+          {step===1&&(
+            <div>
+              <div onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={handleFileDrop} onClick={()=>fileRef.current?.click()}
+                style={{border:`2px dashed ${dragOver?'var(--color-accent)':'var(--color-border)'}`,borderRadius:12,padding:48,textAlign:'center',cursor:'pointer',background:dragOver?'rgba(99,102,241,0.06)':'transparent',transition:'all .2s'}}>
+                <Upload size={36} style={{color:'var(--color-text-secondary)',marginBottom:12}}/>
+                <div style={{fontWeight:600,fontSize:14}}>Trascina il CSV qui o clicca per selezionare</div>
+                <div style={{fontSize:11,marginTop:4,color:'var(--color-text-secondary)'}}>Supporta .csv e .txt — qualsiasi separatore</div>
+              </div>
+              <input ref={fileRef} type="file" accept=".csv,.txt" style={{display:'none'}} onChange={e=>parseFile(e.target.files?.[0])}/>
+              <div style={{marginTop:16,padding:12,background:'rgba(99,102,241,0.07)',borderRadius:8,fontSize:12,color:'var(--color-text-secondary)'}}>
+                <strong style={{color:'var(--color-text)'}}>Come funziona:</strong> Il file viene letto nel browser (nessun upload). Nel passo successivo colleghi le colonne del fornitore ai campi del database.
+              </div>
+            </div>
+          )}
+          {step===2&&(
+            <div>
+              <div style={{marginBottom:12,fontSize:13,color:'var(--color-text-secondary)'}}>File: <strong style={{color:'var(--color-text)'}}>{fileName}</strong> — {rows.length} righe</div>
+              {!skuMapped&&(<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:8,marginBottom:12,fontSize:12,color:'#f59e0b'}}>
+                <AlertCircle size={14}/> Mappa almeno una colonna su <strong style={{marginLeft:4}}>SKU (chiave match)</strong>
+              </div>)}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                {headers.map(col=>(
+                  <div key={col} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',background:'var(--color-background)',borderRadius:8,border:'1px solid var(--color-border)'}}>
+                    <span style={{fontSize:12,fontWeight:600,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={col}>{col}</span>
+                    <ArrowRight size={12} style={{color:'var(--color-text-secondary)',flexShrink:0}}/>
+                    <select value={mapping[col]||'__skip__'} onChange={e=>setMapping(m=>({...m,[col]:e.target.value}))}
+                      style={{fontSize:11,padding:'3px 6px',borderRadius:6,border:'1px solid var(--color-border)',background:'var(--color-surface)',color:'var(--color-text)',maxWidth:155}}>
+                      {DB_FIELDS.map(f=><option key={f.key} value={f.key}>{f.label}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {step===3&&!result&&(
+            <div>
+              <div style={{marginBottom:12,fontSize:13}}><strong style={{color:'var(--color-text)'}}>{totalValid}</strong><span style={{color:'var(--color-text-secondary)'}}> righe con SKU valido — anteprima prime 5:</span></div>
+              <div style={{overflowX:'auto',borderRadius:8,border:'1px solid var(--color-border)'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+                  <thead><tr style={{background:'var(--color-background)'}}>
+                    {mappedCols.map(([col,dbKey])=>(<th key={col} style={{padding:'6px 10px',textAlign:'left',borderBottom:'1px solid var(--color-border)',fontWeight:600,whiteSpace:'nowrap'}}>{DB_FIELDS.find(f=>f.key===dbKey)?.label||dbKey}</th>))}
+                  </tr></thead>
+                  <tbody>{previewRows.map((r,i)=>(<tr key={i} style={{borderBottom:'1px solid var(--color-border)'}}>
+                    {mappedCols.map(([,dbKey])=>(<td key={dbKey} style={{padding:'5px 10px',color:'var(--color-text-secondary)'}}>{r[dbKey]??'—'}</td>))}
+                  </tr>))}</tbody>
+                </table>
+              </div>
+              {totalValid>5&&<div style={{fontSize:11,color:'var(--color-text-secondary)',marginTop:8,textAlign:'right'}}>...e altre {totalValid-5} righe</div>}
+            </div>
+          )}
+          {result&&(
+            <div style={{textAlign:'center',padding:24}}>
+              <CheckCircle size={52} style={{color:'#10b981',marginBottom:12}}/>
+              <div style={{fontWeight:800,fontSize:17,color:'var(--color-text)'}}>Aggiornamento completato!</div>
+              <div style={{display:'flex',justifyContent:'center',gap:32,marginTop:20}}>
+                <div><div style={{fontSize:32,fontWeight:800,color:'#10b981'}}>{result.updated}</div><div style={{fontSize:12,color:'var(--color-text-secondary)'}}>Aggiornati</div></div>
+                <div><div style={{fontSize:32,fontWeight:800,color:'#f59e0b'}}>{result.skipped}</div><div style={{fontSize:12,color:'var(--color-text-secondary)'}}>SKU non trovati</div></div>
+              </div>
+              {result.errors?.length>0&&(<div style={{marginTop:16,textAlign:'left',maxHeight:100,overflowY:'auto',background:'rgba(239,68,68,0.06)',borderRadius:8,padding:10}}>
+                {result.errors.map((e,i)=>(<div key={i} style={{fontSize:11,color:'#ef4444'}}><strong>{e.sku}</strong>: {e.reason}</div>))}
+              </div>)}
+            </div>
+          )}
+        </div>
+        <div style={{padding:'12px 24px',borderTop:'1px solid var(--color-border)',display:'flex',justifyContent:'flex-end',gap:8}}>
+          {!result&&(<button className="sp-btn sp-btn-secondary" onClick={step===1?onClose:()=>setStep(s=>s-1)}>{step===1?'Annulla':'← Indietro'}</button>)}
+          {step===1&&<span style={{fontSize:12,color:'var(--color-text-secondary)',alignSelf:'center'}}>Carica un file per continuare</span>}
+          {step===2&&(<button className="sp-btn sp-btn-primary" disabled={!skuMapped} onClick={()=>setStep(3)} style={{opacity:skuMapped?1:0.5}}>Anteprima <ArrowRight size={14}/></button>)}
+          {step===3&&!result&&(<button className="sp-btn sp-btn-primary" onClick={handleSubmit} disabled={loading}>
+            {loading?<><Loader2 size={14} style={{animation:'spin 1s linear infinite'}}/> Aggiornamento...</>:<><CheckCircle size={14}/> Conferma e invia {totalValid} prodotti</>}
+          </button>)}
+          {result&&<button className="sp-btn sp-btn-primary" onClick={onDone}><CheckCircle size={14}/> Chiudi</button>}
         </div>
       </div>
     </div>
