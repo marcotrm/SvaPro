@@ -317,6 +317,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
     Route::patch('/store-deliveries/{id}/status', [StoreDeliveryController::class, 'updateStatus']);
     Route::delete('/store-deliveries/{id}', [StoreDeliveryController::class, 'destroy']);
 
+    // ── Smart Reorder (preview read-only — accessibile a tutti i ruoli) ───────
+    Route::get('/inventory/smart-reorder/preview', [SmartInventoryController::class, 'preview']);
+    Route::get('/inventory/smart-reorder/export-pdf', [SmartInventoryController::class, 'exportPdf']);
+    Route::get('/inventory/forecast', [SmartInventoryController::class, 'forecast']);
+
+
     Route::middleware('role:superadmin,admin_cliente')->group(function () {
         Route::get('/tenants', [StoreController::class, 'tenants']);
         Route::get('/tenants/health', [StoreController::class, 'tenantHealth']);
@@ -416,10 +422,8 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
         Route::get('/orders/stock-alerts', [OrderController::class, 'stockAlerts']);
         Route::post('/orders/stock-alerts/{alertId}/resolve', [OrderController::class, 'resolveStockAlert']);
 
-        Route::get('/inventory/smart-reorder/preview', [SmartInventoryController::class, 'preview']);
         Route::post('/inventory/smart-reorder/run', [SmartInventoryController::class, 'run'])->middleware('permission:inventory.manage');
         Route::post('/inventory/smart-reorder/run-auto', [SmartInventoryController::class, 'runAutoToCentral'])->middleware('permission:inventory.manage');
-        Route::get('/inventory/smart-reorder/export-pdf', [SmartInventoryController::class, 'exportPdf']);
         Route::post('/inventory/smart-reorder/email-supplier', [SmartInventoryController::class, 'emailSupplier']);
 
         // ── Riordino Automatico Fornitori (nuovo modulo) ──────────────────────
@@ -429,7 +433,6 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
         Route::patch('/reorder-drafts/{id}/lines/{lineId}', [AutoReorderController::class, 'updateLine'])->middleware('permission:purchase_orders.create');
         Route::post('/reorder-drafts/{id}/approve', [AutoReorderController::class, 'approve'])->middleware('permission:purchase_orders.create');
         Route::post('/reorder-drafts/{id}/discard', [AutoReorderController::class, 'discard'])->middleware('permission:purchase_orders.create');
-        Route::get('/inventory/forecast', [SmartInventoryController::class, 'forecast']);
 
         // ── ReplenishmentEngine (DRP + MRP) ──────────────────────────────
         Route::get('/trigger-replenishment/preview', [ReplenishmentController::class, 'preview']);
