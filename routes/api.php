@@ -605,6 +605,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
         // Catalog: accessibile anche ai dipendenti per il POS
         Route::get('/catalog/products', [CatalogController::class, 'index']);
         Route::get('/catalog/brands', [CatalogController::class, 'brands']);
+        Route::post('/catalog/brands', [CatalogController::class, 'storeBrand']);
         Route::get('/catalog/categories', [CatalogController::class, 'categories']);
         Route::get('/catalog/tax-classes', [CatalogController::class, 'taxClasses']);
         Route::get('/catalog/products/{productId}', [CatalogController::class, 'show']);

@@ -474,6 +474,7 @@ export const catalog = {
   toggleOnline: (id, isOnline) => api.patch(`/catalog/products/${id}`, { is_online: isOnline }),
   bulkExcise: (data) => api.post('/catalog/bulk-excise', data),
   getBrands: () => api.get('/catalog/brands'),
+  createBrand: (data) => api.post('/catalog/brands', data),
   getCategories: () => api.get('/catalog/categories'),
   createCategory: (data) => api.post('/catalog/categories', data),
   updateCategory: (id, data) => api.put(`/catalog/categories/${id}`, data),

@@ -146,9 +146,27 @@ const normalizeHwVariants = (product) => {
 
 export default function CatalogModal({ product, storesList = [], suppliers = [], categories = [], brands = [], selectedStoreId = '', onClose, onSave, isDipendente = false }) {
   const [formData, setFormData] = useState(() => normalizeProductFlat(product, storesList, selectedStoreId));
+  const [localBrands, setLocalBrands] = useState(brands);
+
+  useEffect(() => { setLocalBrands(brands); }, [brands]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+
+  const handleCreateBrand = async () => {
+    const name = window.prompt('Inserisci il nome del nuovo Marchio (Brand):');
+    if (!name) return;
+    try {
+      const res = await catalog.createBrand({ name });
+      const newBrand = res.data.data;
+      setLocalBrands(prev => [...prev, newBrand].sort((a,b) => a.name.localeCompare(b.name)));
+      setFormData(p => ({ ...p, brand_id: newBrand.id }));
+    } catch (e) {
+      alert('Errore durante la creazione del marchio');
+    }
+  };
+
   const [imageFile, setImageFile] = useState(null);
   // ── Varianti hardware (colore) ──
   const [hwVariants, setHwVariants] = useState(() => normalizeHwVariants(product));
@@ -358,10 +376,13 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               </div>
 
               <div style={{ gridColumn: '1 / span 1' }}>
-                <label className="sp-label">Marchio (Brand)</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label className="sp-label" style={{ marginBottom: 0 }}>Marchio (Brand)</label>
+                  <button type="button" onClick={handleCreateBrand} style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: 0 }}>+ Nuovo</button>
+                </div>
                 <select className="sp-select" name="brand_id" value={formData.brand_id} onChange={handleChange}>
                   <option value="">— Nessun Marchio —</option>
-                  {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  {localBrands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
 

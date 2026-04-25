@@ -23,6 +23,23 @@ class CatalogController extends Controller
         return response()->json(['data' => $rows]);
     }
 
+    public function storeBrand(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255']
+        ]);
+
+        $id = DB::table('brands')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => $validated['name'],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json(['data' => ['id' => $id, 'name' => $validated['name']]]);
+    }
+
     public function categories(Request $request): JsonResponse
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
