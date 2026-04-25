@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Zap, Clock, Bell, RefreshCcw, Mail, MessageSquare, ShoppingCart, Shield, Play, Pause, Settings, RefreshCw, AlertTriangle, Banknote, Store, Filter } from 'lucide-react';
 import { cashMovements as cashApi } from '../api.jsx';
+import ReorderPanel from '../components/automazioni/ReorderPanel.jsx';
 
 const CASH_THRESHOLD = 1000;
 
@@ -309,6 +310,9 @@ export default function AutomazioniPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Riordino Automatico (reale) ── */}
+      <ReorderPanel />
 
       {/* ── Filtri categoria ── */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
