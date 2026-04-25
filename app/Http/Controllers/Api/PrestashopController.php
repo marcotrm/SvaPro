@@ -146,11 +146,12 @@ class PrestashopController extends Controller
             // ── 1. Fetch dati da PrestaShop ──────────────────────────────────
             try {
                 $batchRes = Http::timeout(25)->get("{$url}/api/products", [
-                    'ws_key'        => $apiKey,
-                    'output_format' => 'JSON',
-                    'display'       => 'full',
-                    'filter[id]'    => '[' . implode('|', $batchIds) . ']',
-                    'limit'         => (string) count($batchIds),
+                    'ws_key'          => $apiKey,
+                    'output_format'   => 'JSON',
+                    'display'         => 'full',
+                    'price_tax_incl'  => '1',      // forza prezzi IVA inclusa in tutti i campi
+                    'filter[id]'      => '[' . implode('|', $batchIds) . ']',
+                    'limit'           => (string) count($batchIds),
                 ]);
 
                 if (!$batchRes->successful()) {
@@ -250,11 +251,29 @@ class PrestashopController extends Controller
                     $sku    = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
                     $name   = $this->extractLangValue($psp['name'] ?? null) ?: "Prodotto #{$psId}";
 
-                    // Con display=full PS restituisce price_ttc (IVA inclusa).
-                    // Fallback a price (netto) se price_ttc non è presente o è 0.
-                    $priceTtc = (float) ($psp['price_ttc'] ?? 0);
-                    $priceNet = (float) ($psp['price'] ?? 0);
-                    $price    = $priceTtc > 0 ? $priceTtc : $priceNet;
+                    // PS con display=full può restituire il prezzo con nomi diversi a seconda
+                    // della versione: price_ttc, price_tax_incl, specific_prices, o solo price (netto).
+                    // Proviamo tutti i campi in ordine di preferenza (IVA inclusa → netto).
+                    $priceTtc      = (float) ($psp['price_ttc'] ?? 0);
+                    $priceTaxIncl  = (float) ($psp['price_tax_incl'] ?? 0);
+                    $priceNet      = (float) ($psp['price'] ?? 0);
+                    $price = $priceTtc > 0 ? $priceTtc
+                           : ($priceTaxIncl > 0 ? $priceTaxIncl
+                           : $priceNet);
+
+                    // DEBUG: logga i campi prezzo del primo prodotto per diagnostica
+                    static $debuggedOnce = false;
+                    if (!$debuggedOnce) {
+                        $debuggedOnce = true;
+                        \Illuminate\Support\Facades\Log::info('PS price debug (primo prodotto)', [
+                            'sku'            => trim($psp['reference'] ?? ''),
+                            'price'          => $psp['price'] ?? 'missing',
+                            'price_ttc'      => $psp['price_ttc'] ?? 'missing',
+                            'price_tax_incl' => $psp['price_tax_incl'] ?? 'missing',
+                            'price_used'     => $price,
+                            'all_price_keys' => array_filter(array_keys($psp), fn($k) => str_contains($k, 'price')),
+                        ]);
+                    }
 
                     $active     = (int) ($psp['active'] ?? 1) === 1;
                     $categoryId = $catMap->first() ?? null;
