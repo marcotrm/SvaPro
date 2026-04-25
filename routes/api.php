@@ -174,26 +174,49 @@ Route::get('/bulk-set-stock', function () {
 Route::get('/debug-ps-product', function (\Illuminate\Http\Request $request) {
     $url    = rtrim($request->input('url', ''), '/');
     $apiKey = $request->input('api_key', '');
-    $psId   = (int) $request->input('ps_id', 1);
+    $psId   = (int) $request->input('ps_id', 0);
     if (!$url || !$apiKey) {
-        return response()->json(['error' => 'Passa ?url=...&api_key=...&ps_id=123']);
+        return response()->json(['error' => 'Passa ?url=...&api_key=...']);
     }
     try {
+        // Se ps_id non specificato, prendi il primo ID valido dalla lista
+        if ($psId === 0) {
+            $listRes = \Illuminate\Support\Facades\Http::timeout(15)->get("{$url}/api/products", [
+                'ws_key'        => $apiKey,
+                'output_format' => 'JSON',
+                'display'       => '[id]',
+                'limit'         => '5',
+            ]);
+            $ids = array_column($listRes->json('products') ?? [], 'id');
+            if (empty($ids)) {
+                return response()->json(['error' => 'Nessun prodotto trovato in PS', 'raw' => $listRes->json()]);
+            }
+            $psId = (int) $ids[0];
+        }
+
         $res = \Illuminate\Support\Facades\Http::timeout(15)->get("{$url}/api/products/{$psId}", [
             'ws_key'        => $apiKey,
             'output_format' => 'JSON',
             'display'       => 'full',
         ]);
-        $product = $res->json('product') ?? $res->json();
+        $product = $res->json('product') ?? [];
+
+        if (empty($product)) {
+            return response()->json(['error' => "Prodotto {$psId} non trovato", 'status' => $res->status(), 'raw' => $res->json()]);
+        }
+
         return response()->json([
+            'ps_id_used'       => $psId,
             'id'               => $product['id'] ?? null,
             'reference'        => $product['reference'] ?? null,
-            'price'            => $product['price'] ?? null,
+            'price'            => $product['price'] ?? '⚠ MANCANTE',
             'price_ttc'        => $product['price_ttc'] ?? '⚠ MANCANTE',
             'tax_rate'         => $product['tax_rate'] ?? '⚠ MANCANTE',
             'id_default_image' => $product['id_default_image'] ?? '⚠ MANCANTE',
             'active'           => $product['active'] ?? null,
             'assoc_images'     => $product['associations']['images'] ?? null,
+            // Tutti i campi disponibili (per debug completo)
+            'all_keys'         => array_keys($product),
         ]);
     } catch (\Throwable $e) {
         return response()->json(['error' => $e->getMessage()], 500);
