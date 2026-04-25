@@ -14,7 +14,12 @@ export default function SuppliersPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', code: '', email: '', phone: '', vat_number: '', address: '', city: '', province: '', zip: '', country: 'IT', notes: '' });
+  const [form, setForm] = useState({
+    name: '', code: '', email: '', phone: '', vat_number: '',
+    address: '', city: '', province: '', zip: '', country: 'IT', notes: '',
+    // Logistica riordino
+    lead_time_giorni: '', moq: '', lot_size: '',
+  });
   const [confirmToDelete, setConfirmToDelete] = useState(null);
 
   useEffect(() => { fetchList(); }, []);
@@ -40,6 +45,10 @@ export default function SuppliersPage() {
       name: item.name || '', code: item.code || '', email: item.email || '', phone: item.phone || '',
       vat_number: item.vat_number || '', address: item.address || '', city: item.city || '',
       province: item.province || '', zip: item.zip || '', country: item.country || 'IT', notes: item.notes || '',
+      // Logistica
+      lead_time_giorni: item.lead_time_giorni ?? '',
+      moq:              item.moq ?? '',
+      lot_size:         item.lot_size ?? '',
     });
     setEditing(item);
     setShowForm(true);
@@ -114,6 +123,38 @@ export default function SuppliersPage() {
             <div><label className="field-label">Provincia</label><input className="field-input" value={form.province} onChange={e => setForm({ ...form, province: e.target.value })} /></div>
             <div><label className="field-label">CAP</label><input className="field-input" value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} /></div>
             <div style={{ gridColumn: 'span 2' }}><label className="field-label">Note</label><input className="field-input" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
+
+            {/* ── Sezione logistica riordino ── */}
+            <div style={{ gridColumn: '1 / -1', margin: '8px 0 4px', borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)' }}>📦 Impostazioni Logistica &amp; Riordino Automatico</span>
+            </div>
+            <div>
+              <label className="field-label">Tempo Consegna (giorni) <span style={{ color: '#6366f1', fontWeight: 700 }}>*</span></label>
+              <input className="field-input" type="number" min="1" max="365"
+                placeholder="es. 7"
+                value={form.lead_time_giorni}
+                onChange={e => setForm({ ...form, lead_time_giorni: e.target.value })}
+              />
+              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>Usato nella formula di riordino: vendite/giorno × giorni</div>
+            </div>
+            <div>
+              <label className="field-label">MOQ — Minimo d'Ordine (pz)</label>
+              <input className="field-input" type="number" min="1"
+                placeholder="es. 6"
+                value={form.moq}
+                onChange={e => setForm({ ...form, moq: e.target.value })}
+              />
+              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>Quantità minima per ordine al fornitore</div>
+            </div>
+            <div>
+              <label className="field-label">Lotto Multiplo (pz)</label>
+              <input className="field-input" type="number" min="1"
+                placeholder="es. 6"
+                value={form.lot_size}
+                onChange={e => setForm({ ...form, lot_size: e.target.value })}
+              />
+              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>L'ordine verrà arrotondato al multiplo più vicino</div>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '0 16px 16px' }}>
             <button className="btn btn-ghost" onClick={resetForm}>Annulla</button>
@@ -136,6 +177,9 @@ export default function SuppliersPage() {
               <th>Telefono</th>
               <th>P.IVA</th>
               <th>Città</th>
+              <th style={{ textAlign: 'center' }}>Lead Time</th>
+              <th style={{ textAlign: 'center' }}>MOQ</th>
+              <th style={{ textAlign: 'center' }}>Lotto</th>
               <th style={{ textAlign: 'right' }}>Azioni</th>
             </tr>
           </thead>
@@ -148,6 +192,17 @@ export default function SuppliersPage() {
                 <td>{s.phone || '-'}</td>
                 <td className="mono">{s.vat_number || '-'}</td>
                 <td>{s.city || '-'}</td>
+                <td style={{ textAlign: 'center' }}>
+                  {s.lead_time_giorni
+                    ? <span style={{ background: '#ede9fe', color: '#6d28d9', borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>{s.lead_time_giorni}gg</span>
+                    : <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>}
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  {s.moq ? <span style={{ fontSize: 12, fontWeight: 600 }}>{s.moq} pz</span> : <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>}
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  {s.lot_size ? <span style={{ fontSize: 12, fontWeight: 600 }}>{s.lot_size} pz</span> : <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>}
+                </td>
                 <td style={{ textAlign: 'right' }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                     <button className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => handleEdit(s)}>Modifica</button>
@@ -156,7 +211,7 @@ export default function SuppliersPage() {
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan="7" style={{ textAlign: 'center', padding: '36px 0', color: 'var(--muted)' }}>Nessun fornitore trovato</td></tr>
+              <tr><td colSpan="10" style={{ textAlign: 'center', padding: '36px 0', color: 'var(--muted)' }}>Nessun fornitore trovato</td></tr>
             )}
           </tbody>
         </table>
