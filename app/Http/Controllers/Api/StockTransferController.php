@@ -14,49 +14,55 @@ class StockTransferController extends Controller
     {
         $tenantId = (int) $request->attributes->get('tenant_id');
 
-        $transfers = DB::table('stock_transfers as t')
-            ->join('stores as fs', 'fs.id', '=', 't.from_store_id')
-            ->join('stores as ts', 'ts.id', '=', 't.to_store_id')
-            ->leftJoin('users as ub', 'ub.id', '=', 't.created_by')
-            ->leftJoin('users as ur', 'ur.id', '=', 't.received_by')
-            ->where('t.tenant_id', $tenantId)
-            ->when($request->filled('status'), fn($q) => $q->where('t.status', $request->input('status')))
-            ->when($request->filled('store_id'), fn($q) => $q->where(function($q2) use ($request) {
-                $q2->where('t.from_store_id', $request->input('store_id'))
-                   ->orWhere('t.to_store_id', $request->input('store_id'));
-            }))
-            ->select([
-                't.*',
-                'fs.name as from_store_name',
-                'ts.name as to_store_name',
-                'ub.name as created_by_name',
-                'ur.name as received_by_name',
-            ])
-            ->orderByDesc('t.is_ai_generated')
-            ->orderByDesc('t.created_at')
-            ->limit(200)
-            ->get();
+        try {
+            $transfers = DB::table('stock_transfers as t')
+                ->join('stores as fs', 'fs.id', '=', 't.from_store_id')
+                ->join('stores as ts', 'ts.id', '=', 't.to_store_id')
+                ->leftJoin('users as ub', 'ub.id', '=', 't.created_by')
+                ->leftJoin('users as ur', 'ur.id', '=', 't.received_by')
+                ->where('t.tenant_id', $tenantId)
+                ->when($request->filled('status'), fn($q) => $q->where('t.status', $request->input('status')))
+                ->when($request->filled('store_id'), fn($q) => $q->where(function($q2) use ($request) {
+                    $q2->where('t.from_store_id', $request->input('store_id'))
+                       ->orWhere('t.to_store_id', $request->input('store_id'));
+                }))
+                ->select([
+                    't.*',
+                    'fs.name as from_store_name',
+                    'ts.name as to_store_name',
+                    'ub.name as created_by_name',
+                    'ur.name as received_by_name',
+                ])
+                ->orderByDesc('t.created_at')
+                ->limit(200)
+                ->get();
 
-        // Arricchisci ogni trasferimento con i suoi item
-        $ids = $transfers->pluck('id');
-        $items = DB::table('stock_transfer_items as sti')
-            ->join('product_variants as pv', 'pv.id', '=', 'sti.product_variant_id')
-            ->join('products as p', 'p.id', '=', 'pv.product_id')
-            ->whereIn('sti.transfer_id', $ids)
-            ->select([
-                'sti.*',
-                'pv.flavor', 'pv.resistance_ohm', 'pv.sale_price',
-                'p.name as product_name', 'p.sku',
-            ])
-            ->get()
-            ->groupBy('transfer_id');
+            // Arricchisci ogni trasferimento con i suoi item
+            $ids = $transfers->pluck('id');
+            $items = DB::table('stock_transfer_items as sti')
+                ->join('product_variants as pv', 'pv.id', '=', 'sti.product_variant_id')
+                ->join('products as p', 'p.id', '=', 'pv.product_id')
+                ->whereIn('sti.transfer_id', $ids)
+                ->select([
+                    'sti.*',
+                    'p.name as product_name', 'p.sku',
+                ])
+                ->get()
+                ->groupBy('transfer_id');
 
-        $transfers = $transfers->map(fn($t) => array_merge(
-            (array) $t,
-            ['items' => $items->get($t->id, collect())->values()]
-        ));
+            $transfers = $transfers->map(fn($t) => array_merge(
+                (array) $t,
+                ['items' => $items->get($t->id, collect())->values()]
+            ));
 
-        return response()->json(['data' => $transfers]);
+            return response()->json(['data' => $transfers]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('StockTransfer index error: ' . $e->getMessage());
+            return response()->json([
+                'data'   => [],
+                '_error' => $e->getMessage(),
+            ], 200); // 200 per non bloccare il frontend
+        }
     }
 
     /* ─── CREATE (bozza DDT) ────────────────────────────────────── */
