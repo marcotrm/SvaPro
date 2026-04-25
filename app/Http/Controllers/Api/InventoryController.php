@@ -383,5 +383,14 @@ class InventoryController extends Controller
 
         return response()->json(['data' => $grouped]);
     }
+
+    public function getWarehouses(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->attributes->get('tenant_id');
+        $warehouses = DB::table('warehouses')
+            ->where('tenant_id', $tenantId)
+            ->get();
+        return response()->json(['data' => $warehouses]);
+    }
 }
 

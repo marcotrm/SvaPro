@@ -518,6 +518,7 @@ export const inventory = {
   getHealthScan: () => api.get('/health-scan'),
   getForecast: () => api.get('/inventory/forecast'),
   getCrossStore: (params = {}) => api.get('/inventory/cross-store', { params }),
+  getWarehouses: () => api.get('/inventory/warehouses'),
 };
 
 // Smart Restocking APIs (Cabina di Regia Acquisti)

@@ -620,6 +620,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
         Route::get('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'comments']);
         Route::post('/inventory-sessions/{id}/comments', [InventorySessionController::class, 'addComment']);
 
+        Route::get('/inventory/warehouses', [InventoryController::class, 'getWarehouses']);
         Route::get('/inventory/stock', [InventoryController::class, 'index']);
         Route::get('/inventory/movements', [InventoryController::class, 'movements']);
 
