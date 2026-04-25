@@ -170,7 +170,35 @@ Route::get('/bulk-set-stock', function () {
     }
 });
 
-// Debug: mostra la struttura grezza di UN prodotto PS (per capire price_ttc e id_default_image)
+// Split stock: metà righe stock_items → 1000, metà → 0  (nessuna auth richiesta)
+Route::get('/split-stock', function () {
+    try {
+        $now  = now();
+        $allIds = \Illuminate\Support\Facades\DB::table('stock_items')->orderBy('id')->pluck('id');
+        $total  = $allIds->count();
+        $half   = (int) ceil($total / 2);
+
+        $u1000 = \Illuminate\Support\Facades\DB::table('stock_items')
+            ->whereIn('id', $allIds->take($half)->all())
+            ->update(['on_hand' => 1000, 'reserved' => 0, 'updated_at' => $now]);
+
+        $u0 = \Illuminate\Support\Facades\DB::table('stock_items')
+            ->whereIn('id', $allIds->skip($half)->all())
+            ->update(['on_hand' => 0, 'reserved' => 0, 'updated_at' => $now]);
+
+        return response()->json([
+            'success'     => true,
+            'total_rows'  => $total,
+            'set_to_1000' => $u1000,
+            'set_to_0'    => $u0,
+            'message'     => "Split: {$u1000} righe → 1000 pz | {$u0} righe → 0 pz",
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+});
+
+// Debug: mostra la struttura grezza di UN prodotto PS
 // Chiamata: /api/debug-ps-product?url=https://...&api_key=KEY&ps_id=123
 Route::get('/debug-ps-product', function (\Illuminate\Http\Request $request) {
     $url    = rtrim($request->input('url', ''), '/');
