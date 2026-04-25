@@ -17,8 +17,8 @@ export default function SuppliersPage() {
   const [form, setForm] = useState({
     name: '', code: '', email: '', phone: '', vat_number: '',
     address: '', city: '', province: '', zip: '', country: 'IT', notes: '',
-    // Logistica riordino
-    lead_time_giorni: '', moq: '', lot_size: '',
+    // Logistica riordino (lot_size è sul prodotto, non sul fornitore)
+    lead_time_giorni: '', moq: '',
   });
   const [confirmToDelete, setConfirmToDelete] = useState(null);
 
@@ -45,10 +45,8 @@ export default function SuppliersPage() {
       name: item.name || '', code: item.code || '', email: item.email || '', phone: item.phone || '',
       vat_number: item.vat_number || '', address: item.address || '', city: item.city || '',
       province: item.province || '', zip: item.zip || '', country: item.country || 'IT', notes: item.notes || '',
-      // Logistica
       lead_time_giorni: item.lead_time_giorni ?? '',
       moq:              item.moq ?? '',
-      lot_size:         item.lot_size ?? '',
     });
     setEditing(item);
     setShowForm(true);
@@ -146,15 +144,6 @@ export default function SuppliersPage() {
               />
               <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>Quantità minima per ordine al fornitore</div>
             </div>
-            <div>
-              <label className="field-label">Lotto Multiplo (pz)</label>
-              <input className="field-input" type="number" min="1"
-                placeholder="es. 6"
-                value={form.lot_size}
-                onChange={e => setForm({ ...form, lot_size: e.target.value })}
-              />
-              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>L'ordine verrà arrotondato al multiplo più vicino</div>
-            </div>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '0 16px 16px' }}>
             <button className="btn btn-ghost" onClick={resetForm}>Annulla</button>
@@ -177,9 +166,8 @@ export default function SuppliersPage() {
               <th>Telefono</th>
               <th>P.IVA</th>
               <th>Città</th>
-              <th style={{ textAlign: 'center' }}>Lead Time</th>
+              <th>Lead Time</th>
               <th style={{ textAlign: 'center' }}>MOQ</th>
-              <th style={{ textAlign: 'center' }}>Lotto</th>
               <th style={{ textAlign: 'right' }}>Azioni</th>
             </tr>
           </thead>
@@ -200,9 +188,6 @@ export default function SuppliersPage() {
                 <td style={{ textAlign: 'center' }}>
                   {s.moq ? <span style={{ fontSize: 12, fontWeight: 600 }}>{s.moq} pz</span> : <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>}
                 </td>
-                <td style={{ textAlign: 'center' }}>
-                  {s.lot_size ? <span style={{ fontSize: 12, fontWeight: 600 }}>{s.lot_size} pz</span> : <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>}
-                </td>
                 <td style={{ textAlign: 'right' }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                     <button className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => handleEdit(s)}>Modifica</button>
@@ -211,7 +196,7 @@ export default function SuppliersPage() {
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan="10" style={{ textAlign: 'center', padding: '36px 0', color: 'var(--muted)' }}>Nessun fornitore trovato</td></tr>
+              <tr><td colSpan="9" style={{ textAlign: 'center', padding: '36px 0', color: 'var(--muted)' }}>Nessun fornitore trovato</td></tr>
             )}
           </tbody>
         </table>

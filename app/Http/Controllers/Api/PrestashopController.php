@@ -148,7 +148,7 @@ class PrestashopController extends Controller
                 $batchRes = Http::timeout(25)->get("{$url}/api/products", [
                     'ws_key'        => $apiKey,
                     'output_format' => 'JSON',
-                    'display'       => '[id,reference,name,price,price_tax_incl,id_default_image,active]',
+                    'display'       => 'full',
                     'filter[id]'    => '[' . implode('|', $batchIds) . ']',
                     'limit'         => (string) count($batchIds),
                 ]);
@@ -250,12 +250,11 @@ class PrestashopController extends Controller
                     $sku    = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
                     $name   = $this->extractLangValue($psp['name'] ?? null) ?: "Prodotto #{$psId}";
 
-                    // Prezzo: preferisce price_tax_incl (IVA inclusa) se disponibile,
-                    // altrimenti usa price (netto). Entrambi possono essere 0 se PS usa
-                    // "prezzi specifici" per gruppo — in quel caso manteniamo il valore.
-                    $priceTaxIncl = (float) ($psp['price_tax_incl'] ?? 0);
-                    $priceNet     = (float) ($psp['price'] ?? 0);
-                    $price        = $priceTaxIncl > 0 ? $priceTaxIncl : $priceNet;
+                    // Con display=full PS restituisce price_ttc (IVA inclusa).
+                    // Fallback a price (netto) se price_ttc non è presente o è 0.
+                    $priceTtc = (float) ($psp['price_ttc'] ?? 0);
+                    $priceNet = (float) ($psp['price'] ?? 0);
+                    $price    = $priceTtc > 0 ? $priceTtc : $priceNet;
 
                     $active     = (int) ($psp['active'] ?? 1) === 1;
                     $categoryId = $catMap->first() ?? null;
@@ -304,10 +303,12 @@ class PrestashopController extends Controller
                         // Assicura SPV e stock per tutti gli store/warehouse
                         $this->ensureSpvAndStock($tenantId, $variantId, $storeIds, $warehouseIds, $now);
 
-                        // URL immagine via WebService PS — il browser carica <img src> direttamente
-                        // CF non blocca le richieste immagine dal browser (solo le HTML)
+                        // URL immagine pubblica PS: /img/p/{digits}/{imgId}-home_default.jpg
+                        // NON usa /api/ o ws_key — CF non blocca i file immagine statici
                         if (!empty($psImgId)) {
-                            $imageUrl = "{$url}/api/images/products/{$psId}/{$psImgId}?ws_key={$apiKey}";
+                            $digits   = str_split((string) $psImgId);
+                            $imgPath  = implode('/', $digits);
+                            $imageUrl = "{$url}/img/p/{$imgPath}/{$psImgId}-home_default.jpg";
                             DB::table('products')->where('id', $existingProduct->id)->update([
                                 'image_url'  => $imageUrl,
                                 'updated_at' => $now,
@@ -342,9 +343,11 @@ class PrestashopController extends Controller
 
                         $this->ensureSpvAndStock($tenantId, $variantId, $storeIds, $warehouseIds, $now);
 
-                        // URL immagine via WebService PS
+                        // URL immagine pubblica PS (nuovo prodotto)
                         if (!empty($psImgId)) {
-                            $imageUrl = "{$url}/api/images/products/{$psId}/{$psImgId}?ws_key={$apiKey}";
+                            $digits   = str_split((string) $psImgId);
+                            $imgPath  = implode('/', $digits);
+                            $imageUrl = "{$url}/img/p/{$imgPath}/{$psImgId}-home_default.jpg";
                             DB::table('products')->where('id', $productId)->update([
                                 'image_url'  => $imageUrl,
                                 'updated_at' => $now,

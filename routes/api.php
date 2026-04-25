@@ -641,6 +641,44 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
             return response()->json(['output' => \Illuminate\Support\Facades\Artisan::output()]);
         });
 
+        // ── Bulk Stock Seed: imposta tutti i prodotti a 1000 (attivi) o 0 (inattivi) ──
+        // USO: GET /api/v1/dev/seed-stock   (solo superadmin / admin_cliente)
+        Route::get('/dev/seed-stock', function (\Illuminate\Http\Request $request) {
+            $tenantId = (int) $request->attributes->get('tenant_id');
+            $now      = now();
+
+            // Prodotti attivi → 1000 pz in tutti i loro stock_items
+            $activeVariantIds = \Illuminate\Support\Facades\DB::table('product_variants as pv')
+                ->join('products as p', 'p.id', '=', 'pv.product_id')
+                ->where('pv.tenant_id', $tenantId)
+                ->where('p.is_active', true)
+                ->pluck('pv.id');
+
+            $updatedActive = \Illuminate\Support\Facades\DB::table('stock_items')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('product_variant_id', $activeVariantIds)
+                ->update(['on_hand' => 1000, 'reserved' => 0, 'updated_at' => $now]);
+
+            // Prodotti inattivi → 0 pz
+            $inactiveVariantIds = \Illuminate\Support\Facades\DB::table('product_variants as pv')
+                ->join('products as p', 'p.id', '=', 'pv.product_id')
+                ->where('pv.tenant_id', $tenantId)
+                ->where('p.is_active', false)
+                ->pluck('pv.id');
+
+            $updatedInactive = \Illuminate\Support\Facades\DB::table('stock_items')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('product_variant_id', $inactiveVariantIds)
+                ->update(['on_hand' => 0, 'reserved' => 0, 'updated_at' => $now]);
+
+            return response()->json([
+                'success'          => true,
+                'active_updated'   => $updatedActive,
+                'inactive_zeroed'  => $updatedInactive,
+                'message'          => "Stock impostato: {$updatedActive} varianti attive → 1000 pz | {$updatedInactive} inattive → 0 pz",
+            ]);
+        })->middleware('role:superadmin,admin_cliente');
+
         // Reports — accessibili anche ai dipendenti (filtrati automaticamente al proprio store)
         Route::get('/reports/summary', [ReportController::class, 'summary']);
         Route::get('/reports/revenue-trend', [ReportController::class, 'revenueTrend']);

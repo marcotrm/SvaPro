@@ -90,10 +90,8 @@ class SupplierController extends Controller
             'province'          => $request->input('province'),
             'zip'               => $request->input('zip'),
             'notes'             => $request->input('notes'),
-            // Campi logistici per riordino automatico
             'lead_time_giorni'  => $request->input('lead_time_giorni') !== null ? (int) $request->input('lead_time_giorni') : null,
             'moq'               => $request->input('moq') !== null ? (int) $request->input('moq') : null,
-            'lot_size'          => $request->input('lot_size') !== null ? (int) $request->input('lot_size') : null,
             'created_at'        => $now,
             'updated_at'        => $now,
         ]);
@@ -139,10 +137,8 @@ class SupplierController extends Controller
                 'province'         => $request->input('province'),
                 'zip'              => $request->input('zip'),
                 'notes'            => $request->input('notes'),
-                // Campi logistici
                 'lead_time_giorni' => $request->input('lead_time_giorni') !== null ? (int) $request->input('lead_time_giorni') : null,
                 'moq'              => $request->input('moq') !== null ? (int) $request->input('moq') : null,
-                'lot_size'         => $request->input('lot_size') !== null ? (int) $request->input('lot_size') : null,
                 'updated_at'       => now(),
             ]);
 
@@ -200,10 +196,9 @@ class SupplierController extends Controller
             'province'         => ['nullable', 'string', 'max:10'],
             'zip'              => ['nullable', 'string', 'max:20'],
             'notes'            => ['nullable', 'string'],
-            // Campi logistici riordino
             'lead_time_giorni' => ['nullable', 'integer', 'min:1', 'max:365'],
             'moq'              => ['nullable', 'integer', 'min:1'],
-            'lot_size'         => ['nullable', 'integer', 'min:1'],
+            // lot_size NON è del fornitore — è specifico per prodotto
         ];
     }
 }

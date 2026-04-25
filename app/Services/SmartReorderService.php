@@ -44,7 +44,8 @@ class SmartReorderService
                     'p.scorta_sicurezza',
                     'pv.sale_price',
                     'pv.cost_price',
-                    'sup.lead_time_medio'
+                    'sup.lead_time_medio',
+                    'sup.name as supplier_name',
                 ])
                 ->get();
 
@@ -96,39 +97,28 @@ class SmartReorderService
                 }
 
                 $alerts[] = [
-                    'store_id' => (int) $store->id,
-                    'store_name' => $store->name,
-                    'warehouse_id' => (int) $item->warehouse_id,
-                    'warehouse_name' => $item->warehouse_name,
-                    'product_id' => (int) $item->product_id,
+                    'store_id'           => (int) $store->id,
+                    'store_name'         => $store->name,
+                    'warehouse_id'       => (int) $item->warehouse_id,
+                    'warehouse_name'     => $item->warehouse_name,
+                    'product_id'         => (int) $item->product_id,
                     'product_variant_id' => (int) $item->product_variant_id,
-                    'product_name' => $item->product_name,
-                    'available' => $available,
-                    'threshold' => $threshold,
-                    'reorder_days' => $reorderDays,
-                    'sold_qty_window' => $soldQty,
-                    'suggested_qty' => $suggestedQty,
-                    'supplier_id' => $item->default_supplier_id,
-                    'supplier_name' => $item->default_supplier_id ? DB::table('suppliers')->where('id', $item->default_supplier_id)->value('name') : 'Nessun Fornitore',
-                    'unit_cost' => (float) ($item->cost_price ?? 0),
-                    'ai_motivation' => null, // Segnaposto
+                    'product_name'       => $item->product_name,
+                    'available'          => $available,
+                    'threshold'          => $threshold,
+                    'reorder_days'       => $reorderDays,
+                    'sold_qty_window'    => $soldQty,
+                    'suggested_qty'      => $suggestedQty,
+                    'supplier_id'        => $item->default_supplier_id,
+                    'supplier_name'      => $item->supplier_name ?? 'Nessun Fornitore',
+                    'unit_cost'          => (float) ($item->cost_price ?? 0),
+                    'ai_motivation'      => 'Calcolo previsionale standard',
                 ];
             }
         }
 
-        // Recupero motivazioni AI in batch
-        $aiService = new AiAnalysisService();
-        $motivations = $aiService->generateReorderMotivations($alerts);
-
-        foreach ($alerts as &$alert) {
-            $vid = $alert['product_variant_id'];
-            if (isset($motivations[$vid])) {
-                $alert['ai_motivation'] = $motivations[$vid];
-            } else {
-                $alert['ai_motivation'] = 'Calcolo previsionale standard';
-            }
-        }
-        unset($alert);
+        // AI motivations disabilitate nel preview per evitare timeout (30s Railway)
+        // Vengono usate solo nell'export PDF/email dove il tempo non è vincolato.
 
         // Separiamo ordini suggeriti per compatibilità con il controller esistente
         $suggestedOrders = array_map(function ($a) {
