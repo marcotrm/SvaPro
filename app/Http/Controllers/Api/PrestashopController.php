@@ -236,9 +236,10 @@ class PrestashopController extends Controller
                     ->groupBy('product_variant_id');
 
             // ── 3. Processa ogni prodotto ─────────────────────────────────────
-            $imported   = 0;
-            $errors     = 0;
-            $firstError = null;
+            $imported      = 0;
+            $errors        = 0;
+            $imagesUpdated = 0;
+            $firstError    = null;
 
             // Per il fetch immagini in parallelo dopo il loop
             $imageQueue = []; // [ ['psId' => x, 'imgId' => y, 'productId' => z] ]
@@ -309,9 +310,14 @@ class PrestashopController extends Controller
                         // Assicura SPV e stock per tutti gli store/warehouse
                         $this->ensureSpvAndStock($tenantId, $variantId, $storeIds, $warehouseIds, $now);
 
-                        // Accoda per il fetch immagine se mancante
-                        if (!empty($psImgId) && empty($existingProduct->image_url)) {
-                            $imageQueue[] = ['psId' => $psId, 'imgId' => $psImgId, 'productId' => $existingProduct->id];
+                        // Salva URL immagine direttamente (no download binario — evita Cloudflare)
+                        if (!empty($psImgId)) {
+                            $imageUrl = "{$url}/api/images/products/{$psId}/{$psImgId}?ws_key={$apiKey}";
+                            DB::table('products')->where('id', $existingProduct->id)->update([
+                                'image_url'  => $imageUrl,
+                                'updated_at' => $now,
+                            ]);
+                            $imagesUpdated++;
                         }
                         $imported++;
                     } else {
@@ -341,9 +347,14 @@ class PrestashopController extends Controller
 
                         $this->ensureSpvAndStock($tenantId, $variantId, $storeIds, $warehouseIds, $now);
 
-                        // Accoda per il fetch immagine (nuovo prodotto → sempre senza immagine)
+                        // Salva URL immagine direttamente (no download binario)
                         if (!empty($psImgId)) {
-                            $imageQueue[] = ['psId' => $psId, 'imgId' => $psImgId, 'productId' => $productId];
+                            $imageUrl = "{$url}/api/images/products/{$psId}/{$psImgId}?ws_key={$apiKey}";
+                            DB::table('products')->where('id', $productId)->update([
+                                'image_url'  => $imageUrl,
+                                'updated_at' => $now,
+                            ]);
+                            $imagesUpdated++;
                         }
                         $imported++;
                     }
@@ -351,46 +362,6 @@ class PrestashopController extends Controller
                     \Illuminate\Support\Facades\Log::error('PS Import Error ID ' . ($psp['id'] ?? '?') . ': ' . $e->getMessage());
                     if ($errors === 0) $firstError = $e->getMessage();
                     $errors++;
-                }
-            }
-
-            // ── 4. Fetch immagini in PARALLELO (Http::pool) ──────────────────
-            $imagesUpdated = 0;
-            if (!empty($imageQueue)) {
-                // Suddividi in chunk da 10 richieste concorrenti per non sovraccaricare PS
-                $chunks = array_chunk($imageQueue, 10);
-                foreach ($chunks as $chunk) {
-                    try {
-                        $responses = Http::pool(function ($pool) use ($chunk, $url, $apiKey) {
-                            $reqs = [];
-                            foreach ($chunk as $item) {
-                                $reqs[] = $pool->as($item['productId'])
-                                    ->timeout(8)
-                                    ->get("{$url}/api/images/products/{$item['psId']}/{$item['imgId']}", [
-                                        'ws_key' => $apiKey,
-                                    ]);
-                            }
-                            return $reqs;
-                        });
-
-                        foreach ($chunk as $item) {
-                            $resp = $responses[$item['productId']] ?? null;
-                            if ($resp && !($resp instanceof \Throwable) && $resp->successful()
-                                && str_starts_with($resp->header('Content-Type'), 'image/')) {
-                                $mime    = $resp->header('Content-Type');
-                                $base64  = base64_encode($resp->body());
-                                $dataUrl = "data:{$mime};base64,{$base64}";
-                                DB::table('products')->where('id', $item['productId'])->update([
-                                    'image_url'  => $dataUrl,
-                                    'updated_at' => $now,
-                                ]);
-                                $imagesUpdated++;
-                            }
-                        }
-                    } catch (\Throwable $e) {
-                        // Ignora errori immagini — non bloccano l'import
-                        \Illuminate\Support\Facades\Log::warning('PS image pool error: ' . $e->getMessage());
-                    }
                 }
             }
 
