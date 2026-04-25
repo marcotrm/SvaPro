@@ -252,12 +252,19 @@ class PrestashopController extends Controller
                     $psId    = (int) ($psp['id'] ?? 0);
                     $sku     = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
                     $name    = $this->extractLangValue($psp['name'] ?? null) ?: "Prodotto #{$psId}";
-                    // Barcode EAN-13 (campo standard PS, usato da Tenpro)
-                    $barcode = trim($psp['ean13'] ?? '') ?: null;
+                    // Barcode EAN-13: ignora "0" e "00000000000000" che PS mette come default vuoto
+                    $rawBarcode = trim($psp['ean13'] ?? '');
+                    $barcode    = ($rawBarcode !== '' && $rawBarcode !== '0' && $rawBarcode !== '0000000000000')
+                                  ? $rawBarcode
+                                  : null;
+                    // Fallback su UPC se ean13 è vuoto
+                    if (!$barcode) {
+                        $rawUpc  = trim($psp['upc'] ?? '');
+                        $barcode = ($rawUpc !== '' && $rawUpc !== '0') ? $rawUpc : null;
+                    }
 
                     // PS con display=full può restituire il prezzo con nomi diversi a seconda
                     // della versione: price_ttc, price_tax_incl, specific_prices, o solo price (netto).
-                    // Proviamo tutti i campi in ordine di preferenza (IVA inclusa → netto).
                     $priceTtc      = (float) ($psp['price_ttc'] ?? 0);
                     $priceTaxIncl  = (float) ($psp['price_tax_incl'] ?? 0);
                     $priceNet      = (float) ($psp['price'] ?? 0);
@@ -265,17 +272,23 @@ class PrestashopController extends Controller
                            : ($priceTaxIncl > 0 ? $priceTaxIncl
                            : $priceNet);
 
-                    // DEBUG: logga i campi prezzo del primo prodotto per diagnostica
+                    // DEBUG: logga i campi prezzo E barcode del primo prodotto per diagnostica
                     static $debuggedOnce = false;
                     if (!$debuggedOnce) {
                         $debuggedOnce = true;
-                        \Illuminate\Support\Facades\Log::info('PS price debug (primo prodotto)', [
+                        \Illuminate\Support\Facades\Log::info('PS import debug (primo prodotto)', [
                             'sku'            => trim($psp['reference'] ?? ''),
+                            // prezzi
                             'price'          => $psp['price'] ?? 'missing',
                             'price_ttc'      => $psp['price_ttc'] ?? 'missing',
                             'price_tax_incl' => $psp['price_tax_incl'] ?? 'missing',
                             'price_used'     => $price,
-                            'all_price_keys' => array_filter(array_keys($psp), fn($k) => str_contains($k, 'price')),
+                            // barcode
+                            'ean13_raw'      => $psp['ean13'] ?? 'missing',
+                            'upc_raw'        => $psp['upc'] ?? 'missing',
+                            'barcode_used'   => $barcode,
+                            // tutti i campi disponibili per diagnosi
+                            'all_keys'       => array_keys($psp),
                         ]);
                     }
 
