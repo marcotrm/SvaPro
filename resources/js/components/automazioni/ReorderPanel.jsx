@@ -7,7 +7,7 @@ const fmt = v => new Intl.NumberFormat('it-IT', { style: 'currency', currency: '
 /* ─── Sezione 1: Riordino Automatico Fornitori ───────────────────────────── */
 function ReorderFornitori() {
   const [preview, setPreview]   = useState(null);
-  const [loading, setLoading]   = useState(true);
+  const [loading, setLoading]   = useState(false);   // non caricare in automatico
   const [running, setRunning]   = useState(false);
   const [result,  setResult]    = useState(null);
   const [error,   setError]     = useState(null);
@@ -22,7 +22,7 @@ function ReorderFornitori() {
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // NON caricare in automatico — l'utente clicca "Carica Preview"
 
   const runReorder = async () => {
     setRunning(true); setResult(null); setError(null);
@@ -81,10 +81,21 @@ function ReorderFornitori() {
 
       {/* Alerts list */}
       {loading ? (
-        <div style={{ padding: 20, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 13 }}>Caricamento prodotti sotto soglia...</div>
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 13 }}>Analisi prodotti sotto soglia in corso…</div>
       ) : error ? (
         <div style={{ padding: 14, background: '#fef2f2', borderRadius: 10, color: '#dc2626', fontSize: 13, display: 'flex', gap: 8 }}>
           <AlertTriangle size={16} />{error}
+        </div>
+      ) : preview === null ? (
+        <div style={{ padding: 20, textAlign: 'center', background: 'var(--color-bg)', borderRadius: 12, color: 'var(--color-text-secondary)', fontSize: 13 }}>
+          <div style={{ marginBottom: 10, opacity: 0.5, fontSize: 28 }}>📦</div>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>Preview non caricata</div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 14 }}>
+            Il calcolo potrebbe richiedere 10–20 secondi. Clicca per avviarlo.
+          </div>
+          <button onClick={load} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+            <RefreshCw size={14} /> Carica Preview
+          </button>
         </div>
       ) : alerts.length === 0 ? (
         <div style={{ padding: 16, textAlign: 'center', background: '#f0fdf4', borderRadius: 12, color: '#16a34a', fontWeight: 700, fontSize: 13 }}>

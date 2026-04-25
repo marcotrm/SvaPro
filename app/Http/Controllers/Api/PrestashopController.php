@@ -148,7 +148,7 @@ class PrestashopController extends Controller
                 $batchRes = Http::timeout(25)->get("{$url}/api/products", [
                     'ws_key'        => $apiKey,
                     'output_format' => 'JSON',
-                    'display'       => '[id,reference,name,price,id_default_image,active]',
+                    'display'       => '[id,reference,name,price,price_tax_incl,id_default_image,active]',
                     'filter[id]'    => '[' . implode('|', $batchIds) . ']',
                     'limit'         => (string) count($batchIds),
                 ]);
@@ -250,9 +250,12 @@ class PrestashopController extends Controller
                     $sku    = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
                     $name   = $this->extractLangValue($psp['name'] ?? null) ?: "Prodotto #{$psId}";
 
-                    // 'price' da PS è il prezzo netto IVA esclusa.
-                    // Con display specifico non abbiamo price_ttc/tax_rate.
-                    $price = (float) ($psp['price'] ?? 0);
+                    // Prezzo: preferisce price_tax_incl (IVA inclusa) se disponibile,
+                    // altrimenti usa price (netto). Entrambi possono essere 0 se PS usa
+                    // "prezzi specifici" per gruppo — in quel caso manteniamo il valore.
+                    $priceTaxIncl = (float) ($psp['price_tax_incl'] ?? 0);
+                    $priceNet     = (float) ($psp['price'] ?? 0);
+                    $price        = $priceTaxIncl > 0 ? $priceTaxIncl : $priceNet;
 
                     $active     = (int) ($psp['active'] ?? 1) === 1;
                     $categoryId = $catMap->first() ?? null;
@@ -301,9 +304,12 @@ class PrestashopController extends Controller
                         // Assicura SPV e stock per tutti gli store/warehouse
                         $this->ensureSpvAndStock($tenantId, $variantId, $storeIds, $warehouseIds, $now);
 
-                        // Salva URL immagine direttamente (no download binario — evita Cloudflare)
+                        // URL immagine pubblica PS: /img/p/{digits}/{imgId}-large_default.jpg
+                        // Non usa il WebService (niente auth, niente CF block)
                         if (!empty($psImgId)) {
-                            $imageUrl = "{$url}/api/images/products/{$psId}/{$psImgId}?ws_key={$apiKey}";
+                            $digits   = str_split((string) $psImgId);
+                            $imgPath  = implode('/', $digits);
+                            $imageUrl = "{$url}/img/p/{$imgPath}/{$psImgId}-large_default.jpg";
                             DB::table('products')->where('id', $existingProduct->id)->update([
                                 'image_url'  => $imageUrl,
                                 'updated_at' => $now,
@@ -338,9 +344,11 @@ class PrestashopController extends Controller
 
                         $this->ensureSpvAndStock($tenantId, $variantId, $storeIds, $warehouseIds, $now);
 
-                        // Salva URL immagine direttamente (no download binario)
+                        // URL immagine pubblica PS: /img/p/{digits}/{imgId}-large_default.jpg
                         if (!empty($psImgId)) {
-                            $imageUrl = "{$url}/api/images/products/{$psId}/{$psImgId}?ws_key={$apiKey}";
+                            $digits   = str_split((string) $psImgId);
+                            $imgPath  = implode('/', $digits);
+                            $imageUrl = "{$url}/img/p/{$imgPath}/{$psImgId}-large_default.jpg";
                             DB::table('products')->where('id', $productId)->update([
                                 'image_url'  => $imageUrl,
                                 'updated_at' => $now,
@@ -544,19 +552,38 @@ class PrestashopController extends Controller
 
     /**
      * Gestisce sia stringhe che array PrestaShop multi-lingua.
+     * PS restituisce name come:
+     *   - stringa semplice
+     *   - {"language": [{"id":"2","value":"Nome"}, ...]}
+     *   - [{"id":"2","value":"Nome"}, ...]
      */
     private function extractLangValue(mixed $value): string
     {
-        if (is_string($value)) return $value;
+        if (is_string($value) && $value !== '') return $value;
+
+        // Formato: {"language": [{"id":"2","value":"Nome"}]}
+        if (is_array($value) && isset($value['language'])) {
+            $value = $value['language'];
+        }
+
         if (is_array($value)) {
-            foreach ($value as $lang) {
-                if (isset($lang['id']) && in_array((int) $lang['id'], [4, 3, 2, 1]) && !empty($lang['value'])) {
-                    return (string) $lang['value'];
+            // Cerca ID lingua 2 (italiano), poi 1 (inglese/default), poi qualunque
+            foreach ([2, 1, 3, 4, 5] as $langId) {
+                foreach ($value as $lang) {
+                    $id  = (int) ($lang['id'] ?? $lang['attrs']['id'] ?? 0);
+                    $val = $lang['value'] ?? '';
+                    if ($id === $langId && $val !== '') {
+                        return (string) $val;
+                    }
                 }
             }
-            $first = reset($value);
-            return is_array($first) ? ((string) ($first['value'] ?? '')) : (string) $first;
+            // Fallback: primo valore non vuoto
+            foreach ($value as $lang) {
+                $val = $lang['value'] ?? (is_string($lang) ? $lang : '');
+                if ($val !== '') return (string) $val;
+            }
         }
+
         return '';
     }
 }
