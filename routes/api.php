@@ -187,9 +187,16 @@ Route::get('/debug-ps-product', function (\Illuminate\Http\Request $request) {
                 'display'       => '[id]',
                 'limit'         => '5',
             ]);
-            $ids = array_column($listRes->json('products') ?? [], 'id');
+            $listJson = $listRes->json();
+            $ids = array_column($listJson['products'] ?? [], 'id');
             if (empty($ids)) {
-                return response()->json(['error' => 'Nessun prodotto trovato in PS', 'raw' => $listRes->json()]);
+                return response()->json([
+                    'error'        => 'Nessun prodotto trovato o risposta non JSON',
+                    'http_status'  => $listRes->status(),
+                    'content_type' => $listRes->header('Content-Type'),
+                    'raw_body'     => substr($listRes->body(), 0, 2000),
+                    'json_parsed'  => $listJson,
+                ]);
             }
             $psId = (int) $ids[0];
         }
@@ -202,7 +209,12 @@ Route::get('/debug-ps-product', function (\Illuminate\Http\Request $request) {
         $product = $res->json('product') ?? [];
 
         if (empty($product)) {
-            return response()->json(['error' => "Prodotto {$psId} non trovato", 'status' => $res->status(), 'raw' => $res->json()]);
+            return response()->json([
+                'error'        => "Prodotto {$psId} non trovato o risposta non JSON",
+                'http_status'  => $res->status(),
+                'content_type' => $res->header('Content-Type'),
+                'raw_body'     => substr($res->body(), 0, 2000),
+            ]);
         }
 
         return response()->json([
