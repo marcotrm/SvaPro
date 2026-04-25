@@ -103,6 +103,7 @@ const normalizeProductFlat = (product, storesList, selectedStoreId = '') => {
     name: product?.name || '',
     sku: product?.sku || variant.sku || '',
     barcode: product?.barcode || variant.barcode || '',
+    brand_id: product?.brand_id ?? '',
     flavor: variant.flavor || '',
     category_id: product?.category_id ?? '',
     subcategory_id: '',
@@ -143,7 +144,7 @@ const normalizeHwVariants = (product) => {
   }));
 };
 
-export default function CatalogModal({ product, storesList = [], suppliers = [], categories = [], selectedStoreId = '', onClose, onSave, isDipendente = false }) {
+export default function CatalogModal({ product, storesList = [], suppliers = [], categories = [], brands = [], selectedStoreId = '', onClose, onSave, isDipendente = false }) {
   const [formData, setFormData] = useState(() => normalizeProductFlat(product, storesList, selectedStoreId));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -357,20 +358,28 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
               </div>
 
               <div style={{ gridColumn: '1 / span 1' }}>
+                <label className="sp-label">Marchio (Brand)</label>
+                <select className="sp-select" name="brand_id" value={formData.brand_id} onChange={handleChange}>
+                  <option value="">— Nessun Marchio —</option>
+                  {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+
+              <div style={{ gridColumn: '2 / span 1' }}>
                 <label className="sp-label">Categoria</label>
                 <select className="sp-select" name="category_id" value={formData.category_id} onChange={handleCategoryChange}>
                   <option value="">— Seleziona Categoria —</option>
                   {parentCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div style={{ gridColumn: '2 / span 1' }}>
+              <div style={{ gridColumn: '3 / span 1' }}>
                 <label className="sp-label">Sottocategoria</label>
                 <select className="sp-select" name="subcategory_id" value={formData.subcategory_id} onChange={(e) => setFormData(p => ({ ...p, subcategory_id: e.target.value }))} disabled={subCategories.length === 0}>
                   <option value="">{subCategories.length === 0 ? '— N.A. —' : '— Seleziona —'}</option>
                   {subCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div style={{ gridColumn: '3 / span 1' }}>
+              <div style={{ gridColumn: '1 / span 3' }}>
                 <label className="sp-label">Fornitore Predefinito</label>
                 <select className="sp-select" name="default_supplier_id" value={formData.default_supplier_id} onChange={handleChange}>
                   <option value="">— Seleziona —</option>

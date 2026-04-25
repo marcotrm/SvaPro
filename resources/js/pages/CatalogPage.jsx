@@ -16,6 +16,7 @@ export default function CatalogPage() {
   const isDipendente = (user?.roles || []).includes('dipendente') || user?.role === 'dipendente';
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [brandsList, setBrandsList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirmToDelete, setConfirmToDelete] = useState(null); // product | null
   const [error, setError] = useState('');
@@ -50,14 +51,16 @@ export default function CatalogPage() {
       clearApiCache();
       // Catalogo admin: mostra SEMPRE tutti i prodotti del tenant (no filtro store_id)
       // L'assegnazione per negozio Ã¨ giÃ  inclusa in variant.assigned_stores nella risposta
-      const [pRes, sRes, cRes] = await Promise.all([
+      const [pRes, sRes, cRes, bRes] = await Promise.all([
         catalog.getProducts({ limit: 10000 }),
         suppliers.getAll().catch(() => ({ data: { data: [] } })),
-        catalog.getCategories()
+        catalog.getCategories(),
+        catalog.getBrands().catch(() => ({ data: { data: [] } }))
       ]);
       setProducts(pRes.data?.data || []);
       setSuppliersList(sRes.data?.data || []);
       setCategories(cRes.data?.data || []);
+      setBrandsList(bRes.data?.data || []);
     } catch (err) {
       setError(err.message || 'Errore caricamento dati');
     } finally { setLoading(false); }
@@ -521,6 +524,7 @@ export default function CatalogPage() {
           storesList={[]}
           categories={categories}
           suppliers={suppliersList}
+          brands={brandsList}
           onClose={() => { setShowModal(false); setSelectedProduct(null); }}
           onSave={() => { setShowModal(false); setSelectedProduct(null); fetchData(); }}
         />
