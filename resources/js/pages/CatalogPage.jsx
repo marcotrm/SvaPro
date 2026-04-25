@@ -766,9 +766,9 @@ function PrestashopImportModal({ onClose, onImported }) {
       }
       
       setProgress({ imported: 0, total: total, errors: 0 });
-      addLog(`Trovati ${total} nuovi prodotti. Inizio download con immagini a blocchi di 50...`);
+      addLog(`Trovati ${total} prodotti. Importazione a blocchi di 10 (ottimizzato per velocità)...`);
 
-      const batchSize = 50;
+      const batchSize = 10;
       let importedCount = 0;
       let errorCount = 0;
 

@@ -145,10 +145,10 @@ class PrestashopController extends Controller
 
             // ── 1. Fetch dati da PrestaShop ──────────────────────────────────
             try {
-                $batchRes = Http::timeout(120)->get("{$url}/api/products", [
+                $batchRes = Http::timeout(25)->get("{$url}/api/products", [
                     'ws_key'        => $apiKey,
                     'output_format' => 'JSON',
-                    'display'       => 'full',
+                    'display'       => '[id,reference,name,price,id_default_image,active]',
                     'filter[id]'    => '[' . implode('|', $batchIds) . ']',
                     'limit'         => (string) count($batchIds),
                 ]);
@@ -250,18 +250,9 @@ class PrestashopController extends Controller
                     $sku    = trim($psp['reference'] ?? '') ?: "PS-{$psId}";
                     $name   = $this->extractLangValue($psp['name'] ?? null) ?: "Prodotto #{$psId}";
 
-                    // price_ttc: PrestaShop lo restituisce come stringa o come campo computato
-                    // Proviamo price_ttc prima, poi calcoliamo da price + tax_rate
-                    $price = (float) ($psp['price_ttc'] ?? 0);
-                    if ($price === 0.0) {
-                        $rawPrice   = (float) ($psp['price'] ?? 0);
-                        $taxRate    = (float) ($psp['tax_rate'] ?? 0);
-                        if ($rawPrice > 0) {
-                            $price = $taxRate > 0
-                                ? round($rawPrice * (1 + $taxRate / 100), 6)
-                                : $rawPrice;
-                        }
-                    }
+                    // 'price' da PS è il prezzo netto IVA esclusa.
+                    // Con display specifico non abbiamo price_ttc/tax_rate.
+                    $price = (float) ($psp['price'] ?? 0);
 
                     $active     = (int) ($psp['active'] ?? 1) === 1;
                     $categoryId = $catMap->first() ?? null;
