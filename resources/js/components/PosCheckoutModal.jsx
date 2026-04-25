@@ -97,7 +97,7 @@ export default function PosCheckoutModal({ cartTotal, cartLines = [], qscareTota
                        <img src={getImageUrl(line.image)} alt="" style={{ width: 54, height: 54, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--color-border)', flexShrink: 0 }} />
                     ) : (
                        <div style={{ width: 54, height: 54, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                         <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>📦</span>
+                         <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>??</span>
                        </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>

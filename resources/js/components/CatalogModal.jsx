@@ -133,7 +133,7 @@ const emptyHwVariant = () => ({ color: '', barcode: '', sku: '', sale_price: '',
 
 const normalizeHwVariants = (product) => {
   if (!product?.variants || product.variants.length <= 1) return [];
-  // Salta la prima variante (è quella master gestita dal form flat)
+  // Salta la prima variante (??quella master gestita dal form flat)
   return product.variants.slice(1).map(v => ({
     id: v.id || null,
     color: v.color || v.flavor || '',
@@ -227,7 +227,7 @@ export default function CatalogModal({ product, storesList = [], suppliers = [],
 
       // ── Varianti colore hardware aggiuntive ──
       hwVariants.forEach((v, i) => {
-        const idx = i + 1; // 0 è la variante master
+        const idx = i + 1; // 0 ??la variante master
         if (v.id) appendValue(fd, `variants[${idx}][id]`, v.id);
         appendValue(fd, `variants[${idx}][color]`, v.color);
         appendValue(fd, `variants[${idx}][flavor]`, v.color); // usato come label nel POS

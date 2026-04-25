@@ -389,7 +389,7 @@ export default function PosPage() {
   }, [activeCategory, fetchedCats, selectedStoreId]);
 
 
-  // L'auto-precompilazione dell'operatore è stata rimossa come richiesto
+  // L'auto-precompilazione dell'operatore ??stata rimossa come richiesto
 
 
   // Auto-invio per codice operatore dopo aver finito di digitare (debounce 1 secondo)
@@ -433,7 +433,7 @@ export default function PosPage() {
 
   /* Cart logic */
 
-  // Helper: determina se un prodotto è hardware/dispositivo (dichiarato prima di addToCart per evitare TDZ)
+  // Helper: determina se un prodotto ??hardware/dispositivo (dichiarato prima di addToCart per evitare TDZ)
   const isHardwareProduct = useCallback((product) => {
     const cat = categories.find(c => c.id === product.category_id);
     const n = cat?.name?.toLowerCase() || '';
@@ -469,7 +469,7 @@ export default function PosPage() {
         location: variant.location || '',
       }];
     });
-    // QScare è di default DISATTIVA. L'operatore sceglierà manualmente la quantità.
+    // QScare ??di default DISATTIVA. L'operatore sceglierà manualmente la quantità.
     toast.success(`${product.name}`, { duration: 900, icon: '🛒' });
   }, [stockMap, isHardwareProduct]);
 
@@ -582,7 +582,7 @@ export default function PosPage() {
     setQscareLines(prev => {
       const current = prev[variantId] || 0;
       const nextRaw = current + delta;
-      const next = Math.max(0, Math.min(nextRaw, maxQty)); // Non può eccedere la qty del carrello
+      const next = Math.max(0, Math.min(nextRaw, maxQty)); // Non pu??eccedere la qty del carrello
       return { ...prev, [variantId]: next };
     });
   };
@@ -646,13 +646,13 @@ export default function PosPage() {
         // NON sommiamo il payload.order_discount_amount del modal (che già parte da cartTotalFinal)
         order_discount_amount: totalCombinedDiscount > 0 ? totalCombinedDiscount : (payload.order_discount_amount ?? 0),
       });
-      toast.success('✅ Vendita completata!');
+      toast.success('? Vendita completata!');
       setCartLines([]); setSelectedCustomer(null); setPointsRedeemed(0); setNote(''); setShowCheckoutModal(false); setQscareLines({});
       setAppliedPromo(null); setPromoCode(''); setPromoError('');
       // Reset operatore dopo ogni vendita (deve riscannerizzare)
       setSoldByEmployeeId(''); setOperatorBarcode(''); setOperatorName(''); setOperatorError('');
       setTimeout(() => operatorBarcodeRef.current?.focus(), 100);
-      // Notifica dashboard e altri componenti che è avvenuta una vendita
+      // Notifica dashboard e altri componenti che ??avvenuta una vendita
       window.dispatchEvent(new CustomEvent('orderPlaced'));
       clearApiCache(); fetchData(true);
     } catch (err) {
@@ -673,11 +673,11 @@ export default function PosPage() {
     const f = flavorTerm.toLowerCase().trim();
     const hasSearch = s.length > 0 || f.length > 0;
 
-    // Applica filtro categoria SOLO se non c'è una ricerca di testo in corso
+    // Applica filtro categoria SOLO se non c'??una ricerca di testo in corso
     if (!hasSearch) {
       if (activeCategory === 'top_selling') {
-        // Mostra i 20 più venduti (già in products grazie al fetch iniziale)
-        // Nessun filtro ulteriore — la lista è già ordinata per vendite
+        // Mostra i 20 pi??venduti (già in products grazie al fetch iniziale)
+        // Nessun filtro ulteriore — la lista ??già ordinata per vendite
       }
       if (activeCategory === 'featured' && !p.is_featured) return false;
       if (typeof activeCategory === 'number' && p.category_id !== activeCategory) return false;
@@ -699,7 +699,7 @@ export default function PosPage() {
     return matchS && matchF && matchC;
   }).slice(0, 30), [products, searchTerm, flavorTerm, activeCategory]);
 
-  // Ricerca clienti: API-driven con debounce (non più filtraggio locale su 1000 record)
+  // Ricerca clienti: API-driven con debounce (non pi??filtraggio locale su 1000 record)
   const [filteredCustomers, setFilteredCustomers] = useState([]);
   const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
 
@@ -1326,7 +1326,7 @@ export default function PosPage() {
                     </button>
                   </div>
                 )}
-                {promoError && <div style={{ fontSize: 10, color: '#fc8181', marginTop: 5, paddingLeft: 4 }}>⚠ {promoError}</div>}
+                {promoError && <div style={{ fontSize: 10, color: '#fc8181', marginTop: 5, paddingLeft: 4 }}>?? {promoError}</div>}
               </div>
             </div>
           )}
@@ -1450,7 +1450,7 @@ export default function PosPage() {
           <button
             onClick={() => {
               if (!soldByEmployeeId) {
-                toast.error('⚠️ Inserisci il codice operatore prima di procedere con la vendita!', { duration: 3500 });
+                toast.error('??️ Inserisci il codice operatore prima di procedere con la vendita!', { duration: 3500 });
                 operatorBarcodeRef.current?.focus();
                 return;
               }
@@ -1657,7 +1657,7 @@ function PosResoModal({ storeId, onClose, onDone }) {
           unit_refund_amount: l.unit_price ?? l.sale_price ?? 0,
         })),
       });
-      toast.success('✅ Reso registrato correttamente');
+      toast.success('? Reso registrato correttamente');
       onDone();
     } catch (e) {
       setError(e.response?.data?.message || 'Errore nella registrazione del reso');
@@ -1818,7 +1818,7 @@ function PointsModal({ customer, pointsRedeemed, pointsDiscountAmt, cartTotal, f
         {/* Anteprima sconto */}
         {inputPts >= 100 && inputPts % 100 === 0 && (
           <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '12px 16px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, color: '#86efac', fontWeight: 700 }}>✅ Sconto da {inputPts} punti</span>
+            <span style={{ fontSize: 13, color: '#86efac', fontWeight: 700 }}>? Sconto da {inputPts} punti</span>
             <span style={{ fontSize: 20, fontWeight: 900, color: '#10B981' }}>-{fmt(previewDiscount)}</span>
           </div>
         )}
@@ -1835,7 +1835,7 @@ function PointsModal({ customer, pointsRedeemed, pointsDiscountAmt, cartTotal, f
             onClick={() => onApply(inputPts)}
             disabled={inputPts < 100 || inputPts % 100 !== 0}
             style={{ flex: 1, padding: '14px', borderRadius: 12, border: 'none', background: (inputPts >= 100 && inputPts % 100 === 0) ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'rgba(255,255,255,0.06)', color: (inputPts >= 100 && inputPts % 100 === 0) ? '#000' : 'rgba(255,255,255,0.25)', fontSize: 15, fontWeight: 900, cursor: (inputPts >= 100 && inputPts % 100 === 0) ? 'pointer' : 'not-allowed', boxShadow: (inputPts >= 100 && inputPts % 100 === 0) ? '0 6px 20px rgba(251,191,36,0.35)' : 'none', transition: 'all 0.2s' }}>
-            {(inputPts >= 100 && inputPts % 100 === 0) ? `Applica ${inputPts} pt → -${fmt(previewDiscount)}` : 'Seleziona punti da usare (min. 100)'}
+            {(inputPts >= 100 && inputPts % 100 === 0) ? `Applica ${inputPts} pt ? -${fmt(previewDiscount)}` : 'Seleziona punti da usare (min. 100)'}
           </button>
         </div>
       </div>

@@ -44,8 +44,8 @@ export default function DriverDeliveriesPage() {
       await driverDeliveries.updateStatus(id, tenantCode, { status, driver_note: note || undefined });
       setNoteModal(null);
       setExpanded(null);
-      if (status === 'done') toast.success('✅ Consegna completata!');
-      if (status === 'issue') toast.error('⚠️ Problema segnalato');
+      if (status === 'done') toast.success('? Consegna completata!');
+      if (status === 'issue') toast.error('??️ Problema segnalato');
       if (status === 'in_progress') toast('🚚 In corso!');
       fetchAll();
     } catch { toast.error('Errore aggiornamento'); }
@@ -163,7 +163,7 @@ export default function DriverDeliveriesPage() {
                     <div style={{ paddingTop:14, display:'flex', flexDirection:'column', gap:8 }}>
                       {!isInProgress && (
                         <button onClick={() => updateStatus(d.id, 'in_progress')} style={{ padding:'12px', background:'rgba(59,130,246,0.15)', border:'1px solid rgba(59,130,246,0.3)', borderRadius:12, fontSize:14, fontWeight:700, color:'#3B82F6', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                          <Truck size={16} /> Sto andando →
+                          <Truck size={16} /> Sto andando ?
                         </button>
                       )}
                       <button onClick={() => setNoteModal({ id: d.id, action: 'done', note: '' })} style={{ padding:'14px', background:'linear-gradient(135deg,#10B981,#059669)', border:'none', borderRadius:12, fontSize:15, fontWeight:800, color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 16px rgba(16,185,129,0.3)' }}>
@@ -204,7 +204,7 @@ export default function DriverDeliveriesPage() {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:999, display:'flex', alignItems:'flex-end' }}>
           <div style={{ background:'#1C1C2E', borderRadius:'20px 20px 0 0', padding:24, width:'100%', maxWidth:600, margin:'0 auto' }}>
             <h3 style={{ fontSize:16, fontWeight:800, marginBottom:12, color:'#fff' }}>
-              {noteModal.action === 'done' ? '✅ Conferma Consegna' : '⚠️ Segnala Problema'}
+              {noteModal.action === 'done' ? '? Conferma Consegna' : '??️ Segnala Problema'}
             </h3>
             <p style={{ fontSize:13, color:'rgba(255,255,255,0.5)', marginBottom:14 }}>Aggiungi una nota (opzionale)</p>
             <textarea

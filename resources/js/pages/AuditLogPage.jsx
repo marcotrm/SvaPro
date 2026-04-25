@@ -77,7 +77,7 @@ export default function AuditLogPage() {
         <div className="alert-banner" style={{ borderColor: 'rgba(230,76,60,.4)' }}>
           <span className="icon">✕</span>
           <span><strong>Errore:</strong> {error}</span>
-          <button className="banner-link" onClick={fetchLogs}>Riprova →</button>
+          <button className="banner-link" onClick={fetchLogs}>Riprova ?</button>
         </div>
       )}
 

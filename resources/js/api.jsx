@@ -69,7 +69,7 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Se il backend ci restituisce un messaggio parlante (e non è una generica stringa di errore),
+    // Se il backend ci restituisce un messaggio parlante (e non ??una generica stringa di errore),
     // usiamo quello a meno che non ci sia una regola fissa preimpostata
     let mappedMessage = null;
     for (const rule of errorMap) {
@@ -79,12 +79,12 @@ api.interceptors.response.use(
       }
     }
     
-    // Applica il custom message solo se c'è un mapping, altrimenti mostra l'errore reale se di senso compiuto (o fallback)
+    // Applica il custom message solo se c'??un mapping, altrimenti mostra l'errore reale se di senso compiuto (o fallback)
     if (mappedMessage) {
       error.userFriendlyMessage = mappedMessage;
     } else {
       error.userFriendlyMessage = status === 500 
-        ? `Errore di sistema (500): ${msg.length < 150 ? msg : 'Si è verificato un problema interno, contatta l\'assistenza.'}` 
+        ? `Errore di sistema (500): ${msg.length < 150 ? msg : 'Si ??verificato un problema interno, contatta l\'assistenza.'}` 
         : msg;
     }
     
@@ -340,7 +340,7 @@ api.interceptors.request.use((config) => {
     // Surgical cache invalidation: only clear entries whose path shares a prefix
     // with the mutated resource (e.g. POST /catalog/products clears /catalog/*)
     const mutatedPath = (config.url || '').replace(API_URL, '').split('?')[0];
-    const prefix = mutatedPath.split('/').slice(0, 3).join('/'); // e.g. "/catalog/products" → "/catalog/products"
+    const prefix = mutatedPath.split('/').slice(0, 3).join('/'); // e.g. "/catalog/products" ? "/catalog/products"
     for (const [key] of responseCache) {
       if (key.includes(prefix)) {
         responseCache.delete(key);
@@ -904,7 +904,7 @@ export const adm = {
   generateReport: (data) => api.post('/adm/generate-report', data, {
     responseType: 'blob',
     headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-    timeout: 120000, // 2 min — la query DB può essere lenta
+    timeout: 120000, // 2 min — la query DB pu??essere lenta
   }),
   getHistory: () => api.get('/adm/history'),
 };

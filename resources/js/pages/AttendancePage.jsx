@@ -50,7 +50,7 @@ function FeedbackBanner({ message, type }) {
   );
 }
 
-// Named export: può essere embeddato come tab in altre pagine
+// Named export: pu??essere embeddato come tab in altre pagine
 export function AttendanceContent({ selectedStoreId: propStoreId } = {}) {
   const ctx = useOutletContext?.() || {};
   const selectedStoreId = propStoreId ?? ctx.selectedStoreId;
@@ -123,10 +123,10 @@ export function AttendanceContent({ selectedStoreId: propStoreId } = {}) {
         }
       } else {
         const res = await attendanceApi.checkIn(params);
-        const lateMsg = res.data.late_minutes > 0 ? ` ⚠️ ${res.data.late_minutes} min ritardo` : '';
+        const lateMsg = res.data.late_minutes > 0 ? ` ??️ ${res.data.late_minutes} min ritardo` : '';
         const breakReturnMsg = emp.status === 'pausa' ? ' — Rientrato dalla pausa' : '';
         showFeedback(
-          `✅ ${res.data.employee_name} ${breakReturnMsg} alle ${new Date(res.data.checked_in_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.${lateMsg}`,
+          `? ${res.data.employee_name} ${breakReturnMsg} alle ${new Date(res.data.checked_in_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.${lateMsg}`,
           res.data.late_minutes > 0 ? 'warning' : 'success', 4000
         );
       }

@@ -35,7 +35,7 @@ function ReturnDetailModal({ returnObj, onClose }) {
     pending: 'In attesa', requested: 'Richiesto', approved: 'Approvato',
     received: 'Ricevuto', refunded: 'Rimborsato', denied: 'Rifiutato',
     rejected: 'Rifiutato', exchanged: 'Scambiato', on_hold: '⏸ In Attesa',
-    repaired: '🔧 Riparato', scrapped: '🗑 Smaltimento', sent_to_supplier: '📦 Al Produttore',
+    repaired: '🔧 Riparato', scrapped: '??? Smaltimento', sent_to_supplier: '?? Al Produttore',
   };
 
   return (
@@ -159,8 +159,8 @@ const STATUS_LABELS = {
   exchanged:          'Scambiato',
   on_hold:            '⏸ In Attesa',
   repaired:           '🔧 Riparato',
-  scrapped:           '🗑 Smaltimento',
-  sent_to_supplier:   '📦 Al Produttore',
+  scrapped:           '??? Smaltimento',
+  sent_to_supplier:   '?? Al Produttore',
 };
 
 const STATUS_BADGE = {
@@ -596,8 +596,8 @@ export default function ReturnsPage() {
                         {r.status === 'approved' && (<>
                           <button className="sp-btn sp-btn-primary sp-btn-sm" onClick={() => handleStatusChange(r.id, 'refunded')}>Rimborsa</button>
                           <button className="sp-btn sp-btn-secondary sp-btn-sm" onClick={() => handleStatusChange(r.id, 'repaired')}>🔧 Riparato</button>
-                          <button className="sp-btn sp-btn-secondary sp-btn-sm" onClick={() => handleStatusChange(r.id, 'scrapped')}>🗑 Smaltimento</button>
-                          <button className="sp-btn sp-btn-secondary sp-btn-sm" onClick={() => handleStatusChange(r.id, 'sent_to_supplier')}>📦 Produttore</button>
+                          <button className="sp-btn sp-btn-secondary sp-btn-sm" onClick={() => handleStatusChange(r.id, 'scrapped')}>??? Smaltimento</button>
+                          <button className="sp-btn sp-btn-secondary sp-btn-sm" onClick={() => handleStatusChange(r.id, 'sent_to_supplier')}>?? Produttore</button>
                         </>)}
                         {/* Da In Attesa: approva o nega */}
                         {r.status === 'on_hold' && (<>

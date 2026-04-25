@@ -180,8 +180,30 @@ class PrestashopController extends Controller
 
             $now = now();
 
+            // ── 1.5 Pre-carica brands da PS ──────────────────────────────────
+            $psBrandsMap = [];
+            try {
+                $manRes = Http::timeout(10)->get("{$url}/api/manufacturers", [
+                    'ws_key'        => $apiKey,
+                    'output_format' => 'JSON',
+                    'display'       => '[id,name]',
+                ]);
+                if ($manRes->successful()) {
+                    $psMans = $manRes->json('manufacturers') ?? [];
+                    foreach ($psMans as $m) {
+                        $psBrandsMap[(int)($m['id'] ?? 0)] = $m['name'] ?? '';
+                    }
+                }
+            } catch (\Throwable $e) {}
+
             // ── 2. Pre-carica dati esistenti IN BULK ─────────────────────────
             $catMap            = DB::table('categories')->where('tenant_id', $tenantId)->pluck('id', 'name');
+            $existingBrands = DB::table('brands')
+                ->where('tenant_id', $tenantId)
+                ->pluck('id', 'name');
+            $brandsByName = $existingBrands->mapWithKeys(function($id, $name) {
+                return [strtolower($name) => $id];
+            })->toArray();
             $defaultTaxClassId = DB::table('tax_classes')->where('tenant_id', $tenantId)->value('id');
             $storeIds          = DB::table('stores')->where('tenant_id', $tenantId)->pluck('id')->all();
             $warehouseIds      = DB::table('warehouses')->where('tenant_id', $tenantId)->pluck('id')->all();
@@ -321,6 +343,26 @@ class PrestashopController extends Controller
                     $active     = (int) ($psp['active'] ?? 1) === 1;
                     $categoryId = $catMap->first() ?? null;
 
+                    $idManufacturer = (int) ($psp['id_manufacturer'] ?? 0);
+                    $brandId = null;
+                    if ($idManufacturer > 0 && isset($psBrandsMap[$idManufacturer])) {
+                        $psBrandName = trim($psBrandsMap[$idManufacturer]);
+                        if ($psBrandName !== '') {
+                            $lowName = strtolower($psBrandName);
+                            if (isset($brandsByName[$lowName])) {
+                                $brandId = $brandsByName[$lowName];
+                            } else {
+                                $brandId = DB::table('brands')->insertGetId([
+                                    'tenant_id' => $tenantId,
+                                    'name' => $psBrandName,
+                                    'created_at' => $now,
+                                    'updated_at' => $now,
+                                ]);
+                                $brandsByName[$lowName] = $brandId;
+                            }
+                        }
+                    }
+
                     $existingProduct = $existingProducts->get($sku);
 
                     // PS image id: può essere intero, stringa, o oggetto {attrs:..., value:"123"}
@@ -356,6 +398,7 @@ class PrestashopController extends Controller
                         // ── MODALITÀ FULL: AGGIORNA prodotto esistente ──────────
                         $updateData = ['name' => $name, 'is_active' => $active, 'updated_at' => $now];
                         if ($barcode) $updateData['barcode'] = $barcode;
+                        if ($brandId) $updateData['brand_id'] = $brandId;
                         DB::table('products')->where('id', $existingProduct->id)->update($updateData);
 
                         // Aggiorna SEMPRE il prezzo e il barcode della variante
@@ -412,6 +455,7 @@ class PrestashopController extends Controller
                             'name'         => $name,
                             'product_type' => 'liquid',
                             'category_id'  => $categoryId,
+                            'brand_id'     => $brandId,
                             'barcode'      => $barcode,
                             'is_active'    => $active,
                             'created_at'   => $now,

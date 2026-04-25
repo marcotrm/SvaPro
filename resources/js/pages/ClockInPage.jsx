@@ -32,7 +32,7 @@ function getMismatch(rec, shift) {
     const expected   = parseShiftDt(date, shift.start_time);
     if (expected) {
       const diff = Math.round((actualIn - expected) / 60000);
-      if (diff >  15) warnings.push({ icon: '⚠️', text: `Ritardo ${diff}m`,            color: '#B45309', bg: '#FFFBEB' });
+      if (diff >  15) warnings.push({ icon: '??️', text: `Ritardo ${diff}m`,            color: '#B45309', bg: '#FFFBEB' });
       if (diff < -15) warnings.push({ icon: 'ℹ️', text: `Anticipato ${Math.abs(diff)}m`, color: '#1D4ED8', bg: '#EFF6FF' });
     }
   }
@@ -245,7 +245,7 @@ function AdminPresenceView() {
         </div>
       </div>
 
-      {/* â”€â”€ Chi è in servizio ORA â”€â”€ */}
+      {/* â”€â”€ Chi ??in servizio ORA â”€â”€ */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
           🟢 Dipendenti in servizio ora ({liveList.length})
@@ -362,7 +362,7 @@ function AdminPresenceView() {
                       {/* Anomalie */}
                       <td style={{ padding: '12px 16px' }}>
                         {warnings.length === 0 ? (
-                          <span style={{ color: '#22c55e', fontSize: 12, fontWeight: 700 }}>✅ Ok</span>
+                          <span style={{ color: '#22c55e', fontSize: 12, fontWeight: 700 }}>? Ok</span>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                             {warnings.map((w, wi) => (
@@ -449,7 +449,7 @@ function AdminPresenceView() {
                   <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 700 }}>GIORNI</div>
                 </div>
               </div>
-              {s.late_count > 0 && <div style={{ marginTop: 8, fontSize: 11, color: '#ef4444', fontWeight: 700 }}>⚠ {s.late_count} ritardi</div>}
+              {s.late_count > 0 && <div style={{ marginTop: 8, fontSize: 11, color: '#ef4444', fontWeight: 700 }}>?? {s.late_count} ritardi</div>}
             </div>
           ))}
         </div>
@@ -593,7 +593,7 @@ function KioskView() {
 
   const performClock = async (emp, forceAction = null, isBreak = false) => {
     setLoading(true);
-    // Risolvi store: localStorage → user.employee_store_id → selectedStoreId (context) → emp.store_id
+    // Risolvi store: localStorage ? user.employee_store_id ? selectedStoreId (context) ? emp.store_id
     const storeId = getStoreId() || emp?.store_id;
     if (!storeId) {
       setMessage({ text: 'Nessun negozio configurato. Contatta un amministratore.', type: 'error' });
@@ -730,7 +730,7 @@ function KioskView() {
                 onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-                <span style={{ fontSize: 40 }}>✅</span>
+                <span style={{ fontSize: 40 }}>?</span>
                 Inizia Turno (Entrata)
             </button>
 
@@ -804,7 +804,7 @@ function KioskView() {
           fontSize: 52, marginBottom: 32,
           animation: 'bounceIn 0.4s cubic-bezier(.36,.07,.19,.97) both',
         }}>
-          {isIn ? '✅' : '👋'}
+          {isIn ? '?' : '👋'}
         </div>
 
         <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>
@@ -931,7 +931,7 @@ function KioskView() {
               color: message.type === 'error' ? '#fca5a5' : '#86efac',
               fontSize: 16, fontWeight: 700,
             }}>
-              {message.type === 'error' ? '⚠️' : '✅'} {message.text}
+              {message.type === 'error' ? '??️' : '?'} {message.text}
             </div>
           )}
 
@@ -972,7 +972,7 @@ function KioskView() {
                   opacity: loading ? 0.7 : 1, letterSpacing: '0.04em', transition: 'opacity 0.15s',
                 }}
               >
-                {loading ? '⏳ Ricerca in corso...' : '✅ Conferma codice'}
+                {loading ? '⏳ Ricerca in corso...' : '? Conferma codice'}
               </button>
             ) : (
               <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, textAlign: 'center' }}>
@@ -1003,7 +1003,7 @@ function KioskView() {
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 export default function ClockInPage() {
   const { user } = useOutletContext() || {};
-  // user.roles è un array (es. ['superadmin'] o ['dipendente'])
+  // user.roles ??un array (es. ['superadmin'] o ['dipendente'])
   const roles = user?.roles || [];
   const isAdmin = roles.includes('superadmin') || roles.includes('admin_cliente');
   return isAdmin ? <AdminPresenceView /> : <KioskView />;

@@ -6,7 +6,7 @@ import { stores, storeDeliveries } from '../api.jsx';
 import { useOutletContext } from 'react-router-dom';
 
 const LS_TPL  = 'svapro_del_tpl_v4';
-const DAYS    = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
+const DAYS    = ['Luned�','Marted�','Mercoled�','Gioved�','Venerd�','Sabato','Domenica'];
 const DAYS_SH = ['LUN','MAR','MER','GIO','VEN','SAB','DOM'];
 
 function getMonday(d) {
@@ -21,7 +21,7 @@ function emptyWeek(){ return Object.fromEntries(DAYS.map((_,i)=>[i,[]])); }
 function loadTpl(){ try{ return JSON.parse(localStorage.getItem(LS_TPL)||'null'); }catch{ return null; } }
 function saveTpl(t){ localStorage.setItem(LS_TPL,JSON.stringify(t)); }
 
-// Trasforma lista API → {dayIdx: [items]}
+// Trasforma lista API ? {dayIdx: [items]}
 function apiListToDays(list, weekStart) {
   const days = emptyWeek();
   (list || []).forEach(item => {
@@ -87,7 +87,7 @@ export default function StoreDeliveriesPage() {
       const sun = toISO(addDays(weekStart, 6));
       const weekList = list.filter(x => x.scheduled_date >= mon && x.scheduled_date <= sun);
       if (weekList.length === 0) {
-        // Settimana vuota → auto-applica template principale
+        // Settimana vuota ? auto-applica template principale
         const tpl = loadTpl();
         if (tpl) {
           const created = [];
@@ -216,7 +216,7 @@ export default function StoreDeliveriesPage() {
       tpl[i] = (days[i] || []).map(s => ({ storeId: s.storeId, storeName: s.storeName }));
     });
     setTemplate(tpl); saveTpl(tpl);
-    toast.success('✅ Template principale salvato! Verrà applicato a tutte le settimane senza consegne.');
+    toast.success('? Template principale salvato! Verrà applicato a tutte le settimane senza consegne.');
   };
 
   const todayStr = toISO(new Date());

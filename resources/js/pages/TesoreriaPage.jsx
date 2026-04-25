@@ -21,7 +21,7 @@ function TabBar({ active, onChange, isDipendente }) {
         { id: 'coins',   label: '🪙 Pacchi Monete' },
       ]
     : [
-        { id: 'live',    label: '💰 Saldo Cassa' },
+        { id: 'live',    label: '?? Saldo Cassa' },
         { id: 'history', label: '📋 Movimentazioni' },
         { id: 'coins',   label: '🪙 Pacchi Monete' },
         { id: 'summary', label: '🏢 Riepilogo Società' },
@@ -77,7 +77,7 @@ function StoreCashCard({ store, onMove }) {
           </div>
         </div>
         <div style={{ padding: '4px 10px', borderRadius: 8, background: isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', color: isPositive ? '#10b981' : '#EF4444', fontSize: 11, fontWeight: 700 }}>
-          {isPositive ? '✓ Regolare' : '⚠ Negativo'}
+          {isPositive ? '✓ Regolare' : '?? Negativo'}
         </div>
       </div>
 
@@ -327,7 +327,7 @@ export default function TesoreriaPage() {
     setDailySub(true);
     try {
       await dailyCashReports.submit({});
-      toast.success('Incasso inviato! Il saldo del superadmin è aggiornato.');
+      toast.success('Incasso inviato! Il saldo del superadmin ??aggiornato.');
       fetchDaily(); // ricarica preview aggiornato
     } catch (e) { toast.error(e.response?.data?.message || 'Errore'); }
     finally { setDailySub(false); }
@@ -337,7 +337,7 @@ export default function TesoreriaPage() {
     if (!window.confirm('Confermare la ricezione di questo pacco monete?')) return;
     try {
       await coinShipments.confirm(id);
-      toast.success('Pacco confermato! La cassa è stata aggiornata.');
+      toast.success('Pacco confermato! La cassa ??stata aggiornata.');
       fetchCoins(); fetchBalances(); fetchStoreBalance();
     } catch (e) { toast.error(e.response?.data?.message || 'Errore'); }
   };
@@ -498,7 +498,7 @@ export default function TesoreriaPage() {
                       color: isPositive ? '#6ee7b7' : '#fca5a5',
                       fontSize: 12, fontWeight: 700, marginBottom: 24,
                     }}>
-                      {isPositive ? '✓ Saldo regolare' : '⚠ Saldo negativo'}
+                      {isPositive ? '✓ Saldo regolare' : '?? Saldo negativo'}
                     </div>
 
                     {/* Contanti | Monete */}
@@ -806,7 +806,7 @@ export default function TesoreriaPage() {
                       background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
                       textAlign: 'center',
                     }}>
-                      <div style={{ fontSize: 18, marginBottom: 4 }}>✅</div>
+                      <div style={{ fontSize: 18, marginBottom: 4 }}>?</div>
                       <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6ee7b7', marginBottom: 6 }}>Già Inviato</div>
                       <div style={{ fontSize: 20, fontWeight: 900, color: '#10b981' }}>{fmt(dailyPreview.already_sent || 0)}</div>
                     </div>
@@ -840,7 +840,7 @@ export default function TesoreriaPage() {
                   </div>
                 )}
 
-                {/* Bottone — sempre visibile, disabilitato solo se non c'è delta */}
+                {/* Bottone — sempre visibile, disabilitato solo se non c'??delta */}
                 <button
                   onClick={handleSubmitDaily}
                   disabled={dailySubmitting || !dailyPreview?.can_send}
@@ -1034,7 +1034,7 @@ export default function TesoreriaPage() {
                 const borderColor = isPending ? '#f59e0b' : isConfirmed ? '#10b981' : '#ef4444';
                 const statusBg    = isPending ? 'rgba(245,158,11,0.1)' : isConfirmed ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
                 const statusColor = isPending ? '#f59e0b' : isConfirmed ? '#10b981' : '#ef4444';
-                const statusLabel = isPending ? '⏳ In attesa' : isConfirmed ? '✅ Confermato' : '❌ Rifiutato';
+                const statusLabel = isPending ? '⏳ In attesa' : isConfirmed ? '? Confermato' : '❌ Rifiutato';
                 const bd = c.coin_breakdown || {};
                 return (
                   <div key={c.id} style={{ background:'var(--color-surface)', borderRadius:16, border:'1px solid var(--color-border)', borderLeft:`4px solid ${borderColor}`, overflow:'hidden' }}>
@@ -1045,7 +1045,7 @@ export default function TesoreriaPage() {
                           <Package size={20} color={borderColor} />
                         </div>
                         <div>
-                          <div style={{ fontWeight:800, fontSize:14, color:'var(--color-text)' }}>Pacco #{c.id} → <span style={{ color:'var(--color-accent)' }}>{c.store_name}</span></div>
+                          <div style={{ fontWeight:800, fontSize:14, color:'var(--color-text)' }}>Pacco #{c.id} ? <span style={{ color:'var(--color-accent)' }}>{c.store_name}</span></div>
                           <div style={{ fontSize:11, color:'var(--color-text-tertiary)', marginTop:2 }}>
                             👤 {c.from_user_name} · {new Date(c.created_at).toLocaleString('it-IT',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}
                           </div>

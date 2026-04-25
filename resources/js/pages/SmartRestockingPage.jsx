@@ -46,7 +46,7 @@ function NetworkTab() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {data.central_warehouse && (
         <div style={{ padding: '10px 16px', background: 'rgba(99,102,241,0.07)', borderRadius: 10, fontSize: 12, color: '#4338ca', fontWeight: 700, border: '1px solid rgba(99,102,241,0.2)' }}>
-          📦 Deposito sorgente: {data.central_warehouse.name}
+          ?? Deposito sorgente: {data.central_warehouse.name}
         </div>
       )}
       {data.stores.map(store => {
@@ -61,7 +61,7 @@ function NetworkTab() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--color-text)' }}>{store.store_name}</div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-                  {store.total_lines} righe mancanti{hasWarn ? ' · ⚠ scorte deposito insufficienti' : ''}
+                  {store.total_lines} righe mancanti{hasWarn ? ' · ?? scorte deposito insufficienti' : ''}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -132,7 +132,7 @@ function DepotTab() {
           b.lines.forEach(l => {
             initQty[`${b.brand_id}_${l.product_variant_id}`] = l.needed_qty;
           });
-          // Seleziona il fornitore primario se c'è, altrimenti il primo
+          // Seleziona il fornitore primario se c'�, altrimenti il primo
           if (b.mapped_suppliers?.length > 0) {
              const prim = b.mapped_suppliers.find(s => s.is_primario);
              initSuppliers[b.brand_id] = prim ? prim.supplier_id : b.mapped_suppliers[0].supplier_id;
@@ -190,7 +190,7 @@ function DepotTab() {
   if (!data?.brands?.length) return (
     <div style={styles.emptyBox}>
       <CheckCircle size={40} color="#10b981" style={{ marginBottom: 12 }}/>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#065f46' }}>Il deposito è ben rifornito</div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: '#065f46' }}>Il deposito ??ben rifornito</div>
       <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Nessun ordine fornitore necessario al momento</div>
     </div>
   );
@@ -437,7 +437,7 @@ function BrandMatrixTab() {
                 ))}
               </div>
             ) : (
-              <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}>⚠ Nessun fornitore mappato</div>
+              <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}>⚠️ Nessun fornitore mappato</div>
             )}
             <select onChange={async e => {
               if (!e.target.value) return;

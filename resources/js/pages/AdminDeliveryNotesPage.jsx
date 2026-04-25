@@ -7,10 +7,10 @@ import ErrorAlert from '../components/ErrorAlert.jsx';
 import { toast } from 'react-hot-toast';
 
 const STATUS_LABELS = {
-    pending:     { label: '📦 In consegna', cls: 'mid'  },
+    pending:     { label: '?? In consegna', cls: 'mid'  },
     in_progress: { label: '🔄 In controllo', cls: 'warn' },
-    received:    { label: '✅ Controllata', cls: 'high' },
-    discrepancy: { label: '⚠️ Arrivata (Discrepanze)', cls: 'low'  },
+    received:    { label: '? Controllata', cls: 'high' },
+    discrepancy: { label: '??️ Arrivata (Discrepanze)', cls: 'low'  },
 };
 
 const fmtDT = v => v ? new Date(v).toLocaleString('it-IT') : '–';

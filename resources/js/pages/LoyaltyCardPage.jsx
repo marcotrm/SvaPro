@@ -36,7 +36,7 @@ export default function LoyaltyCardPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f172a] text-white p-6">
         <div className="bg-red-500/10 border border-red-500/50 p-6 rounded-2xl text-center max-w-md">
-          <p className="text-red-400 font-medium mb-2">Ops! Qualcosa è andato storto</p>
+          <p className="text-red-400 font-medium mb-2">Ops! Qualcosa ??andato storto</p>
           <p className="text-gray-400 text-sm">{error || 'Impossibile visualizzare la carta fedeltà.'}</p>
         </div>
       </div>

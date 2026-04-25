@@ -1,7 +1,7 @@
 import React from 'react';
 
 export default function ErrorAlert({ message, onRetry, onClose }) {
-  // Se il messaggio è un oggetto errore axios, mostra userFriendlyMessage se presente
+  // Se il messaggio ??un oggetto errore axios, mostra userFriendlyMessage se presente
   let displayMessage = message;
   if (message && typeof message === 'object') {
     displayMessage = message.userFriendlyMessage || message.message || 'Errore sconosciuto.';

@@ -378,7 +378,7 @@ export default function StoreRevenuePage() {
           {tab === 'ranking' && (
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <CalPicker label="Dal" value={dateFrom} onChange={v => { setDateFrom(v); if(v>dateTo) setDateTo(v); }} max={dateTo} />
-              <span style={{ fontSize:14, color:'rgba(255,255,255,0.25)', fontWeight:700 }}>→</span>
+              <span style={{ fontSize:14, color:'rgba(255,255,255,0.25)', fontWeight:700 }}>?</span>
               <CalPicker label="Al"  value={dateTo}   onChange={v => { setDateTo(v);   if(v<dateFrom) setDateFrom(v); }} min={dateFrom} />
             </div>
           )}

@@ -11,8 +11,8 @@ import {
 /* ─── Costanti ──────────────────────────────────────────────────────── */
 const STATUS = {
   draft:      { label: '📝 Bozza',           color: '#6b7280', bg: '#f3f4f6' },
-  confirmed:  { label: '✅ Confermato',       color: '#059669', bg: '#d1fae5' },
-  preparing:  { label: '📦 In Preparazione', color: '#d97706', bg: '#fef3c7' },
+  confirmed:  { label: '? Confermato',       color: '#059669', bg: '#d1fae5' },
+  preparing:  { label: '?? In Preparazione', color: '#d97706', bg: '#fef3c7' },
   shipped:    { label: '🚚 Spedito',          color: '#7c3aed', bg: '#ede9fe' },
   cancelled:  { label: '❌ Annullato',        color: '#dc2626', bg: '#fee2e2' },
 };
@@ -62,8 +62,8 @@ export default function RestockOrdersPage() {
   const tabs = [
     { key: 'all',       label: 'Tutti' },
     { key: 'draft',     label: '📝 Bozze' },
-    { key: 'confirmed', label: '✅ Confermati' },
-    { key: 'preparing', label: '📦 In Preparazione' },
+    { key: 'confirmed', label: '? Confermati' },
+    { key: 'preparing', label: '?? In Preparazione' },
     { key: 'shipped',   label: '🚚 Spediti' },
   ];
 
@@ -228,7 +228,7 @@ function OrderDetail({ orderId, onClose, onRefresh, onShip }) {
 
   if (loadErr) return (
     <div className="table-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200, gap: 12 }}>
-      <div style={{ color: '#dc2626', fontSize: 14, fontWeight: 600 }}>⚠️ {loadErr}</div>
+      <div style={{ color: '#dc2626', fontSize: 14, fontWeight: 600 }}>??️ {loadErr}</div>
       <button className="btn btn-ghost" onClick={onClose}>Chiudi</button>
     </div>
   );
@@ -498,7 +498,7 @@ function CreateOrderModal({ storesList, onClose, onCreated }) {
                   color: step >= parseInt(s) ? '#0e1726' : '#fff',
                 }}>{s}</div>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{l}</span>
-                {s === '1' && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>→</span>}
+                {s === '1' && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>?</span>}
               </div>
             ))}
           </div>
@@ -533,7 +533,7 @@ function CreateOrderModal({ storesList, onClose, onCreated }) {
               {/* Info card */}
               <div style={{ padding: '16px 20px', background: '#eff6ff', borderRadius: 14, border: '1px solid #bfdbfe', fontSize: 13, color: '#1e40af', lineHeight: 1.6 }}>
                 <strong>💡 Come funziona:</strong><br />
-                Crea l'ordine come <em>Bozza</em> → confermalo → avvia la preparazione sul palmarino → spedisci. Verrà generata automaticamente una Bolla di Scarico.
+                Crea l'ordine come <em>Bozza</em> ? confermalo ? avvia la preparazione sul palmarino ? spedisci. Verrà generata automaticamente una Bolla di Scarico.
               </div>
             </div>
           )}
@@ -625,7 +625,7 @@ function CreateOrderModal({ storesList, onClose, onCreated }) {
               if (!form.store_id) { toast.error('Seleziona un negozio'); return; }
               setStep(2);
             }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 28px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #1e1b4b, #312e81)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-              Avanti: Aggiungi Articoli →
+              Avanti: Aggiungi Articoli ?
             </button>
           ) : (
             <button onClick={handleSave} disabled={saving || form.items.length === 0} style={{

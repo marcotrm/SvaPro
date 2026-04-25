@@ -123,7 +123,7 @@ export default function ProductInventoryModal({ product, onClose }) {
             </div>
           ) : filteredData.length === 0 ? (
             <div style={{ padding: '40px 20px', textAlign: 'center', fontSize: 14, color: 'var(--color-text-tertiary)' }}>
-              {searchTerm ? 'Nessun negozio trovato con questo nome.' : '⚠️ Nessuna giacenza registrata in alcun negozio per questo prodotto.'}
+              {searchTerm ? 'Nessun negozio trovato con questo nome.' : '??️ Nessuna giacenza registrata in alcun negozio per questo prodotto.'}
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>

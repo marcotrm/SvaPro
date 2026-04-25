@@ -377,7 +377,7 @@ const AiReorderCard = ({ proposal, setAiAnswer }) => {
     try {
       const { ai } = await import('../api.jsx');
       const res = await ai.acceptReorder(proposal.ordini);
-      let answerText = `✅ **Operazione completata!**\n\n${res.data.message}`;
+      let answerText = `? **Operazione completata!**\n\n${res.data.message}`;
       if (res.data.created_ids && res.data.created_ids.length > 0) {
         answerText += `\n\nOrdini creati con successo: ` + res.data.created_ids.map(id => `[Vedi Ordine #${id}](/purchase-orders)`).join(', ');
       }
@@ -470,7 +470,7 @@ export default function DashboardPage() {
       } catch (e) {}
       setAiAnswer(answerText);
     } catch (err) {
-      setAiAnswer('Errore durante la richiesta AI. Riprova più tardi.');
+      setAiAnswer('Errore durante la richiesta AI. Riprova pi??tardi.');
     }
     setAiLoading(false);
   };
@@ -545,7 +545,7 @@ export default function DashboardPage() {
       }
 
       // ── Recent Orders & Employee Activity ─────────────────────
-      // Costruisce mappa nome dipendente → photo_url dai dati reali dipendenti
+      // Costruisce mappa nome dipendente ? photo_url dai dati reali dipendenti
       const empPhotoMap = {};
       if (resEmployees?.status === 'fulfilled') {
         (resEmployees.value?.data?.data || []).forEach(emp => {
@@ -1057,7 +1057,7 @@ export default function DashboardPage() {
                 onClick={() => navigate('/inventory?filter=low')}
                 style={{ color:'#D97706', fontWeight:700, cursor:'pointer', textDecoration:'underline', textUnderlineOffset:2 }}
               >
-                ⚠ {stockStats.low} prodotti sotto soglia →
+                ?? {stockStats.low} prodotti sotto soglia ?
               </span>
             ) : 'Stock regolare'}
           </div>

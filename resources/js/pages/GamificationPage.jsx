@@ -205,7 +205,7 @@ export default function GamificationPage() {
   const fmt = v => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
   const fmtPts = n => Number(n || 0).toLocaleString('it-IT');
 
-  // RuleInput ora è definito FUORI dal componente = nessun rimount su re-render
+  // RuleInput ora ??definito FUORI dal componente = nessun rimount su re-render
   const ruleInputProps = (fieldKey) => ({
     value: editRules[fieldKey] ?? 0,
     onChange: (val) => setEditRules(r => ({ ...r, [fieldKey]: val })),
@@ -334,10 +334,10 @@ export default function GamificationPage() {
                   <td>
                     {emp.breakdown && Object.keys(emp.breakdown).length > 0 && (
                         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-                            {emp.breakdown.euro > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Fatturato"><span style={{ fontSize: 20 }}>💰</span><span style={{ fontSize: 12, fontWeight: 800, color: '#4f46e5', marginTop: 2 }}>{emp.breakdown.euro}</span></div>}
+                            {emp.breakdown.euro > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Fatturato"><span style={{ fontSize: 20 }}>??</span><span style={{ fontSize: 12, fontWeight: 800, color: '#4f46e5', marginTop: 2 }}>{emp.breakdown.euro}</span></div>}
                             {emp.breakdown.fidelity > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Nuovi clienti"><span style={{ fontSize: 20 }}>👤</span><span style={{ fontSize: 12, fontWeight: 800, color: '#0891b2', marginTop: 2 }}>{emp.breakdown.fidelity}</span></div>}
                             {emp.breakdown.discount > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Scontrini alti"><span style={{ fontSize: 20 }}>🏷️</span><span style={{ fontSize: 12, fontWeight: 800, color: '#d97706', marginTop: 2 }}>{emp.breakdown.discount}</span></div>}
-                            {emp.breakdown.big_sale > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Pezzi Multipli"><span style={{ fontSize: 20 }}>📦</span><span style={{ fontSize: 12, fontWeight: 800, color: '#7c3aed', marginTop: 2 }}>{emp.breakdown.big_sale}</span></div>}
+                            {emp.breakdown.big_sale > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Pezzi Multipli"><span style={{ fontSize: 20 }}>??</span><span style={{ fontSize: 12, fontWeight: 800, color: '#7c3aed', marginTop: 2 }}>{emp.breakdown.big_sale}</span></div>}
                             {emp.breakdown.qscare > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="QScare"><span style={{ fontSize: 20 }}>🛡</span><span style={{ fontSize: 12, fontWeight: 800, color: '#0d9488', marginTop: 2 }}>{emp.breakdown.qscare}</span></div>}
                             {emp.breakdown.featured > 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Preferiti"><span style={{ fontSize: 20 }}>⭐</span><span style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', marginTop: 2 }}>{emp.breakdown.featured}</span></div>}
                             {emp.breakdown.late_penalty < 0 && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }} title="Penalità ritardo"><span style={{ fontSize: 20 }}>⏰</span><span style={{ fontSize: 12, fontWeight: 800, color: '#ef4444', marginTop: 2 }}>{emp.breakdown.late_penalty}</span></div>}
@@ -395,7 +395,7 @@ export default function GamificationPage() {
                 <div style={{ marginTop: 12, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
                   {tier.label === 'Novizio'  && 'Benvenuto nel programma!'}
                   {tier.label === 'Bronzo'   && 'Livello iniziale — buon lavoro!'}
-                  {tier.label === 'Argento'  && 'Ottima crescita! Continua così.'}
+                  {tier.label === 'Argento'  && 'Ottima crescita! Continua cos�.'}
                   {tier.label === 'Oro'      && 'Top performer — eccezionale!'}
                   {tier.label === 'Diamante' && '💎 Leggenda del negozio!'}
                 </div>
@@ -424,10 +424,10 @@ export default function GamificationPage() {
           <h2 style={{ fontWeight: 800, marginBottom: 20 }}>Come si guadagnano i punti</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[
-              { icon: '💰', label: 'Fatturato vendita',                          color: '#16a34a', value: `${rules.pts_per_euro} pt per ogni €1 incassato`,                                              desc: 'La regola base — più vendi, più punti ottieni' },
+              { icon: '??', label: 'Fatturato vendita',                          color: '#16a34a', value: `${rules.pts_per_euro} pt per ogni €1 incassato`,                                              desc: 'La regola base — pi??vendi, pi??punti ottieni' },
               { icon: '👤', label: 'Nuova fidelity card creata',                  color: '#0891b2', value: `+${rules.pts_per_fidelity} pt per ogni nuovo cliente`,                                        desc: 'Ogni nuovo profilo cliente registrato conta!' },
               { icon: '🛋️', label: `Scontrino ≥ €${rules.pts_receipt_threshold ?? rules.pts_discount_threshold ?? 25}`, color: '#d97706', value: `+${rules.pts_per_discount} pt per vendita`,  desc: `Quando il totale scontrino supera €${rules.pts_receipt_threshold ?? rules.pts_discount_threshold ?? 25}` },
-              { icon: '📦', label: `Vendita ≥ ${rules.min_items_qty} pezzi`,    color: '#7c3aed', value: `+${rules.pts_per_big_sale} pt per vendita voluminosa`,                                        desc: `Se la vendita include almeno ${rules.min_items_qty} prodotti` },
+              { icon: '??', label: `Vendita ≥ ${rules.min_items_qty} pezzi`,    color: '#7c3aed', value: `+${rules.pts_per_big_sale} pt per vendita voluminosa`,                                        desc: `Se la vendita include almeno ${rules.min_items_qty} prodotti` },
               { icon: '🛡',  label: 'Vendita con QScare inclusa',                color: '#0d9488', value: `+${rules.pts_per_qscare} pt per ogni QScare venduta`,                                        desc: 'Ogni volta che viene aggiunta la garanzia QScare' },
               { icon: '⭐',  label: 'Prodotto Preferito venduto',                  color: '#f59e0b', value: `+${rules.pts_per_featured} pt per ogni prodotto preferito`,                                    desc: 'Per ogni prodotto marcato come "Preferito" nel catalogo' },
               { icon: '⏰',  label: 'Penaltà Ritardo',                              color: '#ef4444', value: `-${rules.pts_late_penalty ?? 50} pt per ogni ritardo`,                                       desc: 'Punti sottratti automaticamente ad ogni ritardo rilevato dalla timbratura' },
@@ -465,7 +465,7 @@ export default function GamificationPage() {
               {/* Regola 1 — Fatturato */}
               <div style={{ padding: '4px 0 8px', borderBottom: '2px solid #f1f5f9' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>REGOLA 1 · Fatturato</div>
-                <RuleInput fieldKey="pts_per_euro" icon="💰" label="Punti per ogni €1 di fatturato" desc="Valore consigliato: 1 (un punto per euro)" suffix="pt / €1" step={1} {...ruleInputProps('pts_per_euro')} />
+                <RuleInput fieldKey="pts_per_euro" icon="??" label="Punti per ogni €1 di fatturato" desc="Valore consigliato: 1 (un punto per euro)" suffix="pt / €1" step={1} {...ruleInputProps('pts_per_euro')} />
               </div>
 
               {/* Regola 2 — Fidelity card */}
@@ -487,7 +487,7 @@ export default function GamificationPage() {
               <div style={{ padding: '4px 0 8px', borderBottom: '2px solid #f1f5f9' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>REGOLA 4 · Vendita Voluminosa</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <RuleInput icon="📦" label="Numero minimo pezzi in vendita" desc="La vendita deve contenere almeno N prodotti" suffix="pz min." step={1} color="#7c3aed" {...ruleInputProps('min_items_qty')} />
+                  <RuleInput icon="??" label="Numero minimo pezzi in vendita" desc="La vendita deve contenere almeno N prodotti" suffix="pz min." step={1} color="#7c3aed" {...ruleInputProps('min_items_qty')} />
                   <RuleInput icon="⭐" label="Punti assegnati se raggiunto" desc="Bonus piatto per vendita con molti pezzi" suffix="pt bonus" step={5} color="#7c3aed" {...ruleInputProps('pts_per_big_sale')} />
                 </div>
               </div>
@@ -509,7 +509,7 @@ export default function GamificationPage() {
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>REGOLA 7 · Penaltà Ritardo</div>
                 <RuleInput icon="⏰" label="Punti sottratti per ogni ritardo" desc="Valore positivo: verrà sottratto automaticamente dalla timbratura" suffix="pt - penaltà" step={5} color="#ef4444" {...ruleInputProps('pts_late_penalty')} />
                 <div style={{ marginTop: 8, padding: '10px 14px', background: '#fef2f2', borderRadius: 10, fontSize: 12, color: '#991b1b', border: '1px solid #fecaca' }}>
-                  ⚠️ La penaltà si applica automaticamente quando un dipendente risulta in ritardo nella timbratura.
+                  ??️ La penaltà si applica automaticamente quando un dipendente risulta in ritardo nella timbratura.
                 </div>
               </div>
 
@@ -530,10 +530,10 @@ export default function GamificationPage() {
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>📊 Esempio calcolo punti</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
                 {[
-                  { label: 'Vendita €100', pts: Math.floor(100 * editRules.pts_per_euro), icon: '💰', color: '#86efac' },
+                  { label: 'Vendita €100', pts: Math.floor(100 * editRules.pts_per_euro), icon: '??', color: '#86efac' },
                   { label: '+ Fidelity',   pts: editRules.pts_per_fidelity,               icon: '👤', color: '#7dd3fc' },
                   { label: '+ Sconto >€25',pts: editRules.pts_per_discount,               icon: '🏷️', color: '#fcd34d' },
-                  { label: `+ ≥${editRules.min_items_qty}pz`, pts: editRules.pts_per_big_sale, icon: '📦', color: '#c4b5fd' },
+                  { label: `+ ≥${editRules.min_items_qty}pz`, pts: editRules.pts_per_big_sale, icon: '??', color: '#c4b5fd' },
                   { label: '+ QScare',     pts: editRules.pts_per_qscare,                 icon: '🛡', color: '#5eead4' },
                   { label: '+ 1 Preferito',pts: editRules.pts_per_featured,               icon: '⭐', color: '#fde68a' },
                 ].map((item, i) => (

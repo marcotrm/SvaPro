@@ -71,7 +71,7 @@ export default function InventoryBollaDetailPage(){
   };
 
   const handleClose=async()=>{
-    if(!window.confirm('Confermi la chiusura? Non potrai più modificare questa bolla.'))return;
+    if(!window.confirm('Confermi la chiusura? Non potrai pi??modificare questa bolla.'))return;
     setClosing(true);
     try{const r=await inventorySessions.storeClose(id);alert(`Bolla chiusa. Allineati: ${r.data.summary.matched}, Differenze: ${r.data.summary.mismatched}`);load();}
     catch(e){alert(e.response?.data?.message??'Errore');}
@@ -115,8 +115,8 @@ export default function InventoryBollaDetailPage(){
           <div style={{fontSize:20,fontWeight:900,color:'var(--color-text)'}}>{session.title}</div>
         </div>
         <span style={{background:STATUS_COLOR[session.status]+'22',color:STATUS_COLOR[session.status],border:`1px solid ${STATUS_COLOR[session.status]}44`,borderRadius:20,padding:'4px 14px',fontSize:12,fontWeight:700}}>{STATUS_LABEL[session.status]??session.status}</span>
-        {isAdmin&&session.status==='CLOSED_BY_STORE'&&<button onClick={handleApprove} style={{padding:'10px 18px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#10B981,#059669)',color:'#fff',fontSize:13,fontWeight:800,cursor:'pointer'}}>✅ Approva</button>}
-        {isAdmin&&session.status==='UNDER_REVIEW'&&<button onClick={handleApprove} style={{padding:'10px 18px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#10B981,#059669)',color:'#fff',fontSize:13,fontWeight:800,cursor:'pointer'}}>✅ Approva</button>}
+        {isAdmin&&session.status==='CLOSED_BY_STORE'&&<button onClick={handleApprove} style={{padding:'10px 18px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#10B981,#059669)',color:'#fff',fontSize:13,fontWeight:800,cursor:'pointer'}}>? Approva</button>}
+        {isAdmin&&session.status==='UNDER_REVIEW'&&<button onClick={handleApprove} style={{padding:'10px 18px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#10B981,#059669)',color:'#fff',fontSize:13,fontWeight:800,cursor:'pointer'}}>? Approva</button>}
         {canClose&&<button onClick={handleClose} disabled={closing} style={{padding:'10px 18px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#8B5CF6,#7C3AED)',color:'#fff',fontSize:13,fontWeight:800,cursor:'pointer',opacity:closing?0.6:1}}>{closing?'Chiusura...':'🔒 Chiudi Inventario'}</button>}
       </div>
 
@@ -152,7 +152,7 @@ export default function InventoryBollaDetailPage(){
           <input ref={scanRef} defaultValue="" onChange={e=>{scanInput.current=e.target.value;}} onKeyDown={e=>{if(e.key==='Enter'){handleScan(scanInput.current);}}} placeholder="Punta lo scanner o digita il barcode..." style={{width:'100%',padding:'12px 16px',borderRadius:12,border:'2px solid var(--color-accent)',background:'var(--color-bg)',color:'var(--color-text)',fontSize:16,outline:'none',boxSizing:'border-box'}} autoFocus />
           {scanFeedback&&(
             <div style={{marginTop:10,padding:'12px 16px',borderRadius:10,background:scanFeedback.ok?'rgba(16,185,129,0.12)':'rgba(239,68,68,0.12)',border:`1px solid ${scanFeedback.ok?'#10B981':'#EF4444'}`,color:scanFeedback.ok?'#10B981':'#EF4444',fontSize:14,fontWeight:700}}>
-              {scanFeedback.ok?'✅':'❌'} {scanFeedback.msg} {scanFeedback.product&&`— ${scanFeedback.product.name} (${scanFeedback.product.counted_quantity} pz)`}
+              {scanFeedback.ok?'?':'❌'} {scanFeedback.msg} {scanFeedback.product&&`— ${scanFeedback.product.name} (${scanFeedback.product.counted_quantity} pz)`}
             </div>
           )}
         </div>
@@ -174,7 +174,7 @@ export default function InventoryBollaDetailPage(){
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:14,fontWeight:800,color:'var(--color-text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.product_name}{item.flavor?` — ${item.flavor}`:''}</div>
               <div style={{fontSize:11,color:'var(--color-text-tertiary)',marginTop:3,display:'flex',gap:12,flexWrap:'wrap'}}>
-                {item.barcode&&<span>📦 {item.barcode}</span>}
+                {item.barcode&&<span>?? {item.barcode}</span>}
                 {item.brand&&<span>{item.brand}</span>}
                 {item.category&&<span>{item.category}</span>}
               </div>

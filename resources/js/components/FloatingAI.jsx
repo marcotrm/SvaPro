@@ -65,7 +65,7 @@ export default function FloatingAI() {
       setMessages([...newMessages, { role: 'assistant', content: reply }]);
     } catch (err) {
       console.error(err);
-      let errMsg = 'Scusa, c\'è stato un errore di connessione con i server AI.';
+      let errMsg = 'Scusa, c\'??stato un errore di connessione con i server AI.';
       if (err.response && err.response.data && err.response.data.message) {
         errMsg = 'Errore dal server: ' + err.response.data.message;
       } else if (err.message) {

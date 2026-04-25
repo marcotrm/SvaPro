@@ -124,7 +124,7 @@ export default function OrderDetailModal({ orderId, orders, onClose, onNavigate 
                 <button
                   onClick={() => hasNext && onNavigate(ordersList[currentIdx + 1].id || ordersList[currentIdx + 1].order_id)}
                   disabled={!hasNext}
-                  title="Vendita successiva (→)"
+                  title="Vendita successiva (?)"
                   style={{
                     background: hasNext ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)',
                     border: 'none', borderRadius: 8, width: 32, height: 32,
@@ -140,7 +140,7 @@ export default function OrderDetailModal({ orderId, orders, onClose, onNavigate 
           </div>
           {/* Hint tastiera */}
           <div style={{ fontSize: 10, opacity: 0.6, textAlign: 'center', letterSpacing: '0.04em' }}>
-            {onNavigate && ordersList.length > 0 ? 'Usa ← → per navigare tra le vendite · ' : ''}ESC per chiudere
+            {onNavigate && ordersList.length > 0 ? 'Usa ← ? per navigare tra le vendite · ' : ''}ESC per chiudere
           </div>
         </div>
 

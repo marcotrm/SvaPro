@@ -7,14 +7,14 @@ import { Package, X, CheckCircle, AlertTriangle, Truck, RefreshCw, Edit3, Search
 
 /* ─── Costanti ─────────────────────────────────────────── */
 const STATUS = {
-  pending:     { label: '📦 In Consegna',       color: '#7c3aed', bg: '#ede9fe' },
+  pending:     { label: '?? In Consegna',       color: '#7c3aed', bg: '#ede9fe' },
   shipped:     { label: '🚛 In Transit',         color: '#3b82f6', bg: '#dbeafe' },
   in_transit:  { label: '🚛 In Transito',        color: '#3b82f6', bg: '#dbeafe' },
   in_progress: { label: '🔄 In Controllo',       color: '#d97706', bg: '#fef3c7' },
-  received:    { label: '✅ Ricevuta',            color: '#059669', bg: '#d1fae5' },
-  completed:   { label: '✅ Completata',          color: '#059669', bg: '#d1fae5' },
-  verified:    { label: '✅ Verificata',          color: '#059669', bg: '#d1fae5' },
-  discrepancy: { label: '⚠️ Discrepanze',         color: '#dc2626', bg: '#fee2e2' },
+  received:    { label: '? Ricevuta',            color: '#059669', bg: '#d1fae5' },
+  completed:   { label: '? Completata',          color: '#059669', bg: '#d1fae5' },
+  verified:    { label: '? Verificata',          color: '#059669', bg: '#d1fae5' },
+  discrepancy: { label: '??️ Discrepanze',         color: '#dc2626', bg: '#fee2e2' },
   cancelled:   { label: '❌ Annullata',           color: '#6b7280', bg: '#f3f4f6' },
 };
 
@@ -305,7 +305,7 @@ function NoteDetail({ noteId, onClose, onRefresh, onScanMode }) {
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <span style={{ background: st.bg, color: st.color, borderRadius: 10, padding: '4px 12px', fontSize: 12, fontWeight: 700 }}>{st.label}</span>
         {note.has_discrepancy && (
-          <span style={{ background: '#fee2e2', color: '#dc2626', borderRadius: 10, padding: '4px 12px', fontSize: 12, fontWeight: 700 }}>⚠️ {note.open_discrepancies} discrepanze</span>
+          <span style={{ background: '#fee2e2', color: '#dc2626', borderRadius: 10, padding: '4px 12px', fontSize: 12, fontWeight: 700 }}>??️ {note.open_discrepancies} discrepanze</span>
         )}
       </div>
 
@@ -314,7 +314,7 @@ function NoteDetail({ noteId, onClose, onRefresh, onScanMode }) {
           ['🏪 Negozio', note.store_name],
           ['👤 Creato da', note.created_by_name],
           ['🕐 Creato il', fmtDT(note.created_at)],
-          note.tracking_number && ['📦 Tracking BRT', note.tracking_number],
+          note.tracking_number && ['?? Tracking BRT', note.tracking_number],
           note.carrier_status  && ['🚛 Stato BRT', ['received','completed','verified'].includes(note.status) ? 'Consegnato ✓' : note.carrier_status],
           note.verification_duration_minutes != null && ['⏱ Tempo verifica', `${note.verification_duration_minutes} min`],
         ].filter(Boolean).map(([l, v]) => (
@@ -386,7 +386,7 @@ function ScanKiosk({ noteId, onClose }) {
         const updated = res.data.data;
         setItems(prev => prev.map(i => i.id === updated.id ? { ...i, scanned_qty: updated.scanned_qty, scan_status: updated.scan_status } : i));
         setLast({ name: updated.product_name, scanned: updated.scanned_qty, expected: updated.expected_qty, status: getScanColor(updated) });
-        toast.success(`${updated.product_name} (+1)`, { duration: 1200, icon: '✅' });
+        toast.success(`${updated.product_name} (+1)`, { duration: 1200, icon: '?' });
       }
     } catch (e) {
       const msg = e.response?.data?.message || 'Barcode non trovato in questa bolla';
@@ -537,7 +537,7 @@ function ScanKiosk({ noteId, onClose }) {
           color: 'white', fontSize: 17, fontWeight: 800, letterSpacing: '0.02em',
           boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
         }}>
-        {completing ? 'Registrazione in corso...' : (redCount === 0 && orangeCount === 0 ? '✅ Concludi Riscontro — Tutto OK' : `⚠️ Concludi Riscontro (${redCount + orangeCount} articoli incompleti)`)}
+        {completing ? 'Registrazione in corso...' : (redCount === 0 && orangeCount === 0 ? '? Concludi Riscontro — Tutto OK' : `??️ Concludi Riscontro (${redCount + orangeCount} articoli incompleti)`)}
       </button>
     </div>
   );

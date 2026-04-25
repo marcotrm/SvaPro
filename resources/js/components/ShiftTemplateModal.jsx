@@ -150,7 +150,7 @@ export default function ShiftTemplateModal({ onClose, storeId, stores = [] }) {
       <ConfirmModal
         isOpen={confirmToDelete !== null}
         title="Elimina template turno"
-        message="Vuoi eliminare questo modello orario? Non sarà più disponibile per l'assegnazione dei turni."
+        message="Vuoi eliminare questo modello orario? Non sarà pi??disponibile per l'assegnazione dei turni."
         onConfirm={doDelete}
         onCancel={() => setConfirmToDelete(null)}
       />

@@ -595,7 +595,7 @@ function CashAlertMonitor() {
               }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: C.textSub, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
                   <span>{store.name}</span>
-                  {isAlert && <span style={{ fontSize: 10, fontWeight: 800, color: '#ef4444', background: 'rgba(239,68,68,0.15)', padding: '1px 6px', borderRadius: 10 }}>⚠ ALLERTA</span>}
+                  {isAlert && <span style={{ fontSize: 10, fontWeight: 800, color: '#ef4444', background: 'rgba(239,68,68,0.15)', padding: '1px 6px', borderRadius: 10 }}>?? ALLERTA</span>}
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 900, color: isAlert ? '#ef4444' : C.text }}>{fmt(store.balance)}</div>
               </div>
@@ -997,7 +997,7 @@ const DEFAULT_CATEGORIES = [
   { id: 'dipendenti',     label: 'Stipendi Dipendenti',      icon: '👥' },
   { id: 'contributi',     label: 'Contributi / INPS',        icon: '🏛️' },
   { id: 'pubblicita',     label: 'Pubblicità & Marketing',   icon: '📣' },
-  { id: 'forniture',      label: 'Forniture & Materiali',    icon: '📦' },
+  { id: 'forniture',      label: 'Forniture & Materiali',    icon: '??' },
   { id: 'commercialista', label: 'Commercialista / Consulenze', icon: '📋' },
   { id: 'assicurazione',  label: 'Assicurazione',            icon: '🛡️' },
   { id: 'tasse',          label: 'Tasse & Imposte',          icon: '🏦' },
@@ -1107,7 +1107,7 @@ const SectionContoEconomico = ({ selectedStoreId }) => {
       {/* KPI Riepilogo */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 20px' }}>
-          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>💰 Ricavi (Vendite)</div>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>?? Ricavi (Vendite)</div>
           <div style={{ fontSize: 24, fontWeight: 900, color: C.success }}>
             {loadingRevenue ? <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} /> : fmt(revenue)}
           </div>
@@ -1187,7 +1187,7 @@ const SectionContoEconomico = ({ selectedStoreId }) => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: utile >= 0 ? '#166534' : '#991B1B', marginBottom: 4 }}>
-                {utile >= 0 ? '✅ Risultato Positivo' : '⚠️ Risultato Negativo'} — {month.split('-').reverse().join('/')}
+                {utile >= 0 ? '? Risultato Positivo' : '??️ Risultato Negativo'} — {month.split('-').reverse().join('/')}
               </div>
               <div style={{ fontSize: 11, color: utile >= 0 ? '#166534' : '#991B1B', opacity: 0.7 }}>
                 Ricavi {fmt(revenue)} — Costi {fmt(totalExpenses)}

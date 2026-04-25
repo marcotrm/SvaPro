@@ -332,7 +332,7 @@ export default function EmployeeModal({ employee, storesList = [], selectedStore
                       className={`${inputClass} ${fe('max_spending_limit') ? 'border-red-400' : ''}`}
                     />
                     {fe('max_spending_limit') && <p className="mt-1 text-xs text-red-500">{fe('max_spending_limit')}</p>}
-                    <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Importo massimo che il dipendente può spendere in acquisti a costo tramite il POS.</p>
+                    <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Importo massimo che il dipendente pu??spendere in acquisti a costo tramite il POS.</p>
                   </div>
                 </>
               )}

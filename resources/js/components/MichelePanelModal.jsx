@@ -24,7 +24,7 @@ const TABLES = [
         ],
       },
       {
-        title: 'Shot 50/50 (20→60ml)',
+        title: 'Shot 50/50 (20?60ml)',
         cols: ['Nicotina (mg/ml)', 'Booster Necessari', 'VG Extra (ml)', 'PG Extra (ml)', 'Volume Finale (ml)'],
         rows: [
           ['0 mg/ml',     'NO',                                                        '30 ml', '10 ml', '60 ml'],
@@ -44,7 +44,7 @@ const TABLES = [
         ],
       },
       {
-        title: 'Shot 70/30 (20→60ml)',
+        title: 'Shot 70/30 (20?60ml)',
         cols: ['Nicotina (mg/ml)', 'Booster Necessari', 'VG Extra (ml)', 'PG Extra (ml)', 'Volume Finale (ml)'],
         rows: [
           ['0 mg/ml',    'NO',                                                         '40 ml', '0 ml',  '60 ml'],

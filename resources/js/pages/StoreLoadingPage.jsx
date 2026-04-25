@@ -10,7 +10,7 @@ import { toast } from 'react-hot-toast';
  * 1. Seleziona bolla pendente dal negozio
  * 2. Scansiona i prodotti uno per uno (barcode)
  * 3. Inserisci quantità ricevuta
- * 4. Conferma → sistema salva e confronta con qtà attesa
+ * 4. Conferma ? sistema salva e confronta con qtà attesa
  * 5. Discrepanze vengono segnalate all'admin (pallino rosso)
  */
 export default function StoreLoadingPage() {
@@ -88,7 +88,7 @@ export default function StoreLoadingPage() {
       next[idx] = { ...next[idx], received_qty: (next[idx].received_qty || 0) + 1 };
       setItems(next);
       setBarcodeInput('');
-      toast.success(`+1 → ${items[idx].product_name}`, { duration: 1200 });
+      toast.success(`+1 ? ${items[idx].product_name}`, { duration: 1200 });
     } else {
       toast.error(`"${val}" non trovato nella bolla`, { duration: 2500 });
       setBarcodeInput('');
@@ -107,9 +107,9 @@ export default function StoreLoadingPage() {
       setResult(data);
       setPhase('summary');
       if (data.discrepancies > 0) {
-        toast.error(`⚠️ ${data.discrepancies} discrepanze rilevate! L'admin è stato notificato.`);
+        toast.error(`??️ ${data.discrepancies} discrepanze rilevate! L'admin ??stato notificato.`);
       } else {
-        toast.success('✅ Carico registrato correttamente!');
+        toast.success('? Carico registrato correttamente!');
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Errore registrazione');
@@ -124,7 +124,7 @@ export default function StoreLoadingPage() {
       <div style={{ maxWidth: 700, margin: '0 auto' }}>
         <div className="page-head">
           <div>
-            <div className="page-head-title">📦 Carico Negozio</div>
+            <div className="page-head-title">?? Carico Negozio</div>
             <div className="page-head-sub">Seleziona la bolla da ricevere e scansiona i prodotti</div>
           </div>
           <button className="btn btn-ghost" onClick={fetchNotes} style={{ fontSize: 13 }}>↺ Aggiorna</button>
@@ -150,7 +150,7 @@ export default function StoreLoadingPage() {
                 onMouseLeave={e => e.currentTarget.style.boxShadow = ''}
               >
                 <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
-                  📦
+                  ??
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--color-text)', marginBottom: 3 }}>
@@ -168,9 +168,9 @@ export default function StoreLoadingPage() {
                     color: note.status === 'in_progress' ? '#92400e' : note.status === 'pending' ? '#1d4ed8' : note.status === 'received' ? '#065f46' : '#991b1b',
                   }}>
                     {note.status === 'in_progress' ? '🔄 In controllo' : 
-                     note.status === 'pending'     ? '📦 In consegna' :
-                     note.status === 'received'    ? '✅ Controllata' :
-                     note.status === 'discrepancy' ? '⚠️ Arrivata (Discrepanze)' : note.status}
+                     note.status === 'pending'     ? '?? In consegna' :
+                     note.status === 'received'    ? '? Controllata' :
+                     note.status === 'discrepancy' ? '??️ Arrivata (Discrepanze)' : note.status}
                   </span>
                 </div>
                 <div style={{ fontSize: 20, color: 'var(--muted)' }}>›</div>
@@ -323,14 +323,14 @@ export default function StoreLoadingPage() {
       <div style={{ maxWidth: 600, margin: '0 auto' }}>
         <div className="table-card" style={{ padding: 40, textAlign: 'center' }}>
           <div style={{ fontSize: 72, marginBottom: 20 }}>
-            {hasDiscrepancy ? '⚠️' : '✅'}
+            {hasDiscrepancy ? '??️' : '?'}
           </div>
           <div style={{ fontWeight: 900, fontSize: 24, marginBottom: 12, color: hasDiscrepancy ? '#b45309' : '#065f46' }}>
             {hasDiscrepancy ? 'Carico con discrepanze' : 'Carico completato!'}
           </div>
           <div style={{ color: 'var(--muted)', fontSize: 15, marginBottom: 28 }}>
             {hasDiscrepancy
-              ? `${result.discrepancies} prodotto/i con quantità diversa da quella attesa. L'area manager è stato notificato.`
+              ? `${result.discrepancies} prodotto/i con quantità diversa da quella attesa. L'area manager ??stato notificato.`
               : 'Tutte le quantità corrispondono. Stock aggiornato correttamente.'
             }
           </div>

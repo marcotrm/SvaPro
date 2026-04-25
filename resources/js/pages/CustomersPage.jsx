@@ -92,7 +92,7 @@ function MarketingModal({ selectedIds, allCustomers, onClose }) {
         <div style={{ padding: 24 }}>
           {result ? (
             <div style={{ textAlign: 'center', padding: '32px 16px' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>{result.ok ? '✅' : '❌'}</div>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>{result.ok ? '?' : '❌'}</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: result.ok ? '#16a34a' : '#dc2626', marginBottom: 8 }}>{result.message}</div>
               <button onClick={onClose} className="sp-btn sp-btn-primary" style={{ marginTop: 16 }}>Chiudi</button>
             </div>

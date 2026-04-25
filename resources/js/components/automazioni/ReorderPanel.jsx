@@ -16,7 +16,7 @@ function ReorderFornitori() {
     setLoading(true); setError(null);
     try {
       const res = await inventory.getSmartReorderPreview();
-      // Il backend può tornare HTTP 200 con _error se la query SQL fallisce
+      // Il backend pu??tornare HTTP 200 con _error se la query SQL fallisce
       if (res.data?._error) {
         setError('Errore server: ' + res.data._error);
         setPreview(null);
@@ -94,7 +94,7 @@ function ReorderFornitori() {
         </div>
       ) : preview === null ? (
         <div style={{ padding: 20, textAlign: 'center', background: 'var(--color-bg)', borderRadius: 12, color: 'var(--color-text-secondary)', fontSize: 13 }}>
-          <div style={{ marginBottom: 10, opacity: 0.5, fontSize: 28 }}>📦</div>
+          <div style={{ marginBottom: 10, opacity: 0.5, fontSize: 28 }}>??</div>
           <div style={{ fontWeight: 700, marginBottom: 6 }}>Preview non caricata</div>
           <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 14 }}>
             Il calcolo potrebbe richiedere 10–20 secondi. Clicca per avviarlo.
@@ -185,7 +185,7 @@ function ReorderMagazzini() {
         </div>
       ) : transfers.length === 0 ? (
         <div style={{ padding: 16, textAlign: 'center', background: 'var(--color-bg)', borderRadius: 12, color: 'var(--color-text-tertiary)', fontSize: 13 }}>
-          Nessun trasferimento recente. Gestisci i trasferimenti dalla sezione <strong>Logistica → DDT</strong>.
+          Nessun trasferimento recente. Gestisci i trasferimenti dalla sezione <strong>Logistica ? DDT</strong>.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -214,7 +214,7 @@ function ReorderMagazzini() {
       )}
 
       <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(16,185,129,0.05)', borderRadius: 10, border: '1px solid rgba(16,185,129,0.2)', fontSize: 12, color: 'var(--color-text-secondary)' }}>
-        💡 Per creare un nuovo trasferimento vai su <strong>Logistica → DDT / Trasferimenti</strong>
+        💡 Per creare un nuovo trasferimento vai su <strong>Logistica ? DDT / Trasferimenti</strong>
       </div>
     </div>
   );

@@ -50,7 +50,7 @@ export default function CatalogPage() {
       // Invalida la cache ogni volta per avere sempre dati aggiornati
       clearApiCache();
       // Catalogo admin: mostra SEMPRE tutti i prodotti del tenant (no filtro store_id)
-      // L'assegnazione per negozio Ã¨ giÃ  inclusa in variant.assigned_stores nella risposta
+      // L'assegnazione per negozio � giÃ  inclusa in variant.assigned_stores nella risposta
       const [pRes, sRes, cRes, bRes] = await Promise.all([
         catalog.getProducts({ limit: 10000 }),
         suppliers.getAll().catch(() => ({ data: { data: [] } })),
@@ -233,22 +233,7 @@ export default function CatalogPage() {
           >
             <Upload size={16} /> Importa CSV
           </button>
-          <button
-            className="sp-btn sp-btn-secondary"
-            onClick={() => setShowCsvBulkUpdate(true)}
-            title="Aggiorna campi prodotti esistenti da CSV (Prezzi, Accise, Nomi...)"
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <FileEdit size={16} /> Aggiorna da CSV
-          </button>
-          <button
-            className="sp-btn sp-btn-secondary"
-            onClick={() => setShowCsvBarcodeUpdate(true)}
-            title="Aggiornamento rapido Barcode massivo (solo ID/SKU e BarCode)"
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(99,102,241,0.1)', color: '#6366f1', borderColor: 'rgba(99,102,241,0.2)' }}
-          >
-            <ScanBarcode size={16} /> Barcode Rapido
-          </button>
+
           <button
             className="sp-btn sp-btn-secondary"
             onClick={() => setShowBulkExcise(true)}
@@ -617,7 +602,7 @@ function CsvImportModal({ onClose, onImported }) {
         header: true, skipEmptyLines: true,
         complete: async (res) => {
           if (!res.data?.length) { 
-             setStatus('error'); setResult({ error: 'Il CSV Ã¨ vuoto o non valido' }); toast.error('Il CSV Ã¨ vuoto'); return; 
+             setStatus('error'); setResult({ error: 'Il CSV � vuoto o non valido' }); toast.error('Il CSV � vuoto'); return; 
           }
           const headers = res.meta.fields || [];
           const hasBarcodeCols = headers.some(h => h.toLowerCase().trim() === 'barcode') && 
@@ -807,7 +792,7 @@ function PrestashopImportModal({ onClose, onImported }) {
   const cleanUrl = (u) => u.trim().replace(/\/$/, '');
 
   const wipeCatalog = async () => {
-    if (!window.confirm("Sei SICURO di voler CANCELLARE TUTTO IL CATALOGO e azzerare tutte le giacenze? L'operazione Ã¨ irreversibile!")) return;
+    if (!window.confirm("Sei SICURO di voler CANCELLARE TUTTO IL CATALOGO e azzerare tutte le giacenze? L'operazione � irreversibile!")) return;
     setStatus('testing');
     addLog('Svuotamento catalogo in corso...', 'warn');
     try {
@@ -1122,7 +1107,7 @@ function CsvBulkUpdateModal({ onClose, onDone }) {
       window.Papa.parse(file, {
         header: true, skipEmptyLines: true,
         complete: (res) => {
-          if (!res.data?.length) { toast.error('Il CSV Ã¨ vuoto o non valido'); return; }
+          if (!res.data?.length) { toast.error('Il CSV � vuoto o non valido'); return; }
           const h = res.meta.fields || [];
           setHeaders(h); setRows(res.data);
           const autoMap = {};
@@ -1282,7 +1267,7 @@ function CsvBarcodeUpdateModal({ onClose, onDone }) {
       window.Papa.parse(file, {
         header: true, skipEmptyLines: true,
         complete: async (res) => {
-          if (!res.data?.length) { toast.error('Il CSV è vuoto'); setLoading(false); return; }
+          if (!res.data?.length) { toast.error('Il CSV ??vuoto'); setLoading(false); return; }
           
           const headers = res.meta.fields.map(f => f.trim());
           const idCol = headers.find(h => /^(id|sku|match_id)$/i.test(h));

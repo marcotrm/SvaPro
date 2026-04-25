@@ -153,7 +153,7 @@ export default function Layout({ user, setUser }) {
     try {
       const response = await stores.getStores();
       let slist = response.data?.data || [];
-      // Se è un dipendente puro (senza ruoli admin/manager) e ha un negozio assegnato, mostra solo quello
+      // Se ??un dipendente puro (senza ruoli admin/manager) e ha un negozio assegnato, mostra solo quello
       const isOnlyDipendente = user?.roles?.includes('dipendente') && !user?.roles?.some(r => ['project_manager','superadmin','store_manager','admin_cliente','admin'].includes(r));
       if (isOnlyDipendente && user?.employee_store_id) {
         slist = slist.filter(s => String(s.id) === String(user.employee_store_id));
@@ -308,7 +308,7 @@ export default function Layout({ user, setUser }) {
           setUnreadAlerts(prev => prev + newAlerts.length);
           newAlerts.forEach(a => prevAlertIdsRef.current.add(a.store_id ?? a.id));
         }
-        // Rimuovi dalla lista prev gli store che non sono piÃ¹ in allerta
+        // Rimuovi dalla lista prev gli store che non sono pi� in allerta
         const alertIds = new Set(visibleAlerts.map(a => a.store_id ?? a.id));
         [...prevAlertIdsRef.current].forEach(id => { if (!alertIds.has(id)) prevAlertIdsRef.current.delete(id); });
       } catch { /* silent */ }
@@ -770,7 +770,7 @@ export default function Layout({ user, setUser }) {
                       onClick={(e) => {
                         e.stopPropagation();
                         exports_.download(reports.downloadDaily(), 'Report_Serale.pdf');
-                        // Non chiudiamo il pannello cosÃ¬ l'utente vede il feedback
+                        // Non chiudiamo il pannello cos� l'utente vede il feedback
                       }}>
                         <div>
                           <div style={{ fontWeight: 800, fontSize: 13, color: '#a5b4fc' }}> Report di Chiusura Pronto</div>
@@ -783,7 +783,7 @@ export default function Layout({ user, setUser }) {
                     )}
                     {!dailyReportAvailable && cashAlertStores.length === 0 ? (
                       <div style={{ padding: '24px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>
-                        ✅ Nessuna allerta attiva
+                        ? Nessuna allerta attiva
                       </div>
                     ) : (
                       cashAlertStores.map((s, i) => (
@@ -800,7 +800,7 @@ export default function Layout({ user, setUser }) {
                             <div style={{ fontWeight: 900, fontSize: 14, color: '#ef4444' }}>
                               {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(s.balance)}
                             </div>
-                             <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: 8 }}>⚠ ALLERTA</span>
+                             <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.2)', color: '#ef4444', padding: '1px 6px', borderRadius: 8 }}>?? ALLERTA</span>
                           </div>
                         </div>
                       ))

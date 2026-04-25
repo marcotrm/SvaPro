@@ -17,7 +17,7 @@ import { AlertTriangle, Trash2, X } from 'lucide-react';
 export default function ConfirmModal({
   isOpen,
   title       = 'Conferma eliminazione',
-  message     = 'Questa azione è irreversibile. Sei sicuro di voler procedere?',
+  message     = 'Questa azione ??irreversibile. Sei sicuro di voler procedere?',
   confirmLabel = 'Elimina',
   onConfirm,
   onCancel,
@@ -83,7 +83,7 @@ export default function ConfirmModal({
             fontSize: 12, color: '#b91c1c', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8,
           }}>
             <AlertTriangle size={13} style={{ flexShrink: 0 }} />
-            Questa azione non può essere annullata.
+            Questa azione non pu??essere annullata.
           </div>
         )}
 

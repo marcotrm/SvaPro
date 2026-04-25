@@ -168,7 +168,7 @@ function AbsenceModal({ emp, existing, onSave, onRemove, onClose }) {
               onClick={onRemove}
               style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#EF4444', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
             >
-              🗑 Rimuovi
+              ??? Rimuovi
             </button>
           )}
           <button
@@ -196,7 +196,7 @@ function AbsenceModal({ emp, existing, onSave, onRemove, onClose }) {
 }
 
 // ── Gap detection ─────────────────────────────────────────────────────────────
-// Converte HH:MM in minuti (definita qui perché usata anche sotto nell'export)
+// Converte HH:MM in minuti (definita qui perch??usata anche sotto nell'export)
 function _toMins(t) {
   if (!t) return -1;
   const parts = String(t).split(':');
@@ -232,11 +232,11 @@ function detectGaps(shiftsMap, weekDays, currentStore = null) {
         }
       }
     } else {
-      // Default: domenica chiuso se non c'è config store
+      // Default: domenica chiuso se non c'??config store
       if (index === 6) isStoreClosed = true;
     }
 
-    if (isStoreClosed) return; // Niente buchi se il negozio è chiuso
+    if (isStoreClosed) return; // Niente buchi se il negozio ??chiuso
 
     const intervals = [];
     
@@ -252,7 +252,7 @@ function detectGaps(shiftsMap, weekDays, currentStore = null) {
     });
 
     // Se non ci sono turni in questo giorno, l'utente non vuole che appaia l'errore "buco"
-    // Questo permette di lasciare i giorni vuoti finché non si compila il turno.
+    // Questo permette di lasciare i giorni vuoti finch??non si compila il turno.
     if (intervals.length === 0) {
       return;
     }
@@ -266,7 +266,7 @@ function detectGaps(shiftsMap, weekDays, currentStore = null) {
       if (curr.startMins <= last.endMins) {
         last.endMins = Math.max(last.endMins, curr.endMins); // Fusi insieme
       } else {
-        merged.push(curr); // C'è un gap interno!
+        merged.push(curr); // C'??un gap interno!
       }
     }
 
@@ -318,7 +318,7 @@ const STATO_COLOR = {
   Indisponibile: '#5B21B6',
 };
 const STATO_EMOJI = {
-  Presente:      '✅',
+  Presente:      '?',
   Ferie:         '🌴',
   Malattia:      '🤒',
   Permesso:      '🕐',
@@ -651,7 +651,7 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
   // Carica dipendenti direttamente dall'API (autonomo, non dipende dallo stato pagina)
   const [allEmployees, setAllEmployees]     = useState([]);
   const [loadingEmps, setLoadingEmps]       = useState(false);
-  // Mappa manuale: excelName → employee_id (per i non matchati)
+  // Mappa manuale: excelName ? employee_id (per i non matchati)
   const [manualMap, setManualMap]           = useState({}); // { 'CLAUDIA': empId }
 
   useEffect(() => {
@@ -676,16 +676,16 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
       const nm    = normName(e.name ?? '');
       // Match esatto (full name o invertito)
       if (full === n || rev === n || nm === n) return true;
-      // Match solo nome o solo cognome (utile per "CLAUDIA" → "Claudia Rossi")
+      // Match solo nome o solo cognome (utile per "CLAUDIA" ? "Claudia Rossi")
       if (first && (n === first || first === n)) return true;
       if (last  && (n === last  || last  === n)) return true;
-      // Match parziale (il nome del file è contenuto nel nome completo)
+      // Match parziale (il nome del file ??contenuto nel nome completo)
       if (n.length >= 3 && (full.includes(n) || nm.includes(n))) return true;
       return false;
     });
   };
 
-  // Converte "20/04" + anno → "YYYY-MM-DD"
+  // Converte "20/04" + anno ? "YYYY-MM-DD"
   const shortDateToISO = (val, year) => {
     const s = String(val ?? '').trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
@@ -718,7 +718,7 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
     setFile(f); setParsing(true); setPreview(null); setManualMap({});
     try {
       const buf = await f.arrayBuffer();
-      // raw:true → legge i numeri Excel reali (date seriali, frazioni per orari)
+      // raw:true ? legge i numeri Excel reali (date seriali, frazioni per orari)
       const wb  = XLSX.read(buf, { type:'array', cellDates:false, raw:true });
       const ws  = wb.Sheets[wb.SheetNames[0]];
 
@@ -776,7 +776,7 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
         return { start_time: `${startH}:${startM}`, end_time: `${endH}:${endM}` };
       };
 
-      // Converti valore cella → data ISO
+      // Converti valore cella ? data ISO
       const toISO = (val, year) => {
         const s = cellStr(val);
         if (!s) return null;
@@ -902,7 +902,7 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
           if (tr) shifts.push({ date: dateISO, ...tr });
         }
 
-        // Aggiungi solo se ha turni E non è già nella lista (deduplicazione merged cells)
+        // Aggiungi solo se ha turni E non ??già nella lista (deduplicazione merged cells)
         if (shifts.length > 0 && !seenNames.has(rawName)) {
           seenNames.add(rawName);
           rawEntries.push({ name: rawName, shifts });
@@ -1042,14 +1042,14 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
                     <div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 14px', borderBottom:'1px solid rgba(255,255,255,0.04)', fontSize:12 }}>
                       <span style={{ fontWeight:700, color:'#cbd5e1', flex:1 }}>{r.emp.first_name ?? r.emp.name} {r.emp.last_name ?? ''}</span>
                       <span style={{ color:'#64748b', fontSize:11 }}>{r.date}</span>
-                      <span style={{ color:'#10B981', fontWeight:700 }}>{r.start_time} → {r.end_time}</span>
+                      <span style={{ color:'#10B981', fontWeight:700 }}>{r.start_time} ? {r.end_time}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Nomi non trovati → mappatura manuale */}
+            {/* Nomi non trovati ? mappatura manuale */}
             {preview.unmatched.length > 0 && (
               <div style={{ marginBottom:16 }}>
                 <div style={{ fontSize:12, fontWeight:800, color:'#F59E0B', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
@@ -1097,7 +1097,7 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
                   <div style={{color:'#fbbf24',marginBottom:6}}>
                     Nomi trovati: {(preview.debug.names||[]).join(', ') || 'nessuno'}
                   </div>
-                  {preview.debug.warning && <div style={{color:'#F59E0B'}}>⚠️ {preview.debug.warning}</div>}
+                  {preview.debug.warning && <div style={{color:'#F59E0B'}}>??️ {preview.debug.warning}</div>}
                   {(preview.debug.rawSample||[]).map((line,i) => <div key={i} style={{color:'#475569'}}>{line}</div>)}
                 </div>
               </details>
@@ -1118,7 +1118,7 @@ function ExcelImportModal({ storeId, weekDays, templates, onImport, onClose }) {
   );
 }
 // ─────────────────────────────────────────────────────────────────────────────
-// ALL-STORES OVERVIEW — vista quando "Tutti i negozi" è selezionato
+// ALL-STORES OVERVIEW — vista quando "Tutti i negozi" ??selezionato
 // ─────────────────────────────────────────────────────────────────────────────
 function AllStoresOverview({
   weekDays, weekStart, setWeekStart,
@@ -1283,7 +1283,7 @@ function AllStoresOverview({
                 const proposed    = pmProposedCounts[store.id] || 0;
                 const total       = pmShiftCounts[store.id];
                 const statusColor = isConfirmed ? '#10B981' : isLocked ? '#F59E0B' : proposed > 0 ? '#6366F1' : '#94A3B8';
-                const statusLabel = isConfirmed ? '✅ Confermati' : isLocked ? '🔒 In Attesa' : proposed > 0 ? '📋 Turni Proposti' : '⏳ Non Inviati';
+                const statusLabel = isConfirmed ? '? Confermati' : isLocked ? '🔒 In Attesa' : proposed > 0 ? '📋 Turni Proposti' : '⏳ Non Inviati';
                 const cardBorder  = isLocked ? 'rgba(245,158,11,0.35)' : proposed > 0 ? 'rgba(99,102,241,0.3)' : 'var(--color-border)';
                 return (
                   <div key={store.id}
@@ -1313,7 +1313,7 @@ function AllStoresOverview({
                         : total === 0
                           ? <div style={{ fontSize: 12, color: '#EF4444', fontWeight: 700 }}>❌ Nessun turno questa settimana</div>
                           : <div style={{ fontSize: 12, color: proposed > 0 ? '#D97706' : '#10B981', fontWeight: 700 }}>
-                              {proposed > 0 ? `🔔 ${proposed} da approvare · ${total} totali` : `✅ ${total} turni questa settimana`}
+                              {proposed > 0 ? `🔔 ${proposed} da approvare · ${total} totali` : `? ${total} turni questa settimana`}
                             </div>
                       }
                     </div>
@@ -1383,10 +1383,10 @@ export default function ShiftsPage() {
 
   // Dipendenti possono proporre i propri turni e bloccarli. PM/Superadmin possono modificare tutto.
   const canEditShifts = true; // Tutti possono editare (dipendenti propongono, admin confermano)
-  // canEditGrid sarà definito più avanti dopo lo stato weekLock
+  // canEditGrid sarà definito pi??avanti dopo lo stato weekLock
   const canSaveShifts = true; // Tutti possono salvare
 
-  // Dipendente: usa il suo store anche se selectedStoreId non è ancora impostato
+  // Dipendente: usa il suo store anche se selectedStoreId non ??ancora impostato
   const defaultStoreId = selectedStoreId || (isDipendente && user?.employee_store_id ? String(user.employee_store_id) : '');
   const [storeId, setStoreId] = useState(defaultStoreId);
 
@@ -1488,7 +1488,7 @@ export default function ShiftsPage() {
 
   useEffect(() => { loadLockStatus(); }, [loadLockStatus]);
 
-  // Helper: split key "empId_YYYY-MM-DD" → ['empId', 'YYYY-MM-DD']
+  // Helper: split key "empId_YYYY-MM-DD" ? ['empId', 'YYYY-MM-DD']
   const splitShiftKey = (key) => {
     const idx = key.indexOf('_');
     return [key.slice(0, idx), key.slice(idx + 1)];
@@ -1598,7 +1598,7 @@ export default function ShiftsPage() {
   const handlePmConfirm = async (sid) => {
     try {
       await shiftsApi.confirmWeek({ store_id: Number(sid), week_start: weekStartStr, user_id: user?.id });
-      toast.success('✅ Turni confermati!');
+      toast.success('? Turni confermati!');
       setPmPreviewStore(null);
       loadPmDashboard();
     } catch { toast.error('Errore nella conferma'); }
@@ -1713,7 +1713,7 @@ export default function ShiftsPage() {
         name: e.name || `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim() || 'N/A',
       }));
 
-      // Fallback solo se la lista è vuota e siamo come dipendente
+      // Fallback solo se la lista ??vuota e siamo come dipendente
       if (empList.length === 0 && isDipendente && currentEmployeeId && user) {
         empList = [{
           id:         Number(currentEmployeeId),
@@ -1725,9 +1725,9 @@ export default function ShiftsPage() {
           status:     'assente',
         }];
       }
-      // Per i turni il cui dipendente NON è nella lista dello store (es. turni proposti
-      // da dipendenti il cui record non è ancora sincronizzato, o filtro paginazione),
-      // aggiungiamo un record "ghost" nella lista così il turno rimane visibile al PM.
+      // Per i turni il cui dipendente NON ??nella lista dello store (es. turni proposti
+      // da dipendenti il cui record non ??ancora sincronizzato, o filtro paginazione),
+      // aggiungiamo un record "ghost" nella lista cos??il turno rimane visibile al PM.
       const rawShifts = shRes?.data?.data || [];
       const ghostEmps = [];
       const empIdSet = new Set(empList.map(e => String(e.id)));
@@ -1946,7 +1946,7 @@ export default function ShiftsPage() {
         }
       });
       await shiftsApi.bulkSave(payload);
-      toast.success(isDipendente ? 'Turni proposti con successo — in attesa di conferma ⏳' : 'Turni salvati con successo ✅');
+      toast.success(isDipendente ? 'Turni proposti con successo — in attesa di conferma ⏳' : 'Turni salvati con successo ?');
       setOriginalShifts(JSON.parse(JSON.stringify(shifts)));
     } catch { toast.error('Errore nel salvataggio'); }
     finally { setSaving(false); }
@@ -1977,7 +1977,7 @@ export default function ShiftsPage() {
             body: `${empName} ha proposto un turno per il ${dateStr} (${start_time} - ${end_time}). Vai in Pianificazione Turni per approvare.`,
             reference_type: 'shift',
           });
-        } catch { /* silent — la notifica è non bloccante */ }
+        } catch { /* silent — la notifica ??non bloccante */ }
       });
     } catch {}
     setShifts(prev => ({
@@ -1995,7 +1995,7 @@ export default function ShiftsPage() {
     if (!sh) return;
     try { if (sh.id) await shiftsApi.confirmShift(sh.id); } catch {}
     setShifts(prev => ({ ...prev, [key]: { ...prev[key], status: 'confirmed' } }));
-    toast.success('Turno confermato ✅');
+    toast.success('Turno confermato ?');
   };
 
   // Shift manager: conferma tutti i turni proposed della settimana
@@ -2008,7 +2008,7 @@ export default function ShiftsPage() {
       toConfirm.forEach(([key]) => { copy[key] = { ...copy[key], status: 'confirmed' }; });
       return copy;
     });
-    toast.success(`✅ ${toConfirm.length} turni confermati`);
+    toast.success(`? ${toConfirm.length} turni confermati`);
   };
 
   const onCellChange = (empId, dateStr, changes) => {
@@ -2098,7 +2098,7 @@ export default function ShiftsPage() {
                       onClick={() => applyTemplate(empId, dateStr, { start_time: custStart, end_time: custEnd, name: 'Personalizzato', color: '#0ea5e9' })}
                       style={{ padding: '11px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 14, fontWeight: 900, cursor: 'pointer' }}
                     >
-                      ✓ Applica {custStart} → {custEnd}
+                      ✓ Applica {custStart} ? {custEnd}
                     </button>
                   </div>
                 )}
@@ -2237,7 +2237,7 @@ export default function ShiftsPage() {
               const total       = pmShiftCounts[store.id] || 0;
               const statusColor = isConfirmed ? '#10B981' : isLocked ? '#F59E0B' : proposed > 0 ? '#6366F1' : '#94A3B8';
               const statusLabel = isConfirmed ? 'Confermati' : isLocked ? 'In Attesa di Conferma' : proposed > 0 ? 'Turni Proposti' : 'Non Inviati';
-              const statusIcon  = isConfirmed ? '✅' : isLocked ? '🔒' : proposed > 0 ? '📋' : '⏳';
+              const statusIcon  = isConfirmed ? '?' : isLocked ? '🔒' : proposed > 0 ? '📋' : '⏳';
               const cardBorder  = isLocked ? 'rgba(245,158,11,0.4)' : proposed > 0 ? 'rgba(99,102,241,0.3)' : 'var(--color-border)';
               const cardShadow  = isLocked ? '0 0 0 2px rgba(245,158,11,0.12)' : proposed > 0 ? '0 0 0 2px rgba(99,102,241,0.08)' : 'none';
 
@@ -2301,7 +2301,7 @@ export default function ShiftsPage() {
 
                   {isConfirmed && (
                     <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(16,185,129,0.08)', fontSize: 11, color: '#10B981', fontWeight: 600, marginTop: 10 }}>
-                      ✅ Confermati da {lock.confirmed_by_name || 'PM'} il {new Date(lock.confirmed_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      ? Confermati da {lock.confirmed_by_name || 'PM'} il {new Date(lock.confirmed_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </div>
                   )}
                 </div>
@@ -2450,12 +2450,12 @@ export default function ShiftsPage() {
               <button 
                 onClick={() => {
                   shiftsApi.confirmWeek({ store_id: Number(storeId), week_start: weekStartStr, user_id: user?.id })
-                    .then(() => { toast.success('✅ Turni confermati!'); loadData(); })
+                    .then(() => { toast.success('? Turni confermati!'); loadData(); })
                     .catch((err) => toast.error(err?.response?.data?.message || 'Errore durante la conferma.'));
                 }} 
                 style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #10B981, #059669)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}
               >
-                ✅ Conferma Settimana
+                ? Conferma Settimana
               </button>
             </div>
           )}
@@ -2465,7 +2465,7 @@ export default function ShiftsPage() {
       {(isDipendente || isSuperAdmin || isProjectManager) && isWeekConfirmed && (
         <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#10B981', fontWeight: 700 }}>
-            <span style={{ fontSize: 18 }}>✅</span> Turni confermati dal Project Manager. Settimana definitiva.
+            <span style={{ fontSize: 18 }}>?</span> Turni confermati dal Project Manager. Settimana definitiva.
           </div>
           {(isSuperAdmin || isProjectManager) && (
             <button onClick={handleUnlockWeek} disabled={lockLoading} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.12)', color: '#10B981', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
@@ -2494,7 +2494,7 @@ export default function ShiftsPage() {
       {isDipendente && !isWeekLocked && !isWeekConfirmed && (
         <div style={{ marginBottom: 16 }}>
           {!currentEmployeeId ? (
-            // Dipendente non identificato — deve scegliere chi è tra i dipendenti in griglia
+            // Dipendente non identificato — deve scegliere chi ??tra i dipendenti in griglia
             <div style={{ background: 'rgba(99,102,241,0.08)', border: '1.5px solid rgba(99,102,241,0.3)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, fontSize: 13, color: '#4338CA', fontWeight: 700 }}>
               <User size={18} />
               <div>
@@ -2616,7 +2616,7 @@ export default function ShiftsPage() {
             marginBottom: 12,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: days.length > 1 ? 8 : 0 }}>
-              <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>??️</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#b45309' }}>
                 {days.length === 1 ? 'Buco di copertura rilevato' : `${days.length} giorni con buchi di copertura`}
               </span>
@@ -2703,7 +2703,7 @@ export default function ShiftsPage() {
                         {empAbsence ? (
                           <div style={{ fontSize: 11, color: absenceColor(empAbsence.type), fontWeight: 700 }}>
                             {absenceLabel(empAbsence.type)}
-                            {' · '}{empAbsence.from?.slice(5).split('-').join('/')}→{empAbsence.to?.slice(5).split('-').join('/')}
+                            {' · '}{empAbsence.from?.slice(5).split('-').join('/')}?{empAbsence.to?.slice(5).split('-').join('/')}
                             {empAbsence.type === 'permesso' && empAbsence.time_from && (
                               <span> · ⏰ {empAbsence.time_from}–{empAbsence.time_to}</span>
                             )}
@@ -2750,7 +2750,7 @@ export default function ShiftsPage() {
                     // ── Cella NORMALE ───────────────────────────────────────
                     const isOwnCell   = currentEmployeeId ? String(emp.id) === String(currentEmployeeId) : false;
                     // Dipendenti: no click se settimana bloccata o confermata
-                    // Se non ha employee_id riconosciuto, può cliccare qualsiasi cella (sarà chiesto di identificarsi)
+                    // Se non ha employee_id riconosciuto, pu??cliccare qualsiasi cella (sarà chiesto di identificarsi)
                     const canClickDip = isDipendente && (!currentEmployeeId || isOwnCell);
                     const canClick    = isGridReadOnly ? false : (canEditShifts || canClickDip);
                     const isProposed  = hasShift && shift.status === 'proposed';
@@ -2790,13 +2790,13 @@ export default function ShiftsPage() {
                                   <button
                                     onClick={e => { e.stopPropagation(); confirmOne(emp.id, day.dateStr); }}
                                     style={{ fontSize: 9, fontWeight: 800, color: '#10B981', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 4, padding: '2px 6px', cursor: 'pointer' }}
-                                  >✅ Conferma</button>
+                                  >? Conferma</button>
                                 )}
                               </div>
                             )}
                             {isConfirmed && isDipendente && (
                               <div style={{ marginBottom: 4 }}>
-                                <span style={{ fontSize: 9, fontWeight: 800, color: '#10B981', background: 'rgba(16,185,129,0.15)', borderRadius: 4, padding: '2px 6px', letterSpacing: '0.04em' }}>✅ CONFERMATO</span>
+                                <span style={{ fontSize: 9, fontWeight: 800, color: '#10B981', background: 'rgba(16,185,129,0.15)', borderRadius: 4, padding: '2px 6px', letterSpacing: '0.04em' }}>? CONFERMATO</span>
                               </div>
                             )}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: isProposed ? 0 : 4 }}>
@@ -2943,7 +2943,7 @@ export default function ShiftsPage() {
           templates={templates}
           onImport={(importedShifts) => {
             setShifts(prev => ({ ...prev, ...importedShifts }));
-            toast.success(`✅ ${Object.keys(importedShifts).length} turni importati! Salva per confermare.`);
+            toast.success(`? ${Object.keys(importedShifts).length} turni importati! Salva per confermare.`);
           }}
           onClose={() => setShowImport(false)}
         />
@@ -2952,7 +2952,7 @@ export default function ShiftsPage() {
       {/* Modal selezione template/Aggiunta turno */}
       {renderActiveCellModal()}
 
-      {/* Jolly picker dropdown — Modal centrale anziché select posizionata assolutamente */}
+      {/* Jolly picker dropdown — Modal centrale anzich??select posizionata assolutamente */}
       {showJollyPicker && (
         <div 
           onClick={() => setShowJollyPicker(false)} 
@@ -2997,7 +2997,7 @@ export default function ShiftsPage() {
               ) : (() => {
                 const q = jollySearch.toLowerCase().trim();
                 // Esclude solo i jolly già aggiunti manualmente (extraEmployees)
-                // Non esclude i dipendenti dello store base — l'admin può aggiungere jolly da qualsiasi store
+                // Non esclude i dipendenti dello store base — l'admin pu??aggiungere jolly da qualsiasi store
                 const alreadyExtra = new Set(extraEmployees.map(e => e.id));
                 const list = allEmployeesGlobal.filter(e => {
                   if (alreadyExtra.has(e.id)) return false;
@@ -3010,7 +3010,7 @@ export default function ShiftsPage() {
                 
                 if (list.length === 0) return (
                   <div style={{ padding: '40px 20px', textAlign: 'center', fontSize: 14, color: 'var(--color-text-tertiary)' }}>
-                    {q ? `Nessun risultato per "${q}"` : allEmployeesGlobal.length === 0 ? '⚠️ Nessun dipendente caricato a sistema' : 'Tutti i dipendenti sono già presenti in griglia'}
+                    {q ? `Nessun risultato per "${q}"` : allEmployeesGlobal.length === 0 ? '??️ Nessun dipendente caricato a sistema' : 'Tutti i dipendenti sono già presenti in griglia'}
                   </div>
                 );
                 

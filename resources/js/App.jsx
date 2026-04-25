@@ -101,7 +101,7 @@ export default function App() {
             localStorage.setItem('tenantCode', response.data.tenant_code);
           }
         } catch (error) {
-          // Se è un timeout o errore di rete, prova a usare l'utente salvato in cache
+          // Se ??un timeout o errore di rete, prova a usare l'utente salvato in cache
           const cachedUser = localStorage.getItem('user');
           if (cachedUser && error.name !== 'AuthenticationError') {
             try {

@@ -4,13 +4,13 @@ import { useOutletContext } from 'react-router-dom';
 import { suppliers as suppliersApi, inventory, stores } from '../api.jsx';
 
 /**
- * SupplierDeliveryPage — DDT Fornitore → Magazzino
+ * SupplierDeliveryPage — DDT Fornitore ? Magazzino
  *
  * Flusso:
  * 1. Seleziona fornitore (o crea nuovo)
  * 2. Aggiungi prodotti con quantità e costo
  * 3. Seleziona magazzino di destinazione
- * 4. Conferma → aggiorna stock automaticamente
+ * 4. Conferma ? aggiorna stock automaticamente
  * 5. Stampa Bolla di Carico DDT
  */
 export default function SupplierDeliveryPage() {
@@ -33,7 +33,7 @@ export default function SupplierDeliveryPage() {
   const [lines, setLines] = useState([{ product_variant_id: '', product_name: '', qty: 1, unit_cost: '' }]);
 
   const DDT_TYPES = [
-    { id: 'carico',          label: '📦 Carico Merce',      sub: 'Fornitore → Magazzino (+stock)',           qtySign: +1, color: '#065f46', bg: '#d1fae5' },
+    { id: 'carico',          label: '?? Carico Merce',      sub: 'Fornitore ? Magazzino (+stock)',           qtySign: +1, color: '#065f46', bg: '#d1fae5' },
     { id: 'scarico_vendita', label: '🛒 Scarico Vendita',   sub: 'Genera fattura immediata (-stock)',          qtySign: -1, color: '#1d4ed8', bg: '#dbeafe' },
     { id: 'conto_visione',   label: '👁 Conto Visione',     sub: 'Trasferimento bene (fattura posticipata)',   qtySign:  0, color: '#92400e', bg: '#fef3c7' },
   ];
@@ -61,7 +61,7 @@ export default function SupplierDeliveryPage() {
       }
     }).catch(err => setError('Errore caricamento dati: ' + err.message));
 
-    // Stock separato — se fallisce il DDT è comunque usabile
+    // Stock separato — se fallisce il DDT ??comunque usabile
     inventory.getStock({ limit: 500 })
       .then(stockRes => setStockItems(stockRes.data?.data || []))
       .catch(() => {});
@@ -172,7 +172,7 @@ export default function SupplierDeliveryPage() {
         totalValue,
         createdAt: new Date().toISOString(),
         errors,
-        // Scarico vendita → flagged for invoice generation
+        // Scarico vendita ? flagged for invoice generation
         needsInvoice: ddtType === 'scarico_vendita',
         isContoVisione: ddtType === 'conto_visione',
       };
@@ -186,7 +186,7 @@ export default function SupplierDeliveryPage() {
       setStep(3);
 
       if (errors.length > 0) {
-        setError(`⚠️ ${errors.length} prodotti non avevano un ID variante valido e non hanno aggiornato lo stock:\n${errors.join('\n')}`);
+        setError(`??️ ${errors.length} prodotti non avevano un ID variante valido e non hanno aggiornato lo stock:\n${errors.join('\n')}`);
       }
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -215,7 +215,7 @@ export default function SupplierDeliveryPage() {
 </style></head><body>
 <h1>BOLLA DI CARICO — DDT FORNITORE</h1>
 <div class="sub">Documento: <strong>${ddt.ddtNumber}</strong> &nbsp;|&nbsp; Emesso il: ${today}</div>
-<div class="badge">✅ MERCE RICEVUTA — STOCK AGGIORNATO</div>
+<div class="badge">? MERCE RICEVUTA — STOCK AGGIORNATO</div>
 <div class="grid">
   <div class="info"><h3>Fornitore (Cedente)</h3><p>${ddt.supplierName}</p></div>
   <div class="info"><h3>Destinazione</h3><p>${ddt.warehouseName}</p></div>
@@ -295,7 +295,7 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
 
       {error && (
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 16px', marginBottom: 16, color: '#991b1b', fontSize: 13, whiteSpace: 'pre-line' }}>
-          ⚠️ {error}
+          ??️ {error}
         </div>
       )}
 
@@ -332,7 +332,7 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
           </div>
           <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
             <button className="btn btn-gold" disabled={!supplierId || !warehouseId} onClick={() => setStep(2)}>
-              Avanti → Prodotti
+              Avanti ? Prodotti
             </button>
           </div>
         </div>
@@ -421,13 +421,13 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
       {step === 3 && success && (
         <div className="table-card" style={{ padding: 24 }}>
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <div style={{ fontSize: 56, marginBottom: 8 }}>✅</div>
+            <div style={{ fontSize: 56, marginBottom: 8 }}>?</div>
             <div style={{ fontWeight: 900, fontSize: 22, color: '#065f46', marginBottom: 4 }}>
               DDT registrato con successo!
             </div>
             <div style={{ color: 'var(--muted)', fontSize: 14 }}>
               {ddtType === 'conto_visione'
-                ? <>Bene in <strong>conto visione</strong> — fattura posticipata. {success.warehouseName} è la destinazione.</>
+                ? <>Bene in <strong>conto visione</strong> — fattura posticipata. {success.warehouseName} ??la destinazione.</>
                 : ddtType === 'scarico_vendita'
                 ? <>Scarico effettuato, stock <strong>decrementato</strong> per {success.lines.filter(l => l.product_variant_id).length} prodotti in {success.warehouseName}.</>
                 : <>Stock <strong>aggiornato</strong> per {success.lines.filter(l => l.product_variant_id).length} prodotti nel magazzino <strong>{success.warehouseName}</strong>.</>
@@ -493,7 +493,7 @@ ${ddt.notes ? `<p style="margin-top:14px;font-size:12px;color:#666"><strong>Note
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
                   <div>
                     <div style={{fontWeight:800,fontFamily:'monospace',fontSize:13}}>{ddt.ddtNumber}</div>
-                    <div style={{fontSize:12,color:'var(--color-text-secondary)',marginTop:2}}>{ddt.supplierName} → {ddt.warehouseName}</div>
+                    <div style={{fontSize:12,color:'var(--color-text-secondary)',marginTop:2}}>{ddt.supplierName} ? {ddt.warehouseName}</div>
                     <div style={{fontSize:11,color:'var(--color-text-tertiary)',marginTop:2}}>{new Date(ddt.deliveryDate).toLocaleDateString('it-IT')} · {ddt.lines?.length||0} art.</div>
                   </div>
                   <div style={{textAlign:'right'}}>

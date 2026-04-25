@@ -157,7 +157,7 @@ export default function PurchaseOrdersPage() {
 </style></head><body>
 <h1>${tipo}</h1>
 <div class="sub">PO # ${po.po_number || po.id} &nbsp;|&nbsp; Data: ${today}</div>
-<div class="badge">✅ MERCI RICEVUTE A MAGAZZINO</div>
+<div class="badge">? MERCI RICEVUTE A MAGAZZINO</div>
 <div class="info-grid">
   <div class="info-block"><h3>Fornitore</h3><p>${po.supplier_name || '—'}</p></div>
   <div class="info-block"><h3>Magazzino Destinazione</h3><p>${wh?.name || `ID ${warehouseId}`}</p></div>
@@ -218,8 +218,8 @@ export default function PurchaseOrdersPage() {
   const [poFulfillment, setPoFulfillment] = useState({});
   const FULFIL_OPTS = [
     { key: 'scaricato',   label: '📥 Scaricato',   bg: '#dbeafe', color: '#1d4ed8' },
-    { key: 'controllato', label: '✅ Controllato',  bg: '#d1fae5', color: '#065f46' },
-    { key: 'pagato',      label: '💰 Pagato',       bg: '#fef3c7', color: '#92400e' },
+    { key: 'controllato', label: '? Controllato',  bg: '#d1fae5', color: '#065f46' },
+    { key: 'pagato',      label: '?? Pagato',       bg: '#fef3c7', color: '#92400e' },
     { key: 'none',        label: '— Nessuno',      bg: '#f3f4f6', color: '#6b7280' },
   ];
 
@@ -318,7 +318,7 @@ export default function PurchaseOrdersPage() {
       {/* ── Post-receive DDT prompt ── */}
       {lastReceived && (
         <div className="table-card" style={{ marginBottom: 16, background: '#f0fdf4', border: '1px solid #86efac', padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 22 }}>✅</span>
+          <span style={{ fontSize: 22 }}>?</span>
           <div style={{ flex: 1 }}>
             <strong>Merce ricevuta con successo!</strong> PO #{lastReceived.po_number || lastReceived.id} da {lastReceived.supplier_name}
           </div>
@@ -336,7 +336,7 @@ export default function PurchaseOrdersPage() {
           <div style={{ background: '#1a1a2e', borderRadius: 16, width: '100%', maxWidth: 680, maxHeight: '90vh', overflow: 'auto', padding: 0 }}>
             {/* Header */}
             <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>📦 Ricezione Merce — PO # {receiveModal.po_number || receiveModal.id}</div>
+              <div style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>?? Ricezione Merce — PO # {receiveModal.po_number || receiveModal.id}</div>
               <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 2 }}>Fornitore: {receiveModal.supplier_name}</div>
             </div>
 
@@ -628,7 +628,7 @@ export default function PurchaseOrdersPage() {
                     {(po.status === 'sent' || po.status === 'partial') && (
                       <button className="btn btn-gold" style={{ fontSize: 11, padding: '4px 10px', background: '#16a34a' }}
                         onClick={() => openReceive(po)}>
-                        📦 Carica Merce
+                        ?? Carica Merce
                       </button>
                     )}
                     {['draft', 'sent'].includes(po.status) && (
@@ -692,7 +692,7 @@ export default function PurchaseOrdersPage() {
                 <div style={{ textAlign:'center', padding:'60px 20px', color:'var(--color-text-tertiary)', fontSize:14 }}>Caricamento prodotti sotto-scorta...</div>
               ) : autoLines.length === 0 ? (
                 <div style={{ textAlign:'center', padding:'60px 20px' }}>
-                  <div style={{ fontSize:40, marginBottom:12 }}>✅</div>
+                  <div style={{ fontSize:40, marginBottom:12 }}>?</div>
                   <div style={{ fontSize:15, fontWeight:700, color:'var(--color-text)' }}>Stock OK!</div>
                   <div style={{ fontSize:13, color:'var(--color-text-tertiary)', marginTop:4 }}>Nessun prodotto sotto il punto di riordino.</div>
                 </div>

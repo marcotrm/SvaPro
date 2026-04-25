@@ -164,7 +164,7 @@ export default function InvoicesPage() {
           {ddtLoading ? <SkeletonTable /> : (
             <table className="table-v3">
               <thead><tr>
-                <th>N. DDT</th><th>Tipo</th><th>Mittente → Destinatario</th>
+                <th>N. DDT</th><th>Tipo</th><th>Mittente ? Destinatario</th>
                 <th>Articoli</th><th>Data</th><th className="text-right">Azioni</th>
               </tr></thead>
               <tbody>
@@ -178,7 +178,7 @@ export default function InvoicesPage() {
                     </td>
                     <td>
                       <span className="font-bold">{t.from_store_name}</span>
-                      <span className="text-indigo-500 mx-2">→</span>
+                      <span className="text-indigo-500 mx-2">?</span>
                       <span className="font-bold">{t.to_store_name}</span>
                     </td>
                     <td className="text-slate-500">{(t.items||[]).reduce((s,i) => s+(i.quantity_sent||0), 0)} pz</td>

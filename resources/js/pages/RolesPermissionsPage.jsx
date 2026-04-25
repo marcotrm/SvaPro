@@ -276,7 +276,7 @@ export default function RolesPermissionsPage() {
 
   // ─ elimina utente ───────────────────────────────────────────
   const handleDeleteUser = async (userId, userName) => {
-    if (!window.confirm(`Eliminare definitivamente l'utente "${userName}"?\nQuesta azione non è reversibile.`)) return;
+    if (!window.confirm(`Eliminare definitivamente l'utente "${userName}"?\nQuesta azione non ??reversibile.`)) return;
     setProcessing(true); setError('');
     try {
       await rolesPermissions.deleteUser(userId);
@@ -355,7 +355,7 @@ export default function RolesPermissionsPage() {
       {/* ── ERROR BANNER ── */}
       {error && (
         <div className="sp-alert sp-alert-error" style={{ marginBottom: 20, display: 'flex', gap: 10 }}>
-          ⚠ {error}
+          ?? {error}
           <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}>✕</button>
         </div>
       )}
@@ -797,7 +797,7 @@ export default function RolesPermissionsPage() {
       {modalType === 'editUser' && (
         <Modal
           title="✏ Modifica Utente"
-          subtitle="Solo i superadmin possono modificare queste informazioni. La password è visibile solo in questa schermata."
+          subtitle="Solo i superadmin possono modificare queste informazioni. La password ??visibile solo in questa schermata."
           onClose={() => setModalType(null)}
         >
           <form onSubmit={handleSaveUser} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>

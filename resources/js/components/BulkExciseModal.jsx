@@ -42,7 +42,7 @@ export default function BulkExciseModal({ categories, onClose, onSave }) {
             </div>
             <div>
               <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Accise Massive</h2>
-              <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>Applica un'accisa fissa a più prodotti contemporaneamente.</p>
+              <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>Applica un'accisa fissa a pi??prodotti contemporaneamente.</p>
             </div>
           </div>
           <button onClick={onClose} style={{

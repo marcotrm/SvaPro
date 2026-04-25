@@ -156,7 +156,7 @@ export default function InventoryPage() {
   .total-item strong { font-size: 18px; font-weight: 900; }
   @media print { body { margin: 16px; } }
 </style></head><body>
-<h1>📦 Bolla di Scarico Merci</h1>
+<h1>?? Bolla di Scarico Merci</h1>
 <div class="sub">Documento interno — Non valido ai fini fiscali</div>
 <div class="info-grid">
   <div class="info-block"><h3>Negozio</h3><p>${storeName}</p></div>
@@ -186,9 +186,9 @@ export default function InventoryPage() {
 </table>
 <div class="totals">
   <div class="total-item"><span>Totale Referenze</span><strong>${filtered.length}</strong></div>
-  <div class="total-item"><span>⚠ Stock Basso</span><strong style="color:#d97706">${filtered.filter(i => i.on_hand < (i.reorder_point||5) && i.on_hand > 0).length}</strong></div>
+  <div class="total-item"><span>?? Stock Basso</span><strong style="color:#d97706">${filtered.filter(i => i.on_hand < (i.reorder_point||5) && i.on_hand > 0).length}</strong></div>
   <div class="total-item"><span>🔴 Esaurito</span><strong style="color:#dc2626">${filtered.filter(i => i.on_hand <= 0).length}</strong></div>
-  <div class="total-item"><span>✅ In Ordine</span><strong style="color:#16a34a">${filtered.filter(i => i.on_hand >= (i.reorder_point||5)).length}</strong></div>
+  <div class="total-item"><span>? In Ordine</span><strong style="color:#16a34a">${filtered.filter(i => i.on_hand >= (i.reorder_point||5)).length}</strong></div>
 </div>
 <div class="footer">
   <div class="sign-box">Firma Responsabile</div>
@@ -343,7 +343,7 @@ export default function InventoryPage() {
                         <span style={{ fontWeight: 700, fontSize: 13, color: item.total_on_hand > 0 ? 'var(--color-success)' : 'var(--color-error)' }}>
                           {item.total_on_hand}
                           {item.total_on_hand > (item.available ?? item.on_hand) && (
-                            <span title="Stock presente in altri magazzini" style={{ marginLeft: 5, fontSize: 10, color: '#6366f1', fontWeight: 600 }}>📦 +altri</span>
+                            <span title="Stock presente in altri magazzini" style={{ marginLeft: 5, fontSize: 10, color: '#6366f1', fontWeight: 600 }}>?? +altri</span>
                           )}
                         </span>
                       ) : <span style={{ color: 'var(--color-text-tertiary)' }}>—</span>}
@@ -509,7 +509,7 @@ export default function InventoryPage() {
       {/* By Store Tab — superadmin only */}
       {activeTab === 'by_store' && isSuperAdmin && (() => {
 
-        // Raggruppa stock per warehouse_id → store
+        // Raggruppa stock per warehouse_id ? store
         const stockByWarehouse = {};
         allStoresStock.forEach(item => {
           const key = item.warehouse_name || `Magazzino #${item.warehouse_id}`;
@@ -554,7 +554,7 @@ export default function InventoryPage() {
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{group.name}</div>
                       <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
                         {group.items.length} prodotti
-                        {lowItems > 0 && <span style={{ marginLeft: 8, color: 'var(--color-warning)', fontWeight: 600 }}>⚠ {lowItems} in esaurimento</span>}
+                        {lowItems > 0 && <span style={{ marginLeft: 8, color: 'var(--color-warning)', fontWeight: 600 }}>?? {lowItems} in esaurimento</span>}
                       </div>
                     </div>
                     {isOpen ? <ChevronDown size={16} color="var(--color-text-tertiary)" /> : <ChevronRight size={16} color="var(--color-text-tertiary)" />}

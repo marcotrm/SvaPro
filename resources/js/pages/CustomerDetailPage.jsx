@@ -404,14 +404,14 @@ export default function CustomerDetailPage() {
             <h2 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
               📱 Invia WhatsApp
               {customer.phone
-                ? <span style={{ fontWeight: 400, fontSize: 13, color: '#64748b' }}>→ {customer.phone}</span>
+                ? <span style={{ fontWeight: 400, fontSize: 13, color: '#64748b' }}>? {customer.phone}</span>
                 : <span style={{ fontWeight: 400, fontSize: 12, color: '#ef4444' }}>Numero non disponibile</span>}
             </h2>
 
             {/* Template rapidi */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               {[
-                { label: '🎁 Promozione', text: `Ciao ${customer.first_name}! Abbiamo un'offerta esclusiva per te. Passa in negozio o contattaci per saperne di più!` },
+                { label: '🎁 Promozione', text: `Ciao ${customer.first_name}! Abbiamo un'offerta esclusiva per te. Passa in negozio o contattaci per saperne di pi�!` },
                 { label: '👋 Bentornato', text: `Ciao ${customer.first_name}! È un po' che non ti vediamo. Ti aspettiamo con tante novità!` },
                 { label: '⭐ Follow-up', text: `Ciao ${customer.first_name}! Come va con il tuo ultimo acquisto? Siamo qui per ogni domanda.` },
               ].map(tmpl => (
@@ -467,7 +467,7 @@ export default function CustomerDetailPage() {
                 background: waResult.ok ? '#f0fdf4' : '#fef2f2',
                 color: waResult.ok ? '#16a34a' : '#dc2626',
                 border: `1px solid ${waResult.ok ? '#bbf7d0' : '#fecaca'}` }}>
-                {waResult.ok ? '✅' : '❌'} {waResult.msg}
+                {waResult.ok ? '?' : '❌'} {waResult.msg}
               </div>
             )}
           </div>
@@ -477,7 +477,7 @@ export default function CustomerDetailPage() {
             <h2 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
               📧 Invia Email
               {customer.email
-                ? <span style={{ fontWeight: 400, fontSize: 13, color: '#64748b' }}>→ {customer.email}</span>
+                ? <span style={{ fontWeight: 400, fontSize: 13, color: '#64748b' }}>? {customer.email}</span>
                 : <span style={{ fontWeight: 400, fontSize: 12, color: '#ef4444' }}>Email non disponibile</span>}
             </h2>
             <input
@@ -524,7 +524,7 @@ export default function CustomerDetailPage() {
                 background: emailResult.ok ? '#f0fdf4' : '#fef2f2',
                 color: emailResult.ok ? '#16a34a' : '#dc2626',
                 border: `1px solid ${emailResult.ok ? '#bbf7d0' : '#fecaca'}` }}>
-                {emailResult.ok ? '✅' : '❌'} {emailResult.msg}
+                {emailResult.ok ? '?' : '❌'} {emailResult.msg}
               </div>
             )}
           </div>

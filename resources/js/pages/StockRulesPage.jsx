@@ -459,7 +459,7 @@ function StoreGroupsTab({ storeGroups, warehouses, onRefresh }) {
         {storeGroups.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--color-text-tertiary)' }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>Nessun gruppo configurato.</div>
-            <div style={{ fontSize: 13, marginTop: 4 }}>Crea un gruppo per applicare regole a più negozi contemporaneamente.</div>
+            <div style={{ fontSize: 13, marginTop: 4 }}>Crea un gruppo per applicare regole a pi??negozi contemporaneamente.</div>
           </div>
         ) : (
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>

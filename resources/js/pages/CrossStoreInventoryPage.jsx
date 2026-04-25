@@ -65,7 +65,7 @@ export default function CrossStoreInventoryPage() {
 
   // ── LOGICA DI FILTRAGGIO SIMILE AL REPORT FATTURATI ──
   // Per ogni negozio calcoliamo lo stock in base al prodotto cercato.
-  // Se non c'è ricerca, aggreghiamo lo stock TOTALE di quel negozio (come overview globale).
+  // Se non c'??ricerca, aggreghiamo lo stock TOTALE di quel negozio (come overview globale).
   const tableData = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
     
@@ -96,7 +96,7 @@ export default function CrossStoreInventoryPage() {
       const sku = row.sku || '';
       const flavor = row.flavor || '';
 
-      // Se c'è una query di ricerca prodotto, filtriamo le righe
+      // Se c'??una query di ricerca prodotto, filtriamo le righe
       let matches = true;
       if (q) {
         matches = prodName.toLowerCase().includes(q) || sku.toLowerCase().includes(q) || flavor.toLowerCase().includes(q);
@@ -104,7 +104,7 @@ export default function CrossStoreInventoryPage() {
 
       if (matches) {
         storeMap[key].totalQty += qty;
-        if (qty > 0 || row.sku || row.flavor) { // Memorizziamo un riassunto dei prodotti matchati per questo negozio se c"è q
+        if (qty > 0 || row.sku || row.flavor) { // Memorizziamo un riassunto dei prodotti matchati per questo negozio se c"??q
              storeMap[key].matchedProducts.push({ name: prodName, sku, flavor, qty });
         }
       }
@@ -138,7 +138,7 @@ export default function CrossStoreInventoryPage() {
 
   const getBadgeColor = (index, qty) => {
     if (qty <= 0) return '#EF4444'; // Rosso (esaurito)
-    if (index === 0) return '#8B5CF6'; // Viola per il primo (più stock)
+    if (index === 0) return '#8B5CF6'; // Viola per il primo (pi??stock)
     if (index === 1) return '#F59E0B'; // Arancione
     if (index === 2) return '#10B981'; // Verde
     return '#E5E7EB'; // Grigio default

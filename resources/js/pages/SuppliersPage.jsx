@@ -126,7 +126,7 @@ export default function SuppliersPage() {
 
             {/* ── Sezione logistica riordino ── */}
             <div style={{ gridColumn: '1 / -1', margin: '8px 0 4px', borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)' }}>📦 Impostazioni Logistica &amp; Riordino Automatico</span>
+              <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)' }}>?? Impostazioni Logistica &amp; Riordino Automatico</span>
             </div>
             <div>
               <label className="field-label">Tempo Consegna (giorni) <span style={{ color: '#6366f1', fontWeight: 700 }}>*</span></label>

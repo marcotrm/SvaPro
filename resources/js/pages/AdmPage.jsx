@@ -141,11 +141,11 @@ export default function AdmPage() {
       document.body.removeChild(a); URL.revokeObjectURL(url);
 
       setLastGenerated({ type: reportType, periodo: periodoLabel, nome: nomeFile, at: new Date() });
-      toast.success(`✅ File "${nomeFile}" scaricato con successo!`);
+      toast.success(`? File "${nomeFile}" scaricato con successo!`);
     } catch (err) {
       let msg = 'Errore durante la generazione del report';
       let detail = '';
-      // La risposta è sempre un Blob dato responseType:'blob'
+      // La risposta ??sempre un Blob dato responseType:'blob'
       if (err.response?.data instanceof Blob) {
         try {
           const text = await err.response.data.text();
@@ -399,9 +399,9 @@ export default function AdmPage() {
             Come funziona la generazione
           </div>
           <div style={{ fontSize: 12, color: '#0c4a6e', lineHeight: 1.7 }}>
-            Il sistema genera il file Excel in tre modalità (dalla più avanzata alla base):<br />
-            <strong>1. n8n Workflow</strong> — se <code style={{ background: '#e0f2fe', padding: '0 4px', borderRadius: 4 }}>N8N_WEBHOOK_URL</code> è configurato su Railway.<br />
-            <strong>2. excel-api</strong> — se <code style={{ background: '#e0f2fe', padding: '0 4px', borderRadius: 4 }}>EXCEL_API_URL</code> è configurato su Railway.<br />
+            Il sistema genera il file Excel in tre modalità (dalla pi??avanzata alla base):<br />
+            <strong>1. n8n Workflow</strong> — se <code style={{ background: '#e0f2fe', padding: '0 4px', borderRadius: 4 }}>N8N_WEBHOOK_URL</code> ??configurato su Railway.<br />
+            <strong>2. excel-api</strong> — se <code style={{ background: '#e0f2fe', padding: '0 4px', borderRadius: 4 }}>EXCEL_API_URL</code> ??configurato su Railway.<br />
             <strong>3. Generazione nativa</strong> — sempre disponibile come fallback, senza dipendenze esterne.
           </div>
         </div>

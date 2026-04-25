@@ -388,7 +388,7 @@ export default function SettingsPage() {
             <Shield size={28} style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 12 }} />
             <div style={{ fontWeight: 900, fontSize: 17, marginBottom: 6, letterSpacing: '-0.01em' }}>Sistema Sicuro</div>
             <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgba(255,255,255,0.6)', margin: '0 0 16px' }}>
-              Tutte le modifiche alle impostazioni vengono registrate nell'Audit Log. Ogni azione è tracciata e protetta.
+              Tutte le modifiche alle impostazioni vengono registrate nell'Audit Log. Ogni azione ??tracciata e protetta.
             </p>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
               v{new Date().getFullYear()} · SvaPro

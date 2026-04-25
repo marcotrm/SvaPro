@@ -39,10 +39,10 @@ export default class ErrorBoundary extends React.Component {
             fontSize: 24, color: '#e64c3c',
           }}>!</div>
           <h2 style={{ color: '#e8ecf4', fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>
-            Qualcosa è andato storto
+            Qualcosa ??andato storto
           </h2>
           <p style={{ color: '#7b8ba5', fontSize: 13, lineHeight: 1.6, margin: '0 0 24px' }}>
-            Si è verificato un errore imprevisto. Puoi riprovare o ricaricare la pagina.
+            Si ??verificato un errore imprevisto. Puoi riprovare o ricaricare la pagina.
           </p>
           {this.state.error && (
             <pre style={{

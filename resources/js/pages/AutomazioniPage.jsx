@@ -38,7 +38,7 @@ const AUTOMATIONS = [
     name: 'Suggerimento Riordino Automatico',
     description: 'Crea automaticamente una bozza di ordine fornitore basandosi sul consumo storico e le scorte attuali.',
     status: 'active',
-    trigger: 'Ogni lunedì alle 08:00',
+    trigger: 'Ogni luned??alle 08:00',
     action: 'Crea PO bozza',
     lastRun: '14 Apr 2026, 08:00',
   },
@@ -267,7 +267,7 @@ export default function AutomazioniPage() {
                       position: 'absolute', top: 0, right: 0, background: '#ef4444',
                       color: '#fff', fontSize: 9, fontWeight: 800, padding: '3px 8px',
                       borderRadius: '0 0 0 8px', letterSpacing: '0.05em',
-                    }}>⚠ ALLERTA</div>
+                    }}>?? ALLERTA</div>
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <Store size={14} color={isHigh ? '#ef4444' : 'var(--color-text-secondary)'} />
@@ -391,7 +391,7 @@ export default function AutomazioniPage() {
                     <span style={{ fontWeight: 800, color: 'var(--color-text-secondary)' }}>⚡ Trigger:</span> {automation.trigger}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-                    <span style={{ fontWeight: 800, color: 'var(--color-text-secondary)' }}>→ Azione:</span> {automation.action}
+                    <span style={{ fontWeight: 800, color: 'var(--color-text-secondary)' }}>? Azione:</span> {automation.action}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                     <span style={{ fontWeight: 800, color: 'var(--color-text-secondary)' }}>🕐 Ultima:</span> {automation.lastRun}

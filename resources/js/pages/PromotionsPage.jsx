@@ -207,7 +207,7 @@ export default function PromotionsPage() {
                 <td className="mono" style={{ fontWeight: 600, color: 'var(--gold)' }}>{fmtValue(p.type, p.value)}</td>
                 <td className="mono">{p.used_count || 0}{p.max_uses ? ` / ${p.max_uses}` : ''}</td>
                 <td style={{ fontSize: 12, color: 'var(--muted2)' }}>
-                  {p.starts_at || p.ends_at ? `${fmtDate(p.starts_at)} → ${fmtDate(p.ends_at)}` : 'Sempre'}
+                  {p.starts_at || p.ends_at ? `${fmtDate(p.starts_at)} ? ${fmtDate(p.ends_at)}` : 'Sempre'}
                 </td>
                 <td>
                   {isExpired(p)
@@ -236,7 +236,7 @@ export default function PromotionsPage() {
       <ConfirmModal
         isOpen={confirmToDelete !== null}
         title="Elimina promozione"
-        message="Vuoi eliminare questa promozione? I codici sconto non saranno più validi."
+        message="Vuoi eliminare questa promozione? I codici sconto non saranno pi??validi."
         onConfirm={doDelete}
         onCancel={() => setConfirmToDelete(null)}
       />

@@ -40,7 +40,7 @@ export default function EmployeesPage() {
   };
   const handleUnsuspend = (emp) => {
     const next = new Set(suspendedIds); next.delete(emp.id); setSuspendedIds(next); saveSuspended(next);
-    toast.success(`${emp.first_name} ${emp.last_name} riattivato ✅`);
+    toast.success(`${emp.first_name} ${emp.last_name} riattivato ?`);
   };
 
   useEffect(() => { fetchEmployees(); }, [selectedStoreId]);
@@ -78,7 +78,7 @@ export default function EmployeesPage() {
 
   const handleSaveEmployee = async (isNew = false, updatedData = null) => {
     handleCloseModal();
-    toast.success(isNew ? 'Dipendente creato! 🎉' : 'Dipendente aggiornato! ✅');
+    toast.success(isNew ? 'Dipendente creato! 🎉' : 'Dipendente aggiornato! ?');
 
     // Aggiornamento ottimistico istantaneo: mostra subito la nuova foto
     if (!isNew && updatedData?.id) {

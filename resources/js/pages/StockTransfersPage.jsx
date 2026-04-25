@@ -234,7 +234,7 @@ function DDTDetailModal({ transfer, onClose }) {
                             { icon: '📤', label: 'MITTENTE', value: transfer.from_store_name || '–', accent: '#6366F1' },
                             { icon: '📥', label: 'DESTINATARIO', value: transfer.to_store_name || '–', accent: '#8B5CF6' },
                             { icon: '📅', label: 'DATA INVIO', value: fmtDT(transfer.sent_at), accent: '#3B82F6' },
-                            { icon: '✅', label: 'DATA RICEZIONE', value: fmtDT(transfer.received_at), accent: '#10B981' },
+                            { icon: '?', label: 'DATA RICEZIONE', value: fmtDT(transfer.received_at), accent: '#10B981' },
                         ].map(({ icon, label, value, accent }) => (
                             <div key={label} style={{
                                 background: 'var(--color-surface, #F9FAFB)', borderRadius: 12, padding: '14px 16px',
@@ -340,7 +340,7 @@ function DDTDetailModal({ transfer, onClose }) {
                             border: '1px solid rgba(99,102,241,0.12)',
                             display: 'flex', alignItems: 'center', gap: 6,
                         }}>
-                            <span style={{ fontSize: 15 }}>📦</span>
+                            <span style={{ fontSize: 15 }}>??</span>
                             Totale pezzi inviati: <span style={{ fontWeight: 900, fontSize: 16 }}>{totalSent}</span>
                         </div>
                         {transfer.status === 'received' && (
@@ -351,7 +351,7 @@ function DDTDetailModal({ transfer, onClose }) {
                                 border: '1px solid rgba(16,185,129,0.12)',
                                 display: 'flex', alignItems: 'center', gap: 6,
                             }}>
-                                <span style={{ fontSize: 15 }}>✅</span>
+                                <span style={{ fontSize: 15 }}>?</span>
                                 Totale pezzi ricevuti: <span style={{ fontWeight: 900, fontSize: 16 }}>{totalReceived}</span>
                             </div>
                         )}
@@ -479,7 +479,7 @@ export default function StockTransfersPage() {
     };
 
     const handleDelete = async (id) => {
-        if (!confirm("Eliminare definitivamente questo DDT? L'operazione non è reversibile.")) return;
+        if (!confirm("Eliminare definitivamente questo DDT? L'operazione non ??reversibile.")) return;
         try { setError(''); await stockTransfers.delete(id); await fetchAll(); }
         catch (e) { setError(e.response?.data?.message || e.message); }
     };
@@ -581,7 +581,7 @@ export default function StockTransfersPage() {
                                     {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
                             </div>
-                            <div style={{ textAlign: 'center', fontSize: 20, color: 'var(--color-accent)', fontWeight: 700, paddingTop: 18 }}>→</div>
+                            <div style={{ textAlign: 'center', fontSize: 20, color: 'var(--color-accent)', fontWeight: 700, paddingTop: 18 }}>?</div>
                             <div>
                                 <label className="field-label">Negozio Destinatario *</label>
                                 <select className="field-input" value={form.to_store_id} onChange={e => setForm(f => ({ ...f, to_store_id: e.target.value }))}>
@@ -712,7 +712,7 @@ export default function StockTransfersPage() {
                     <thead>
                         <tr>
                             <th>N. DDT</th>
-                            <th>Mittente → Destinatario</th>
+                            <th>Mittente ? Destinatario</th>
                             <th>Prodotti</th>
                             <th>Stato</th>
                             <th>Data</th>
@@ -731,7 +731,7 @@ export default function StockTransfersPage() {
                                     </td>
                                     <td>
                                         <span style={{ fontWeight: 600 }}>{t.from_store_name}</span>
-                                        <span style={{ color: 'var(--color-accent)', margin: '0 6px' }}>→</span>
+                                        <span style={{ color: 'var(--color-accent)', margin: '0 6px' }}>?</span>
                                         <span style={{ fontWeight: 600 }}>{t.to_store_name}</span>
                                     </td>
                                     <td>
@@ -767,7 +767,7 @@ export default function StockTransfersPage() {
                                                 <button className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 8px', color: 'var(--color-error)' }} onClick={() => handleCancel(t.id)}>Annulla</button>
                                             )}
                                             {['draft','cancelled'].includes(t.status) && (
-                                                <button className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 8px', color: 'var(--color-error)', fontWeight: 800 }} onClick={() => handleDelete(t.id)} title="Elimina DDT">🗑</button>
+                                                <button className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 8px', color: 'var(--color-error)', fontWeight: 800 }} onClick={() => handleDelete(t.id)} title="Elimina DDT">???</button>
                                             )}
                                         </div>
                                     </td>

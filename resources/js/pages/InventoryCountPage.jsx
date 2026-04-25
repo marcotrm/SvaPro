@@ -35,7 +35,7 @@ export default function InventoryCountPage() {
         ordersApi.getOptions(selectedStoreId ? { store_id: selectedStoreId } : {}),
       ]);
       setSessions(sessRes.data?.data || []);
-      // Warehouses reali dalla DB (non dallo stock, che può avere dati obsoleti)
+      // Warehouses reali dalla DB (non dallo stock, che pu??avere dati obsoleti)
       setWarehouses(optRes.data?.data?.warehouses || []);
     } catch (err) {
       setError(err);

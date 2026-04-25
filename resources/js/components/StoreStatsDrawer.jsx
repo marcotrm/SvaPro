@@ -130,7 +130,7 @@ export default function StoreStatsDrawer({ store, onClose }) {
         });
       } else {
         console.error('[StoreStatsDrawer] summary failed:', summRes.reason?.response?.data || summRes.reason?.message);
-        // Fallback: calcola KPI base dagli ordini se summary non è disponibile
+        // Fallback: calcola KPI base dagli ordini se summary non ??disponibile
         if (ordRes.status === 'fulfilled') {
           const orderList = ordRes.value.data?.data || ordRes.value.data || [];
           if (Array.isArray(orderList) && orderList.length > 0) {
@@ -267,7 +267,7 @@ export default function StoreStatsDrawer({ store, onClose }) {
                   <Calendar size={14} color="#7B6FD0" />
                   Transazioni ({recentOrders.length})
                 </div>
-                <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12 }}>Clicca su una vendita per il dettaglio completo · usa ← → da tastiera nel modal</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12 }}>Clicca su una vendita per il dettaglio completo · usa ← ? da tastiera nel modal</div>
                 {recentOrders.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '24px 0', color: '#9ca3af' }}>
                     <Package size={36} style={{ opacity: 0.2, margin: '0 auto 8px', display: 'block' }} />

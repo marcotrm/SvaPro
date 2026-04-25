@@ -18,7 +18,7 @@ export default function InventoryMovementModal({ stock = [], storeId, onClose, o
     [stock]
   );
 
-  // Varianti dalla lista stock oppure dal catalogo (se stock è vuoto)
+  // Varianti dalla lista stock oppure dal catalogo (se stock ??vuoto)
   const stockVariants = useMemo(
     () => Array.from(
       new Map(stock.map((item) => [

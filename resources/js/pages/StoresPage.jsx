@@ -10,11 +10,11 @@ import { toast } from 'react-hot-toast';
 
 // ─── Costanti ──────────────────────────────────────────────────────
 const DAYS = [
-  { key: 'mon', label: 'Lunedì' },
-  { key: 'tue', label: 'Martedì' },
-  { key: 'wed', label: 'Mercoledì' },
-  { key: 'thu', label: 'Giovedì' },
-  { key: 'fri', label: 'Venerdì' },
+  { key: 'mon', label: 'Luned�' },
+  { key: 'tue', label: 'Marted�' },
+  { key: 'wed', label: 'Mercoled�' },
+  { key: 'thu', label: 'Gioved�' },
+  { key: 'fri', label: 'Venerd�' },
   { key: 'sat', label: 'Sabato' },
   { key: 'sun', label: 'Domenica' },
 ];
@@ -138,7 +138,7 @@ function OpeningHoursEditor({ value, onChange }) {
                       <input type="time" value={slot.open}
                         onChange={e => updateSlot(key, idx, 'open', e.target.value)}
                         className="sp-input" style={{ width: 100, fontSize: 13 }} />
-                      <span style={{ color: 'var(--color-text-tertiary)', fontSize: 12 }}>→</span>
+                      <span style={{ color: 'var(--color-text-tertiary)', fontSize: 12 }}>?</span>
                       <input type="time" value={slot.close}
                         onChange={e => updateSlot(key, idx, 'close', e.target.value)}
                         className="sp-input" style={{ width: 100, fontSize: 13 }} />
@@ -183,7 +183,7 @@ function OpeningHoursEditor({ value, onChange }) {
               if (!isValid) {
                 return (
                   <div style={{ marginTop: 6, paddingLeft: 130, fontSize: 11, color: '#ef4444', fontWeight: 700 }}>
-                    ⚠️ Orari sovrapposti — la pausa inizia prima della chiusura mattina
+                    ??️ Orari sovrapposti — la pausa inizia prima della chiusura mattina
                   </div>
                 );
               }
@@ -434,7 +434,7 @@ function StoreModal({ store, onClose, onSaved }) {
               <div style={{ background: 'var(--color-bg)', borderRadius: 12, padding: 16, border: '1px solid var(--color-border)' }}>
                 <h4 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>🔔 Soglia notifica ritardo</h4>
                 <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
-                  Ricevi una notifica WhatsApp se un dipendente arriva con più di N minuti di ritardo.
+                  Ricevi una notifica WhatsApp se un dipendente arriva con pi??di N minuti di ritardo.
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <input type="number" min="0" max="120" className="sp-input"
@@ -467,7 +467,7 @@ function StoreModal({ store, onClose, onSaved }) {
                       try {
                         // Passa il numero dal form nel body (funziona anche prima di salvare)
                         const res = await employeesApi.testWhatsapp(store.id, { phone: form.whatsapp_notify_phone });
-                        toast.success(res.data.message || '✅ Test inviato!');
+                        toast.success(res.data.message || '? Test inviato!');
                       } catch (err) {
                         const msg = err?.response?.data?.message || 'Errore invio test';
                         toast.error(msg);
@@ -629,7 +629,7 @@ function StoreAccessTab({ store }) {
           </span>
         ) : (
           <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(245,158,11,0.1)', color: '#b45309', border: '1px solid rgba(245,158,11,0.2)' }}>
-            ⚠ Nessun accesso
+            ?? Nessun accesso
           </span>
         )}
       </div>
@@ -671,7 +671,7 @@ function StoreAccessTab({ store }) {
                   </>
                 ) : (
                   <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>
-                    {loadingCreds ? 'Caricamento...' : '⚠ Password non trovata. Aggiorna le credenziali per salvarla.'}
+                    {loadingCreds ? 'Caricamento...' : '?? Password non trovata. Aggiorna le credenziali per salvarla.'}
                   </span>
                 )}
               </div>
@@ -827,7 +827,7 @@ function StoreCard({ store, onEdit, onDelete }) {
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-text-secondary)' }}>
           🕐 Oggi: {hoursDisplay}
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--color-accent)' }} title="Media settimanale: fatturato accumulato entro le 18:00 per ogni giorno di questa settimana (lun→oggi), diviso per i giorni.">
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--color-accent)' }} title="Media settimanale: fatturato accumulato entro le 18:00 per ogni giorno di questa settimana (lun?oggi), diviso per i giorni.">
           📊 Media h18 (sett.): € {(store.revenue_18 || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
         </span>
 
@@ -994,7 +994,7 @@ export default function StoresPage() {
             <AlertTriangle size={40} style={{ color: 'var(--color-error)', margin: '0 auto 16px' }} />
             <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800 }}>Elimina negozio?</h3>
             <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginBottom: 24 }}>
-              Stai per eliminare <strong>"{confirmDelete.name}"</strong>. Questa azione non può essere annullata.
+              Stai per eliminare <strong>"{confirmDelete.name}"</strong>. Questa azione non pu??essere annullata.
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button className="sp-btn sp-btn-ghost" onClick={() => setConfirmDelete(null)} disabled={deleting}>Annulla</button>

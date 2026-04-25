@@ -286,7 +286,7 @@ export default function CustomerModal({ customer, onClose, onSave }) {
     setEditingPreset(false);
   };
 
-  // Quando cambia il preset, aggiorna il discount se military è attivo
+  // Quando cambia il preset, aggiorna il discount se military ??attivo
   const handleMilitaryToggle = (checked) => {
     setFormData(prev => ({
       ...prev,

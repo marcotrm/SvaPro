@@ -99,7 +99,7 @@ function CreateModal({ onClose, onCreated }) {
 
   // ── Crea bolla ──
   const handleSubmit = async () => {
-    if (!form.title.trim()) { setFormErr('Il titolo è obbligatorio'); return; }
+    if (!form.title.trim()) { setFormErr('Il titolo ??obbligatorio'); return; }
     if (!form.store_id)     { setFormErr('Seleziona un negozio'); return; }
     setSaving(true); setFormErr('');
     try {
@@ -138,14 +138,14 @@ function CreateModal({ onClose, onCreated }) {
           {/* Errori globali */}
           {formErr && (
             <div style={{ background:'#EF444420', color:'#EF4444', padding:'10px 16px', borderRadius:10, fontSize:13, border:'1px solid #EF444440' }}>
-              ⚠️ {formErr}
+              ??️ {formErr}
             </div>
           )}
 
           {/* Avviso nessuno store */}
           {!loadingOpts && optsError && (
             <div style={{ background:'#F59E0B20', color:'#F59E0B', padding:'10px 16px', borderRadius:10, fontSize:13, border:'1px solid #F59E0B40' }}>
-              ⚠️ {optsError}
+              ??️ {optsError}
             </div>
           )}
 
@@ -284,10 +284,10 @@ function CreateModal({ onClose, onCreated }) {
             }}>
               {preview.count > 0 ? (
                 <>ℹ️ Con questi filtri la bolla includerà <strong>{preview.count}</strong> varianti prodotto
-                {!preview.warehouse_id ? <span style={{ color:'#F59E0B' }}> — ⚠️ Nessun magazzino configurato per questo store</span> : ''}.
+                {!preview.warehouse_id ? <span style={{ color:'#F59E0B' }}> — ??️ Nessun magazzino configurato per questo store</span> : ''}.
                 </>
               ) : (
-                <>⚠️ Nessun prodotto trovato con i filtri selezionati. Modifica i criteri di ricerca.</>
+                <>??️ Nessun prodotto trovato con i filtri selezionati. Modifica i criteri di ricerca.</>
               )}
             </div>
           )}
@@ -420,7 +420,7 @@ export default function InventoryBollePage() {
           borderRadius:10, padding:'14px 18px', marginBottom:20,
           color:'#FCA5A5', fontSize:14, display:'flex', alignItems:'center', gap:10
         }}>
-          <span style={{ fontSize:20 }}>⚠️</span>
+          <span style={{ fontSize:20 }}>??️</span>
           <span>{loadError}</span>
         </div>
       )}
@@ -451,7 +451,7 @@ export default function InventoryBollePage() {
         </div>
       ) : sessions.length === 0 ? (
         <div style={{ textAlign:'center', padding:60 }}>
-          <div style={{ fontSize:52, marginBottom:16 }}>📦</div>
+          <div style={{ fontSize:52, marginBottom:16 }}>??</div>
           <div style={{ fontSize:16, fontWeight:700, color:'var(--color-text)' }}>Nessuna bolla inventario</div>
           <div style={{ fontSize:13, color:'var(--color-text-tertiary)', marginTop:6 }}>
             {isAdmin ? 'Clicca "+ Crea Bolla" per iniziare.' : 'Nessun inventario assegnato al momento.'}
@@ -486,8 +486,8 @@ export default function InventoryBollePage() {
                 <div style={{ fontSize:12, color:'var(--color-text-tertiary)', display:'flex', gap:16, flexWrap:'wrap' }}>
                   {s.store_name && <span>🏪 {s.store_name}</span>}
                   {s.due_date && <span>⏰ Scad. {new Date(s.due_date).toLocaleDateString('it-IT')}</span>}
-                  {s.summary?.total !== undefined && <span>📦 {s.summary.total} prodotti</span>}
-                  {s.total_items  !== undefined && <span>📦 {s.total_items} prodotti</span>}
+                  {s.summary?.total !== undefined && <span>?? {s.summary.total} prodotti</span>}
+                  {s.total_items  !== undefined && <span>?? {s.total_items} prodotti</span>}
                 </div>
               </div>
 
@@ -542,7 +542,7 @@ export default function InventoryBollePage() {
                   onMouseEnter={e => e.currentTarget.style.background = '#EF444415'}
                   onMouseLeave={e => e.currentTarget.style.background = 'none'}
                 >
-                  {deletingId === s.id ? '⏳' : '🗑'}
+                  {deletingId === s.id ? '⏳' : '???'}
                 </button>
               )}
             </div>
