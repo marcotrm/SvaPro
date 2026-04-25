@@ -246,30 +246,81 @@ class SmartRestockingService
         if (!$centralWarehouse) {
             return ['suppliers' => [], 'total_suppliers' => 0, 'error' => 'Nessun deposito centrale'];
         }
+        // Magazzino Centrale usa una logica dinamica basata sui giorni di scorta:
+        // Considera lo stock totale della rete e le vendite degli ultimi 30 giorni.
+        $cutoff30 = now()->subDays(30)->toDateTimeString();
 
-        // Varianti sotto scorta nel deposito centrale
-        $deficits = DB::table('stock_items as si')
-            ->join('product_variants as pv', 'pv.id', '=', 'si.product_variant_id')
-            ->join('products as p', 'p.id', '=', 'pv.product_id')
-            ->leftJoin('brands as b', 'b.id', '=', 'p.brand_id')
-            ->where('si.warehouse_id', $centralWarehouse->id)
-            ->where('si.scorta_minima', '>', 0)
-            ->whereRaw('(si.on_hand - si.reserved) < si.scorta_minima')
-            ->select([
-                'si.product_variant_id',
-                'si.on_hand',
-                'si.reserved',
-                'si.scorta_minima',
-                'si.quantita_riordino_target',
-                'p.id as product_id',
-                'p.name as product_name',
-                'p.sku',
-                'p.brand_id',
-                'b.name as brand_name',
-                'pv.flavor',
-                'pv.cost_price',
-            ])
-            ->get();
+        $rows = DB::select("
+            WITH network_stock AS (
+                SELECT product_variant_id, SUM(on_hand - reserved) as total_available
+                FROM stock_items
+                WHERE tenant_id = :tid1
+                GROUP BY product_variant_id
+            ),
+            sales_30d AS (
+                SELECT sol.product_variant_id, SUM(sol.qty) as sold_qty
+                FROM sales_order_lines sol
+                JOIN sales_orders so ON so.id = sol.sales_order_id
+                WHERE so.tenant_id = :tid2
+                  AND so.status = 'paid'
+                  AND so.paid_at >= :c30
+                GROUP BY sol.product_variant_id
+            )
+            SELECT
+                pv.id as product_variant_id,
+                COALESCE(ns.total_available, 0) as total_available,
+                p.id as product_id,
+                p.name as product_name,
+                p.sku,
+                p.brand_id,
+                b.name as brand_name,
+                pv.flavor,
+                pv.cost_price,
+                COALESCE(sup.lead_time_medio, 7) as lead_time_medio,
+                COALESCE(s30.sold_qty, 0) as sold_30d
+            FROM product_variants pv
+            JOIN products p ON p.id = pv.product_id
+            LEFT JOIN brands b ON b.id = p.brand_id
+            LEFT JOIN network_stock ns ON ns.product_variant_id = pv.id
+            LEFT JOIN sales_30d s30 ON s30.product_variant_id = pv.id
+            LEFT JOIN suppliers sup ON sup.id = p.default_supplier_id
+            WHERE pv.tenant_id = :tid3
+        ", [
+            'tid1' => $tenantId,
+            'tid2' => $tenantId,
+            'c30'  => $cutoff30,
+            'tid3' => $tenantId
+        ]);
+
+        $deficits = collect();
+        foreach ($rows as $r) {
+            $sold30d = (int) $r->sold_30d;
+            $dailyBurn = $sold30d / 30.0;
+            
+            // Se non ci sono vendite, non facciamo riordini automatici per il deposito centrale.
+            if ($dailyBurn <= 0) continue; 
+
+            $leadTime = max(1, (int) $r->lead_time_medio);
+            $minDays = 20; // Giorni minimi di copertura
+            $maxDays = 30; // Giorni massimi target da ripristinare
+
+            $reorderPoint = (int) ceil(($leadTime + $minDays) * $dailyBurn);
+            $targetStock  = (int) ceil(($leadTime + $maxDays) * $dailyBurn);
+
+            $available = (int) $r->total_available; // Scorta totale rete
+
+            if ($available < $reorderPoint) {
+                $neededQty = max(0, $targetStock - $available);
+                if ($neededQty > 0) {
+                    // Mappiamo le property per renderle compatibili col resto del codice
+                    $r->on_hand = $available;
+                    $r->reserved = 0;
+                    $r->scorta_minima = $reorderPoint;
+                    $r->quantita_riordino_target = $targetStock;
+                    $deficits->push($r);
+                }
+            }
+        }
 
         if ($deficits->isEmpty()) {
             return ['suppliers' => [], 'total_suppliers' => 0, 'warehouse' => [
