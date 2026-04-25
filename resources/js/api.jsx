@@ -533,6 +533,15 @@ export const smartRestocking = {
   removeBrand:  (data)       => api.delete('/smart-restocking/brand-matrix', { data }),
 };
 
+// Stock Rules Engine APIs
+export const stockRules = {
+  getStoreGroups: () => api.get('/logistics/store-groups'),
+  saveStoreGroup: (data) => api.post('/logistics/store-groups', data),
+  deleteStoreGroup: (id) => api.delete(`/logistics/store-groups/${id}`),
+  getRules: () => api.get('/logistics/stock-rules'),
+  applyRule: (data) => api.post('/logistics/stock-rules/apply', data),
+};
+
 
 // Customer APIs
 export const customers = {

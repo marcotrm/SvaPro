@@ -338,6 +338,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'throttle:1000,1'])->group(function
         Route::put('/smart-restocking/brand-matrix', [SmartRestockingController::class, 'upsertBrandMatrix']);
         Route::delete('/smart-restocking/brand-matrix', [SmartRestockingController::class, 'removeBrandMatrix']);
 
+        // ── Stock Rules Engine ──────────────────────────────────────────────────
+        Route::get('/logistics/store-groups', [\App\Http\Controllers\Api\StockRulesController::class, 'getStoreGroups']);
+        Route::post('/logistics/store-groups', [\App\Http\Controllers\Api\StockRulesController::class, 'saveStoreGroup']);
+        Route::delete('/logistics/store-groups/{id}', [\App\Http\Controllers\Api\StockRulesController::class, 'deleteStoreGroup']);
+        Route::get('/logistics/stock-rules', [\App\Http\Controllers\Api\StockRulesController::class, 'getRules']);
+        Route::post('/logistics/stock-rules/apply', [\App\Http\Controllers\Api\StockRulesController::class, 'saveAndApplyRule']);
+
         Route::get('/tenants', [StoreController::class, 'tenants']);
         Route::get('/tenants/health', [StoreController::class, 'tenantHealth']);
         Route::get('/audit-logs', [AuditController::class, 'index']);

@@ -53,6 +53,7 @@ const DeliveryNotesPage    = lazy(() => import('./pages/DeliveryNotesPage.jsx'))
 const AdmPage              = lazy(() => import('./pages/AdmPage.jsx'));
 const AutomazioniPage      = lazy(() => import('./pages/AutomazioniPage.jsx'));
 const SmartRestockingPage  = lazy(() => import('./pages/SmartRestockingPage.jsx'));
+const StockRulesPage       = lazy(() => import('./pages/StockRulesPage.jsx'));
 const StoreRevenuePage     = lazy(() => import('./pages/StoreRevenuePage.jsx'));
 const StoreDeliveriesPage  = lazy(() => import('./pages/StoreDeliveriesPage.jsx'));
 const DriverDeliveriesPage = lazy(() => import('./pages/DriverDeliveriesPage.jsx'));
@@ -198,6 +199,7 @@ export default function App() {
               <Route path="/automazioni" element={<AutomazioniPage />} />
               <Route path="/smart-restocking" element={<SmartRestockingPage />} />
               <Route path="/warehouse/store-deliveries" element={<StoreDeliveriesPage />} />
+              <Route path="/logistics/stock-rules" element={<StockRulesPage />} />
 
             </Route>
           </Route>

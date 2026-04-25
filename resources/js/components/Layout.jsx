@@ -15,7 +15,7 @@ import {
   PanelLeftClose, PanelLeftOpen, Link, Fingerprint, Store, AlertCircle,
   LayoutDashboard, ShoppingCart, Megaphone, HandCoins,
   Menu, X, Home, ChevronRight as ChevRight, Calendar, FileSpreadsheet, Zap,
-  RefreshCw
+  RefreshCw, Layers
 } from 'lucide-react';
 
 
@@ -48,6 +48,7 @@ const allNavigation = [
   // 5. Acquisti / Fornitori Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   { section: 'Acquisti / Fornitori', icon: ShoppingCart, items: [
     { label: '⚡ Controllo Riordini',  href: '/smart-restocking', icon: Zap,      roles: ['superadmin','admin_cliente','store_manager'] },
+    { label: 'Regole di Stock',        href: '/logistics/stock-rules', icon: Layers, roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Ordini Fornitori (PO)',  href: '/purchase-orders',   icon: Receipt,  roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Ricezione Merce',        href: '/store-loading',     icon: Package,  roles: ['superadmin','admin_cliente','store_manager'] },
     { label: 'Anagrafica Fornitori',   href: '/suppliers',         icon: Truck,    roles: ['superadmin','admin_cliente','store_manager'] },
