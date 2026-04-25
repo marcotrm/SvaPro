@@ -335,7 +335,7 @@ class SmartRestockingService
             ]];
         }
 
-        // Mappa brand_id → supplier_id primario
+        // Mappa brand_id → supplier_id 
         $brandIds = $deficits->pluck('brand_id')->filter()->unique()->all();
         $brandSupplierMap = [];
 
@@ -344,15 +344,18 @@ class SmartRestockingService
                 ->join('suppliers as s', 's.id', '=', 'bs.supplier_id')
                 ->where('bs.tenant_id', $tenantId)
                 ->whereIn('bs.brand_id', $brandIds)
-                ->where('bs.is_primario', true)
-                ->select('bs.brand_id', 'bs.supplier_id', 's.name as supplier_name', 's.email as supplier_email')
+                ->select('bs.brand_id', 'bs.supplier_id', 'bs.is_primario', 's.name as supplier_name', 's.email as supplier_email')
                 ->get();
 
             foreach ($mappings as $m) {
-                $brandSupplierMap[$m->brand_id] = [
+                if (!isset($brandSupplierMap[$m->brand_id])) {
+                    $brandSupplierMap[$m->brand_id] = [];
+                }
+                $brandSupplierMap[$m->brand_id][] = [
                     'supplier_id'    => $m->supplier_id,
                     'supplier_name'  => $m->supplier_name,
                     'supplier_email' => $m->supplier_email,
+                    'is_primario'    => (bool) $m->is_primario,
                 ];
             }
         }
@@ -365,47 +368,44 @@ class SmartRestockingService
             ->select('p.brand_id', 'p.default_supplier_id as supplier_id', 's.name as supplier_name', 's.email as supplier_email')
             ->get();
 
-        // Raggruppa per fornitore
-        $bySupplier = [];
+        // Raggruppa per BRAND
+        $byBrand = [];
 
         foreach ($deficits as $d) {
             $available = max(0, $d->on_hand - $d->reserved);
             $neededQty = max(0, ($d->quantita_riordino_target > 0 ? $d->quantita_riordino_target : $d->scorta_minima) - $available);
             if ($neededQty <= 0) continue;
 
-            // Cerca fornitore: brand_suppliers → default_supplier
-            $sup = $brandSupplierMap[$d->brand_id] ?? null;
-            if (!$sup) {
-                $fallback = $defaultSupplierIds->firstWhere('brand_id', $d->brand_id);
-                $sup = $fallback ? [
-                    'supplier_id'    => $fallback->supplier_id,
-                    'supplier_name'  => $fallback->supplier_name,
-                    'supplier_email' => $fallback->supplier_email,
-                ] : [
-                    'supplier_id'    => null,
-                    'supplier_name'  => 'Fornitore non mappato',
-                    'supplier_email' => null,
-                ];
-            }
+            $brandKey = $d->brand_id ?? 'unbranded';
 
-            $key = $sup['supplier_id'] ?? 'unmapped';
-            if (!isset($bySupplier[$key])) {
-                $bySupplier[$key] = [
-                    'supplier_id'    => $sup['supplier_id'],
-                    'supplier_name'  => $sup['supplier_name'],
-                    'supplier_email' => $sup['supplier_email'] ?? null,
-                    'lines'          => [],
-                    'total_value'    => 0.0,
-                    // Eventuale PO bozza esistente per questo fornitore
-                    'draft_po_id'    => $sup['supplier_id']
-                        ? $this->getExistingDraftPo($tenantId, (int) $sup['supplier_id'])
-                        : null,
+            if (!isset($byBrand[$brandKey])) {
+                $mappedSuppliers = $brandSupplierMap[$d->brand_id] ?? [];
+                
+                // Se non c'è mapping, proviamo col default
+                if (empty($mappedSuppliers)) {
+                    $fallback = $defaultSupplierIds->firstWhere('brand_id', $d->brand_id);
+                    if ($fallback) {
+                        $mappedSuppliers[] = [
+                            'supplier_id'    => $fallback->supplier_id,
+                            'supplier_name'  => $fallback->supplier_name,
+                            'supplier_email' => $fallback->supplier_email,
+                            'is_primario'    => true, // come fallback
+                        ];
+                    }
+                }
+
+                $byBrand[$brandKey] = [
+                    'brand_id'         => $d->brand_id,
+                    'brand_name'       => $d->brand_name ?? 'Senza Marchio',
+                    'mapped_suppliers' => $mappedSuppliers,
+                    'lines'            => [],
+                    'total_value'      => 0.0,
                 ];
             }
 
             $lineValue = round((float) $d->cost_price * $neededQty, 2);
 
-            $bySupplier[$key]['lines'][] = [
+            $byBrand[$brandKey]['lines'][] = [
                 'product_variant_id' => $d->product_variant_id,
                 'product_name'       => $d->product_name . ($d->flavor ? " ({$d->flavor})" : ''),
                 'sku'                => $d->sku,
@@ -417,16 +417,13 @@ class SmartRestockingService
                 'line_value'         => $lineValue,
             ];
 
-            $bySupplier[$key]['total_value'] += $lineValue;
+            $byBrand[$brandKey]['total_value'] += $lineValue;
         }
-
-        // Ordina: unmapped alla fine
-        uasort($bySupplier, fn($a, $b) => is_null($a['supplier_id']) <=> is_null($b['supplier_id']));
 
         return [
             'warehouse'       => ['id' => $centralWarehouse->id, 'name' => $centralWarehouse->name],
-            'suppliers'       => array_values($bySupplier),
-            'total_suppliers' => count($bySupplier),
+            'brands'          => array_values($byBrand),
+            'total_brands'    => count($byBrand),
         ];
     }
 

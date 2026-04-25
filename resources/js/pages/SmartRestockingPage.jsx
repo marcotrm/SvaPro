@@ -115,7 +115,8 @@ function DepotTab() {
   const [error, setError]       = useState(null);
   const [expanded, setExpanded] = useState({});
   const [editQty, setEditQty]   = useState({});
-  const [generating, setGen]    = useState({});
+  const [selectedSuppliers, setSelectedSuppliers] = useState({});
+  const [generating, setGen]    = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -123,15 +124,22 @@ function DepotTab() {
       const res = await smartRestocking.depotNeeds();
       const d = res.data?.data || null;
       setData(d);
-      // Init editQty con valori di default
-      if (d?.suppliers) {
-        const init = {};
-        d.suppliers.forEach(sup => {
-          sup.lines.forEach(l => {
-            init[`${sup.supplier_id}_${l.product_variant_id}`] = l.needed_qty;
+      
+      if (d?.brands) {
+        const initQty = {};
+        const initSuppliers = {};
+        d.brands.forEach(b => {
+          b.lines.forEach(l => {
+            initQty[`${b.brand_id}_${l.product_variant_id}`] = l.needed_qty;
           });
+          // Seleziona il fornitore primario se c'è, altrimenti il primo
+          if (b.mapped_suppliers?.length > 0) {
+             const prim = b.mapped_suppliers.find(s => s.is_primario);
+             initSuppliers[b.brand_id] = prim ? prim.supplier_id : b.mapped_suppliers[0].supplier_id;
+          }
         });
-        setEditQty(init);
+        setEditQty(initQty);
+        setSelectedSuppliers(initSuppliers);
       }
     } catch (e) { setError(e?.message || 'Errore caricamento'); }
     finally { setLoading(false); }
@@ -139,24 +147,47 @@ function DepotTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  const generatePo = async (sup) => {
-    setGen(p => ({ ...p, [sup.supplier_id]: true }));
+  const generateBulkPo = async () => {
+    setGen(true);
     try {
-      const lines = sup.lines.map(l => ({
-        product_variant_id: l.product_variant_id,
-        qty:       editQty[`${sup.supplier_id}_${l.product_variant_id}`] ?? l.needed_qty,
-        unit_cost: l.cost_price,
-      }));
-      await smartRestocking.generatePo({ supplier_id: sup.supplier_id, lines });
-      alert(`Ordine generato per ${sup.supplier_name}!`);
+      // Raggruppa le righe per supplier_id selezionato
+      const bySup = {};
+      data.brands.forEach(b => {
+        const supId = selectedSuppliers[b.brand_id];
+        if (!supId) return; // Ignora se non ha selezionato un fornitore
+        
+        if (!bySup[supId]) bySup[supId] = [];
+        
+        b.lines.forEach(l => {
+           bySup[supId].push({
+             product_variant_id: l.product_variant_id,
+             qty: editQty[`${b.brand_id}_${l.product_variant_id}`] ?? l.needed_qty,
+             unit_cost: l.cost_price,
+           });
+        });
+      });
+
+      const supIds = Object.keys(bySup);
+      if (supIds.length === 0) {
+        alert('Nessun fornitore selezionato per i marchi da riordinare.');
+        setGen(false);
+        return;
+      }
+
+      // Esegui sequenzialmente le chiamate API
+      for (const supId of supIds) {
+         await smartRestocking.generatePo({ supplier_id: parseInt(supId), lines: bySup[supId] });
+      }
+
+      alert(`Generati ${supIds.length} ordini d'acquisto accorpati!`);
       await load();
     } catch (e) { alert('Errore generazione PO: ' + e?.message); }
-    finally { setGen(p => ({ ...p, [sup.supplier_id]: false })); }
+    finally { setGen(false); }
   };
 
   if (loading) return <div style={styles.center}>Analisi fabbisogno deposito in corso…</div>;
   if (error)   return <div style={styles.errBox}><AlertTriangle size={15}/> {error}</div>;
-  if (!data?.suppliers?.length) return (
+  if (!data?.brands?.length) return (
     <div style={styles.emptyBox}>
       <CheckCircle size={40} color="#10b981" style={{ marginBottom: 12 }}/>
       <div style={{ fontWeight: 700, fontSize: 15, color: '#065f46' }}>Il deposito è ben rifornito</div>
@@ -164,41 +195,68 @@ function DepotTab() {
     </div>
   );
 
+  const totalValueOverall = data.brands.reduce((sum, b) => {
+    return sum + b.lines.reduce((s, l) => {
+      return s + (editQty[`${b.brand_id}_${l.product_variant_id}`] ?? l.needed_qty) * l.cost_price;
+    }, 0);
+  }, 0);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {data.warehouse && (
-        <div style={{ padding: '10px 16px', background: 'rgba(16,185,129,0.07)', borderRadius: 10, fontSize: 12, color: '#065f46', fontWeight: 700, border: '1px solid rgba(16,185,129,0.2)' }}>
-          🏭 Deposito analizzato: {data.warehouse.name}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(16,185,129,0.07)', borderRadius: 10, border: '1px solid rgba(16,185,129,0.2)' }}>
+          <div style={{ fontSize: 12, color: '#065f46', fontWeight: 700 }}>
+            🏭 Deposito analizzato: {data.warehouse.name}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#10b981' }}>Totale Bozza: {fmt(totalValueOverall)}</span>
+            <button onClick={generateBulkPo} disabled={generating}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: generating ? '#94a3b8' : '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 800, boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}>
+              <Package size={14}/> {generating ? 'Generazione in corso…' : 'Genera Ordini Accorpati'}
+            </button>
+          </div>
         </div>
       )}
-      {data.suppliers.map(sup => {
-        const isOpen = expanded[sup.supplier_id ?? 'unmapped'];
-        const totalEdit = sup.lines.reduce((s, l) => {
-          const q = editQty[`${sup.supplier_id}_${l.product_variant_id}`] ?? l.needed_qty;
+      {data.brands.map(brand => {
+        const isOpen = expanded[brand.brand_id ?? 'unbranded'];
+        const totalEdit = brand.lines.reduce((s, l) => {
+          const q = editQty[`${brand.brand_id}_${l.product_variant_id}`] ?? l.needed_qty;
           return s + q * l.cost_price;
         }, 0);
-        const isMapped = !!sup.supplier_id;
+        const mapped = brand.mapped_suppliers || [];
+        const currentSup = selectedSuppliers[brand.brand_id];
+
         return (
-          <div key={sup.supplier_id ?? 'unmapped'} style={{ background: 'var(--color-surface)', borderRadius: 18, border: `1.5px solid ${isMapped ? 'rgba(16,185,129,0.2)' : '#fca5a5'}`, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', padding: '16px 20px', cursor: 'pointer', gap: 14 }} onClick={() => setExpanded(p => ({ ...p, [sup.supplier_id ?? 'unmapped']: !isOpen }))}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: isMapped ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <ShoppingBag size={20} color={isMapped ? '#10b981' : '#ef4444'}/>
+          <div key={brand.brand_id ?? 'unbranded'} style={{ background: 'var(--color-surface)', borderRadius: 18, border: `1.5px solid ${currentSup ? 'rgba(99,102,241,0.2)' : '#fca5a5'}`, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '16px 20px', cursor: 'pointer', gap: 14 }} onClick={() => setExpanded(p => ({ ...p, [brand.brand_id ?? 'unbranded']: !isOpen }))}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: currentSup ? 'rgba(99,102,241,0.1)' : 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <ShoppingBag size={20} color={currentSup ? '#6366f1' : '#ef4444'}/>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--color-text)' }}>{sup.supplier_name}</div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--color-text)' }}>{brand.brand_name}</div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-                  {sup.lines.length} referenze · Valore stimato <strong style={{ color: '#10b981' }}>{fmt(totalEdit)}</strong>
+                  {brand.lines.length} referenze in riordino · Valore stimato <strong style={{ color: '#6366f1' }}>{fmt(totalEdit)}</strong>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {isMapped && (
-                  <button onClick={e => { e.stopPropagation(); generatePo(sup); }} disabled={generating[sup.supplier_id]}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: generating[sup.supplier_id] ? '#94a3b8' : '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-                    <Package size={13}/> {generating[sup.supplier_id] ? 'Generando…' : sup.draft_po_id ? 'Rigenera Ordine' : 'Genera Ordine'}
-                  </button>
-                )}
-                {!isMapped && <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 700 }}>⚠ Fornitore non mappato</span>}
-                {isOpen ? <ChevronUp size={16} color="#94a3b8"/> : <ChevronDown size={16} color="#94a3b8"/>}
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                   <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>Fornitore Scelto:</span>
+                   <select 
+                     value={currentSup || ''} 
+                     onChange={e => setSelectedSuppliers(p => ({ ...p, [brand.brand_id]: e.target.value ? parseInt(e.target.value) : null }))}
+                     style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 12, fontWeight: 700, color: 'var(--color-text)', background: 'var(--color-bg)', outline: 'none' }}
+                   >
+                     <option value="">-- Seleziona Fornitore --</option>
+                     {mapped.map(s => (
+                       <option key={s.supplier_id} value={s.supplier_id}>
+                         {s.is_primario ? '⭐ ' : ''}{s.supplier_name}
+                       </option>
+                     ))}
+                   </select>
+                </div>
+                <div onClick={() => setExpanded(p => ({ ...p, [brand.brand_id ?? 'unbranded']: !isOpen }))} style={{ cursor: 'pointer', padding: 4 }}>
+                   {isOpen ? <ChevronUp size={16} color="#94a3b8"/> : <ChevronDown size={16} color="#94a3b8"/>}
+                </div>
               </div>
             </div>
             {isOpen && (
@@ -206,19 +264,18 @@ function DepotTab() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: 'var(--color-bg)' }}>
-                      {['Prodotto','Brand','Disp.','Soglia','Q.tà Ordine','Costo/u','Totale riga'].map(h => (
+                      {['Prodotto','Disp.','Soglia','Q.tà Ordine','Costo/u','Totale riga'].map(h => (
                         <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--color-text-secondary)', fontSize: 11, borderBottom: '1px solid var(--color-border)' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {sup.lines.map((line, i) => {
-                      const qKey = `${sup.supplier_id}_${line.product_variant_id}`;
+                    {brand.lines.map((line, i) => {
+                      const qKey = `${brand.brand_id}_${line.product_variant_id}`;
                       const qty  = editQty[qKey] ?? line.needed_qty;
                       return (
                         <tr key={i} style={{ borderBottom: '1px solid var(--color-border)' }}>
                           <td style={{ padding: '9px 14px', fontWeight: 600 }}>{line.product_name}<br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{line.sku}</span></td>
-                          <td style={{ padding: '9px 14px', color: '#64748b', fontSize: 12 }}>{line.brand_name || '—'}</td>
                           <td style={{ padding: '9px 14px', color: '#ef4444', fontWeight: 700 }}>{line.available} pz</td>
                           <td style={{ padding: '9px 14px', color: '#64748b' }}>{line.scorta_minima} pz</td>
                           <td style={{ padding: '9px 14px' }}>
